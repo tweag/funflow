@@ -27,6 +27,7 @@ type PureCtx = M.Map T.Text Value
 
 type FlowM a = StateT (Freshers, PureCtx) IO a
 
+initFlow :: (Freshers, PureCtx)
 initFlow = (genFreshersPrefixed "", M.empty)
 
 fresh :: FlowM T.Text
@@ -72,3 +73,16 @@ resumeFlow (Name n' f) x = do
   case mv of
     Nothing -> puttingSym n =<< resumeFlow f x
     Just y -> return y
+resumeFlow (Step f) x = do
+  n <- fresh
+  mv <- lookupSym n
+  case mv of
+    Nothing -> puttingSym n =<< lift (f x)
+    Just y -> return y
+resumeFlow (Arr f) x = return $ f x
+resumeFlow (Compose f g) x = do
+  y <- resumeFlow f x
+  resumeFlow g y
+resumeFlow (First f) (x,d) = do
+  y <- resumeFlow f x
+  return (y,d)
