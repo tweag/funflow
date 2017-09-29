@@ -4,16 +4,11 @@ module Control.FunFlow where
 
 import Control.FunFlow.Base
 
-import Control.Arrow
 import Data.Aeson
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-
-promptFor :: Read a => Flow String a
-promptFor = proc s -> do
-     () <- Step putStr -< (s++"> ")
-     s' <- Step (const getLine) -< ()
-     returnA -< read s'
+import Control.Monad.State.Strict
+import Data.Monoid ((<>))
 
 collectNames :: Flow a b -> [T.Text]
 collectNames (Name n f) = n : collectNames f
@@ -22,11 +17,58 @@ collectNames (Arr _) = []
 collectNames (Compose f g) = collectNames f ++ collectNames g
 collectNames (First f) = collectNames f
 
+-- | a fresh variable supply
+newtype Freshers = Freshers { unFreshers :: [T.Text] }
+
+genFreshersPrefixed :: T.Text -> Freshers
+genFreshersPrefixed p = Freshers $ map ((p<>) . T.pack . show) [(0::Int)..]
+
 type PureCtx = M.Map T.Text Value
 
-resumeFlow :: PureCtx -> Flow a b -> a -> IO (PureCtx, b)
-resumeFlow ctx (Name n f) x = case M.lookup n ctx of
-  Nothing -> do (nctx, y) <- resumeFlow ctx f x
-                return (M.insert n (toJSON y) nctx,y)
-  Just yv -> do let Success y = fromJSON yv
-                return (ctx, y)
+type FlowM a = StateT (Freshers, PureCtx) IO a
+
+initFlow = (genFreshersPrefixed "", M.empty)
+
+fresh :: FlowM T.Text
+fresh = do
+  (Freshers (f:fs), ctx) <- get
+  put $ (Freshers fs, ctx)
+  return f
+
+withFreshesPre :: T.Text -> FlowM a -> FlowM a
+withFreshesPre pre fm = do
+  (oldfs, ctx) <- get
+  let newfs = genFreshersPrefixed pre
+  put $ (newfs, ctx)
+  res <- fm
+  put $ (oldfs, ctx)
+  return res
+
+lookupSym :: FromJSON a => T.Text -> FlowM (Maybe a)
+lookupSym k = do
+  (_, ctx) <- get
+  case M.lookup k ctx of
+    Nothing -> return Nothing
+    Just yv -> case fromJSON yv of
+                Success y -> return $ Just y
+                Error _ -> return Nothing
+
+putSym :: ToJSON a => T.Text -> a -> FlowM ()
+putSym k x = do
+  (fs, ctx) <- get
+  put $ (fs, M.insert k (toJSON x) ctx)
+
+puttingSym :: ToJSON a => T.Text -> a -> FlowM a
+puttingSym n x = putSym n x >> return x
+
+
+runFlowM :: FlowM a -> IO a
+runFlowM fm = evalStateT fm initFlow
+
+resumeFlow :: Flow a b -> a -> FlowM b
+resumeFlow (Name n' f) x = do
+  n <- (n'<>) <$> fresh
+  mv <- lookupSym n
+  case mv of
+    Nothing -> puttingSym n =<< resumeFlow f x
+    Just y -> return y
