@@ -2,6 +2,7 @@
 
 import Control.FunFlow.Base
 import Control.FunFlow.Steps
+import Control.FunFlow.Pretty
 import Control.FunFlow.Exec.Local
 import Control.Arrow
 
@@ -20,3 +21,5 @@ flow2 = proc () -> do
 main :: IO ()
 main = do res <- runTillDone flow2 ()
           print res
+          putStrLn $ showFlow myFlow
+          putStrLn $ showFlow flow2
