@@ -1,4 +1,4 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections #-}
 
 module Control.FunFlow where
 
@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Control.Monad.State.Strict
 import Data.Monoid ((<>))
+import Control.Exception
 
 collectNames :: Flow a b -> [T.Text]
 collectNames (Name n f) = n : collectNames f
@@ -25,9 +26,11 @@ genFreshersPrefixed p = Freshers $ map ((p<>) . T.pack . show) [(0::Int)..]
 
 type PureCtx = M.Map T.Text Value
 
-type FlowM a = StateT (Freshers, PureCtx) IO a
+type FlowM a = StateT FlowST IO a
 
-initFlow :: (Freshers, PureCtx)
+type FlowST = (Freshers, PureCtx)
+
+initFlow :: FlowST
 initFlow = (genFreshersPrefixed "", M.empty)
 
 fresh :: FlowM T.Text
@@ -59,30 +62,48 @@ putSym k x = do
   (fs, ctx) <- get
   put $ (fs, M.insert k (toJSON x) ctx)
 
-puttingSym :: ToJSON a => T.Text -> a -> FlowM a
-puttingSym n x = putSym n x >> return x
+puttingSym :: ToJSON a => T.Text -> Either String a -> FlowM (Either String a)
+puttingSym _ (Left s) = return $ Left s
+puttingSym n (Right x) = putSym n x >> return (Right x)
 
 
-runFlowM :: FlowM a -> IO a
-runFlowM fm = evalStateT fm initFlow
+runFlowM :: FlowM a -> IO  a
+runFlowM fm =
+   evalStateT fm initFlow
 
-resumeFlow :: Flow a b -> a -> FlowM b
-resumeFlow (Name n' f) x = do
+
+runFlow :: Flow a b -> a -> IO (Either (String, FlowST) b)
+runFlow f ini = resumeFlow f ini initFlow
+
+resumeFlow :: Flow a b -> a -> FlowST -> IO (Either (String, FlowST) b)
+resumeFlow f ini flowst = do
+  (ex, st) <- runStateT (proceedFlow f ini) flowst
+  case ex of
+    Left err -> return $ Left (err,st)
+    Right x -> return $ Right x
+
+proceedFlow :: Flow a b -> a -> FlowM (Either String b)
+proceedFlow (Name n' f) x = do
   n <- (n'<>) <$> fresh
   mv <- lookupSym n
   case mv of
-    Nothing -> puttingSym n =<< resumeFlow f x
-    Just y -> return y
-resumeFlow (Step f) x = do
+    Just y -> return $ Right y
+    Nothing -> puttingSym n =<< proceedFlow f x
+
+proceedFlow (Step f) x = do
   n <- fresh
   mv <- lookupSym n
   case mv of
-    Nothing -> puttingSym n =<< lift (f x)
-    Just y -> return y
-resumeFlow (Arr f) x = return $ f x
-resumeFlow (Compose f g) x = do
-  y <- resumeFlow f x
-  resumeFlow g y
-resumeFlow (First f) (x,d) = do
-  y <- resumeFlow f x
-  return (y,d)
+    Just y -> return $ Right y
+    Nothing -> do
+      liftIO (fmap Right (f x) `catch` (\e -> return $ Left (show (e::SomeException))))
+
+proceedFlow (Arr f) x = return $ Right $ f x
+proceedFlow (Compose f g) x = do
+  ey <- proceedFlow f x
+  case ey of
+    Left s -> return $ Left s
+    Right y -> proceedFlow g y
+proceedFlow (First f) (x,d) = do
+  ey <- proceedFlow f x
+  return $ fmap (,d) ey
