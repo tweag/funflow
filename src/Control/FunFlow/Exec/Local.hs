@@ -6,6 +6,8 @@ import Control.FunFlow.Base
 import Control.FunFlow
 
 import Data.Aeson
+import Data.Either (lefts)
+import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Control.Monad.State.Strict
@@ -15,6 +17,7 @@ import Control.Exception
 
 type PureCtx = M.Map T.Text Value
 
+--sadly i seem unable to use a EitherT or ErrorT monad
 type FlowM a = StateT FlowST IO a
 
 type FlowST = (Freshers, PureCtx)
@@ -94,6 +97,12 @@ proceedFlow (Compose f g) x = do
   case ey of
     Left s -> return $ Left s
     Right y -> proceedFlow g y
+proceedFlow (Par f g) (x,y) = do
+  ew <- proceedFlow f x
+  ez <- proceedFlow g y
+  case (ew, ez) of
+    (Right w, Right z) -> return $ Right (w,z)
+    _ -> return $ Left $ intercalate " and also " $ lefts [ew] ++ lefts [ez]
 proceedFlow (First f) (x,d) = do
   ey <- proceedFlow f x
   return $ fmap (,d) ey
