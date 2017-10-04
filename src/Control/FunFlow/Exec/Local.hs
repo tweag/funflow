@@ -110,3 +110,10 @@ proceedFlow (Fanin f _) (Left x) = do
   proceedFlow f x
 proceedFlow (Fanin _ g) (Right x) = do
   proceedFlow g x
+proceedFlow (Fold fstep) (lst,acc) = go lst acc where
+  go [] y = return $ Right y
+  go (x:xs) y0 = do
+      ey1 <- proceedFlow fstep (x,y0)
+      case ey1 of
+        Left err -> return $ Left err
+        Right y1 -> go xs y1

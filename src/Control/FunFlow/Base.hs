@@ -17,6 +17,7 @@ data Flow a b where
   First   :: Flow b c -> Flow (b,d) (c,d)
   Par     :: Flow b c -> Flow b' c' -> Flow (b, b') (c, c')
   Fanin   :: Flow b d -> Flow c d -> Flow (Either b c) d
+  Fold    :: Flow (a,b) b -> Flow ([a],b) b
 
 instance Category Flow where
   id = Arr Prelude.id
@@ -58,3 +59,18 @@ runFlow (Fanin f _) (Left x) =
   runFlow f x
 runFlow (Fanin _ g) (Right x) =
   runFlow g x
+runFlow (Fold fstep) (lst, acc) = go lst acc where
+  go [] y = return y
+  go (x:xs) y0 = do
+      y1 <- runFlow fstep (x,y0)
+      go xs y1
+
+withBase :: a -> Flow (b,a) c -> Flow b c
+withBase x f = proc y -> do
+  z <- f -< (y,x)
+  returnA -< z
+
+mapF :: Flow a b -> Flow [a] [b]
+mapF f = withBase [] $ Fold $ proc (x,ys) -> do
+      y <- f -< x
+      returnA -< y:ys
