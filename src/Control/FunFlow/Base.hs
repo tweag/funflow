@@ -16,6 +16,7 @@ data Flow a b where
   Compose :: Flow a b -> Flow b c -> Flow a c
   First   :: Flow b c -> Flow (b,d) (c,d)
   Par     :: Flow b c -> Flow b' c' -> Flow (b, b') (c, c')
+  Fanin   :: Flow b d -> Flow c d -> Flow (Either b c) d
 
 instance Category Flow where
   id = Arr Prelude.id
@@ -28,6 +29,12 @@ instance Arrow Flow where
 
 instance Functor (Flow a) where
   fmap f flow = Compose flow (Arr f)
+
+instance ArrowChoice Flow where
+    left f = f +++ arr id
+    right f = arr id +++ f
+    f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
+    f ||| g = Fanin f g
 
 (<:) :: (FromJSON a,FromJSON b, ToJSON b) => Flow a b -> T.Text -> Flow a b
 f <: nm = Name nm f
@@ -47,3 +54,7 @@ runFlow (Par f g) (x,y) = do
   w <- runFlow f x
   z <- runFlow g y
   return (w,z)
+runFlow (Fanin f _) (Left x) =
+  runFlow f x
+runFlow (Fanin _ g) (Right x) =
+  runFlow g x

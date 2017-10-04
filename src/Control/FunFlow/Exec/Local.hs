@@ -106,3 +106,7 @@ proceedFlow (Par f g) (x,y) = do
 proceedFlow (First f) (x,d) = do
   ey <- proceedFlow f x
   return $ fmap (,d) ey
+proceedFlow (Fanin f _) (Left x) = do
+  proceedFlow f x
+proceedFlow (Fanin _ g) (Right x) = do
+  proceedFlow g x

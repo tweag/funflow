@@ -14,6 +14,7 @@ collectNames (Arr _) = []
 collectNames (Compose f g) = collectNames f ++ collectNames g
 collectNames (First f) = collectNames f
 collectNames (Par f g) = collectNames f ++ collectNames g
+collectNames (Fanin f g) = collectNames f ++ collectNames g
 
 
 -- | a fresh variable supply
