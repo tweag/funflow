@@ -20,6 +20,7 @@ collectNames (First f) = collectNames f
 
 -- | a fresh variable supply
 newtype Freshers = Freshers { unFreshers :: [T.Text] }
+  deriving Show
 
 genFreshersPrefixed :: T.Text -> Freshers
 genFreshersPrefixed p = Freshers $ map ((p<>) . T.pack . show) [(0::Int)..]
@@ -63,24 +64,29 @@ putSym k x = do
   put $ (fs, M.insert k (toJSON x) ctx)
 
 puttingSym :: ToJSON a => T.Text -> Either String a -> FlowM (Either String a)
-puttingSym _ (Left s) = return $ Left s
-puttingSym n (Right x) = putSym n x >> return (Right x)
+puttingSym _ l@(Left _) = return l
+puttingSym n r@(Right x) = putSym n x >> return r
 
 
 runFlowM :: FlowM a -> IO  a
 runFlowM fm =
    evalStateT fm initFlow
 
+runTillDone :: Flow a b -> a -> IO b
+runTillDone f x = go M.empty where
+  go st0 = do
+    ey <- resumeFlow f x st0
+    case ey of
+      Right y -> return y
+      Left (err, st1) -> do putStrLn $ "Flow failed with "++err
+                            go st1
 
-runFlow :: Flow a b -> a -> IO (Either (String, FlowST) b)
-runFlow f ini = resumeFlow f ini initFlow
-
-resumeFlow :: Flow a b -> a -> FlowST -> IO (Either (String, FlowST) b)
-resumeFlow f ini flowst = do
-  (ex, st) <- runStateT (proceedFlow f ini) flowst
+resumeFlow :: Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
+resumeFlow f ini ctx = do
+  (ex, st) <- runStateT (proceedFlow f ini) (genFreshersPrefixed "", ctx)
   case ex of
-    Left err -> return $ Left (err,st)
-    Right x -> return $ Right x
+    Left err -> return $ Left (err,snd st)
+    Right x ->  return $ Right x
 
 proceedFlow :: Flow a b -> a -> FlowM (Either String b)
 proceedFlow (Name n' f) x = do
@@ -96,7 +102,10 @@ proceedFlow (Step f) x = do
   case mv of
     Just y -> return $ Right y
     Nothing -> do
-      liftIO (fmap Right (f x) `catch` (\e -> return $ Left (show (e::SomeException))))
+      ey <- liftIO $ fmap Right (f x)
+                       `catch`
+                         (\e -> return $ Left (show (e::SomeException)))
+      puttingSym n ey
 
 proceedFlow (Arr f) x = return $ Right $ f x
 proceedFlow (Compose f g) x = do
