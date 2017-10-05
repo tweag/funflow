@@ -20,7 +20,7 @@ Individual effectful steps are created using the `Step` combinator:
 
 The inputs and the outputs have to be in the `Store` class defined in the `store` package. Many types are already defined in this type class so it is quite likely that you won't have to do any work in that respect. 
 
-Pure computations can be raised into workflows using the standard arrow combinators, for instance `arr :: (a -> b) -> Flow a b`. Pure computations turned into workflows in this way will not be cached in the same way as steps based on monadic functions declared using `Step`. This is because any type can be used in a pure computation, including types that are not in the `Store` type class and thus we don't know how to serialise them to a binary store. Therefore pure computations may needlessly be repeated of the workflow is restarted.
+Pure computations can be raised into workflows using the standard arrow combinators, for instance `arr :: (a -> b) -> Flow a b`. Pure computations turned into workflows in this way will not be cached in the same way as steps based on monadic functions declared using `Step`. This is because any type can be used in a pure computation, including types that are not in the `Store` type class and thus we don't know how to serialise them to a binary store. Therefore pure computations may needlessly be repeated if the workflow is restarted.
 
 If you would like to cache a pure computation in the same way as an effectful `Step`, you can give it a name:
 
@@ -29,7 +29,7 @@ If you would like to cache a pure computation in the same way as an effectful `S
 Both the input and the output types of named workflows are subject to the same restrictions as steps, that is they have to be in the Store type class. Naming workflows has two effects:
 
 * Named workflows are cached so they will not be repeated if the calculation is restarted. 
-* Names given to workflows when you are logging or visualising the dependency graph
+* Names given to workflows htlp when you are logging or visualising the dependency graph
 
 ## Wiring 
 
@@ -45,6 +45,8 @@ myFlow = proc () -> do
 ```
 
 Helper functions and some basic steps are given in the module [Control.FunFlow.Steps](https://github.com/glutamate/funflow/blob/master/src/Control/FunFlow/Steps.hs)
+
+You can implement your own retry logic (or use the simple one in the Control.FunFlow.Steps module) based on the elementary combinators for failure handling. See `Control.FunFlow.Steps.retry`.
 
 ## Execution engines
 
