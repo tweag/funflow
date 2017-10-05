@@ -54,4 +54,4 @@ Workflows can be executed in a variety of ways and you can define your own inter
 
 * A basic non-interruptible interpreter `runFlow` is given in [Control.FunFlow.Base](https://github.com/glutamate/funflow/blob/master/src/Control/FunFlow/Base.hs)
 * An interruptible and resumable interpreter where all state is stored in-process is given in [Control.FunFlow.Exec.Local](https://github.com/glutamate/funflow/blob/master/src/Control/FunFlow/Exec/Local.hs)
-* An execution engine based on Redis is given in[Control.FunFlow.Exec.Redis](https://github.com/glutamate/funflow/blob/master/src/Control/FunFlow/Exec/Redis.hs)
+* An execution engine based on Redis is given in [Control.FunFlow.Exec.Redis](https://github.com/glutamate/funflow/blob/master/src/Control/FunFlow/Exec/Redis.hs)
