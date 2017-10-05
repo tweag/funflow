@@ -15,6 +15,8 @@ collectNames (Compose f g) = collectNames f ++ collectNames g
 collectNames (First f) = collectNames f
 collectNames (Par f g) = collectNames f ++ collectNames g
 collectNames (Fanin f g) = collectNames f ++ collectNames g
+collectNames (Fold f) = collectNames f
+collectNames (Catch f h) = collectNames f ++ collectNames h
 
 
 -- | a fresh variable supply

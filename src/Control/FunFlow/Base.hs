@@ -8,6 +8,7 @@ import Prelude hiding ((.), id)
 import qualified Prelude
 import Data.Aeson
 import qualified Data.Text as T
+import Control.Exception (SomeException, catch)
 
 data Flow a b where
   Step    :: (FromJSON a,FromJSON b, ToJSON b) => (a -> IO b) -> Flow a b
@@ -18,6 +19,7 @@ data Flow a b where
   Par     :: Flow b c -> Flow b' c' -> Flow (b, b') (c, c')
   Fanin   :: Flow b d -> Flow c d -> Flow (Either b c) d
   Fold    :: Flow (a,b) b -> Flow ([a],b) b
+  Catch   :: Flow a b -> Flow (a,String) b -> Flow a b
 
 instance Category Flow where
   id = Arr Prelude.id
@@ -64,13 +66,5 @@ runFlow (Fold fstep) (lst, acc) = go lst acc where
   go (x:xs) y0 = do
       y1 <- runFlow fstep (x,y0)
       go xs y1
-
-withBase :: a -> Flow (b,a) c -> Flow b c
-withBase x f = proc y -> do
-  z <- f -< (y,x)
-  returnA -< z
-
-mapF :: Flow a b -> Flow [a] [b]
-mapF f = withBase [] $ Fold $ proc (x,ys) -> do
-      y <- f -< x
-      returnA -< y:ys
+runFlow (Catch f h) x =
+  runFlow f x `catch` (\e -> runFlow h (x,show (e::SomeException)))

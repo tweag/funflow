@@ -18,8 +18,13 @@ flow2 = proc () -> do
   r2 <- worstBernoulli -< 0.2
   returnA -< (r1,r2)
 
+flow3 :: Flow [Int] [Int]
+flow3 = mapF (arr (+1))
+
 main :: IO ()
 main = do res <- runTillDone flow2 ()
           print res
           putStrLn $ showFlow myFlow
           putStrLn $ showFlow flow2
+          res1 <- runFlow flow3 [1..10]
+          print res1

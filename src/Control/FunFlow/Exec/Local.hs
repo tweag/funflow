@@ -117,3 +117,9 @@ proceedFlow (Fold fstep) (lst,acc) = go lst acc where
       case ey1 of
         Left err -> return $ Left err
         Right y1 -> go xs y1
+proceedFlow (Catch f h) x = do
+  st <- get
+  ey <- proceedFlow f x
+  case ey of
+    Right y -> return $ Right y
+    Left err -> put st >> proceedFlow h (x,err)
