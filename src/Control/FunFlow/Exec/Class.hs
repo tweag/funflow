@@ -21,6 +21,9 @@ class MonadIO m => FlowM m  where
   getState :: m (FlowS m)
   restoreState :: FlowS m -> m ()
 
+  par :: m a -> m b -> m (a,b)
+  par mx my = liftM2 (,) mx my
+
 puttingSym :: (FlowM m, Store a) => T.Text -> Either String a -> m (Either String a)
 puttingSym _ l@(Left _) = return l
 puttingSym n r@(Right x) = putSym n x >> return r
@@ -51,8 +54,7 @@ proceedFlow (Compose f g) x = do
     Left s -> return $ Left s
     Right y -> proceedFlow g y
 proceedFlow (Par f g) (x,y) = do
-  ew <- proceedFlow f x
-  ez <- proceedFlow g y
+  (ew, ez) <- par (proceedFlow f x) (proceedFlow g y)
   case (ew, ez) of
     (Right w, Right z) -> return $ Right (w,z)
     _ -> return $ Left $ intercalate " and also " $ lefts [ew] ++ lefts [ez]

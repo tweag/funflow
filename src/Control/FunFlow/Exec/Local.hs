@@ -1,46 +1,42 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections,
+             TypeFamilies, GeneralizedNewtypeDeriving #-}
 
 module Control.FunFlow.Exec.Local where
 
 import Control.FunFlow.Base
 import Control.FunFlow
-
+import Control.FunFlow.Exec.Class
 import Data.Store
-import Data.Either (lefts)
-import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Control.Monad.State.Strict
-import Data.Monoid ((<>))
-import Control.Exception
 import Data.ByteString (ByteString)
 
+instance FlowM LFlowM where
+  type FlowS LFlowM = FlowST
+  fresh = lfresh
+  lookupSym = llookupSym
+  putSym = lputSym
+  getState = get
+  restoreState = put
 
 type PureCtx = M.Map T.Text ByteString
 
 --sadly i seem unable to use a EitherT or ErrorT monad
-type FlowM a = StateT FlowST IO a
+newtype LFlowM a = LFLowM { runLFlowM :: StateT FlowST IO a }
+  deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST)
 
 type FlowST = (Freshers, PureCtx)
 
-fresh :: FlowM T.Text
-fresh = do
+lfresh :: LFlowM T.Text
+lfresh = do
   (fs, ctx) <- get
   let (f,nfs) = popFreshers fs
   put (nfs, ctx)
   return f
 
-withFreshesPre :: T.Text -> FlowM a -> FlowM a
-withFreshesPre pre fm = do
-  (oldfs, ctx) <- get
-  let newfs = genFreshersPrefixed pre
-  put $ (newfs, ctx)
-  res <- fm
-  put $ (oldfs, ctx)
-  return res
-
-lookupSym :: Store a => T.Text -> FlowM (Maybe a)
-lookupSym k = do
+llookupSym :: Store a => T.Text -> LFlowM (Maybe a)
+llookupSym k = do
   (_, ctx) <- get
   case M.lookup k ctx of
     Nothing -> return Nothing
@@ -48,14 +44,11 @@ lookupSym k = do
                 Right y -> return $ Just y
                 Left _ -> return Nothing
 
-putSym :: Store a => T.Text -> a -> FlowM ()
-putSym k x = do
+lputSym :: Store a => T.Text -> a -> LFlowM ()
+lputSym k x = do
   (fs, ctx) <- get
   put $ (fs, M.insert k (encode x) ctx)
 
-puttingSym :: Store a => T.Text -> Either String a -> FlowM (Either String a)
-puttingSym _ l@(Left _) = return l
-puttingSym n r@(Right x) = putSym n x >> return r
 
 runTillDone :: Flow a b -> a -> IO b
 runTillDone f x = go M.empty where
@@ -68,59 +61,7 @@ runTillDone f x = go M.empty where
 
 resumeFlow :: Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
 resumeFlow f ini ctx = do
-  (ex, st) <- runStateT (proceedFlow f ini) (initFreshers, ctx)
+  (ex, st) <- runStateT (runLFlowM $ proceedFlow f ini) (initFreshers, ctx)
   case ex of
     Left err -> return $ Left (err,snd st)
     Right x ->  return $ Right x
-
-proceedFlow :: Flow a b -> a -> FlowM (Either String b)
-proceedFlow (Name n' f) x = do
-  n <- (n'<>) <$> fresh
-  mv <- lookupSym n
-  case mv of
-    Just y -> return $ Right y
-    Nothing -> puttingSym n =<< proceedFlow f x
-
-proceedFlow (Step f) x = do
-  n <- fresh
-  mv <- lookupSym n
-  case mv of
-    Just y -> return $ Right y
-    Nothing -> do
-      ey <- liftIO $ fmap Right (f x)
-                       `catch`
-                         (\e -> return $ Left (show (e::SomeException)))
-      puttingSym n ey
-
-proceedFlow (Arr f) x = return $ Right $ f x
-proceedFlow (Compose f g) x = do
-  ey <- proceedFlow f x
-  case ey of
-    Left s -> return $ Left s
-    Right y -> proceedFlow g y
-proceedFlow (Par f g) (x,y) = do
-  ew <- proceedFlow f x
-  ez <- proceedFlow g y
-  case (ew, ez) of
-    (Right w, Right z) -> return $ Right (w,z)
-    _ -> return $ Left $ intercalate " and also " $ lefts [ew] ++ lefts [ez]
-proceedFlow (First f) (x,d) = do
-  ey <- proceedFlow f x
-  return $ fmap (,d) ey
-proceedFlow (Fanin f _) (Left x) = do
-  proceedFlow f x
-proceedFlow (Fanin _ g) (Right x) = do
-  proceedFlow g x
-proceedFlow (Fold fstep) (lst,acc) = go lst acc where
-  go [] y = return $ Right y
-  go (x:xs) y0 = do
-      ey1 <- proceedFlow fstep (x,y0)
-      case ey1 of
-        Left err -> return $ Left err
-        Right y1 -> go xs y1
-proceedFlow (Catch f h) x = do
-  st <- get
-  ey <- proceedFlow f x
-  case ey of
-    Right y -> return $ Right y
-    Left err -> put st >> proceedFlow h (x,err)
