@@ -15,6 +15,8 @@ ppFlow (Par f g) = parens $ ppFlow f <+>  char '|' <+> ppFlow g
 ppFlow (Fanin f g) = parens $ ppFlow f <+>  text "|||" <+> ppFlow g
 ppFlow (First f) = text "first" <+> parens (ppFlow f)
 ppFlow (Fold _) = text "fold"
+ppFlow (Catch f h) = parens $ ppFlow f <+>  text "catch" <+> ppFlow h
+
 
 showFlow :: Flow a b -> String
 showFlow = render . ppFlow

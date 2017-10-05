@@ -6,14 +6,14 @@ import Control.Arrow
 import Control.Category
 import Prelude hiding ((.), id)
 import qualified Prelude
-import Data.Aeson
+import Data.Store
 import qualified Data.Text as T
 import Control.Exception (SomeException, catch)
 
 data Flow a b where
-  Step    :: (FromJSON a,FromJSON b, ToJSON b) => (a -> IO b) -> Flow a b
+  Step    :: (Store a, Store b) => (a -> IO b) -> Flow a b
   Arr     :: (a -> b) -> Flow a b
-  Name    :: (FromJSON a,FromJSON b, ToJSON b) => T.Text -> Flow a b -> Flow a b
+  Name    :: (Store a, Store b) => T.Text -> Flow a b -> Flow a b
   Compose :: Flow a b -> Flow b c -> Flow a c
   First   :: Flow b c -> Flow (b,d) (c,d)
   Par     :: Flow b c -> Flow b' c' -> Flow (b, b') (c, c')
@@ -39,7 +39,7 @@ instance ArrowChoice Flow where
     f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
     f ||| g = Fanin f g
 
-(<:) :: (FromJSON a,FromJSON b, ToJSON b) => Flow a b -> T.Text -> Flow a b
+(<:) :: (Store a, Store b) => Flow a b -> T.Text -> Flow a b
 f <: nm = Name nm f
 
 -- | Simple evaulation of a flow

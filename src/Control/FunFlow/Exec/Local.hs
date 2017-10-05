@@ -5,7 +5,7 @@ module Control.FunFlow.Exec.Local where
 import Control.FunFlow.Base
 import Control.FunFlow
 
-import Data.Aeson
+import Data.Store
 import Data.Either (lefts)
 import Data.List
 import qualified Data.Map.Strict as M
@@ -13,9 +13,10 @@ import qualified Data.Text as T
 import Control.Monad.State.Strict
 import Data.Monoid ((<>))
 import Control.Exception
+import Data.ByteString (ByteString)
 
 
-type PureCtx = M.Map T.Text Value
+type PureCtx = M.Map T.Text ByteString
 
 --sadly i seem unable to use a EitherT or ErrorT monad
 type FlowM a = StateT FlowST IO a
@@ -38,21 +39,21 @@ withFreshesPre pre fm = do
   put $ (oldfs, ctx)
   return res
 
-lookupSym :: FromJSON a => T.Text -> FlowM (Maybe a)
+lookupSym :: Store a => T.Text -> FlowM (Maybe a)
 lookupSym k = do
   (_, ctx) <- get
   case M.lookup k ctx of
     Nothing -> return Nothing
-    Just yv -> case fromJSON yv of
-                Success y -> return $ Just y
-                Error _ -> return Nothing
+    Just yv -> case decode yv of
+                Right y -> return $ Just y
+                Left _ -> return Nothing
 
-putSym :: ToJSON a => T.Text -> a -> FlowM ()
+putSym :: Store a => T.Text -> a -> FlowM ()
 putSym k x = do
   (fs, ctx) <- get
-  put $ (fs, M.insert k (toJSON x) ctx)
+  put $ (fs, M.insert k (encode x) ctx)
 
-puttingSym :: ToJSON a => T.Text -> Either String a -> FlowM (Either String a)
+puttingSym :: Store a => T.Text -> Either String a -> FlowM (Either String a)
 puttingSym _ l@(Left _) = return l
 puttingSym n r@(Right x) = putSym n x >> return r
 
