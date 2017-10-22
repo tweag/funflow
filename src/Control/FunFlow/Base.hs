@@ -8,10 +8,9 @@ import Prelude hiding ((.), id)
 import qualified Prelude
 import Data.Store
 import qualified Data.Text as T
-import Control.Exception (SomeException, catch)
 import GHC.Generics
 
-newtype MailBox = MaulBox { unMailBox :: T.Text }
+newtype MailBox = MailBox { unMailBox :: T.Text }
   deriving Generic
 
 type External a b = a -> MailBox -> IO ()
