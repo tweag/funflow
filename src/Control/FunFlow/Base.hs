@@ -15,12 +15,17 @@ import Data.ByteString (ByteString)
 newtype MailBox = MailBox { unMailBox :: T.Text }
   deriving Generic
 
+-- | a general facility for sending msgs. Can be created in different ways,
+-- see e.g. `newLocalPostOffice`.
+-- Some PostOffices may survive restart (e.g. backed by persistency). Of course you
+-- wont get the same object but the MailBox will in that case still be
+-- be routed to the right recipient. Other PostOffices will not survive process
+-- restart.
 data PostOffice = PostOffice
-  { reservePostBox :: MailBox -> IO ()
-  , send :: MailBox -> ByteString -> IO ()
-  , receive :: MailBox -> IO ByteString
+  { reservePostBox :: MailBox -> IO () -- invoked by receiver
+  , send :: MailBox -> ByteString -> IO () -- invoked by external
+  , receive :: MailBox -> IO ByteString -- invoked by receiver
   }
-
 
 type External a b = a -> PostOffice -> MailBox -> IO ()
 

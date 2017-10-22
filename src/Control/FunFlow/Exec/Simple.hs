@@ -34,18 +34,18 @@ newLocalPostOffice = do
       receive = \(MailBox nm)-> do
         p <- readIORef lpo
         case Map.lookup nm p of
-          Nothing -> fail $ "no mailbox with name" ++ T.unpack nm
+          Nothing -> fail $ "no mailbox with name " ++ T.unpack nm
           Just mv ->
             takeMVar mv
     }
 
 -- | Simple evaulation of a flow
 runFlow :: Flow a b -> a -> IO b
-runFlow f x = do po <- newLocalPostOffice
-                 runFlow' po f x
+runFlow f' x' = do po <- newLocalPostOffice
+                   runFlow' po f' x'
   where
     runFlow' :: PostOffice -> Flow a b -> a -> IO b
-    runFlow' po (Step f) x = f x
+    runFlow' _ (Step f) x = f x
     runFlow' po (Name _ f) x = runFlow' po f x
     runFlow' po (Compose f g) x = do
       y <- runFlow' po f x
@@ -53,7 +53,7 @@ runFlow f x = do po <- newLocalPostOffice
     runFlow' po (First f) (x,d) = do
       y <- runFlow' po f x
       return (y,d)
-    runFlow' po (Arr f) x = return $ f x
+    runFlow' _ (Arr f) x = return $ f x
     runFlow' po (Par f g) (x,y) = do
       w <- runFlow' po f x
       z <- runFlow' po g y
@@ -70,7 +70,9 @@ runFlow f x = do po <- newLocalPostOffice
     runFlow' po (Catch f h) x =
       runFlow' po f x `catch` (\e -> runFlow' po h (x,show (e::SomeException)))
     runFlow' po (Async ext) x = do
-      nm <- T.pack . show . hashUnique <$> newUnique
-      reservePostBox po (MailBox nm)
-      undefined
+      mbox <- MailBox . T.pack . show . hashUnique <$> newUnique
+      reservePostBox po mbox
+      ext x po mbox
+      Right y <- decode <$> receive po mbox
+      return y
 
