@@ -14,40 +14,34 @@ import Data.Store
 import Control.FunFlow.Base
 import Data.Unique
 
-type PostOffice = IORef (Map.Map T.Text (MVar BS.ByteString))
+type LocalPostOffice = IORef (Map.Map T.Text (MVar BS.ByteString))
 
-newPostOffice :: IO PostOffice
-newPostOffice = do
-  newIORef (Map.empty)
-
-reservePostBox :: PostOffice -> MailBox -> IO ()
-reservePostBox po (MailBox nm) = do
-  mv <- newEmptyMVar
-  modifyIORef po $ Map.insert nm mv
-
-goPostal :: Store a => PostOffice -> MailBox -> a -> IO ()
-goPostal po (MailBox nm) x = do
-  p <- readIORef po
-  case Map.lookup nm p of
-    Nothing -> do
-      mv <- newMVar $ encode x
-      modifyIORef po $ Map.insert nm mv
-    Just mv ->
-      putMVar mv $ encode x
-
-checkMail :: Store a => PostOffice -> MailBox -> IO a
-checkMail po (MailBox nm) = do
-  p <- readIORef po
-  case Map.lookup nm p of
-    Nothing -> fail $ "no mailbox with name" ++ T.unpack nm
-    Just mv ->
-      let fromR (Right x) = x in
-      fmap (fromR . decode) $ takeMVar mv
-
+newLocalPostOffice :: IO PostOffice
+newLocalPostOffice = do
+  lpo <- newIORef Map.empty
+  return $ PostOffice
+    { reservePostBox = \(MailBox nm)-> do
+        mv <- newEmptyMVar
+        modifyIORef lpo $ Map.insert nm mv,
+      send = \(MailBox nm) x-> do
+        p <- readIORef lpo
+        case Map.lookup nm p of
+          Nothing -> do
+            mv <- newMVar x
+            modifyIORef lpo $ Map.insert nm mv
+          Just mv ->
+            putMVar mv x,
+      receive = \(MailBox nm)-> do
+        p <- readIORef lpo
+        case Map.lookup nm p of
+          Nothing -> fail $ "no mailbox with name" ++ T.unpack nm
+          Just mv ->
+            takeMVar mv
+    }
 
 -- | Simple evaulation of a flow
 runFlow :: Flow a b -> a -> IO b
-runFlow f x = do po <- newPostOffice
+runFlow f x = do po <- newLocalPostOffice
                  runFlow' po f x
   where
     runFlow' :: PostOffice -> Flow a b -> a -> IO b

@@ -1,4 +1,4 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, DeriveGeneric #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, DeriveGeneric, ExistentialQuantification #-}
 
 module Control.FunFlow.Base where
 
@@ -9,11 +9,20 @@ import qualified Prelude
 import Data.Store
 import qualified Data.Text as T
 import GHC.Generics
+import Data.ByteString (ByteString)
+
 
 newtype MailBox = MailBox { unMailBox :: T.Text }
   deriving Generic
 
-type External a b = a -> MailBox -> IO ()
+data PostOffice = PostOffice
+  { reservePostBox :: MailBox -> IO ()
+  , send :: MailBox -> ByteString -> IO ()
+  , receive :: MailBox -> IO ByteString
+  }
+
+
+type External a b = a -> PostOffice -> MailBox -> IO ()
 
 data Flow a b where
   Step    :: Store b => (a -> IO b) -> Flow a b
@@ -25,7 +34,7 @@ data Flow a b where
   Fanin   :: Flow b d -> Flow c d -> Flow (Either b c) d
   Fold    :: Flow (a,b) b -> Flow ([a],b) b
   Catch   :: Flow a b -> Flow (a,String) b -> Flow a b
-  Async   :: External a b -> Flow a b
+  Async   :: Store b => External a b -> Flow a b
 
 instance Category Flow where
   id = Arr Prelude.id
