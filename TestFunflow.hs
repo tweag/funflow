@@ -4,6 +4,7 @@ import Control.FunFlow.Base
 import Control.FunFlow.Steps
 import Control.FunFlow.Pretty
 import Control.FunFlow.Exec.Local
+import Control.FunFlow.Exec.Simple
 import Control.Arrow
 
 
