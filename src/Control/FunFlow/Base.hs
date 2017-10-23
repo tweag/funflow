@@ -24,7 +24,8 @@ newtype MailBox = MailBox { unMailBox :: T.Text }
 data PostOffice = PostOffice
   { reservePostBox :: MailBox -> IO () -- invoked by receiver
   , send :: MailBox -> ByteString -> IO () -- invoked by external
-  , receive :: MailBox -> IO ByteString -- invoked by receiver
+  , awaitMail :: MailBox -> IO ByteString -- invoked by receive, blocking
+  , checkMail :: MailBox -> IO (Maybe ByteString) -- invoked by receive, nonblocking
   }
 
 type External a b = a -> PostOffice -> MailBox -> IO ()

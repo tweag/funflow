@@ -1,11 +1,9 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, DeriveGeneric #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, DeriveGeneric, ScopedTypeVariables #-}
 
 module Control.FunFlow.Exec.Simple where
 
-import Control.Arrow
 import qualified Data.Text as T
 import Control.Exception (SomeException, catch)
-import GHC.Generics
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import qualified Data.ByteString as BS
@@ -14,11 +12,10 @@ import Data.Store
 import Control.FunFlow.Base
 import Data.Unique
 
-type LocalPostOffice = IORef (Map.Map T.Text (MVar BS.ByteString))
-
 newLocalPostOffice :: IO PostOffice
 newLocalPostOffice = do
-  lpo <- newIORef Map.empty
+  lpo :: IORef (Map.Map T.Text (MVar BS.ByteString))
+      <- newIORef Map.empty
   return $ PostOffice
     { reservePostBox = \(MailBox nm)-> do
         mv <- newEmptyMVar
@@ -31,12 +28,18 @@ newLocalPostOffice = do
             modifyIORef lpo $ Map.insert nm mv
           Just mv ->
             putMVar mv x,
-      receive = \(MailBox nm)-> do
+      awaitMail = \(MailBox nm)-> do
         p <- readIORef lpo
         case Map.lookup nm p of
           Nothing -> fail $ "no mailbox with name " ++ T.unpack nm
           Just mv ->
-            takeMVar mv
+            takeMVar mv,
+      checkMail = \(MailBox nm)-> do
+        p <- readIORef lpo
+        case Map.lookup nm p of
+          Nothing -> return $ Nothing
+          Just mv ->
+            tryTakeMVar mv
     }
 
 -- | Simple evaulation of a flow
@@ -73,6 +76,6 @@ runFlow f' x' = do po <- newLocalPostOffice
       mbox <- MailBox . T.pack . show . hashUnique <$> newUnique
       reservePostBox po mbox
       ext x po mbox
-      Right y <- decode <$> receive po mbox
+      Right y <- decode <$> awaitMail po mbox
       return y
 
