@@ -22,7 +22,7 @@ newtype MailBox = MailBox { unMailBox :: T.Text }
 -- be routed to the right recipient. Other PostOffices will not survive process
 -- restart.
 data PostOffice = PostOffice
-  { reservePostBox :: MailBox -> IO () -- invoked by receiver
+  { reserveMailBox :: IO MailBox -- invoked by receiver
   , send :: MailBox -> ByteString -> IO () -- invoked by external
   , awaitMail :: MailBox -> IO ByteString -- invoked by receive, blocking
   , checkMail :: MailBox -> IO (Maybe ByteString) -- invoked by receive, nonblocking

@@ -17,9 +17,11 @@ newLocalPostOffice = do
   lpo :: IORef (Map.Map T.Text (MVar BS.ByteString))
       <- newIORef Map.empty
   return $ PostOffice
-    { reservePostBox = \(MailBox nm)-> do
+    { reserveMailBox = do
         mv <- newEmptyMVar
-        modifyIORef lpo $ Map.insert nm mv,
+        nm <- T.pack . show . hashUnique <$> newUnique
+        modifyIORef lpo $ Map.insert nm mv
+        return $ MailBox nm,
       send = \(MailBox nm) x-> do
         p <- readIORef lpo
         case Map.lookup nm p of
@@ -73,8 +75,7 @@ runFlow f' x' = do po <- newLocalPostOffice
     runFlow' po (Catch f h) x =
       runFlow' po f x `catch` (\e -> runFlow' po h (x,show (e::SomeException)))
     runFlow' po (Async ext) x = do
-      mbox <- MailBox . T.pack . show . hashUnique <$> newUnique
-      reservePostBox po mbox
+      mbox <- reserveMailBox po
       ext x po mbox
       Right y <- decode <$> awaitMail po mbox
       return y
