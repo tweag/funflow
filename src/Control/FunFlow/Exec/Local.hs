@@ -1,5 +1,5 @@
 {-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections,
-             TypeFamilies, GeneralizedNewtypeDeriving #-}
+             TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables #-}
 
 module Control.FunFlow.Exec.Local where
 
@@ -11,6 +11,7 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Control.Monad.State.Strict
 import Data.ByteString (ByteString)
+import Control.Monad.Except
 
 instance FlowM LFlowM where
   type FlowS LFlowM = FlowST
@@ -23,7 +24,7 @@ instance FlowM LFlowM where
 type PureCtx = M.Map T.Text ByteString
 
 --sadly i seem unable to use a EitherT or ErrorT monad
-newtype LFlowM a = LFLowM { runLFlowM :: StateT FlowST IO a }
+newtype LFlowM a = LFLowM { runLFlowM :: ExceptT String (StateT FlowST IO) a }
   deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST)
 
 type FlowST = (Freshers, PureCtx)
@@ -59,9 +60,9 @@ runTillDone f x = go M.empty where
       Left (err, st1) -> do putStrLn $ "Flow failed with "++err
                             go st1
 
-resumeFlow :: Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
+resumeFlow :: forall a b. Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
 resumeFlow f ini ctx = do
-  (ex, st) <- runStateT (runLFlowM $ proceedFlow f ini) (initFreshers, ctx)
-  case ex of
-    Left err -> return $ Left (err,snd st)
-    Right x ->  return $ Right x
+  (eres, st) <- runStateT (runExceptT $ runLFlowM $ proceedFlow f ini) (initFreshers, ctx)
+  case eres of
+    Left err ->  return $ Left (err, snd st)
+    Right res -> return $ Right res

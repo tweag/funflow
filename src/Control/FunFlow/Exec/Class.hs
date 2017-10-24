@@ -15,6 +15,7 @@ import Control.Monad.IO.Class ()
 
 class MonadIO m => FlowM m  where
   type FlowS m
+
   fresh :: m T.Text
   lookupSym :: Store a => T.Text -> m (Maybe a)
   putSym :: Store a => T.Text -> a -> m ()
