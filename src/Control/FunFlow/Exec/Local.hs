@@ -53,7 +53,7 @@ runTillDone f x = go M.empty where
       Left (err, st1) -> do putStrLn $ "Flow failed with "++err
                             go st1
 
-resumeFlow :: forall a b. Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
+resumeFlow :: Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
 resumeFlow f ini ctx = do
   (eres, st) <- runStateT (runExceptT $ runLFlowM $ proceedFlow f ini) (initFreshers, ctx)
   case eres of
