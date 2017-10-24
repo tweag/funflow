@@ -9,7 +9,6 @@ import Control.FunFlow
 import Data.Store
 import Data.Either (lefts)
 import Data.List
-import Control.FunFlow.Exec.Class
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DTE
@@ -18,14 +17,6 @@ import Data.Monoid ((<>))
 import Control.Exception
 import Data.ByteString (ByteString)
 import qualified Database.Redis as R
-
-instance FlowM RFlowM where
-  type FlowS RFlowM = FlowST
-  fresh = rfresh
-  lookupSym = rlookupSym
-  putSym = rputSym
-  getState = get
-  restoreState = put
 
 type PureCtx = M.Map T.Text ByteString
 type NameSpace = ByteString
