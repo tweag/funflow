@@ -17,6 +17,7 @@ import Data.Monoid ((<>))
 import Control.Exception
 import Data.ByteString (ByteString)
 import qualified Database.Redis as R
+import GHC.Conc
 
 type NameSpace = ByteString
 
@@ -69,9 +70,19 @@ redisPostOffice conn = PostOffice
     send = \(MailBox nm) bs -> R.runRedis conn $ do
       void $ R.set (DTE.encodeUtf8 nm) bs,
     checkMail = \(MailBox nm) -> R.runRedis conn $ do
-      fmap fromRight $ R.get (DTE.encodeUtf8 nm)
+      fmap fromRight $ R.get (DTE.encodeUtf8 nm),
+    awaitMail = \(MailBox nm) -> R.runRedis conn $ do
+      waitGet (DTE.encodeUtf8 nm) -- temp until we do pubsub
   }
 
+waitGet :: ByteString -> R.Redis ByteString
+waitGet k = do
+  emv <- R.get k
+  case emv of
+    Left r -> fail $ "redis fail "++ show r
+    Right (Nothing) -> do liftIO $ threadDelay 500000
+                          waitGet k
+    Right (Just v) -> return v
 
 
 
