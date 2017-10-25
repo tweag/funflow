@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE CPP #-}
 #if __GLASGOW_HASKELL__ >= 702
 {-# LANGUAGE Safe #-}
@@ -30,11 +31,11 @@ module Control.Monad.Result (
     -- * The ResultT monad transformer
     ResultT(ResultT),
     runResultT,
-    mapResultT,
+ --   mapResultT,
 
     -- * Exception operations
-    throwE,
-    catchE
+  --  throwE,
+  --  catchE
   ) where
 
 import Control.Monad.IO.Class
@@ -60,14 +61,19 @@ import Control.Concurrent.Async
 
 data Result e a
   = Ready !a
-  | Pending !(Async a)
+  | Pending !(Async (Result e a))
   | Error e
   deriving (Eq, Ord)
+
+runResult :: Result e a -> IO (Either e a)
+runResult (Ready a) = pure (Right a)
+runResult (Error e) = pure (Left e)
+runResult (Pending a) = join $ runResult <$> wait a
 
 instance Functor (Result e) where
     fmap f (Ready x) = Ready $ f x
     fmap f (Error e) = Error e
-    fmap f (Pending as) = Pending $ fmap f as
+    fmap f (Pending as) = Pending $ fmap (fmap f) as
 
 {-
 instance Applicative (Result e) where
@@ -98,47 +104,47 @@ foo af ax =  doIO $ do (f,x) <- waitBoth af ax
 -- value, while @>>=@ sequences two subcomputations, exiting on the
 -- first exception.
 
-newtype ResultT e m a = ResultT (m (Result e a))
+newtype ResultT e m a = ResultT { getResultT :: m (Result e (m a))}
 
 -- | The inverse of 'ResultT'.
-runResultT :: ResultT e m a -> m (Result e a)
-runResultT (ResultT m) = m
+runResultT :: MonadIO m => ResultT e m a -> m (Either e a)
+runResultT (ResultT f) = do
+  f >>= \case
+    Ready fm -> fmap Right fm
+    Error e  -> pure (Left e)
+    Pending f -> do
+      em <- liftIO (wait f)
+      runResultT (ResultT $ pure em)
 {-# INLINE runResultT #-}
 
--- | Map the unwrapped computation using the given function.
---
--- * @'runResultT' ('mapResultT' f m) = f ('runResultT' m)@
-mapResultT :: (m (Result e a) -> n (Result e' b))
-        -> ResultT e m a
-        -> ResultT e' n b
-mapResultT f m = ResultT $ f (runResultT m)
-{-# INLINE mapResultT #-}
-
--- | Transform any exceptions thrown by the computation using the
--- given function.
---withResultT :: (Functor m) => (e -> e') -> ResultT e m a -> ResultT e' m a
---withResultT f = mapResultT $ fmap $ either (Left . f) Right
-{- INLINE withResultT #-}
-
 instance (Functor m, MonadIO m) => Functor (ResultT e m) where
-    fmap f = ResultT . fmap (fmap f) . runResultT
-    {-# INLINE fmap #-}
+  fmap f = ResultT . fmap (fmap (fmap f)) . getResultT
+  {-# INLINE fmap #-}
 
 instance (Functor m, MonadIO m) => Applicative (ResultT e m) where
-    pure a = ResultT $ return (Ready a)
-    {-# INLINE pure #-}
-    ResultT f <*> ResultT v = ResultT $ do
-        mf <- f
-        case mf of
-            Error e -> return (Error e)
-            Ready k -> do
-                mv <- v
-                case mv of
-                    Error e -> return (Error e)
-                    Ready x -> return (Ready (k x))
-    {-# INLINEABLE (<*>) #-}
-    m *> k = m >>= \_ -> k
-    {-# INLINE (*>) #-}
+  pure = return
+  -- On the contrary to monad we don't have to wait for the asyncs
+  -- to complete, so we can create new Pending here.
+  af <*> av = ResultT $ do
+    f <- getResultT af
+    v <- getResultT av
+    case (f,v) of
+      (Error e, _) -> pure $ Error e
+      (_, Error e) -> pure $ Error e
+      (Ready k, Ready a) -> do
+         b <- k `ap` a
+         pure $ Ready (pure b)
+      (Pending af, Pending av) -> do
+        px <- liftIO $ async $ do
+          (mf, mv) <- liftIO $ concurrently (wait af >>= runResult)
+                                            (wait av >>= runResult)
+
+          pure $ case (mf, mv) of
+            (Left e,_) -> Error e
+            (_, Left e) -> Error e
+            (Right f, Right v) -> Ready $ f `ap` v
+        pure $ Pending px
+
 
 
 instance (MonadIO m) => Monad (ResultT e m) where
@@ -147,29 +153,38 @@ instance (MonadIO m) => Monad (ResultT e m) where
     {-# INLINE return #-}
 #endif
     m >>= k = ResultT $ do
-        a <- runResultT m
-        case a of
-            Error e -> return (Error e)
-            Ready x -> runResultT (k x)
-            Pending px -> do kx <- liftIO $ fmap k $ wait px
-                             runResultT (kx) -- where to call async?
-    {-# INLINE (>>=) #-}
+       a <- getResultT m
+       case a of
+         Ready fx -> fx >>= getResultT . k
+         Error e -> pure (Error e)
+         Pending px -> do
+           ea <- liftIO $ runResult =<< wait px
+           case ea of
+             Left e -> pure (Error e)
+             Right fa -> fa >>= getResultT . k
+
+    {-# INLINEABLE (>>=) #-}
     fail = ResultT . fail
     {-# INLINE fail #-}
 
+{-
 myWithAsync :: Async a -> (a -> IO b) -> IO (Async b)
 myWithAsync as f = async (f =<< wait as)
+-}
 
 
+{-
 foo :: (MonadIO m) => (a -> ResultT e m b) -> Async a -> ResultT e m b
 foo k px = ResultT $ do
     --return $ Pending $ do
     x <- liftIO $ fmap k $  wait px
 
     runResultT $  x
+    -}
 
 
 
+{-
 -- | Signal an exception value @e@.
 --
 -- * @'runResultT' ('throwE' e) = 'return' ('Left' e)@
@@ -195,5 +210,5 @@ m `catchE` h = ResultT $ do
         Error  l -> runResultT (h l)
         Ready r -> return (Ready r)
 {-# INLINE catchE #-}
-
+-}
 
