@@ -20,7 +20,6 @@ import qualified Database.Redis as R
 
 type NameSpace = ByteString
 
---sadly i seem unable to use a EitherT or ErrorT monad
 newtype RFlowM a = RFlowM { runRFlowM :: StateT FlowST R.Redis a }
   deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST)
 
@@ -31,7 +30,6 @@ redis r = do ex <- RFlowM $ lift r
              case ex of
                Left rply -> fail $ "redis: "++show rply
                Right x -> return x
-
 
 nameForKey :: T.Text -> RFlowM ByteString
 nameForKey k = do
@@ -45,23 +43,37 @@ fresh = do
 
 lookupSym ::  Store a => T.Text -> RFlowM (Maybe a)
 lookupSym k = do
-  mv <- RFlowM . lift . R.get  =<< nameForKey k
-  let process (Left _) = return Nothing
-      process (Right x) = do
-        return $ Just x
+  mv <- redis . R.get  =<< nameForKey k
   case mv of
-    Right (Just v) -> process $ decode v
+    Just v -> return $ eitherToMaybe $ decode v
     _ -> return Nothing
 
 eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe (Left _) = Nothing
 eitherToMaybe (Right x) = Just x
 
+fromRight :: Show a => Either a b -> b
+fromRight (Right x) = x
+fromRight (Left e) = error $ "fromRight: Left "++show e
 
 putSym :: Store a => T.Text -> a -> RFlowM ()
 putSym k x = do
   _ <- RFlowM . lift . (`R.set` (encode x)) =<< nameForKey k
   return ()
+
+redisPostOffice :: R.Connection -> PostOffice
+redisPostOffice conn = PostOffice
+  { reserveMailBox = R.runRedis conn $ do
+      n <- fmap fromRight $ R.incr "fffresh"
+      return $ MailBox $ T.pack $ show (n::Integer),
+    send = \(MailBox nm) bs -> R.runRedis conn $ do
+      void $ R.set (DTE.encodeUtf8 nm) bs,
+    checkMail = \(MailBox nm) -> R.runRedis conn $ do
+      fmap fromRight $ R.get (DTE.encodeUtf8 nm)
+  }
+
+
+
 
 {-
 runTillDone :: Flow a b -> a -> IO b
