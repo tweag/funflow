@@ -18,33 +18,36 @@ import Control.Exception
 import Data.ByteString (ByteString)
 import qualified Database.Redis as R
 
-type PureCtx = M.Map T.Text ByteString
 type NameSpace = ByteString
 
 --sadly i seem unable to use a EitherT or ErrorT monad
 newtype RFlowM a = RFlowM { runRFlowM :: StateT FlowST R.Redis a }
   deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST)
 
-type FlowST = (Freshers, PureCtx, NameSpace)
+type FlowST = (NameSpace)
+
+redis ::  R.Redis (Either R.Reply a) -> RFlowM a
+redis r = do ex <- RFlowM $ lift r
+             case ex of
+               Left rply -> fail $ "redis: "++show rply
+               Right x -> return x
+
 
 nameForKey :: T.Text -> RFlowM ByteString
 nameForKey k = do
-  (_,_,ns) <- get
+  (ns) <- get
   return $ ns <> "_" <> DTE.encodeUtf8 k
 
-rfresh :: RFlowM T.Text
-rfresh = do
-  (fs, ctx, ns) <- get
-  let (f,nfs) = popFreshers fs
-  put (nfs, ctx, ns)
-  return f
+fresh :: RFlowM T.Text
+fresh = do
+  n <- redis $ R.incr "fffresh"
+  return $ T.pack $ show (n::Integer)
 
-fetchSym ::  Store a => T.Text -> RFlowM (Maybe a)
-fetchSym k = do
+lookupSym ::  Store a => T.Text -> RFlowM (Maybe a)
+lookupSym k = do
   mv <- RFlowM . lift . R.get  =<< nameForKey k
   let process (Left _) = return Nothing
       process (Right x) = do
-        putLocal k x
         return $ Just x
   case mv of
     Right (Just v) -> process $ decode v
@@ -55,24 +58,10 @@ eitherToMaybe (Left _) = Nothing
 eitherToMaybe (Right x) = Just x
 
 
-rlookupSym :: Store a => T.Text -> RFlowM (Maybe a)
-rlookupSym k = do
-  (_, ctx, _) <- get
-  case M.lookup k ctx of
-    Nothing -> fetchSym k
-    Just yv -> case decode yv of
-                Right y -> return $ Just y
-                Left _ -> fetchSym k
-
-rputSym :: Store a => T.Text -> a -> RFlowM ()
-rputSym k x = do
+putSym :: Store a => T.Text -> a -> RFlowM ()
+putSym k x = do
   _ <- RFlowM . lift . (`R.set` (encode x)) =<< nameForKey k
-  putLocal k x
-
-putLocal :: Store a => T.Text -> a -> RFlowM ()
-putLocal k x = do
-  (fs, ctx, ns) <- get
-  put $ (fs, M.insert k (encode x) ctx, ns)
+  return ()
 
 {-
 runTillDone :: Flow a b -> a -> IO b
