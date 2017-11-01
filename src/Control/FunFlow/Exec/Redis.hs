@@ -1,5 +1,5 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections,
-       TypeFamilies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections, DeriveGeneric,
+       TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
 
 module Control.FunFlow.Exec.Redis where
 
@@ -16,8 +16,12 @@ import Control.Monad.State.Strict
 import Data.Monoid ((<>))
 import Control.Exception
 import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BS8
 import qualified Database.Redis as R
 import GHC.Conc
+import GHC.Generics
+import Lens.Micro
 
 type NameSpace = ByteString
 
@@ -25,6 +29,20 @@ newtype RFlowM a = RFlowM { runRFlowM :: StateT FlowST R.Redis a }
   deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST)
 
 type FlowST = (NameSpace)
+
+type JobId = Integer
+
+data JobStatus = JobDone | JobError String | JobRunning deriving Generic
+
+data Job a = Job
+  { jobId :: JobId
+  , taskName :: T.Text
+  , argument :: a
+  , jobStatus :: JobStatus
+  } deriving Generic
+
+instance Store JobStatus
+instance Store a => Store (Job a)
 
 redis ::  R.Redis (Either R.Reply a) -> RFlowM a
 redis r = do ex <- RFlowM $ lift r
@@ -65,7 +83,7 @@ putSym k x = do
 redisPostOffice :: R.Connection -> PostOffice
 redisPostOffice conn = PostOffice
   { reserveMailBox = R.runRedis conn $ do
-      n <- fmap fromRight $ R.incr "fffresh"
+      n <- fmap fromRight $ R.incr "pofresh"
       return $ MailBox $ T.pack $ show (n::Integer),
     send = \(MailBox nm) bs -> R.runRedis conn $ do
       void $ R.set (DTE.encodeUtf8 nm) bs,
@@ -74,32 +92,48 @@ redisPostOffice conn = PostOffice
     awaitMail = \(MailBox nm) -> R.runRedis conn $ do
       waitGet (DTE.encodeUtf8 nm) -- temp until we do pubsub
   }
+ where
+  waitGet :: ByteString -> R.Redis ByteString
+  waitGet k = do
+    emv <- R.get k
+    case emv of
+      Left r -> fail $ "redis fail "++ show r
+      Right (Nothing) -> do liftIO $ threadDelay 500000
+                            waitGet k
+      Right (Just v) -> return v
 
-waitGet :: ByteString -> R.Redis ByteString
-waitGet k = do
-  emv <- R.get k
-  case emv of
-    Left r -> fail $ "redis fail "++ show r
-    Right (Nothing) -> do liftIO $ threadDelay 500000
-                          waitGet k
-    Right (Just v) -> return v
+sparkJob :: Store a => T.Text -> a -> RFlowM JobId
+sparkJob nm x = do
+  jid :: JobId <- redis $ R.incr "jobfresh"
+  let job = Job jid nm x JobRunning
+  redis $ R.rpush "jobs_running" [encode jid]
+  redis $ R.set (BS8.pack $ "job_"++show jid) (encode job)
+  return jid
 
+resumeJobs :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
+resumeJobs allJobs = do
+  mjid <- redis $ R.lpop "jobs_running"
+  case mdecode mjid of
+    Left err -> return ()
+    Right (jid::JobId) -> do
+      mjob <- redis $ R.get (BS8.pack $ "job_"++show jid)
+      case mdecode mjob of
+        Left err -> return ()
+        Right (job :: Job a) -> do
+          --lookup job
+          --set namespace
+          --runJob
+          return ()
+  return ()
 
+getJobStatus :: Store b => JobId -> RFlowM (Either String b)
+getJobStatus jid = do
+  return undefined
 
-{-
-runTillDone :: Flow a b -> a -> IO b
-runTillDone f x = go M.empty where
-  go st0 = do
-    ey <- resumeFlow f x st0
-    case ey of
-      Right y -> return y
-      Left (err, st1) -> do putStrLn $ "Flow failed with "++err
-                            go st1
+runJob :: Flow a b -> a -> RFlowM ()
+runJob flow x = do
+  return ()
 
-resumeFlow :: Flow a b -> a -> PureCtx -> IO (Either (String, PureCtx) b)
-resumeFlow f ini ctx = do
-  (ex, st) <- runStateT (proceedFlow f ini) (initFreshers, ctx)
-  case ex of
-    Left err -> return $ Left (err,snd st)
-    Right x ->  return $ Right x
--}
+mdecode :: Store a => Maybe ByteString -> Either String a
+mdecode (Nothing) = Left "no value"
+mdecode (Just bs) = over _Left show $ decode bs
