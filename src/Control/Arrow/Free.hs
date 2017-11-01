@@ -1,3 +1,4 @@
+{-# LANGUAGE Arrows              #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE Rank2Types          #-}
@@ -12,10 +13,12 @@ module Control.Arrow.Free
   , effectChoice
   , evalChoice
   , mapA
+  , filterA
   ) where
 
 import           Control.Arrow
 import           Control.Category
+import           Data.Bool        (Bool)
 import           Data.Either      (Either (..))
 import           Data.Function    (const, flip, ($))
 import           Data.List        (uncons)
@@ -94,3 +97,17 @@ evalChoice f a = runChoice a f
 mapA :: ArrowChoice a => a b c -> a [b] [c]
 mapA f = arr (maybe (Left ()) Right . uncons)
       >>> (arr (const []) ||| ((f *** mapA f) >>> arr (uncurry (:))))
+
+-- | Filter a list given an arrow filter
+filterA :: ArrowChoice a => a b Bool -> a [b] [b]
+filterA f = proc xs -> do
+  case xs of
+    [] -> returnA -< []
+    (y:ys) -> do
+      b <- f -< y
+      if b then
+        (id *** filterA f >>> arr (uncurry (:))) -< (y,ys)
+      else
+        filterA f -< ys
+
+

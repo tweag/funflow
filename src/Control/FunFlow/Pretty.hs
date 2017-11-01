@@ -1,22 +1,23 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings #-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Control.FunFlow.Pretty where
 
-import Text.PrettyPrint
-import Control.FunFlow.Base
-import qualified Data.Text as T
+import           Control.FunFlow.Base
+import           Control.FunFlow.Diagram
+import qualified Data.Text               as T
+import           Text.PrettyPrint
 
 ppFlow :: Flow a b -> Doc
-ppFlow (Step _) = text "step"
-ppFlow (Name nm f) = text (T.unpack nm) <> parens (ppFlow f)
-ppFlow (Arr _) = text "arr"
-ppFlow (Compose f g) = parens $ ppFlow f <+>  text ">>>" <+> ppFlow g
-ppFlow (Par f g) = parens $ ppFlow f <+>  char '|' <+> ppFlow g
-ppFlow (Fanin f g) = parens $ ppFlow f <+>  text "|||" <+> ppFlow g
-ppFlow (First f) = text "first" <+> parens (ppFlow f)
-ppFlow (Fold _) = text "fold"
-ppFlow (Catch f h) = parens $ ppFlow f <+>  text "catch" <+> ppFlow h
-
+ppFlow = ppDiagram . toDiagram where
+  ppDiagram :: forall a b. Diagram a b -> Doc
+  ppDiagram (Node (NodeProperties (lbl:_)) _ _)    = text . T.unpack $ lbl
+  ppDiagram (Node _ _ _)    = text "unlabeled step"
+  ppDiagram (Seq f g) = parens $ ppDiagram f <+> text ">>>" <+> ppDiagram g
+  ppDiagram (Par f g) = parens $ ppDiagram f <+>  text "***" <+> ppDiagram g
+  ppDiagram (Fanin f g) = parens $ ppDiagram f <+>  text "|||" <+> ppDiagram g
 
 showFlow :: Flow a b -> String
 showFlow = render . ppFlow

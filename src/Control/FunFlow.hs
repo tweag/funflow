@@ -1,22 +1,25 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections       #-}
 
 module Control.FunFlow where
 
-import Control.FunFlow.Base
+import           Control.FunFlow.Base
+import           Control.FunFlow.Diagram
 
-import qualified Data.Text as T
-import Data.Monoid ((<>))
+import           Data.Monoid             ((<>))
+import qualified Data.Text               as T
 
 collectNames :: Flow a b -> [T.Text]
-collectNames (Name n f) = n : collectNames f
-collectNames (Step _) = []
-collectNames (Arr _) = []
-collectNames (Compose f g) = collectNames f ++ collectNames g
-collectNames (First f) = collectNames f
-collectNames (Par f g) = collectNames f ++ collectNames g
-collectNames (Fanin f g) = collectNames f ++ collectNames g
-collectNames (Fold f) = collectNames f
-collectNames (Catch f h) = collectNames f ++ collectNames h
+collectNames flow = collectNames' $ toDiagram flow
+  where
+    collectNames' :: forall a1 b1. Diagram a1 b1 -> [T.Text]
+    collectNames' (Node (NodeProperties lbls) _ _) = lbls
+    collectNames' (Seq a b) = collectNames' a ++ collectNames' b
+    collectNames' (Par a b) = collectNames' a ++ collectNames' b
+    collectNames' (Fanin a b) = collectNames' a ++ collectNames' b
 
 
 -- | a fresh variable supply
@@ -32,4 +35,5 @@ initFreshers = genFreshersPrefixed ""
 popFreshers :: Freshers -> (T.Text, Freshers)
 popFreshers (Freshers (f:fs)) = (f, Freshers fs)
 popFreshers _ = error "popFreshers ran out of names! please report this a bug"
+
 
