@@ -6,20 +6,20 @@
 module Control.FunFlow.External.Coordinator.Memory where
 
 import           Control.Concurrent.STM.TVar
+import           Control.FunFlow.ContentHashable      (ContentHash)
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.STM
-import           Data.List                            (lookup)
+import           Data.List                            (find)
 import qualified Data.Map.Strict                      as M
-import           Data.UUID.V4                         (nextRandom)
 import           System.Clock                         (fromNanoSecs)
 
 data MemoryCoordinator
 
 data MemHook = MemHook {
-    _mhTaskQueue      :: TVar [(TaskId, TaskDescription)]
-  , _mhExecutionQueue :: TVar (M.Map TaskId TaskInfo)
+    _mhTaskQueue      :: TVar [TaskDescription]
+  , _mhExecutionQueue :: TVar (M.Map ContentHash TaskInfo)
   }
 
 makeLenses ''MemHook
@@ -34,10 +34,8 @@ instance Coordinator MemoryCoordinator where
     return $ MemHook taskQueue executionQueue
 
   submitTask mh td = liftIO $ do
-    tid <- TaskId <$> nextRandom
     atomically $
-      modifyTVar (mh ^. mhTaskQueue) ((tid, td) : )
-    return tid
+      modifyTVar (mh ^. mhTaskQueue) (td : )
 
   queueSize mh = liftIO $ do
     queue <- atomically . readTVar $ mh ^. mhTaskQueue
@@ -50,22 +48,22 @@ instance Coordinator MemoryCoordinator where
       return (eq, tq)
     return $ case M.lookup tid eq of
       Just ti -> Just ti
-      Nothing -> case lookup tid tq of
-        Just td -> Just $ TaskInfo Pending (td ^. tdOutput)
+      Nothing -> case find ((==tid) . (^. tdOutput)) tq of
+        Just _ -> Just $ TaskInfo Pending
         Nothing -> Nothing
 
   popTask mh executor = let
       executionInfo = ExecutionInfo executor (fromNanoSecs 0)
-      mkTaskInfo td = TaskInfo (Running executionInfo) (td ^. tdOutput)
+      mkTaskInfo = TaskInfo (Running executionInfo)
     in liftIO . atomically $ do
         tq <- readTVar (mh ^. mhTaskQueue)
         case reverse tq of
           [] -> return Nothing
-          (x@(tid, td):xs) -> do
+          (td:xs) -> do
             writeTVar (mh ^. mhTaskQueue) xs
             modifyTVar (mh ^. mhExecutionQueue) $ \eq ->
-              M.insert tid (mkTaskInfo td) eq
-            return $ Just x
+              M.insert (td ^. tdOutput) mkTaskInfo eq
+            return $ Just td
 
   updateTaskStatus mh tid stat = liftIO . atomically $ do
     modifyTVar (mh ^. mhExecutionQueue) $ \eq ->
