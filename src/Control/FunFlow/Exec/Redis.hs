@@ -178,6 +178,22 @@ runJob (Arr f) x = return $ f x
 runJob (Compose f g) x = do
   y <- runJob f x
   runJob g y
+runJob (First f) (x,d) = do
+  ey <- runJob f x
+  return $ (ey,d)
+runJob (Fanin f _) (Left x) = do
+  runJob f x
+runJob (Fanin _ g) (Right x) = do
+  runJob g x
+runJob (Fold fstep) (lst,acc) = go lst acc where
+  go [] y = return y
+  go (x:xs) y0 = do
+      y1 <- runJob fstep (x,y0)
+      go xs y1
+runJob (Catch f h) x = do
+  --st <- get
+  runJob f x `catchError` (\err -> do
+    --put st
+    runJob h (x,err))
 runJob (Par f g) (x,y) = do
-
     liftM2 (,) (runJob f x) (runJob g y)
