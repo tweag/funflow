@@ -10,6 +10,7 @@ import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.STM
+import           Data.List                            (lookup)
 import qualified Data.Map.Strict                      as M
 import           Data.UUID.V4                         (nextRandom)
 import           System.Clock                         (fromNanoSecs)
@@ -49,7 +50,7 @@ instance Coordinator MemoryCoordinator where
       return (eq, tq)
     return $ case M.lookup tid eq of
       Just ti -> Just ti
-      Nothing -> case M.lookup tid (M.fromList tq)  of
+      Nothing -> case lookup tid tq of
         Just td -> Just $ TaskInfo Pending (td ^. tdOutput)
         Nothing -> Nothing
 
