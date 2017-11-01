@@ -39,7 +39,7 @@ instance MonadBaseControl IO R.Redis where
   liftBaseWith f = R.reRedis $ liftBaseWith $ \q -> f (q . R.unRedis)
   restoreM = R.reRedis . restoreM
 
-type FlowST = (NameSpace)
+type FlowST = (NameSpace, R.Connection)
 
 type JobId = Integer
 
@@ -63,7 +63,7 @@ redis r = do ex <- lift $ lift r
 
 nameForKey :: T.Text -> RFlowM ByteString
 nameForKey k = do
-  (ns) <- get
+  (ns,_) <- get
   return $ ns <> "_" <> DTE.encodeUtf8 k
 
 fresh :: RFlowM T.Text
@@ -147,7 +147,8 @@ resumeFirstJob allJobs = do
           case lookup (taskName job) allJobs of
             Nothing -> return ()
             Just flow -> do
-              put jobIdNm -- set namespace
+              (_,c)<-get
+              put (jobIdNm,c) -- set namespace
               res <- catching $ runJob flow (argument job)
               case res of
                 Right _ -> redis $ R.set jobIdNm (encode (job {jobStatus = JobDone}))
@@ -163,7 +164,6 @@ getJobStatus jid = do
   case mdecode mjob of
     Left err -> return $ JobError err
     Right (job :: Job ()) -> return $ jobStatus job
-
 
 runJob :: Flow a b -> a -> RFlowM b
 runJob (Step f) x = do
@@ -209,3 +209,10 @@ runJob (Par f g) (x,y) = do
   ax <- async (runJob f x)
   ay <- async (runJob g y)
   waitBoth ax ay
+runJob (Async ext) x = do
+  conn <- fmap snd get
+  let po = redisPostOffice conn
+  mbox <- liftIO $ reserveMailBox po
+  liftIO $ ext x po mbox
+  Right y <- decode <$> liftIO (awaitMail po mbox)
+  return y
