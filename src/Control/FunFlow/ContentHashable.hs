@@ -69,7 +69,7 @@ import           System.IO                     (IOMode (ReadMode),
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 -- | File path appropriate encoding of a hash
 hashToPath :: ContentHash -> FilePath
