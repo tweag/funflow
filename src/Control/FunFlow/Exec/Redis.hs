@@ -1,5 +1,5 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections, DeriveGeneric,
-       TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables  #-}
+{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections, DeriveGeneric, StandaloneDeriving,
+       TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables, MultiParamTypeClasses  #-}
 
 module Control.FunFlow.Exec.Redis where
 
@@ -23,11 +23,21 @@ import Control.Monad.Except
 import GHC.Conc
 import GHC.Generics
 import Lens.Micro
+import Control.Concurrent.Async.Lifted
+import Control.Monad.Trans.Control
+import Control.Monad.Base
 
 type NameSpace = ByteString
 
-newtype RFlowM a = RFlowM { runRFlowM :: ExceptT String (StateT FlowST R.Redis) a }
-  deriving (Monad, Applicative, Functor, MonadIO, MonadState FlowST, MonadError String)
+type RFlowM a = ExceptT String (StateT FlowST R.Redis) a
+
+instance MonadBase IO R.Redis where
+  liftBase = liftIO
+
+instance MonadBaseControl IO R.Redis where
+  type StM R.Redis a = a
+  liftBaseWith f = R.reRedis $ liftBaseWith $ \q -> f (q . R.unRedis)
+  restoreM = R.reRedis . restoreM
 
 type FlowST = (NameSpace)
 
@@ -46,7 +56,7 @@ instance Store JobStatus
 instance Store a => Store (Job a)
 
 redis ::  R.Redis (Either R.Reply a) -> RFlowM a
-redis r = do ex <- RFlowM $ lift $ lift r
+redis r = do ex <- lift $ lift r
              case ex of
                Left rply -> throwError $ "redis: "++show rply
                Right x -> return x
@@ -193,7 +203,9 @@ runJob (Fold fstep) (lst,acc) = go lst acc where
 runJob (Catch f h) x = do
   --st <- get
   runJob f x `catchError` (\err -> do
-    --put st
+    --put st  --TODO delete created variables?
     runJob h (x,err))
 runJob (Par f g) (x,y) = do
-    liftM2 (,) (runJob f x) (runJob g y)
+  ax <- async (runJob f x)
+  ay <- async (runJob g y)
+  waitBoth ax ay
