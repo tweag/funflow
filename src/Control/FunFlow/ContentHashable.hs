@@ -1,15 +1,15 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE TypeApplications     #-}
+{-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnboxedTuples        #-}
 
 module Control.FunFlow.ContentHashable
-  ( ContentHashable(..)
+  ( ContentHash
+  , ContentHashable(..)
   , contentHashUpdate_binaryFile
   , contentHashUpdate_byteArray#
   , contentHashUpdate_fingerprint
@@ -28,53 +28,61 @@ module Control.FunFlow.ContentHashable
   ) where
 
 
-import Control.Monad ((>=>), foldM)
-import Crypto.Hash
-  ( Context, Digest, SHA256
-  , digestFromByteString, hashFinalize, hashInit, hashUpdate
-  )
-import Data.Bits (shiftL)
-import Data.ByteArray (Bytes, MemView(MemView), allocAndFreeze)
-import Data.ByteArray.Encoding (Base(Base64URLUnpadded), convertFromBase, convertToBase)
-import qualified Data.ByteString as BS
-import Data.ByteString.Builder.Extra (defaultChunkSize)
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy as BSL
-import Data.Int
-import Data.List (sort)
-import qualified Data.Text as T
-import qualified Data.Text.Array as TA
-import qualified Data.Text.Internal as T
-import qualified Data.Text.Lazy as TL
-import Data.Typeable
-import Data.Word
-import Foreign.Marshal.Utils (with)
-import Foreign.Ptr (castPtr)
-import Foreign.Storable
-import GHC.Fingerprint
-import GHC.Generics
-import GHC.Integer.GMP.Internals (BigNat(..), Integer(..))
-import GHC.Natural (Natural(..))
-import GHC.Prim (ByteArray#, copyByteArrayToAddr#, sizeofByteArray#)
-import GHC.Ptr (Ptr(Ptr))
-import GHC.Types (Int(I#), IO(IO), Word(W#))
-import System.Directory (doesFileExist, listDirectory)
-import System.FilePath ((</>))
-import System.IO (IOMode(ReadMode), withBinaryFile)
+import           Control.Monad                 (foldM, (>=>))
+import           Crypto.Hash                   (Context, Digest, SHA256,
+                                                digestFromByteString,
+                                                hashFinalize, hashInit,
+                                                hashUpdate)
+import           Data.Bits                     (shiftL)
+import           Data.ByteArray                (Bytes, MemView (MemView),
+                                                allocAndFreeze)
+import           Data.ByteArray.Encoding       (Base (Base64URLUnpadded),
+                                                convertFromBase, convertToBase)
+import qualified Data.ByteString               as BS
+import           Data.ByteString.Builder.Extra (defaultChunkSize)
+import qualified Data.ByteString.Char8         as C8
+import qualified Data.ByteString.Lazy          as BSL
+import           Data.Int
+import           Data.List                     (sort)
+import qualified Data.Text                     as T
+import qualified Data.Text.Array               as TA
+import qualified Data.Text.Internal            as T
+import qualified Data.Text.Lazy                as TL
+import           Data.Typeable
+import           Data.Word
+import           Foreign.Marshal.Utils         (with)
+import           Foreign.Ptr                   (castPtr)
+import           Foreign.Storable
+import           GHC.Fingerprint
+import           GHC.Generics
+import           GHC.Integer.GMP.Internals     (BigNat (..), Integer (..))
+import           GHC.Natural                   (Natural (..))
+import           GHC.Prim                      (ByteArray#,
+                                                copyByteArrayToAddr#,
+                                                sizeofByteArray#)
+import           GHC.Ptr                       (Ptr (Ptr))
+import           GHC.Types                     (IO (IO), Int (I#), Word (W#))
+import           System.Directory              (doesFileExist, listDirectory)
+import           System.FilePath               ((</>))
+import           System.IO                     (IOMode (ReadMode),
+                                                withBinaryFile)
 
+
+newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
+  deriving (Eq, Show)
 
 -- | File path appropriate encoding of a hash
-hashToPath :: Digest SHA256 -> FilePath
-hashToPath = C8.unpack . convertToBase Base64URLUnpadded
+hashToPath :: ContentHash -> FilePath
+hashToPath = C8.unpack . convertToBase Base64URLUnpadded . unContentHash
 
 
 -- | Inverse of 'hashToPath' if given a valid input.
 --
 -- prop> pathToHash (hashToPath x) = Just x
-pathToHash :: FilePath -> Maybe (Digest SHA256)
+pathToHash :: FilePath -> Maybe ContentHash
 pathToHash fp = case convertFromBase Base64URLUnpadded (C8.pack fp) of
   Left  _ -> Nothing
-  Right x -> digestFromByteString (x :: BS.ByteString)
+  Right x -> ContentHash <$> digestFromByteString (x :: BS.ByteString)
 
 
 class ContentHashable a where
@@ -93,8 +101,8 @@ class ContentHashable a where
   -- | Generate hash of the given value.
   --
   -- See 'Crypto.Hash.hash'.
-  contentHash :: a -> IO (Digest SHA256)
-  contentHash x = hashFinalize <$> contentHashUpdate hashInit x
+  contentHash :: a -> IO ContentHash
+  contentHash x = ContentHash . hashFinalize <$> contentHashUpdate hashInit x
 
 
 -- | Update hash context based on binary in memory representation due to 'Foreign.Storable.Storable'.
