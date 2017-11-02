@@ -7,7 +7,7 @@ import Control.FunFlow.Base
 import Control.FunFlow
 
 import Data.Store
-import Data.Either (lefts)
+import Data.Either (lefts, rights)
 import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -43,12 +43,14 @@ type FlowST = (NameSpace, R.Connection)
 
 type JobId = Integer
 
-data JobStatus = JobDone | JobError String | JobRunning deriving (Generic, Show)
+data JobStatus = JobDone | JobError | JobRunning
+  deriving (Generic, Show)
 
 data Job a = Job
   { jobId :: JobId
   , taskName :: T.Text
   , jobStatus :: JobStatus
+  , jobError :: Maybe String
   , argument :: a
   } deriving Generic
 
@@ -132,10 +134,20 @@ catching mx =(fmap Right mx) `catchError` (\e -> return $ Left e)
 sparkJob :: Store a => T.Text -> a -> RFlowM JobId
 sparkJob nm x = do
   jid :: JobId <- redis $ R.incr "jobfresh"
-  let job = Job jid nm JobRunning x
+  let job = Job jid nm JobRunning Nothing x
   redis $ R.rpush "jobs_running" [encode jid]
   redis $ R.set (BS8.pack $ "job_"++show jid) (encode job)
   return jid
+
+getJobsByStatus :: JobStatus -> RFlowM [Job ()]
+getJobsByStatus js = do
+  let queueNm = case js of
+                  JobRunning -> "jobs_running"
+                  JobDone -> "jobs_done"
+                  JobRunning -> "jobs_error"
+  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
+  mapM getJobStatus $ rights jids
+
 
 resumeFirstJob :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
 resumeFirstJob allJobs = do
@@ -158,23 +170,23 @@ finishJob :: Store a => Job a -> Either String b -> RFlowM ()
 finishJob job y = do
   let jid = jobId job
   let jobIdNm = BS8.pack $ "job_"++show jid
-  let newStatus = case y of
-         Right _ -> JobDone
-         Left err -> JobError err
-  redis $ R.set jobIdNm (encode (job {jobStatus = newStatus}))
+  let newJob = case y of
+         Right _ -> job {jobStatus = JobDone}
+         Left err -> job {jobStatus = JobError, jobError = Just err}
+  redis $ R.set jobIdNm (encode newJob)
   redis $ R.lrem "jobs_running" 1 (encode jid)
   case y of
     Right _ -> redis $ R.rpush "jobs_done" [encode jid]
     Left _ -> redis $ R.rpush "jobs_error" [encode jid]
   return ()
 
-getJobStatus :: JobId -> RFlowM JobStatus
+getJobStatus :: JobId -> RFlowM (Job ())
 getJobStatus jid = do
   let jobIdNm = BS8.pack $ "job_"++show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
-    Left err -> return $ JobError err
-    Right (job :: Job ()) -> return $ jobStatus job
+    Left err -> throwError err
+    Right (job :: Job ()) -> return job
 
 runJob :: Flow a b -> a -> RFlowM b
 runJob (Step f) x = do
