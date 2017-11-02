@@ -152,16 +152,21 @@ resumeFirstJob allJobs = do
             Nothing -> return ()
             Just flow -> do
               _1 .= jobIdNm
-              res <- catching $ runJob flow (argument job)
-              case res of
-                Right _ -> redis $ R.set jobIdNm (encode (job {jobStatus = JobDone}))
-                Left err -> redis $ R.set jobIdNm (encode (job {jobStatus = JobError err}))
-              return ()
-          return ()
-  return ()
+              finishJob job =<< catching (runJob flow (argument job))
 
-finishJob :: Job a -> b -> RFlowM ()
-finishJob job y = return ()
+finishJob :: Store a => Job a -> Either String b -> RFlowM ()
+finishJob job y = do
+  let jid = jobId job
+  let jobIdNm = BS8.pack $ "job_"++show jid
+  let newStatus = case y of
+         Right _ -> JobDone
+         Left err -> JobError err
+  redis $ R.set jobIdNm (encode (job {jobStatus = newStatus}))
+  redis $ R.lrem "jobs_running" 1 (encode jid)
+  case y of
+    Right _ -> redis $ R.rpush "jobs_done" [encode jid]
+    Left _ -> redis $ R.rpush "jobs_error" [encode jid]
+  return ()
 
 getJobStatus :: JobId -> RFlowM JobStatus
 getJobStatus jid = do
