@@ -22,10 +22,10 @@ import qualified Database.Redis as R
 import Control.Monad.Except
 import GHC.Conc
 import GHC.Generics
-import Lens.Micro
 import Control.Concurrent.Async.Lifted
 import Control.Monad.Trans.Control
 import Control.Monad.Base
+import Lens.Micro.Platform
 
 type NameSpace = ByteString
 
@@ -43,7 +43,7 @@ type FlowST = (NameSpace, R.Connection)
 
 type JobId = Integer
 
-data JobStatus = JobDone | JobError String | JobRunning deriving Generic
+data JobStatus = JobDone | JobError String | JobRunning deriving (Generic, Show)
 
 data Job a = Job
   { jobId :: JobId
@@ -54,6 +54,10 @@ data Job a = Job
 
 instance Store JobStatus
 instance Store a => Store (Job a)
+
+runRFlow :: R.Connection -> RFlowM a -> IO (Either String a)
+runRFlow conn mx = do
+  R.runRedis conn $ evalStateT (runExceptT mx) ("", conn)
 
 redis ::  R.Redis (Either R.Reply a) -> RFlowM a
 redis r = do ex <- lift $ lift r
@@ -147,8 +151,7 @@ resumeFirstJob allJobs = do
           case lookup (taskName job) allJobs of
             Nothing -> return ()
             Just flow -> do
-              (_,c)<-get
-              put (jobIdNm,c) -- set namespace
+              _1 .= jobIdNm
               res <- catching $ runJob flow (argument job)
               case res of
                 Right _ -> redis $ R.set jobIdNm (encode (job {jobStatus = JobDone}))
@@ -156,6 +159,9 @@ resumeFirstJob allJobs = do
               return ()
           return ()
   return ()
+
+finishJob :: Job a -> b -> RFlowM ()
+finishJob job y = return ()
 
 getJobStatus :: JobId -> RFlowM JobStatus
 getJobStatus jid = do
