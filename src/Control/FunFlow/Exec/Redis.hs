@@ -8,6 +8,7 @@ import Control.FunFlow
 
 import Data.Store
 import Data.Either (lefts, rights)
+import Data.Maybe (catMaybes)
 import Data.List
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
@@ -139,15 +140,23 @@ sparkJob nm x = do
   redis $ R.set (BS8.pack $ "job_"++show jid) (encode job)
   return jid
 
-getJobsByStatus :: JobStatus -> RFlowM [Job ()]
+getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
 getJobsByStatus js = do
   let queueNm = case js of
                   JobRunning -> "jobs_running"
                   JobDone -> "jobs_done"
-                  JobRunning -> "jobs_error"
+                  JobError -> "jobs_error"
   jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
-  mapM getJobStatus $ rights jids
+  fmap catMaybes $ mapM getJobStatus $ rights jids
 
+
+getJobStatus :: Store a => JobId -> RFlowM (Maybe (Job a))
+getJobStatus jid = do
+  let jobIdNm = BS8.pack $ "job_"++show jid
+  mjob <- redis $ R.get jobIdNm
+  case mdecode mjob of
+    Left _ -> return Nothing
+    Right job -> return $ Just job
 
 resumeFirstJob :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
 resumeFirstJob allJobs = do
@@ -179,14 +188,6 @@ finishJob job y = do
     Right _ -> redis $ R.rpush "jobs_done" [encode jid]
     Left _ -> redis $ R.rpush "jobs_error" [encode jid]
   return ()
-
-getJobStatus :: JobId -> RFlowM (Job ())
-getJobStatus jid = do
-  let jobIdNm = BS8.pack $ "job_"++show jid
-  mjob <- redis $ R.get jobIdNm
-  case mdecode mjob of
-    Left err -> throwError err
-    Right (job :: Job ()) -> return job
 
 runJob :: Flow a b -> a -> RFlowM b
 runJob (Step f) x = do
