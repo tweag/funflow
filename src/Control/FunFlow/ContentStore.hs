@@ -103,7 +103,8 @@ data ContentStore = ContentStore
   { storeRoot :: FilePath
   -- ^ Subtrees are stored directly under this directory.
   , storeLock :: MVar ()
-  -- ^ One global lock to ensure thread safety.
+  -- ^ One global lock on store metadata to ensure thread safety.
+  -- The lock is taken when subtree state is changed or queried.
   --
   -- XXX: Could be replaced by a file-locks per subtree
   --      if it becomes a bottleneck.
