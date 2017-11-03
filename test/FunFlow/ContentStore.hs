@@ -88,6 +88,41 @@ tests = testGroup "Content Store"
         content <- readFile item
         content @?= expectedContent
 
+  , testCase "construct if missing" $
+    withEmptyStore $ \store -> do
+      hash <- contentHash "test"
+      let file = "file"
+          expectedContent = "Hello World"
+
+      ContentStore.constructIfMissing store hash >>= \case
+        ContentStore.Wait ->
+          assertFailure "missing already under construction"
+        ContentStore.Consume _ ->
+          assertFailure "missing already complete"
+        ContentStore.Construct subtree -> do
+          writable <$> getPermissions subtree
+            @? "under construction not writable"
+          writeFile (subtree </> file) expectedContent
+
+      ContentStore.constructIfMissing store hash >>= \case
+        ContentStore.Construct _ ->
+          assertFailure "under construction still missing"
+        ContentStore.Consume _ ->
+          assertFailure "under construction already complete"
+        ContentStore.Wait ->
+          ContentStore.markComplete store hash
+
+      ContentStore.constructIfMissing store hash >>= \case
+        ContentStore.Construct _ ->
+          assertFailure "complete still missing"
+        ContentStore.Wait ->
+          assertFailure "complete still under construction"
+        ContentStore.Consume subtree -> do
+          not . writable <$> getPermissions (subtree </> file)
+            @? "complete still writable"
+          content <- readFile (subtree </> file)
+          content @?= expectedContent
+
   , testCase "remove failed" $
     withEmptyStore $ \store -> do
       hash <- contentHash "test"

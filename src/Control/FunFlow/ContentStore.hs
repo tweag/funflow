@@ -36,6 +36,7 @@
 -- @
 module Control.FunFlow.ContentStore
   ( Status (..)
+  , Instruction (..)
   , StoreError (..)
   , ContentStore
   , root
@@ -48,6 +49,7 @@ module Control.FunFlow.ContentStore
   , isUnderConstruction
   , isComplete
   , lookup
+  , constructIfMissing
   , markUnderConstruction
   , markComplete
   , removeFailed
@@ -85,6 +87,18 @@ data Status
   -- ^ The subtree is under construction and not ready for consumption.
   | Complete
   -- ^ The subtree is complete and ready for consumption.
+  deriving (Eq, Show)
+
+-- | Instruction to the caller on what to do after calling
+-- 'Control.FunFlow.ContentStore.constructIfMissing'.
+data Instruction
+  = Construct FilePath
+  -- ^ The subtree was previously missing
+  -- and is now marked as under construction.
+  | Wait
+  -- ^ The subtree is already under construction.
+  | Consume FilePath
+  -- ^ The subtree is already complete and ready for consumption.
   deriving (Eq, Show)
 
 -- | Errors that can occur when interacting with the store.
@@ -164,9 +178,24 @@ lookup store hash = withStoreLock store $
     UnderConstruction -> return Nothing
     Complete -> return $ Just (toStorePath store hash)
 
+-- | Atomically query the state of a subtree
+-- and mark it as under construction if missing.
+constructIfMissing :: ContentStore -> ContentHash -> IO Instruction
+constructIfMissing store hash = withStoreLock store $
+  let dir = toStorePath store hash in
+  internalQuery store hash >>= \case
+    Complete -> return $ Consume dir
+    UnderConstruction -> return Wait
+    Missing -> withWritableStore store $ do
+      createDirectory dir
+      setDirWritable dir
+      return $ Construct dir
+
 -- | Mark a non-existent subtree as under construction.
 --
 -- Creates the destination directory and returns its path.
+--
+-- See also: 'Control.FunFlow.ContentStore.constructIfMissing'.
 markUnderConstruction :: ContentStore -> ContentHash -> IO FilePath
 markUnderConstruction store hash = withStoreLock store $
   internalQuery store hash >>= \case
