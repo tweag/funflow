@@ -39,17 +39,17 @@ data Flow' a b where
   Named   :: Store b => T.Text -> (a -> b) -> Flow' a b
   Async   :: Store b => External a b -> Flow' a b
 
-type Flow = Choice Flow'
+type Flow ex = ErrorChoice ex Flow'
 
-step :: Store b => (a -> IO b) -> Flow a b
-step = effectChoice . Step
+step :: Store b => (a -> IO b) -> Flow ex a b
+step = effect . Step
 
-named :: Store b => T.Text -> (a -> b) -> Flow a b
-named n f = effectChoice $ Named n f
+named :: Store b => T.Text -> (a -> b) -> Flow ex a b
+named n f = effect $ Named n f
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
-toDiagram :: Flow a b -> Diagram a b
-toDiagram flow = evalChoice toDiagram' flow where
+toDiagram :: Flow ex a b -> Diagram ex a b
+toDiagram flow = eval toDiagram' flow where
   toDiagram' (Named n f)  = node f [n]
   toDiagram' _
       = Node emptyNodeProperties (Proxy :: Proxy a1) (Proxy :: Proxy b1)

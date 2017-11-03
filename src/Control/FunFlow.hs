@@ -12,15 +12,15 @@ import           Control.FunFlow.Diagram
 import           Data.Monoid             ((<>))
 import qualified Data.Text               as T
 
-collectNames :: Flow a b -> [T.Text]
+collectNames :: forall ex a b. Flow ex a b -> [T.Text]
 collectNames flow = collectNames' $ toDiagram flow
   where
-    collectNames' :: forall a1 b1. Diagram a1 b1 -> [T.Text]
+    collectNames' :: forall a1 b1. Diagram ex a1 b1 -> [T.Text]
     collectNames' (Node (NodeProperties lbls) _ _) = lbls
     collectNames' (Seq a b) = collectNames' a ++ collectNames' b
     collectNames' (Par a b) = collectNames' a ++ collectNames' b
     collectNames' (Fanin a b) = collectNames' a ++ collectNames' b
-
+    collectNames' (Catch a b) = collectNames' a ++ collectNames' b
 
 -- | a fresh variable supply
 newtype Freshers = Freshers { unFreshers :: [T.Text] }

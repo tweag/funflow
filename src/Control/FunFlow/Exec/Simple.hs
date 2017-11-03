@@ -6,8 +6,11 @@
 
 module Control.FunFlow.Exec.Simple where
 
+import           Control.Arrow           (Kleisli (..), runKleisli)
+import           Control.Arrow.Free      (eval)
 import           Control.Concurrent.MVar
 import           Control.FunFlow.Base
+import           Control.Monad.Catch     (Exception)
 import qualified Data.ByteString         as BS
 import           Data.IORef
 import qualified Data.Map.Strict         as Map
@@ -48,16 +51,16 @@ newLocalPostOffice = do
     }
 
 -- | Simple evaulation of a flow
-runFlow :: Flow' a b -> a -> IO b
-runFlow f' x' = do po <- newLocalPostOffice
-                   runFlow' po f' x'
+runFlow :: Exception ex => Flow ex a b -> a -> IO b
+runFlow flow input = do
+  po <- newLocalPostOffice
+  runKleisli (eval (runFlow' po) flow) input
   where
-    runFlow' :: PostOffice -> Flow' a b -> a -> IO b
-    runFlow' _ (Step f) x = f x
-    runFlow' _ (Named _ f) x = return $ f x
-    runFlow' po (Async ext) x = do
+    runFlow' :: PostOffice -> Flow' a b -> Kleisli IO a b
+    runFlow' _ (Step f) = Kleisli $ \x -> f x
+    runFlow' _ (Named _ f) = Kleisli $ \x -> return $ f x
+    runFlow' po (Async ext) = Kleisli $ \x -> do
       mbox <- reserveMailBox po
       ext x po mbox
       Right y <- decode <$> awaitMail po mbox
       return y
-
