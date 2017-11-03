@@ -14,6 +14,9 @@ promptFor = proc s -> do
      s' <- Step (const getLine) -< ()
      returnA -< read s'
 
+printS :: Show a => Flow a ()
+printS = Step $ \s-> print s
+
 worstBernoulli :: Flow Double Double
 worstBernoulli = Step $ \p -> do
   r <- randomRIO (0,1)
