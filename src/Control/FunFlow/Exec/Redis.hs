@@ -27,6 +27,7 @@ import Control.Concurrent.Async.Lifted
 import Control.Monad.Trans.Control
 import Control.Monad.Base
 import Lens.Micro.Platform
+import Control.FunFlow.Utils
 
 type NameSpace = ByteString
 
@@ -44,7 +45,7 @@ type FlowST = (NameSpace, R.Connection)
 
 type JobId = Integer
 
-data JobStatus = JobDone | JobError | JobRunning
+data JobStatus = JobDone | JobError | JobRunning | JobQueue
   deriving (Generic, Show)
 
 data Job a = Job
@@ -125,18 +126,11 @@ redisPostOffice conn = PostOffice
       Right (Just v) -> return v
 
 
-mdecode :: Store a => Maybe ByteString -> Either String a
-mdecode (Nothing) = Left "no value"
-mdecode (Just bs) = over _Left show $ decode bs
-
-catching :: MonadError s m => m a -> m (Either s a)
-catching mx =(fmap Right mx) `catchError` (\e -> return $ Left e)
-
 sparkJob :: Store a => T.Text -> a -> RFlowM JobId
 sparkJob nm x = do
   jid :: JobId <- redis $ R.incr "jobfresh"
-  let job = Job jid nm JobRunning Nothing x
-  redis $ R.rpush "jobs_running" [encode jid]
+  let job = Job jid nm JobQueue Nothing x
+  redis $ R.rpush "jobs_queue" [encode jid]
   redis $ R.set (BS8.pack $ "job_"++show jid) (encode job)
   return jid
 
@@ -144,36 +138,41 @@ getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
 getJobsByStatus js = do
   let queueNm = case js of
                   JobRunning -> "jobs_running"
+                  JobQueue -> "jobs_queue"
                   JobDone -> "jobs_done"
                   JobError -> "jobs_error"
   jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
-  fmap catMaybes $ mapM getJobStatus $ rights jids
+  fmap catMaybes $ mapM getJobById $ rights jids
 
 
-getJobStatus :: Store a => JobId -> RFlowM (Maybe (Job a))
-getJobStatus jid = do
+getJobById :: Store a => JobId -> RFlowM (Maybe (Job a))
+getJobById jid = do
   let jobIdNm = BS8.pack $ "job_"++show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
     Left _ -> return Nothing
     Right job -> return $ Just job
 
+queueLoop :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
+queueLoop allJobs = forever go where
+  go = do mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
+          whenRight (mdecode mkj) $ \jid -> do
+            mjob <- getJobById jid
+            whenJust mjob $ resumeJob allJobs
+
 resumeFirstJob :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
 resumeFirstJob allJobs = do
   mjid <- redis $ R.lpop "jobs_running"
-  case mdecode mjid of
-    Left err -> return ()
-    Right (jid::JobId) -> do
-      let jobIdNm = BS8.pack $ "job_"++show jid
-      mjob <- redis $ R.get jobIdNm
-      case mdecode mjob of
-        Left err -> return ()
-        Right (job :: Job a) -> do
-          case lookup (taskName job) allJobs of
-            Nothing -> return ()
-            Just flow -> do
-              _1 .= jobIdNm
-              finishJob job =<< catching (runJob flow (argument job))
+  whenRight (mdecode mjid) $ \(jid::JobId) -> do
+    mjob <- getJobById jid
+    whenJust mjob $ resumeJob allJobs
+
+resumeJob :: forall a b. Store a => [(T.Text, Flow a b)] -> Job a -> RFlowM ()
+resumeJob allJobs job = do
+      whenJust (lookup (taskName job) allJobs) $ \flow -> do
+        let jobIdNm = BS8.pack $ "job_"++show (jobId job)
+        _1 .= jobIdNm
+        finishJob job =<< catching (runJob flow (argument job))
 
 finishJob :: Store a => Job a -> Either String b -> RFlowM ()
 finishJob job y = do
