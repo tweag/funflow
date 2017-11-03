@@ -69,10 +69,12 @@ instance Store JobStatus
 
 instance Store a => Store (Job a)
 
+-- | Run the RFlowM monad 
 runRFlow :: R.Connection -> RFlowM a -> IO (Either String a)
 runRFlow conn mx = do
   R.runRedis conn $ evalStateT (runExceptT mx) ("", conn)
 
+-- | Use redis commands inside RFlowM
 redis :: R.Redis (Either R.Reply a) -> RFlowM a
 redis r = do
   ex <- lift $ lift r
@@ -80,16 +82,19 @@ redis r = do
     Left rply -> throwError $ "redis: " ++ show rply
     Right x   -> return x
 
+-- | Convert a key name to a redis key - using the current namespace
 nameForKey :: T.Text -> RFlowM ByteString
 nameForKey k = do
   (ns, _) <- get
   return $ ns <> "_" <> DTE.encodeUtf8 k
 
+-- | Get a fresh variable name
 fresh :: RFlowM T.Text
 fresh = do
   n <- redis $ R.incr "fffresh"
   return $ T.pack $ show (n :: Integer)
 
+-- | Look up a value in the current namespace
 lookupSym :: Store a => T.Text -> RFlowM (Maybe a)
 lookupSym k = do
   mv <- redis . R.get =<< nameForKey k
@@ -97,14 +102,17 @@ lookupSym k = do
     Just v -> return $ eitherToMaybe $ decode v
     _      -> return Nothing
 
+-- | Store a value under a symbol in redis, discarding the result
 putSym_ :: Store a => T.Text -> a -> RFlowM ()
 putSym_ k x = do
   _ <- redis . (`R.set` (encode x)) =<< nameForKey k
   return ()
 
+-- | Store a value under a symbol, and return it again
 putSym :: Store a => T.Text -> a -> RFlowM a
 putSym n x = putSym n x >> return x
 
+-- | Create a `PostOffice` based on a redis database connection
 redisPostOffice :: R.Connection -> PostOffice
 redisPostOffice conn =
   PostOffice
@@ -134,6 +142,7 @@ redisPostOffice conn =
           waitGet k
         Right (Just v) -> return v
 
+-- | Create a job in the waiting queue without actually running it
 sparkJob :: Store a => T.Text -> a -> RFlowM JobId
 sparkJob nm x = do
   jid :: JobId <- redis $ R.incr "jobfresh"
@@ -142,6 +151,7 @@ sparkJob nm x = do
   redis $ R.set (BS8.pack $ "job_" ++ show jid) (encode job)
   return jid
 
+-- | Get all the jobs by status 
 getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
 getJobsByStatus js = do
   let queueNm =
@@ -153,6 +163,7 @@ getJobsByStatus js = do
   jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
   fmap catMaybes $ mapM getJobById $ rights jids
 
+-- | Get a job by job ID
 getJobById :: Store a => JobId -> RFlowM (Maybe (Job a))
 getJobById jid = do
   let jobIdNm = BS8.pack $ "job_" ++ show jid
@@ -161,6 +172,7 @@ getJobById jid = do
     Left _    -> return Nothing
     Right job -> return $ Just job
 
+-- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
 queueLoop ::
      forall a b. Store a
   => [(T.Text, Flow a b)]
@@ -173,6 +185,7 @@ queueLoop allJobs = forever go
         mjob <- getJobById jid
         whenJust mjob $ resumeJob allJobs
 
+-- | Run the first job in the running queue. This is probably not so useful anymore
 resumeFirstJob ::
      forall a b. Store a
   => [(T.Text, Flow a b)]
@@ -183,6 +196,7 @@ resumeFirstJob allJobs = do
     mjob <- getJobById jid
     whenJust mjob $ resumeJob allJobs
 
+-- | Resume a job
 resumeJob ::
      forall a b. Store a
   => [(T.Text, Flow a b)]
@@ -194,6 +208,7 @@ resumeJob allJobs job = do
     _1 .= jobIdNm
     finishJob job =<< catching (runJob flow (argument job))
 
+-- | When a job has finished, mark it as done and put it on the done or error queues
 finishJob :: Store a => Job a -> Either String b -> RFlowM ()
 finishJob job y = do
   let jid = jobId job
@@ -209,6 +224,7 @@ finishJob job y = do
     Left _  -> redis $ R.rpush "jobs_error" [encode jid]
   return ()
 
+-- | The `Flow` arrow interpreter
 runJob :: Flow a b -> a -> RFlowM b
 runJob (Step f) x = do
   n <- fresh
