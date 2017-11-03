@@ -19,3 +19,11 @@ whenJust (Just x) f = f x
 whenRight :: Monad m => Either b a -> (a -> m ()) -> m ()
 whenRight (Left _) _ = return ()
 whenRight (Right x) f = f x
+
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Left _) = Nothing
+eitherToMaybe (Right x) = Just x
+
+fromRight :: Show a => Either a b -> b
+fromRight (Right x) = x
+fromRight (Left e) = error $ "fromRight: Left "++show e

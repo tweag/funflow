@@ -1,33 +1,38 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, TupleSections, DeriveGeneric, StandaloneDeriving,
-       TypeFamilies, GeneralizedNewtypeDeriving, ScopedTypeVariables, MultiParamTypeClasses  #-}
+{-# LANGUAGE Arrows                     #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module Control.FunFlow.Exec.Redis where
 
-import Control.FunFlow.Base
-import Control.FunFlow
+import           Control.FunFlow.Base
 
-import Data.Store
-import Data.Either (lefts, rights)
-import Data.Maybe (catMaybes)
-import Data.List
-import qualified Data.Map.Strict as M
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as DTE
-import Control.Monad.State.Strict
-import Data.Monoid ((<>))
-import Control.Exception
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BS8
-import qualified Database.Redis as R
-import Control.Monad.Except
-import GHC.Conc
-import GHC.Generics
-import Control.Concurrent.Async.Lifted
-import Control.Monad.Trans.Control
-import Control.Monad.Base
-import Lens.Micro.Platform
-import Control.FunFlow.Utils
+import           Data.Either                     (rights)
+import           Data.Maybe                      (catMaybes)
+import           Data.Store
+
+import           Control.Concurrent.Async.Lifted
+import           Control.Exception
+import           Control.FunFlow.Utils
+import           Control.Monad.Base
+import           Control.Monad.Except
+import           Control.Monad.State.Strict
+import           Control.Monad.Trans.Control
+import           Data.ByteString                 (ByteString)
+import qualified Data.ByteString.Char8           as BS8
+import           Data.Monoid                     ((<>))
+import qualified Data.Text                       as T
+import qualified Data.Text.Encoding              as DTE
+import qualified Database.Redis                  as R
+import           GHC.Conc
+import           GHC.Generics
+import           Lens.Micro.Platform
 
 type NameSpace = ByteString
 
@@ -45,147 +50,163 @@ type FlowST = (NameSpace, R.Connection)
 
 type JobId = Integer
 
-data JobStatus = JobDone | JobError | JobRunning | JobQueue
+data JobStatus
+  = JobDone
+  | JobError
+  | JobRunning
+  | JobQueue
   deriving (Generic, Show)
 
 data Job a = Job
-  { jobId :: JobId
-  , taskName :: T.Text
+  { jobId     :: JobId
+  , taskName  :: T.Text
   , jobStatus :: JobStatus
-  , jobError :: Maybe String
-  , argument :: a
-  } deriving Generic
+  , jobError  :: Maybe String
+  , argument  :: a
+  } deriving (Generic)
 
 instance Store JobStatus
+
 instance Store a => Store (Job a)
 
 runRFlow :: R.Connection -> RFlowM a -> IO (Either String a)
 runRFlow conn mx = do
   R.runRedis conn $ evalStateT (runExceptT mx) ("", conn)
 
-redis ::  R.Redis (Either R.Reply a) -> RFlowM a
-redis r = do ex <- lift $ lift r
-             case ex of
-               Left rply -> throwError $ "redis: "++show rply
-               Right x -> return x
+redis :: R.Redis (Either R.Reply a) -> RFlowM a
+redis r = do
+  ex <- lift $ lift r
+  case ex of
+    Left rply -> throwError $ "redis: " ++ show rply
+    Right x   -> return x
 
 nameForKey :: T.Text -> RFlowM ByteString
 nameForKey k = do
-  (ns,_) <- get
+  (ns, _) <- get
   return $ ns <> "_" <> DTE.encodeUtf8 k
 
 fresh :: RFlowM T.Text
 fresh = do
   n <- redis $ R.incr "fffresh"
-  return $ T.pack $ show (n::Integer)
+  return $ T.pack $ show (n :: Integer)
 
-lookupSym ::  Store a => T.Text -> RFlowM (Maybe a)
+lookupSym :: Store a => T.Text -> RFlowM (Maybe a)
 lookupSym k = do
-  mv <- redis . R.get  =<< nameForKey k
+  mv <- redis . R.get =<< nameForKey k
   case mv of
     Just v -> return $ eitherToMaybe $ decode v
-    _ -> return Nothing
+    _      -> return Nothing
 
-eitherToMaybe :: Either a b -> Maybe b
-eitherToMaybe (Left _) = Nothing
-eitherToMaybe (Right x) = Just x
-
-fromRight :: Show a => Either a b -> b
-fromRight (Right x) = x
-fromRight (Left e) = error $ "fromRight: Left "++show e
-
-putSym :: Store a => T.Text -> a -> RFlowM ()
-putSym k x = do
-  _ <- redis .  (`R.set` (encode x)) =<< nameForKey k
+putSym_ :: Store a => T.Text -> a -> RFlowM ()
+putSym_ k x = do
+  _ <- redis . (`R.set` (encode x)) =<< nameForKey k
   return ()
 
-
-puttingSym :: Store a => T.Text -> a -> RFlowM a
-puttingSym n x = putSym n x >> return x
+putSym :: Store a => T.Text -> a -> RFlowM a
+putSym n x = putSym n x >> return x
 
 redisPostOffice :: R.Connection -> PostOffice
-redisPostOffice conn = PostOffice
-  { reserveMailBox = R.runRedis conn $ do
-      n <- fmap fromRight $ R.incr "pofresh"
-      return $ MailBox $ T.pack $ show (n::Integer),
-    send = \(MailBox nm) bs -> R.runRedis conn $ do
-      void $ R.set (DTE.encodeUtf8 nm) bs,
-    checkMail = \(MailBox nm) -> R.runRedis conn $ do
-      fmap fromRight $ R.get (DTE.encodeUtf8 nm),
-    awaitMail = \(MailBox nm) -> R.runRedis conn $ do
-      waitGet (DTE.encodeUtf8 nm) -- temp until we do pubsub
+redisPostOffice conn =
+  PostOffice
+  { reserveMailBox =
+      R.runRedis conn $ do
+        n <- fmap fromRight $ R.incr "pofresh"
+        return $ MailBox $ T.pack $ show (n :: Integer)
+  , send =
+      \(MailBox nm) bs ->
+        R.runRedis conn $ do void $ R.set (DTE.encodeUtf8 nm) bs
+  , checkMail =
+      \(MailBox nm) ->
+        R.runRedis conn $ do fmap fromRight $ R.get (DTE.encodeUtf8 nm)
+  , awaitMail =
+      \(MailBox nm) ->
+        R.runRedis conn $ do
+          waitGet (DTE.encodeUtf8 nm) -- temp until we do pubsub
   }
- where
-  waitGet :: ByteString -> R.Redis ByteString
-  waitGet k = do
-    emv <- R.get k
-    case emv of
-      Left r -> fail $ "redis fail "++ show r
-      Right (Nothing) -> do liftIO $ threadDelay 500000
-                            waitGet k
-      Right (Just v) -> return v
-
+  where
+    waitGet :: ByteString -> R.Redis ByteString
+    waitGet k = do
+      emv <- R.get k
+      case emv of
+        Left r -> fail $ "redis fail " ++ show r
+        Right (Nothing) -> do
+          liftIO $ threadDelay 500000
+          waitGet k
+        Right (Just v) -> return v
 
 sparkJob :: Store a => T.Text -> a -> RFlowM JobId
 sparkJob nm x = do
   jid :: JobId <- redis $ R.incr "jobfresh"
   let job = Job jid nm JobQueue Nothing x
   redis $ R.rpush "jobs_queue" [encode jid]
-  redis $ R.set (BS8.pack $ "job_"++show jid) (encode job)
+  redis $ R.set (BS8.pack $ "job_" ++ show jid) (encode job)
   return jid
 
 getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
 getJobsByStatus js = do
-  let queueNm = case js of
-                  JobRunning -> "jobs_running"
-                  JobQueue -> "jobs_queue"
-                  JobDone -> "jobs_done"
-                  JobError -> "jobs_error"
+  let queueNm =
+        case js of
+          JobRunning -> "jobs_running"
+          JobQueue   -> "jobs_queue"
+          JobDone    -> "jobs_done"
+          JobError   -> "jobs_error"
   jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
   fmap catMaybes $ mapM getJobById $ rights jids
 
-
 getJobById :: Store a => JobId -> RFlowM (Maybe (Job a))
 getJobById jid = do
-  let jobIdNm = BS8.pack $ "job_"++show jid
+  let jobIdNm = BS8.pack $ "job_" ++ show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
-    Left _ -> return Nothing
+    Left _    -> return Nothing
     Right job -> return $ Just job
 
-queueLoop :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
-queueLoop allJobs = forever go where
-  go = do mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
-          whenRight (mdecode mkj) $ \jid -> do
-            mjob <- getJobById jid
-            whenJust mjob $ resumeJob allJobs
+queueLoop ::
+     forall a b. Store a
+  => [(T.Text, Flow a b)]
+  -> RFlowM ()
+queueLoop allJobs = forever go
+  where
+    go = do
+      mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
+      whenRight (mdecode mkj) $ \jid -> do
+        mjob <- getJobById jid
+        whenJust mjob $ resumeJob allJobs
 
-resumeFirstJob :: forall a b. Store a => [(T.Text, Flow a b)] -> RFlowM ()
+resumeFirstJob ::
+     forall a b. Store a
+  => [(T.Text, Flow a b)]
+  -> RFlowM ()
 resumeFirstJob allJobs = do
   mjid <- redis $ R.lpop "jobs_running"
-  whenRight (mdecode mjid) $ \(jid::JobId) -> do
+  whenRight (mdecode mjid) $ \(jid :: JobId) -> do
     mjob <- getJobById jid
     whenJust mjob $ resumeJob allJobs
 
-resumeJob :: forall a b. Store a => [(T.Text, Flow a b)] -> Job a -> RFlowM ()
+resumeJob ::
+     forall a b. Store a
+  => [(T.Text, Flow a b)]
+  -> Job a
+  -> RFlowM ()
 resumeJob allJobs job = do
-      whenJust (lookup (taskName job) allJobs) $ \flow -> do
-        let jobIdNm = BS8.pack $ "job_"++show (jobId job)
-        _1 .= jobIdNm
-        finishJob job =<< catching (runJob flow (argument job))
+  whenJust (lookup (taskName job) allJobs) $ \flow -> do
+    let jobIdNm = BS8.pack $ "job_" ++ show (jobId job)
+    _1 .= jobIdNm
+    finishJob job =<< catching (runJob flow (argument job))
 
 finishJob :: Store a => Job a -> Either String b -> RFlowM ()
 finishJob job y = do
   let jid = jobId job
-  let jobIdNm = BS8.pack $ "job_"++show jid
-  let newJob = case y of
-         Right _ -> job {jobStatus = JobDone}
-         Left err -> job {jobStatus = JobError, jobError = Just err}
+  let jobIdNm = BS8.pack $ "job_" ++ show jid
+  let newJob =
+        case y of
+          Right _  -> job {jobStatus = JobDone}
+          Left err -> job {jobStatus = JobError, jobError = Just err}
   redis $ R.set jobIdNm (encode newJob)
   redis $ R.lrem "jobs_running" 1 (encode jid)
   case y of
     Right _ -> redis $ R.rpush "jobs_done" [encode jid]
-    Left _ -> redis $ R.rpush "jobs_error" [encode jid]
+    Left _  -> redis $ R.rpush "jobs_error" [encode jid]
   return ()
 
 runJob :: Flow a b -> a -> RFlowM b
@@ -195,40 +216,44 @@ runJob (Step f) x = do
   case mv of
     Just y -> return y
     Nothing -> do
-      ey <- liftIO $ fmap Right (f x)
-                       `catch`
-                         (\e -> return $ Left (show (e::SomeException)))
+      ey <-
+        liftIO $
+        fmap Right (f x) `catch`
+        (\e -> return $ Left (show (e :: SomeException)))
       case ey of
-        Right y -> puttingSym n y
+        Right y  -> putSym n y
         Left err -> throwError err
 runJob (Name n' f) x = do
-  n <- (n'<>) <$> fresh
+  n <- (n' <>) <$> fresh
   mv <- lookupSym n
   case mv of
-    Just y -> return y
-    Nothing -> puttingSym n =<< runJob f x
+    Just y  -> return y
+    Nothing -> putSym n =<< runJob f x
 runJob (Arr f) x = return $ f x
 runJob (Compose f g) x = do
   y <- runJob f x
   runJob g y
-runJob (First f) (x,d) = do
+runJob (First f) (x, d) = do
   ey <- runJob f x
-  return $ (ey,d)
+  return $ (ey, d)
 runJob (Fanin f _) (Left x) = do
   runJob f x
 runJob (Fanin _ g) (Right x) = do
   runJob g x
-runJob (Fold fstep) (lst,acc) = go lst acc where
-  go [] y = return y
-  go (x:xs) y0 = do
-      y1 <- runJob fstep (x,y0)
+runJob (Fold fstep) (lst, acc) = go lst acc
+  where
+    go [] y = return y
+    go (x:xs) y0 = do
+      y1 <- runJob fstep (x, y0)
       go xs y1
-runJob (Catch f h) x = do
+runJob (Catch f h) x
   --st <- get
-  runJob f x `catchError` (\err -> do
+ = do
+  runJob f x `catchError`
+    (\err
     --put st  --TODO delete created variables?
-    runJob h (x,err))
-runJob (Par f g) (x,y) = do
+      -> do runJob h (x, err))
+runJob (Par f g) (x, y) = do
   ax <- async (runJob f x)
   ay <- async (runJob g y)
   waitBoth ax ay
