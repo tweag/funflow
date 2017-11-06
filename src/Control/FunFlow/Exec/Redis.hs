@@ -14,7 +14,6 @@ module Control.FunFlow.Exec.Redis where
 
 import           Control.Arrow
 import           Control.Arrow.Free                   (eval)
-import           Control.Concurrent.Async.Lifted
 import           Control.Exception
 import           Control.FunFlow.Base
 import qualified Control.FunFlow.ContentHashable      as CHash
@@ -28,20 +27,17 @@ import           Control.Monad.Fix                    (fix)
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control
 import           Data.ByteString                      (ByteString)
-import qualified Data.ByteString.Char8                as BS8
-import           Data.Either                          (fromRight, rights)
-import           Data.Maybe                           (catMaybes)
+import           Data.Either                          (fromRight)
 import           Data.Monoid                          ((<>))
 import           Data.Store
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as DTE
 import qualified Database.Redis                       as R
 import           GHC.Conc
-import           GHC.Generics
 import           Lens.Micro.Platform
 import           System.Clock                         (fromNanoSecs)
 
-data Redis
+data Redis = Redis
 
 instance Coordinator Redis where
   type Config Redis = R.Connection
@@ -82,7 +78,7 @@ instance Coordinator Redis where
         Right (Just v) -> case decode v of
           Left r                          -> fail $ "Decode fail: " ++ show r
           Right (TaskInfo (Completed ei)) -> return $ Just ei
-          Right (TaskInfo (Failed ei _))  -> return Nothing
+          Right (TaskInfo (Failed _ _))  -> return Nothing
           _ -> do
             liftIO $ threadDelay 500000
             waitGet
@@ -102,7 +98,7 @@ instance Coordinator Redis where
           case CHash.fromBytes chashbytes of
             Just chash -> do
               let status = Running $ ExecutionInfo executor (fromNanoSecs 0)
-              R.set chashbytes (encode $ TaskInfo status)
+              _ <- R.set chashbytes (encode $ TaskInfo status)
               return . Just $ TaskDescription chash serialised
             Nothing    -> fail $ "Cannot decode content hash."
 

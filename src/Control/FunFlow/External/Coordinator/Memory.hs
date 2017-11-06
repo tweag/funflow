@@ -16,7 +16,7 @@ import           Data.List                            (find)
 import qualified Data.Map.Strict                      as M
 import           System.Clock                         (fromNanoSecs)
 
-data MemoryCoordinator
+data MemoryCoordinator = MemoryCoordinator
 
 data MemHook = MemHook {
     _mhTaskQueue      :: TVar [TaskDescription]
