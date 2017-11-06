@@ -1,28 +1,35 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings #-}
+{-# LANGUAGE Arrows            #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-import Control.FunFlow.Base
-import Control.FunFlow.Steps
-import Control.FunFlow.Pretty
-import Control.FunFlow.Exec.Local
-import Control.FunFlow.Exec.Simple
-import Control.FunFlow.Exec.Redis
-import Control.Arrow
-import Database.Redis
-import Control.Monad.IO.Class
+import           Control.Arrow
+import           Control.Arrow.Free
+import           Control.FunFlow.Base
+import           Control.FunFlow.Exec.Local
+import           Control.FunFlow.Exec.Redis
+import           Control.FunFlow.Exec.Simple
+import           Control.FunFlow.Pretty
+import           Control.FunFlow.Steps
+import           Control.Monad.Catch         (Exception)
+import           Database.Redis
 
-myFlow :: Flow () Bool
+newtype MyEx = MyEx [Char]
+  deriving Show
+instance Exception MyEx
+
+myFlow :: Flow MyEx () Bool
 myFlow = proc () -> do
-  age <- promptFor <: "getNm" -< "How old are you"
+  age <- promptFor -< "How old are you"
   returnA -< age > (65::Int)
 
-flow2 :: Flow () (Double,Double)
+flow2 :: Flow MyEx () (Double,Double)
 flow2 = proc () -> do
-  r1 <- worstBernoulli -< 0.1
-  r2 <- worstBernoulli -< 0.2
+  r1 <- worstBernoulli MyEx -< 0.1
+  r2 <- worstBernoulli MyEx -< 0.2
   returnA -< (r1,r2)
 
-flow3 :: Flow [Int] [Int]
-flow3 = mapF (arr (+1))
+flow3 :: Flow MyEx [Int] [Int]
+flow3 = mapA (arr (+1))
 
 allJobs = [("job1", flow2)]
 
@@ -30,8 +37,8 @@ main :: IO ()
 main = do conn <- connect defaultConnectInfo
           runRFlow conn $ do jid <- sparkJob "job1" ()
                              resumeFirstJob allJobs
-                             js <- getJobStatus jid
-                             liftIO $ print js
+                             -- js <- getJobStatus jid
+                             -- liftIO $ print js
           return ()
 
           {-res <- runTillDone flow2 ()

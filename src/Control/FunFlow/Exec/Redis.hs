@@ -11,22 +11,24 @@
 
 module Control.FunFlow.Exec.Redis where
 
-import           Control.FunFlow.Base
-
-import           Data.Either                     (rights)
-import           Data.Maybe                      (catMaybes)
-import           Data.Store
-
+import           Control.Arrow
+import           Control.Arrow.Free              (eval)
 import           Control.Concurrent.Async.Lifted
 import           Control.Exception
+import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Monad.Base
+import           Control.Monad.Catch             hiding (catch)
+import qualified Control.Monad.Catch
 import           Control.Monad.Except
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control
 import           Data.ByteString                 (ByteString)
 import qualified Data.ByteString.Char8           as BS8
+import           Data.Either                     (rights)
+import           Data.Maybe                      (catMaybes)
 import           Data.Monoid                     ((<>))
+import           Data.Store
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as DTE
 import qualified Database.Redis                  as R
@@ -45,6 +47,13 @@ instance MonadBaseControl IO R.Redis where
   type StM R.Redis a = a
   liftBaseWith f = R.reRedis $ liftBaseWith $ \q -> f (q . R.unRedis)
   restoreM = R.reRedis . restoreM
+
+instance MonadThrow R.Redis where
+  throwM = liftIO . throwM
+
+instance MonadCatch R.Redis where
+  catch x y = R.reRedis
+            $ Control.Monad.Catch.catch (R.unRedis x) (R.unRedis <$> y)
 
 type FlowST = (NameSpace, R.Connection)
 
@@ -69,7 +78,7 @@ instance Store JobStatus
 
 instance Store a => Store (Job a)
 
--- | Run the RFlowM monad 
+-- | Run the RFlowM monad
 runRFlow :: R.Connection -> RFlowM a -> IO (Either String a)
 runRFlow conn mx = do
   R.runRedis conn $ evalStateT (runExceptT mx) ("", conn)
@@ -151,7 +160,7 @@ sparkJob nm x = do
   redis $ R.set (BS8.pack $ "job_" ++ show jid) (encode job)
   return jid
 
--- | Get all the jobs by status 
+-- | Get all the jobs by status
 getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
 getJobsByStatus js = do
   let queueNm =
@@ -174,8 +183,8 @@ getJobById jid = do
 
 -- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
 queueLoop ::
-     forall a b. Store a
-  => [(T.Text, Flow a b)]
+     forall ex a b. (Store a, Exception ex)
+  => [(T.Text, Flow ex a b)]
   -> RFlowM ()
 queueLoop allJobs = forever go
   where
@@ -187,8 +196,8 @@ queueLoop allJobs = forever go
 
 -- | Run the first job in the running queue. This is probably not so useful anymore
 resumeFirstJob ::
-     forall a b. Store a
-  => [(T.Text, Flow a b)]
+     forall ex a b. (Store a, Exception ex)
+  => [(T.Text, Flow ex a b)]
   -> RFlowM ()
 resumeFirstJob allJobs = do
   mjid <- redis $ R.lpop "jobs_running"
@@ -198,8 +207,8 @@ resumeFirstJob allJobs = do
 
 -- | Resume a job
 resumeJob ::
-     forall a b. Store a
-  => [(T.Text, Flow a b)]
+     forall ex a b. (Store a, Exception ex)
+  => [(T.Text, Flow ex a b)]
   -> Job a
   -> RFlowM ()
 resumeJob allJobs job = do
@@ -225,58 +234,32 @@ finishJob job y = do
   return ()
 
 -- | The `Flow` arrow interpreter
-runJob :: Flow a b -> a -> RFlowM b
-runJob (Step f) x = do
-  n <- fresh
-  mv <- lookupSym n
-  case mv of
-    Just y -> return y
-    Nothing -> do
-      ey <-
-        liftIO $
-        fmap Right (f x) `catch`
-        (\e -> return $ Left (show (e :: SomeException)))
-      case ey of
-        Right y  -> putSym n y
-        Left err -> throwError err
-runJob (Name n' f) x = do
-  n <- (n' <>) <$> fresh
-  mv <- lookupSym n
-  case mv of
-    Just y  -> return y
-    Nothing -> putSym n =<< runJob f x
-runJob (Arr f) x = return $ f x
-runJob (Compose f g) x = do
-  y <- runJob f x
-  runJob g y
-runJob (First f) (x, d) = do
-  ey <- runJob f x
-  return $ (ey, d)
-runJob (Fanin f _) (Left x) = do
-  runJob f x
-runJob (Fanin _ g) (Right x) = do
-  runJob g x
-runJob (Fold fstep) (lst, acc) = go lst acc
+runJob :: Exception ex => Flow ex a b -> a -> RFlowM b
+runJob flow input = runKleisli (eval runJob' flow) input
   where
-    go [] y = return y
-    go (x:xs) y0 = do
-      y1 <- runJob fstep (x, y0)
-      go xs y1
-runJob (Catch f h) x
-  --st <- get
- = do
-  runJob f x `catchError`
-    (\err
-    --put st  --TODO delete created variables?
-      -> do runJob h (x, err))
-runJob (Par f g) (x, y) = do
-  ax <- async (runJob f x)
-  ay <- async (runJob g y)
-  waitBoth ax ay
-runJob (Async ext) x = do
-  conn <- fmap snd get
-  let po = redisPostOffice conn
-  mbox <- liftIO $ reserveMailBox po
-  liftIO $ ext x po mbox
-  Right y <- decode <$> liftIO (awaitMail po mbox)
-  return y
+    runJob' (Step f) = Kleisli $ \x -> do
+      n <- fresh
+      mv <- lookupSym n
+      case mv of
+        Just y -> return y
+        Nothing -> do
+          ey <-
+            liftIO $
+            fmap Right (f x) `catch`
+            (\e -> return $ Left ((e :: SomeException)))
+          case ey of
+            Right y  -> putSym n y
+            Left err -> throw err
+    runJob' (Named n' f) = Kleisli $ \x -> do
+      n <- (n' <>) <$> fresh
+      mv <- lookupSym n
+      case mv of
+        Just y  -> return y
+        Nothing -> putSym n $ f x
+    runJob' (Async ext) = Kleisli $ \x -> do
+      conn <- fmap snd get
+      let po = redisPostOffice conn
+      mbox <- liftIO $ reserveMailBox po
+      liftIO $ ext x po mbox
+      Right y <- decode <$> liftIO (awaitMail po mbox)
+      return y

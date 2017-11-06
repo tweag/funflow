@@ -1,16 +1,22 @@
-{-# LANGUAGE Arrows, GADTs, OverloadedStrings, DeriveGeneric, ScopedTypeVariables #-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Control.FunFlow.Exec.Simple where
 
-import qualified Data.Text as T
-import Control.Exception (SomeException, catch)
-import Data.IORef
-import qualified Data.Map.Strict as Map
-import qualified Data.ByteString as BS
-import Control.Concurrent.MVar
-import Data.Store
-import Control.FunFlow.Base
-import Data.Unique
+import           Control.Arrow           (Kleisli (..), runKleisli)
+import           Control.Arrow.Free      (eval)
+import           Control.Concurrent.MVar
+import           Control.FunFlow.Base
+import           Control.Monad.Catch     (Exception)
+import qualified Data.ByteString         as BS
+import           Data.IORef
+import qualified Data.Map.Strict         as Map
+import           Data.Store
+import qualified Data.Text               as T
+import           Data.Unique
 
 newLocalPostOffice :: IO PostOffice
 newLocalPostOffice = do
@@ -45,38 +51,16 @@ newLocalPostOffice = do
     }
 
 -- | Simple evaulation of a flow
-runFlow :: Flow a b -> a -> IO b
-runFlow f' x' = do po <- newLocalPostOffice
-                   runFlow' po f' x'
+runFlow :: Exception ex => Flow ex a b -> a -> IO b
+runFlow flow input = do
+  po <- newLocalPostOffice
+  runKleisli (eval (runFlow' po) flow) input
   where
-    runFlow' :: PostOffice -> Flow a b -> a -> IO b
-    runFlow' _ (Step f) x = f x
-    runFlow' po (Name _ f) x = runFlow' po f x
-    runFlow' po (Compose f g) x = do
-      y <- runFlow' po f x
-      runFlow' po g y
-    runFlow' po (First f) (x,d) = do
-      y <- runFlow' po f x
-      return (y,d)
-    runFlow' _ (Arr f) x = return $ f x
-    runFlow' po (Par f g) (x,y) = do
-      w <- runFlow' po f x
-      z <- runFlow' po g y
-      return (w,z)
-    runFlow' po (Fanin f _) (Left x) =
-      runFlow' po f x
-    runFlow' po (Fanin _ g) (Right x) =
-      runFlow' po g x
-    runFlow' po (Fold fstep) (lst, acc) = go lst acc where
-      go [] y = return y
-      go (x:xs) y0 = do
-          y1 <- runFlow' po fstep (x,y0)
-          go xs y1
-    runFlow' po (Catch f h) x =
-      runFlow' po f x `catch` (\e -> runFlow' po h (x,show (e::SomeException)))
-    runFlow' po (Async ext) x = do
+    runFlow' :: PostOffice -> Flow' a b -> Kleisli IO a b
+    runFlow' _ (Step f) = Kleisli $ \x -> f x
+    runFlow' _ (Named _ f) = Kleisli $ \x -> return $ f x
+    runFlow' po (Async ext) = Kleisli $ \x -> do
       mbox <- reserveMailBox po
       ext x po mbox
       Right y <- decode <$> awaitMail po mbox
       return y
-
