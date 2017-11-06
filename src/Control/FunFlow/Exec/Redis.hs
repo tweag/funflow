@@ -12,7 +12,7 @@
 
 module Control.FunFlow.Exec.Redis where
 
-import           Control.Arrow
+import           Control.Arrow.Async
 import           Control.Arrow.Free                   (eval)
 import           Control.Exception
 import           Control.FunFlow.Base
@@ -174,11 +174,11 @@ runJob :: forall c ex a b. (Coordinator c, Exception ex)
         -> RFlowM b
 runJob _ cfg flow input = do
     hook <- initialise cfg
-    runKleisli (eval (runJob' hook) flow) input
+    runAsyncA (eval (runJob' hook) flow) input
   where
     runJob' :: Hook c -> Flow' a1 b1
-            -> Kleisli (ExceptT String (StateT FlowST R.Redis)) a1 b1
-    runJob' _ (Step f) = Kleisli $ \x -> do
+            -> AsyncA (ExceptT String (StateT FlowST R.Redis)) a1 b1
+    runJob' _ (Step f) = AsyncA $ \x -> do
       n <- fresh
       mv <- lookupSym n
       case mv of
@@ -191,13 +191,13 @@ runJob _ cfg flow input = do
           case ey of
             Right y  -> putSym n y
             Left err -> throw err
-    runJob' _ (Named n' f) = Kleisli $ \x -> do
+    runJob' _ (Named n' f) = AsyncA $ \x -> do
       n <- (n' <>) <$> fresh
       mv <- lookupSym n
       case mv of
         Just y  -> return y
         Nothing -> putSym n $ f x
-    runJob' po (External toTask) = Kleisli $ \x -> do
+    runJob' po (External toTask) = AsyncA $ \x -> do
       chash <- liftIO $ CHash.contentHash x
       submitTask po $ TaskDescription chash (encode $ toTask x)
       Just _ <- awaitTask po chash
