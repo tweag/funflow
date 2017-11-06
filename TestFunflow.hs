@@ -34,14 +34,7 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do conn <- connect defaultConnectInfo
-          runRFlow conn $ do jid <- sparkJob "job1" ()
-                             resumeFirstJob allJobs
-                             -- js <- getJobStatus jid
-                             -- liftIO $ print js
-          return ()
-
-          {-res <- runTillDone flow2 ()
+main = do res <- runTillDone flow2 ()
           print res
           putStrLn $ showFlow myFlow
           putStrLn $ showFlow flow2

@@ -5,6 +5,7 @@
 --   except for testing purposes.
 module Control.FunFlow.External.Coordinator.Memory where
 
+import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.STM.TVar
 import           Control.FunFlow.ContentHashable      (ContentHash)
 import           Control.FunFlow.External.Coordinator
@@ -49,8 +50,17 @@ instance Coordinator MemoryCoordinator where
     return $ case M.lookup tid eq of
       Just ti -> Just ti
       Nothing -> case find ((==tid) . (^. tdOutput)) tq of
-        Just _ -> Just $ TaskInfo Pending
+        Just _  -> Just $ TaskInfo Pending
         Nothing -> Nothing
+
+  awaitTask mh tid = liftIO $ do
+    ti <- taskInfo mh tid
+    case ti of
+      Nothing -> return Nothing
+      Just (TaskInfo (Completed ei)) -> return $ Just ei
+      _ -> do
+        threadDelay $ 5*1000000
+        awaitTask mh tid
 
   popTask mh executor = let
       executionInfo = ExecutionInfo executor (fromNanoSecs 0)

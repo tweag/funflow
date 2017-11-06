@@ -1,7 +1,8 @@
-{-# LANGUAGE StrictData             #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StrictData                 #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeFamilyDependencies     #-}
 module Control.FunFlow.External.Coordinator where
 
 import           Control.FunFlow.ContentHashable (ContentHash)
@@ -9,13 +10,19 @@ import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
 import qualified Data.ByteString                 as B
+import           Data.Store                      (Store)
+import           Data.Store.TH                   (makeStore)
+
 
 import           Network.HostName
 import           System.Clock                    (TimeSpec)
 
+instance Store TimeSpec
+
 -- | Information about an executor capable of running tasks. Currently this
 --   is just a newtype wrapper around hostname.
 newtype Executor = Executor HostName
+  deriving Store
 
 data TaskDescription = TaskDescription {
     _tdOutput     :: ContentHash
@@ -60,6 +67,11 @@ class Coordinator c where
   popTask :: MonadIO m => Hook c -> Executor
           -> m (Maybe TaskDescription)
 
+  -- | Await task completion. If the task is not running or an invalid
+  --   content hash is submitted, this will return Nothing immediately.
+  --   If the task has failed, this will also return 'Nothing'.
+  awaitTask :: MonadIO m => Hook c -> ContentHash -> m (Maybe ExecutionInfo)
+
   -- | Update execution status for a running task.
   --   This should error for a task which is not running.
   updateTaskStatus :: MonadIO m => Hook c -> ContentHash -> TaskStatus -> m ()
@@ -69,6 +81,9 @@ class Coordinator c where
 makeLenses ''TaskDescription
 makeLenses ''TaskInfo
 makeLenses ''ExecutionInfo
+makeStore ''TaskStatus
+makeStore ''ExecutionInfo
+makeStore ''TaskInfo
 
 -- Derived functionality
 
