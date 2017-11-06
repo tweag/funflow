@@ -49,7 +49,7 @@ instance Coordinator Redis where
   submitTask conn td = liftIO $ do
       R.runRedis conn $ do
         void $ R.rpush "jobs_queue" [encode (jid, td ^. tdSerialised)]
-        void $ R.set jid (encode $ TaskInfo Pending)
+        void $ R.set jid (encode Pending)
     where
       jid = CHash.toBytes $ td ^. tdOutput
 
@@ -61,31 +61,26 @@ instance Coordinator Redis where
       eoutput <- R.get $ CHash.toBytes chash
       case eoutput of
         Left r -> fail $ "Redis fail: " ++ show r
-        Right Nothing -> return Nothing
+        Right Nothing -> return UnknownTask
         Right (Just bs) -> case decode bs of
           Left r   -> fail $ "Decode fail: " ++ show r
-          Right ti -> return $ Just ti
+          Right ti -> return $ KnownTask ti
 
 
   awaitTask conn chash = liftIO . R.runRedis conn $
     fix $ \waitGet -> do
-      emv <- R.get $ CHash.toBytes chash
-      case emv of
-        Left r -> fail $ "redis fail " ++ show r
-        Right Nothing -> do
+      ti <- taskInfo conn chash
+      case ti of
+        UnknownTask -> return UnknownTask
+        info@(KnownTask (Completed _)) -> return info
+        info@(KnownTask (Failed _ _)) -> return info
+        _ -> do
           liftIO $ threadDelay 500000
           waitGet
-        Right (Just v) -> case decode v of
-          Left r                          -> fail $ "Decode fail: " ++ show r
-          Right (TaskInfo (Completed ei)) -> return $ Just ei
-          Right (TaskInfo (Failed _ _))  -> return Nothing
-          _ -> do
-            liftIO $ threadDelay 500000
-            waitGet
 
   updateTaskStatus conn chash status = liftIO $ do
     R.runRedis conn
-      $ void $ R.set (CHash.toBytes chash) (encode $ TaskInfo status)
+      $ void $ R.set (CHash.toBytes chash) (encode status)
 
   popTask conn executor = liftIO . R.runRedis conn $ do
     job <- R.brpoplpush "jobs_queue" "job_running" 1
@@ -98,7 +93,7 @@ instance Coordinator Redis where
           case CHash.fromBytes chashbytes of
             Just chash -> do
               let status = Running $ ExecutionInfo executor (fromNanoSecs 0)
-              _ <- R.set chashbytes (encode $ TaskInfo status)
+              _ <- R.set chashbytes (encode status)
               return . Just $ TaskDescription chash serialised
             Nothing    -> fail $ "Cannot decode content hash."
 
@@ -200,5 +195,5 @@ runJob _ cfg flow input = do
     runJob' po (External toTask) = Kleisli $ \x -> do
       chash <- liftIO $ CHash.contentHash x
       submitTask po $ TaskDescription chash (encode $ toTask x)
-      Just _ <- awaitTask po chash
+      KnownTask _ <- awaitTask po chash
       return chash

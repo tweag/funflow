@@ -31,5 +31,5 @@ runFlow _ cfg flow input = do
     runFlow' po (External toTask) = Kleisli $ \x -> do
       chash <- contentHash x
       submitTask po $ TaskDescription chash (encode $ toTask x)
-      Just _ <- awaitTask po chash
+      KnownTask _ <- awaitTask po chash
       return chash

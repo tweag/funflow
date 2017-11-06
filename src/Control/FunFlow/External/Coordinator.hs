@@ -37,9 +37,9 @@ data TaskStatus =
     -- | Task has failed with failure count
   | Failed ExecutionInfo Int
 
-data TaskInfo = TaskInfo {
-    _tiStatus :: TaskStatus
-  }
+data TaskInfo =
+    KnownTask TaskStatus
+  | UnknownTask
 
 data ExecutionInfo = ExecutionInfo {
     _eiExecutor :: Executor
@@ -60,17 +60,21 @@ class Coordinator c where
   queueSize :: MonadIO m => Hook c -> m Int
 
   -- | Fetch information on the current task
-  taskInfo :: MonadIO m => Hook c -> ContentHash -> m (Maybe TaskInfo)
+  taskInfo :: MonadIO m => Hook c -> ContentHash -> m TaskInfo
 
   -- | Pop a task off of the queue for execution. The popped task should be
   --   added to the execution queue
   popTask :: MonadIO m => Hook c -> Executor
           -> m (Maybe TaskDescription)
 
-  -- | Await task completion. If the task is not running or an invalid
-  --   content hash is submitted, this will return Nothing immediately.
-  --   If the task has failed, this will also return 'Nothing'.
-  awaitTask :: MonadIO m => Hook c -> ContentHash -> m (Maybe ExecutionInfo)
+  -- | Await task completion.
+  --
+  --   If the task is complete, this will return 'KnownTask Completed'.
+  --   If the task is failed, this will return 'KnownTask Failed'.
+  --   If the task is not known to the system, this will return 'UnknownTask'.
+  --   Otherwise (if the task is pending or running), this will block until
+  --   the task either completes or fails.
+  awaitTask :: MonadIO m => Hook c -> ContentHash -> m TaskInfo
 
   -- | Update execution status for a running task.
   --   This should error for a task which is not running.
@@ -79,7 +83,6 @@ class Coordinator c where
 -- TH Splices
 
 makeLenses ''TaskDescription
-makeLenses ''TaskInfo
 makeLenses ''ExecutionInfo
 makeStore ''TaskStatus
 makeStore ''ExecutionInfo
