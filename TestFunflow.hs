@@ -8,9 +8,10 @@ import           Control.FunFlow.Base
 import           Control.FunFlow.Exec.Local
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
+import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.Pretty
 import           Control.FunFlow.Steps
-import           Control.Monad.Catch         (Exception)
+import           Control.Monad.Catch                         (Exception)
 import           Database.Redis
 
 newtype MyEx = MyEx [Char]
@@ -34,16 +35,9 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do conn <- connect defaultConnectInfo
-          runRFlow conn $ do jid <- sparkJob "job1" ()
-                             resumeFirstJob allJobs
-                             -- js <- getJobStatus jid
-                             -- liftIO $ print js
-          return ()
-
-          {-res <- runTillDone flow2 ()
+main = do res <- runTillDone flow2 ()
           print res
           putStrLn $ showFlow myFlow
           putStrLn $ showFlow flow2
-          res1 <- runFlow flow3 [1..10]
-          print res1 -}
+          res1 <- runFlow MemoryCoordinator () flow3 [1..10]
+          print res1

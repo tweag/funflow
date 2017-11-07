@@ -15,8 +15,3 @@ data ExternalTask = ExternalTask {
 } deriving Generic
 
 instance Store ExternalTask
-
--- | Class of things which can be turned into an external task.
-class Externalisable a where
-  toExternalTask :: a -> ExternalTask
-

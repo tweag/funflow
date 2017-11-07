@@ -9,6 +9,8 @@
 
 module Control.FunFlow.ContentHashable
   ( ContentHash
+  , toBytes
+  , fromBytes
   , ContentHashable(..)
   , contentHashUpdate_binaryFile
   , contentHashUpdate_byteArray#
@@ -35,7 +37,7 @@ import           Crypto.Hash                   (Context, Digest, SHA256,
                                                 hashUpdate)
 import           Data.Bits                     (shiftL)
 import           Data.ByteArray                (Bytes, MemView (MemView),
-                                                allocAndFreeze)
+                                                allocAndFreeze, convert)
 import           Data.ByteArray.Encoding       (Base (Base64URLUnpadded),
                                                 convertFromBase, convertToBase)
 import qualified Data.ByteString               as BS
@@ -70,6 +72,12 @@ import           System.IO                     (IOMode (ReadMode),
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
   deriving (Eq, Ord, Show)
+
+toBytes :: ContentHash -> BS.ByteString
+toBytes (ContentHash digest) = convert digest
+
+fromBytes :: BS.ByteString -> Maybe ContentHash
+fromBytes bs = ContentHash <$> digestFromByteString bs
 
 -- | File path appropriate encoding of a hash
 hashToPath :: ContentHash -> FilePath

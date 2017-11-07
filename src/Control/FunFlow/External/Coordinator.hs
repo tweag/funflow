@@ -1,7 +1,8 @@
-{-# LANGUAGE StrictData             #-}
-{-# LANGUAGE TemplateHaskell        #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StrictData                 #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeFamilyDependencies     #-}
 module Control.FunFlow.External.Coordinator where
 
 import           Control.FunFlow.ContentHashable (ContentHash)
@@ -9,13 +10,19 @@ import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
 import qualified Data.ByteString                 as B
+import           Data.Store                      (Store)
+import           Data.Store.TH                   (makeStore)
+
 
 import           Network.HostName
 import           System.Clock                    (TimeSpec)
 
+instance Store TimeSpec
+
 -- | Information about an executor capable of running tasks. Currently this
 --   is just a newtype wrapper around hostname.
 newtype Executor = Executor HostName
+  deriving Store
 
 data TaskDescription = TaskDescription {
     _tdOutput     :: ContentHash
@@ -30,9 +37,9 @@ data TaskStatus =
     -- | Task has failed with failure count
   | Failed ExecutionInfo Int
 
-data TaskInfo = TaskInfo {
-    _tiStatus :: TaskStatus
-  }
+data TaskInfo =
+    KnownTask TaskStatus
+  | UnknownTask
 
 data ExecutionInfo = ExecutionInfo {
     _eiExecutor :: Executor
@@ -53,12 +60,21 @@ class Coordinator c where
   queueSize :: MonadIO m => Hook c -> m Int
 
   -- | Fetch information on the current task
-  taskInfo :: MonadIO m => Hook c -> ContentHash -> m (Maybe TaskInfo)
+  taskInfo :: MonadIO m => Hook c -> ContentHash -> m TaskInfo
 
   -- | Pop a task off of the queue for execution. The popped task should be
   --   added to the execution queue
   popTask :: MonadIO m => Hook c -> Executor
           -> m (Maybe TaskDescription)
+
+  -- | Await task completion.
+  --
+  --   If the task is complete, this will return 'KnownTask Completed'.
+  --   If the task is failed, this will return 'KnownTask Failed'.
+  --   If the task is not known to the system, this will return 'UnknownTask'.
+  --   Otherwise (if the task is pending or running), this will block until
+  --   the task either completes or fails.
+  awaitTask :: MonadIO m => Hook c -> ContentHash -> m TaskInfo
 
   -- | Update execution status for a running task.
   --   This should error for a task which is not running.
@@ -67,8 +83,10 @@ class Coordinator c where
 -- TH Splices
 
 makeLenses ''TaskDescription
-makeLenses ''TaskInfo
 makeLenses ''ExecutionInfo
+makeStore ''TaskStatus
+makeStore ''ExecutionInfo
+makeStore ''TaskInfo
 
 -- Derived functionality
 
