@@ -5,7 +5,6 @@
 import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.FunFlow.Base
-import           Control.FunFlow.Exec.Local
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External.Coordinator.Memory
@@ -29,14 +28,19 @@ flow2 = proc () -> do
   r2 <- worstBernoulli MyEx -< 0.2
   returnA -< (r1,r2)
 
+flow2caught :: Flow MyEx () (Double,Double)
+flow2caught = retry 100 0 flow2
+
 flow3 :: Flow MyEx [Int] [Int]
 flow3 = mapA (arr (+1))
 
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do res <- runTillDone flow2 ()
+main = do res <- runFlow MemoryCoordinator () flow2 ()
           print res
+          res' <- runFlow MemoryCoordinator () flow2caught ()
+          print res'
           putStrLn $ showFlow myFlow
           putStrLn $ showFlow flow2
           res1 <- runFlow MemoryCoordinator () flow3 [1..10]
