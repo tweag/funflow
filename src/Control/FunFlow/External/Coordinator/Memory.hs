@@ -8,6 +8,7 @@ module Control.FunFlow.External.Coordinator.Memory where
 import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.STM.TVar
 import           Control.FunFlow.ContentHashable      (ContentHash)
+import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad.IO.Class               (liftIO)

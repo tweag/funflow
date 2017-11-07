@@ -3,10 +3,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeFamilyDependencies     #-}
-module Control.FunFlow.External.Coordinator (
-    module Control.FunFlow.External.Coordinator
-  , TaskDescription(..)
-  ) where
+module Control.FunFlow.External.Coordinator where
 
 import           Control.FunFlow.ContentHashable (ContentHash)
 import           Control.FunFlow.External
@@ -80,7 +77,6 @@ class Coordinator c where
 
 -- TH Splices
 
-makeLenses ''TaskDescription
 makeLenses ''ExecutionInfo
 makeStore ''TaskStatus
 makeStore ''ExecutionInfo
