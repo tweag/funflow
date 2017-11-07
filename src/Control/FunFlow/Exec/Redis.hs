@@ -40,11 +40,11 @@ import           System.Clock                         (fromNanoSecs)
 data Redis = Redis
 
 instance Coordinator Redis where
-  type Config Redis = R.Connection
+  type Config Redis = R.ConnectInfo
   type Hook Redis = R.Connection
 
   -- | Create a redis connection
-  initialise = return
+  initialise = liftIO . R.connect
 
   submitTask conn td = liftIO $ do
       R.runRedis conn $ do
