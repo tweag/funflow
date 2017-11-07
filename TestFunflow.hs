@@ -16,6 +16,7 @@ import           Control.FunFlow.Steps
 import           Control.Monad.Catch                         (Exception)
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
+import           System.Posix.Temp                           (mkdtemp)
 
 newtype MyEx = MyEx [Char]
   deriving Show
@@ -41,14 +42,16 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do res <- runFlow MemoryCoordinator () flow2 ()
-          print res
-          res' <- runFlow MemoryCoordinator () flow2caught ()
-          print res'
-          putStrLn $ showFlow myFlow
-          putStrLn $ showFlow flow2
-          res1 <- runFlow MemoryCoordinator () flow3 [1..10]
-          print res1
+main = do
+  storeDir <- mkdtemp "test"
+  res <- runFlow MemoryCoordinator () storeDir flow2 ()
+  print res
+  res' <- runFlow MemoryCoordinator () storeDir flow2caught ()
+  print res'
+  putStrLn $ showFlow myFlow
+  putStrLn $ showFlow flow2
+  res1 <- runFlow MemoryCoordinator () storeDir flow3 [1..10]
+  print res1
 -- main = redisTest
 
 redisTest :: IO ()
@@ -66,5 +69,5 @@ redisTest = let
       , _etWriteToStdOut = True
       }
   in do
-    out <- runFlow Redis redisConf flow someString
+    out <- runFlow Redis redisConf "/tmp" flow someString
     print out
