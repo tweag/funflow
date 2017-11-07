@@ -3,7 +3,7 @@
 -- | Definition of external tasks
 module Control.FunFlow.External where
 
-import           Control.FunFlow.ContentHashable (ContentHash)
+import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
 import           Control.Lens.TH
 import           Data.Store                      (Store)
 import qualified Data.Text                       as T
@@ -22,6 +22,7 @@ data ExternalTask = ExternalTask {
   , _etWriteToStdOut :: Bool
 } deriving Generic
 
+instance ContentHashable ExternalTask
 instance Store ExternalTask
 
 data TaskDescription = TaskDescription {
