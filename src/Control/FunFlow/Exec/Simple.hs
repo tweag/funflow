@@ -10,9 +10,9 @@ import           Control.Arrow                        (Kleisli (..), runKleisli)
 import           Control.Arrow.Free                   (eval)
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
+import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Monad.Catch                  (Exception, try)
-import           Data.Store
 
 -- | Simple evaulation of a flow
 runFlow :: forall c ex a b. (Coordinator c, Exception ex)

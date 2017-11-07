@@ -3,14 +3,16 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeFamilyDependencies     #-}
-module Control.FunFlow.External.Coordinator where
+module Control.FunFlow.External.Coordinator (
+    module Control.FunFlow.External.Coordinator
+  , TaskDescription(..)
+  ) where
 
 import           Control.FunFlow.ContentHashable (ContentHash)
 import           Control.FunFlow.External
 import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
-import qualified Data.ByteString                 as B
 import           Data.Store                      (Store)
 import           Data.Store.TH                   (makeStore)
 
@@ -24,11 +26,6 @@ instance Store TimeSpec
 --   is just a newtype wrapper around hostname.
 newtype Executor = Executor HostName
   deriving Store
-
-data TaskDescription = TaskDescription {
-    _tdOutput :: ContentHash
-  , _tdTask   :: ExternalTask
-  }
 
 data TaskStatus =
     -- | Task is in the queue and has not begun executing
