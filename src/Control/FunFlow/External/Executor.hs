@@ -2,6 +2,7 @@
 -- | Executor for external tasks.
 module Control.FunFlow.External.Executor where
 
+import           Control.Exception                    (IOException, try)
 import           Control.FunFlow.ContentStore
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
@@ -50,16 +51,21 @@ execute store td = do
           else return Inherit
 
         start <- getTime Monotonic
-        (_, _, _, ph) <- createProcess $ procSpec out
-        exitCode <- waitForProcess ph
-        end <- getTime Monotonic
-        case exitCode of
-          ExitSuccess   -> do
-            markComplete store (td ^. tdOutput)
-            return $ Success (diffTimeSpec start end)
-          ExitFailure i -> do
+        mp <- try $ createProcess $ procSpec out
+        case mp of
+          Left (_ex :: IOException) -> do
             removeFailed store (td ^. tdOutput)
-            return $ Failure (diffTimeSpec start end) i
+            return $ Failure (diffTimeSpec start start) 2
+          Right (_, _, _, ph) -> do
+            exitCode <- waitForProcess ph
+            end <- getTime Monotonic
+            case exitCode of
+              ExitSuccess   -> do
+                markComplete store (td ^. tdOutput)
+                return $ Success (diffTimeSpec start end)
+              ExitFailure i -> do
+                removeFailed store (td ^. tdOutput)
+                return $ Failure (diffTimeSpec start end) i
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
