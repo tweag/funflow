@@ -6,6 +6,7 @@
 module Control.FunFlow.External.Coordinator where
 
 import           Control.FunFlow.ContentHashable (ContentHash)
+import           Control.FunFlow.External
 import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
@@ -25,8 +26,8 @@ newtype Executor = Executor HostName
   deriving Store
 
 data TaskDescription = TaskDescription {
-    _tdOutput     :: ContentHash
-  , _tdSerialised :: B.ByteString
+    _tdOutput :: ContentHash
+  , _tdTask   :: ExternalTask
   }
 
 data TaskStatus =
