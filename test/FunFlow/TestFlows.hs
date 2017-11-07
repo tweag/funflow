@@ -1,16 +1,16 @@
-{-# LANGUAGE GADTs                     #-}
+{-# LANGUAGE GADTs #-}
 
 module FunFlow.TestFlows where
 
+import           Control.Arrow
+import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Steps
-import           Control.Arrow
+import           Control.Monad                               (when)
+import           Data.Dynamic
+import           System.Directory
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Control.Exception
-import           System.Directory
-import           Control.Monad (when)
-import           Data.Dynamic
 
 import           Control.FunFlow.Exec.Local
 import           Control.FunFlow.Exec.Redis
@@ -30,7 +30,7 @@ flowAssertions :: [FlowAssertion]
 flowAssertions =
   [ FlowAssertion "death" "foo" melancholicLazarus Nothing setup
   , FlowAssertion "resurrection" "bar" (retry 1 1 melancholicLazarus) (Just "bar") setup
-  , FlowAssertion "bernoulli" 0.2 (retry 20 1 $ worstBernoulli (toException . toDyn) >>> arr (<2.0)) (Just True) (return ())
+  , FlowAssertion "bernoulli" 0.2 (retry 20 0 $ worstBernoulli (toException . toDyn) >>> arr (<2.0)) (Just True) (return ())
   , FlowAssertion "failStep" () failStep Nothing (return ())
 
   ]

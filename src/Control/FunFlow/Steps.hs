@@ -8,12 +8,13 @@ module Control.FunFlow.Steps where
 
 import           Control.Arrow
 import           Control.Arrow.Free   (catch)
-import           Control.Exception    (Exception, throw)
+import           Control.Exception    (Exception)
 import           Control.FunFlow.Base
+import           Control.Monad.Catch  (throwM)
 import           Data.Store
 import           GHC.Conc             (threadDelay)
-import           System.Random
 import           System.Directory
+import           System.Random
 
 promptFor :: Read a => Flow ex String a
 promptFor = proc s -> do
@@ -32,7 +33,7 @@ worstBernoulli errorC = step $ \p -> do
   r <- randomRIO (0,1)
   if r < p
     then return r
-    else throw . errorC $ "worstBernoulli fail with "++ show r++ " > "++show p
+    else throwM . errorC $ "worstBernoulli fail with "++ show r++ " > "++show p
 
 -- | pause for a given number of seconds. Thread through a value to ensure
 --   delay does not happen inparallel with other processing
