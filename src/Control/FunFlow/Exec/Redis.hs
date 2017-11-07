@@ -193,7 +193,7 @@ runJob _ cfg flow input = do
         Just y  -> return y
         Nothing -> putSym n $ f x
     runJob' po (External toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ CHash.contentHash x
+      chash <- liftIO $ CHash.contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
       return chash

@@ -29,7 +29,7 @@ runFlow _ cfg flow input = do
     runFlow' _ (Step f) = Kleisli $ \x -> f x
     runFlow' _ (Named _ f) = Kleisli $ \x -> return $ f x
     runFlow' po (External toTask) = Kleisli $ \x -> do
-      chash <- contentHash x
+      chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
       return chash
