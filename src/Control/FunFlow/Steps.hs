@@ -24,6 +24,9 @@ promptFor = proc s -> do
 printS :: Show a => Flow ex a ()
 printS = step $ \s-> print s
 
+failStep :: Flow ex () ()
+failStep = step $ \_ -> fail "failStep"
+
 worstBernoulli :: Exception ex => (String -> ex) -> Flow ex Double Double
 worstBernoulli errorC = step $ \p -> do
   r <- randomRIO (0,1)
