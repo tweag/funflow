@@ -13,6 +13,7 @@ import           Control.FunFlow.Base
 import           Data.Store
 import           GHC.Conc             (threadDelay)
 import           System.Random
+import           System.Directory
 
 promptFor :: Read a => Flow ex String a
 promptFor = proc s -> do
@@ -36,6 +37,17 @@ pauseWith :: Store a => Flow ex (Int, a) a
 pauseWith = step $ \(secs,a) -> do
   threadDelay (secs*1000000)
   return a
+
+melancholicLazarus :: Flow ex String String
+melancholicLazarus = step $ \s -> do
+  let fnm = "/tmp/lazarus_note"
+  ex <- doesFileExist fnm
+  if ex
+    then do s1 <- readFile fnm
+            removeFile fnm
+            return s1
+    else do writeFile fnm s
+            fail "lazarus fail"
 
 -- | `retry n s f` reruns `f` on failure at most n times with a delay of `s`
 --   seconds between retries
