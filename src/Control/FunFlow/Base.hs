@@ -29,6 +29,9 @@ step = effect . Step
 named :: Store b => T.Text -> (a -> b) -> Flow ex a b
 named n f = effect $ Named n f
 
+external :: ContentHashable a => (a -> ExternalTask) -> Flow ex a ContentHash
+external = effect . External
+
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow ex a b -> Diagram ex a b
 toDiagram flow = eval toDiagram' flow where

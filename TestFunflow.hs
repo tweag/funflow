@@ -5,13 +5,17 @@
 import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.FunFlow.Base
+import           Control.FunFlow.ContentHashable             (ContentHash)
+import           Control.FunFlow.Exec.Local
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
+import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.Pretty
 import           Control.FunFlow.Steps
 import           Control.Monad.Catch                         (Exception)
-import           Database.Redis
+import qualified Data.Text                                   as T
+import qualified Database.Redis                              as R
 
 newtype MyEx = MyEx [Char]
   deriving Show
@@ -45,3 +49,22 @@ main = do res <- runFlow MemoryCoordinator () flow2 ()
           putStrLn $ showFlow flow2
           res1 <- runFlow MemoryCoordinator () flow3 [1..10]
           print res1
+-- main = redisTest
+
+redisTest :: IO ()
+redisTest = let
+    redisConf = R.defaultConnectInfo {
+        R.connectHost = "10.233.2.2"
+      , R.connectPort = R.PortNumber . fromIntegral $ 6379
+      , R.connectAuth = Nothing
+      }
+    someString = "Hello World" :: T.Text
+    flow :: Flow MyEx T.Text ContentHash
+    flow = external $ \t -> ExternalTask {
+        _etCommand = "/run/current-system/sw/bin/echo"
+      , _etParams = [t]
+      , _etWriteToStdOut = True
+      }
+  in do
+    out <- runFlow Redis redisConf flow someString
+    print out

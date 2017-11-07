@@ -2,7 +2,6 @@
 -- | Executor for external tasks.
 module Control.FunFlow.External.Executor where
 
-import           Control.Concurrent                   (threadDelay)
 import           Control.FunFlow.ContentStore
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
@@ -81,7 +80,7 @@ executeLoop _ cfg sroot = do
   forever $ do
     mtask <- popTask hook executor
     case mtask of
-      Nothing -> threadDelay 1000000
+      Nothing -> return ()
       Just task -> do
         res <- execute store task
         updateTaskStatus hook (task ^. tdOutput) $ case res of
