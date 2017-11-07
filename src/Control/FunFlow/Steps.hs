@@ -38,6 +38,8 @@ pauseWith = step $ \(secs,a) -> do
   threadDelay (secs*1000000)
   return a
 
+-- | on first invocation die and leave a suicide note
+--   on second invocation it is resurrected and destroys suicide note, returning contents
 melancholicLazarus :: Flow ex String String
 melancholicLazarus = step $ \s -> do
   let fnm = "/tmp/lazarus_note"
