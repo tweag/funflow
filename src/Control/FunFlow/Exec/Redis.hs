@@ -47,7 +47,7 @@ instance Coordinator Redis where
 
   submitTask conn td = liftIO $ do
       R.runRedis conn $ do
-        void $ R.rpush "jobs_queue" [encode (jid, td ^. tdSerialised)]
+        void $ R.rpush "jobs_queue" [encode (jid, td ^. tdTask)]
         void $ R.set jid (encode Pending)
     where
       jid = CHash.toBytes $ td ^. tdOutput
@@ -88,12 +88,12 @@ instance Coordinator Redis where
       Right Nothing -> return Nothing
       Right (Just bs) -> case decode bs of
         Left r                          -> fail $ "Decode fail: " ++ show r
-        Right (chashbytes, serialised) ->
+        Right (chashbytes, task) ->
           case CHash.fromBytes chashbytes of
             Just chash -> do
               let status = Running $ ExecutionInfo executor (fromNanoSecs 0)
               _ <- R.set chashbytes (encode status)
-              return . Just $ TaskDescription chash serialised
+              return . Just $ TaskDescription chash task
             Nothing    -> fail $ "Cannot decode content hash."
 
 type NameSpace = ByteString
@@ -193,6 +193,6 @@ runJob _ cfg flow input = do
         Nothing -> putSym n $ f x
     runJob' po (External toTask) = AsyncA $ \x -> do
       chash <- liftIO $ CHash.contentHash x
-      submitTask po $ TaskDescription chash (encode $ toTask x)
+      submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
       return chash
