@@ -27,7 +27,6 @@ import           Control.Monad.Fix                    (fix)
 import           Control.Monad.State.Strict
 import           Control.Monad.Trans.Control
 import           Data.ByteString                      (ByteString)
-import           Data.Either                          (fromRight)
 import           Data.Monoid                          ((<>))
 import           Data.Store
 import qualified Data.Text                            as T
@@ -54,7 +53,7 @@ instance Coordinator Redis where
       jid = CHash.toBytes $ td ^. tdOutput
 
   queueSize conn = liftIO $ R.runRedis conn $ do
-    fromIntegral . Data.Either.fromRight 0 <$> R.llen "jobs_queue"
+    fromIntegral . fromRight 0 <$> R.llen "jobs_queue"
 
   taskInfo conn chash = liftIO $ do
     R.runRedis conn $ do

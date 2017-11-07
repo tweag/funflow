@@ -24,6 +24,6 @@ eitherToMaybe :: Either a b -> Maybe b
 eitherToMaybe (Left _) = Nothing
 eitherToMaybe (Right x) = Just x
 
-fromRight :: Show a => Either a b -> b
-fromRight (Right x) = x
-fromRight (Left e) = error $ "fromRight: Left "++show e
+fromRight :: Show a => b -> Either a b -> b
+fromRight _ (Right x) = x
+fromRight d (Left _) = d
