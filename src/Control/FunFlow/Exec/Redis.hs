@@ -17,6 +17,7 @@ import           Control.Arrow.Free                   (eval)
 import           Control.Exception
 import           Control.FunFlow.Base
 import qualified Control.FunFlow.ContentHashable      as CHash
+import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.Utils
 import           Control.Monad.Base
