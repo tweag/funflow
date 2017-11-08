@@ -1,5 +1,6 @@
 module Control.FunFlow.Utils where
 
+import Control.Monad (unless)
 import Control.Monad.Except
 import Data.Store
 import Data.ByteString (ByteString)
@@ -27,3 +28,8 @@ eitherToMaybe (Right x) = Just x
 fromRight :: Show a => b -> Either a b -> b
 fromRight _ (Right x) = x
 fromRight d (Left _) = d
+
+unlessM :: Monad m => m Bool -> m () -> m ()
+unlessM test action = do
+  t <- test
+  unless t action

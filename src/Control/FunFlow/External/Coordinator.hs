@@ -49,6 +49,8 @@ class Coordinator c where
   initialise :: MonadIO m => Config c -> m (Hook c)
 
   -- | Submit a task to the task queue.
+  --   If this task is already known to the system and not completed, then
+  --   it should not be re-added to the task queue as a result of this call.
   submitTask :: MonadIO m => Hook c -> TaskDescription -> m ()
 
   -- | View the size of the current task queue
@@ -90,3 +92,16 @@ startTask :: (Coordinator c, MonadIO m)
 startTask h = liftIO $ do
   executorInfo <- Executor <$> getHostName
   popTask h executorInfo
+
+-- | Check if a task is currently 'in progress' - e.g.
+--   pending or running.
+isInProgress :: (Coordinator c, MonadIO m)
+          => Hook c
+          -> ContentHash
+          -> m Bool
+isInProgress h ch = do
+  ti <- taskInfo h ch
+  return $ case ti of
+    KnownTask Pending     -> True
+    KnownTask (Running _) -> True
+    _                     -> False
