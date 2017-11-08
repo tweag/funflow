@@ -21,6 +21,10 @@ data ExecutionResult =
     --   to execute. This is also returned if the job is already running
     --   elsewhere.
     Cached
+    -- | The computation is already running elsewhere. This is probably
+    --   indicative of a bug, because the coordinator should only allow one
+    --   instance of a task to be running at any time.
+  | AlreadyRunning
     -- | Execution completed successfully after a certain amount of time.
   | Success TimeSpec
     -- | Execution failed with the following exit code.
@@ -32,7 +36,7 @@ execute :: CS.ContentStore -> TaskDescription -> IO ExecutionResult
 execute store td = do
   instruction <- CS.constructIfMissing store (td ^. tdOutput)
   case instruction of
-    CS.Wait -> return Cached
+    CS.Wait -> return AlreadyRunning
     CS.Consume _ -> return Cached
     CS.Construct fp -> let
         defaultProc = proc (T.unpack $ td ^. tdTask . etCommand)
@@ -89,7 +93,8 @@ executeLoop _ cfg sroot = do
       Nothing -> return ()
       Just task -> do
         res <- execute store task
-        updateTaskStatus hook (task ^. tdOutput) $ case res of
-          Cached      -> fromCache
-          Success t   -> afterTime t
-          Failure t i -> afterFailure t i
+        case res of
+          Cached      -> updateTaskStatus hook (task ^. tdOutput) fromCache
+          Success t   -> updateTaskStatus hook (task ^. tdOutput) $ afterTime t
+          Failure t i -> updateTaskStatus hook (task ^. tdOutput) $ afterFailure t i
+          AlreadyRunning -> return ()
