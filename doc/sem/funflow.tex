@@ -1,0 +1,217 @@
+\documentclass[11pt]{beamer}
+\usetheme{CambridgeUS}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{listings}
+\lstset{language=Haskell}
+\author{Tom Nielsen, Nicholas Clarke, Andreas Hermann}
+\title{FunFlow}
+%\setbeamercovered{transparent} 
+%\setbeamertemplate{navigation symbols}{} 
+%\logo{} 
+%\institute{} 
+\date{2017-11-09} 
+%\subject{} 
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Contents}
+\tableofcontents
+\end{frame}
+
+\begin{frame}{What is FunFlow?}
+\begin{itemize}
+\item A Workflow system in Haskell based on arrows.
+\begin{itemize}
+\item Steps capture both inputs and outputs.
+\item Encapsulates both pure and effectful computation.
+\item Arrows can be inspected (unlike monads).
+\end{itemize}
+\item (Will) Support extending over arbitrary term DSLs
+\item Easy to integrate into other systems.
+\item Clean support for both in-process and out-of-process computation.
+\item Supports distributing out-of-process computation.
+\item Uses nix-like hashing to ensure caching and dependency capture.
+\end{itemize}
+\end{frame}
+\begin{frame}{Why another workflow system?}
+We evaluated Luigi and found it wanting\dots \\
+\pause
+Vs Luigi, Drake etc.
+\begin{itemize}
+\item Designed for integration into wider systems.
+\item Much more principled dependency management.
+\end{itemize}
+\pause
+Vs Taverna, YAWL, BPEL etc
+\begin{itemize}
+\item Based on a pretty simple framework.
+\item No XML, WSDL, SOAP\dots
+\item Easy to scale deployments.
+\end{itemize}
+\pause
+Vs nix
+\begin{itemize}
+\item Speed
+\item Easier to "mix-in" with other approaches.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Core DSL}
+\begin{lstlisting}[basicstyle=\tiny]
+data Flow' eff a b where
+  -- Pure and effectful computations
+  Step    :: Store b => (a -> IO b) -> Flow' a b
+  Named   :: Store b => T.Text -> (a -> b) -> Flow' a b
+  
+  -- External tasks
+  External :: ContentHashable a => (a -> ExternalTask) -> Flow' a ContentHash
+  PutInStore :: (ContentHashable a, Store a) => Flow' a ContentHash
+  GetFromStore :: (ContentHashable a, Store a) => Flow' ContentHash (Maybe a)
+  
+  -- Wrapped client DSL
+  Wrapped :: eff a b -> Flow' a b
+
+type Flow eff ex = ErrorChoice ex (Flow' eff)
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Internal and External steps}
+We clearly delineate between Haskell computations and external ones.
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{center}
+Internal
+\begin{itemize}
+\item Arbitrary Haskell computation
+\item Great for gluing things together.
+\item Takes advantage of Haskell type system.
+\item Can be extended to cover a specific domain.
+\end{itemize}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth} 
+\begin{center}
+External
+\begin{itemize}
+\item Computations are just commands.
+\item Easy to distribute between nodes.
+\item Read and write from the content store.
+\item Only the hash is represented in Haskell land.
+\end{itemize}
+\end{center}	
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{External steps}
+\begin{lstlisting}[basicstyle=\tiny, frame=single]
+External :: ContentHashable a => (a -> ExternalTask) -> Flow' a ContentHash
+run (External toTask) = ...
+\end{lstlisting}
+\begin{enumerate}
+\item Calculate the hash of $(x, toTask x)$
+\end{enumerate}
+\end{frame}
+\begin{frame}{External steps}
+Why external steps?
+\begin{itemize}
+\item We can use things written in any language.
+\item Avoid the issue of shipping Haskell computations.
+\item External tasks can take advantage of other tools:
+\begin{itemize}
+\item Docker
+\item Nix
+\end{itemize}
+\item A crucial point: we can require that the task itself is hashable. So if the task changes, so does the output hash. Hard to do with in-process computation!
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Content Hashable}
+Inspired by Nix: acts much like a normal Hash, but for its treatment of files/directories:
+\begin{lstlisting}[basicstyle=\tiny]
+-- | Path to a regular file
+--
+-- Only the file's content is taken into account when generating the content hash.
+-- The path itself is ignored.
+newtype FileContent = FileContent FilePath
+
+instance ContentHashable FileContent where
+
+  contentHashUpdate ctx (FileContent fp) = contentHashUpdate_binaryFile ctx fp
+
+
+-- | Path to a directory
+--
+-- Only the contents of the directory and their path relative to the directory
+-- are taken into account when generating the content hash.
+-- The path to the directory is ignored.
+newtype DirectoryContent = DirectoryContent FilePath
+
+instance ContentHashable DirectoryContent where
+
+  contentHashUpdate ctx0 (DirectoryContent root) = foldM go ctx0 =<< sort <$> listDirectory root
+    where
+      go ctx curr = ...
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Content Store}
+Again, inspired by nix. A managed area of the filesystem which holds content-hashed directories.
+\begin{lstlisting}[basicstyle=\tiny]
+[nc@varda:~]$ ll /tmp/tmp.i54QL7iKhU/
+total 20
+dr-xr-xr-x 2 nc users 4096 Nov  7 16:21 Ddqi9r69FZmNbNXBkcbvnbmST9NlDZGgnF3w6G5u9mU
+drwxr-xr-x 2 nc users 4096 Nov  7 16:21 EH_LMIAhtnDp759qZQA8hKQvAamd76eeoBiXnOW_7po
+dr-xr-xr-x 2 nc users 4096 Nov  7 17:03 eVTW269tao9Z3pNhMfRMJIDWkmmgmHOUhZZUUTNtvzc
+dr-xr-xr-x 2 nc users 4096 Nov  7 16:02 JLZttS-FEJgae7iTBHEO4sJolB-kmjrPUerRbgSbPao
+dr-xr-xr-x 2 nc users 4096 Nov  7 15:43 Li1y-bG1GNY14zSLx_qzsLB8IMUBlzdbAKcE5lZaJak
+
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]{Example Flow}
+Note that we interpose our own effects:
+\begin{lstlisting}[basicstyle=\tiny]
+projectOnto :: Flow ContentHash ContentHash
+projectOnto = proc input -> do
+  dockerFlow -< DockerConfig
+                  "pfizer/trainPCA"
+                  (SingleInput input)
+                  "/usr/bin/python"
+                  ["..."]
+
+transformPCA :: Flow TableName (Matrix Int Int)
+transformPCA = proc tableName -> do
+  input <- (sqlQuery $ \tableName -> TL.toStrict
+              $ format "select * from {}" ( Only tableName )
+           )
+        -< tableName
+  inputPath <- putInStore -< input
+  resultPath <- projectOnto -< inputPath
+  results <- getFromStore -< resultPath
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Some current assumptions}
+\begin{itemize}
+\item Content store is shared between all machines.
+\item Coordinator is permanently available.
+\item All resources needed to run a given computation are available on all nodes.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ideas}
+\begin{itemize}
+\item Unify the content store with the coordinator DB (using inotify).
+\item Phantom types to glue together external steps.
+\end{itemize}
+\end{frame}
+
+
+\end{document}
