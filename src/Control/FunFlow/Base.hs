@@ -20,6 +20,8 @@ data Flow' a b where
   Step    :: Store b => (a -> IO b) -> Flow' a b
   Named   :: Store b => T.Text -> (a -> b) -> Flow' a b
   External :: ContentHashable a => (a -> ExternalTask) -> Flow' a ContentHash
+  PutInStore :: (ContentHashable a, Store a) => Flow' a ContentHash
+  GetFromStore :: (ContentHashable a, Store a) => Flow' ContentHash (Maybe a)
 
 type Flow ex = ErrorChoice ex Flow'
 
@@ -31,6 +33,12 @@ named n f = effect $ Named n f
 
 external :: ContentHashable a => (a -> ExternalTask) -> Flow ex a ContentHash
 external = effect . External
+
+putInStore :: (ContentHashable a, Store a) => Flow ex a ContentHash
+putInStore = effect $ PutInStore
+getFromStore :: (ContentHashable a, Store a) => Flow ex ContentHash (Maybe a)
+getFromStore = effect $ GetFromStore
+
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow ex a b -> Diagram ex a b

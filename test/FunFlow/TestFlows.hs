@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs, Arrows #-}
+{-# LANGUAGE Arrows #-}
+{-# LANGUAGE GADTs  #-}
 
 module FunFlow.TestFlows where
 
@@ -8,6 +9,7 @@ import           Control.FunFlow.Base
 import           Control.FunFlow.Steps
 import           Control.Monad                               (when)
 import           System.Directory
+import           System.Posix.Temp                           (mkdtemp)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -52,8 +54,9 @@ setup = do ex <- doesFileExist "/tmp/lazarus_note"
 testFlowAssertion :: FlowAssertion -> TestTree
 testFlowAssertion (FlowAssertion nm x flw expect before) =
   testCase nm $ do
+    store <- mkdtemp "test"
     before
-    res <- runFlow MemoryCoordinator () flw x
+    res <- runFlow MemoryCoordinator () store flw x
     assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion
