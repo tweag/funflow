@@ -164,12 +164,11 @@ putSym n x = putSym_ n x >> return x
 -- | The `Flow` arrow interpreter
 runJob :: forall c ex a b. (Coordinator c, Exception ex)
         => c
-        -> Config c
+        -> Hook c
         -> Flow ex a b
         -> a
         -> RFlowM b
-runJob _ cfg flow input = do
-    hook <- initialise cfg
+runJob _ hook flow input = do
     runAsyncA (eval (runJob' hook) flow) input
   where
     runJob' :: Hook c -> Flow' a1 b1

@@ -1,0 +1,122 @@
+{-# LANGUAGE Arrows                     #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE EmptyDataDecls             #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
+
+module Control.FunFlow.Exec.RedisJobs where
+
+import           Control.FunFlow.Exec.Redis
+import           Data.Either                     (rights)
+import           Data.Maybe                      (catMaybes)
+
+import           Control.Exception
+import           Control.FunFlow.Base
+import           Control.FunFlow.Utils
+import           Control.Monad.Except
+import           Control.Monad.State.Strict
+import           Data.Store
+import qualified Data.Text                            as T
+import qualified Database.Redis                       as R
+import           Lens.Micro.Platform
+import           GHC.Generics
+import qualified Data.ByteString.Char8           as BS8
+
+type JobId = Integer
+
+data JobStatus
+  = JobDone
+  | JobError
+  | JobRunning
+  | JobQueue
+  deriving (Generic, Show)
+
+data Job a = Job
+  { jobId     :: JobId
+  , taskName  :: T.Text
+  , jobStatus :: JobStatus
+  , jobError  :: Maybe String
+  , argument  :: a
+  } deriving (Generic)
+
+instance Store JobStatus
+
+instance Store a => Store (Job a)
+
+-- | Create a job in the waiting queue without actually running it
+sparkJob :: Store a => T.Text -> a -> RFlowM JobId
+sparkJob nm x = do
+  jid :: JobId <- redis $ R.incr "jobfresh"
+  let job = Job jid nm JobQueue Nothing x
+  redis $ R.rpush "jobs_queue" [encode jid]
+  redis $ R.set (BS8.pack $ "job_" ++ show jid) (encode job)
+  return jid
+
+-- | Get all the jobs by status
+getJobsByStatus :: Store a => JobStatus -> RFlowM [Job a]
+getJobsByStatus js = do
+  let queueNm =
+        case js of
+          JobRunning -> "jobs_running"
+          JobQueue   -> "jobs_queue"
+          JobDone    -> "jobs_done"
+          JobError   -> "jobs_error"
+  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
+  fmap catMaybes $ mapM getJobById $ rights jids
+
+-- | Get a job by job ID
+getJobById :: Store a => JobId -> RFlowM (Maybe (Job a))
+getJobById jid = do
+  let jobIdNm = BS8.pack $ "job_" ++ show jid
+  mjob <- redis $ R.get jobIdNm
+  case mdecode mjob of
+    Left _    -> return Nothing
+    Right job -> return $ Just job
+
+-- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
+queueLoop ::
+     forall a b ex. (Store a, Exception ex)
+  => [(T.Text, Flow ex a b)]
+  -> RFlowM ()
+queueLoop allJobs = forever go
+  where
+    go = do
+      mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
+      whenRight (mdecode mkj) $ \jid -> do
+        mjob <- getJobById jid
+        whenJust mjob $ resumeJob allJobs
+
+-- | Resume a job
+resumeJob ::
+     forall a b ex. (Store a, Exception ex)
+  => [(T.Text, Flow ex a b)]
+  -> Job a
+  -> RFlowM ()
+resumeJob allJobs job = do
+  whenJust (lookup (taskName job) allJobs) $ \flow -> do
+    conn <- snd <$> get
+    let jobIdNm = BS8.pack $ "job_" ++ show (jobId job)
+    _1 .= jobIdNm
+    finishJob job =<< catching (runJob Redis conn flow (argument job))
+
+-- | When a job has finished, mark it as done and put it on the done or error queues
+finishJob :: Store a => Job a -> Either String b -> RFlowM ()
+finishJob job y = do
+  let jid = jobId job
+  let jobIdNm = BS8.pack $ "job_" ++ show jid
+  let newJob =
+        case y of
+          Right _  -> job {jobStatus = JobDone}
+          Left err -> job {jobStatus = JobError, jobError = Just err}
+  redis $ R.set jobIdNm (encode newJob)
+  redis $ R.lrem "jobs_running" 1 (encode jid)
+  case y of
+    Right _ -> redis $ R.rpush "jobs_done" [encode jid]
+    Left _  -> redis $ R.rpush "jobs_error" [encode jid]
+  return ()
