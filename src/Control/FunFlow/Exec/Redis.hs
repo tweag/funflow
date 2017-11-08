@@ -182,10 +182,11 @@ runJob _ hook flow input = do
           ey <-
             liftIO $
             fmap Right (f x) `catch`
-            (\e -> return $ Left ((e :: SomeException)))
+            (\e -> return $ Left (e::SomeException) )
           case ey of
             Right y  -> putSym n y
-            Left err -> throw err
+            Left err -> do
+              throwError $ show err
     runJob' _ (Named n' f) = AsyncA $ \x -> do
       n <- (n' <>) <$> fresh
       mv <- lookupSym n

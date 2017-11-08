@@ -76,7 +76,8 @@ getJobById jid = do
   let jobIdNm = BS8.pack $ "job_" ++ show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
-    Left _    -> return Nothing
+    Left err    -> do
+      return Nothing
     Right job -> return $ Just job
 
 -- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
@@ -90,6 +91,7 @@ queueLoop allJobs = forever go
       mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
       whenRight (mdecode mkj) $ \jid -> do
         mjob <- getJobById jid
+        --liftIO $ putStrLn $ "queueLoop got job id "++ show (jid,fmap jobId mjob)
         whenJust mjob $ resumeJob allJobs
 
 -- | Resume a job
@@ -99,8 +101,10 @@ resumeJob ::
   -> Job a
   -> RFlowM ()
 resumeJob allJobs job = do
+  --liftIO $ putStrLn $ "resumeJob got taskName "++ show (taskName job)
   whenJust (lookup (taskName job) allJobs) $ \flow -> do
     conn <- snd <$> get
+    --liftIO $ putStrLn $ "resumeJob got job id "++ show (jobId job)
     let jobIdNm = BS8.pack $ "job_" ++ show (jobId job)
     _1 .= jobIdNm
     finishJob job =<< catching (runJob Redis conn flow (argument job))
@@ -109,6 +113,7 @@ resumeJob allJobs job = do
 finishJob :: Store a => Job a -> Either String b -> RFlowM ()
 finishJob job y = do
   let jid = jobId job
+  --liftIO $ putStrLn $ "finish got job id "++ show jid
   let jobIdNm = BS8.pack $ "job_" ++ show jid
   let newJob =
         case y of
