@@ -69,5 +69,6 @@ redisTest = let
       , _etWriteToStdOut = True
       }
   in do
-    out <- runFlow Redis redisConf "/tmp" flow someString
+    storeDir <- mkdtemp "test"
+    out <- runFlow Redis redisConf storeDir flow someString
     print out

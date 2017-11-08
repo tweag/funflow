@@ -43,7 +43,7 @@ runFlow _ cfg sroot flow input = do
       chash <- contentHash x
       instruction <- CS.constructIfMissing store chash
       case instruction of
-        CS.Wait -> return chash -- XXX Correct behaviour?
+        CS.Wait -> return chash
         CS.Consume _ -> return chash
         CS.Construct fp -> let
             file = fp </> "out"
