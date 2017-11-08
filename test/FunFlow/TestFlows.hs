@@ -24,10 +24,13 @@ data FlowAssertion where
                 -> IO () -- test setup action
                 -> FlowAssertion
 
+mkError :: String -> SomeException
+mkError = toException . userError
+
 flow2 :: Flow SomeException () (Double,Double)
 flow2 = proc () -> do
-  r1 <- worstBernoulli error -< 0.2
-  r2 <- worstBernoulli error -< 0.3
+  r1 <- worstBernoulli mkError -< 0.2
+  r2 <- worstBernoulli mkError -< 0.3
   returnA -< (r1,r2)
 
 flow2caught :: Flow SomeException () (Double,Double)
@@ -37,7 +40,7 @@ flowAssertions :: [FlowAssertion]
 flowAssertions =
   [ FlowAssertion "death" "foo" melancholicLazarus Nothing setup
   , FlowAssertion "resurrection" "bar" (retry 1 0 melancholicLazarus) (Just "bar") setup
-  , FlowAssertion "bernoulli_once" 0.2 (retry 20 0 $ worstBernoulli error >>^ (<2.0)) (Just True) (return ())
+  , FlowAssertion "bernoulli_once" 0.2 (retry 20 0 $ worstBernoulli mkError >>^ (<2.0)) (Just True) (return ())
   , FlowAssertion "bernoulli_twice" () (flow2caught >>^ snd >>^ (<2.0)) (Just True) (return ())
   , FlowAssertion "failStep" () failStep Nothing (return ())
   ]
