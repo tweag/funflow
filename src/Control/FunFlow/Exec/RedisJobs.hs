@@ -94,6 +94,22 @@ queueLoop allJobs = forever go
         --liftIO $ putStrLn $ "queueLoop got job id "++ show (jid,fmap jobId mjob)
         whenJust mjob $ resumeJob allJobs
 
+runJobById ::
+     forall a b ex. (Store a, Exception ex)
+     => [(T.Text, Flow ex a b)]
+     -> JobId
+     -> RFlowM b
+runJobById allJobs jid = do
+  let jobIdNm = BS8.pack $ "job_" ++ show jid
+  mjob <- redis $ R.get jobIdNm
+  case mdecode mjob of
+    Left _ -> throwError "no such job"
+    Right job -> do
+      conn <- snd <$> get
+      case (lookup (taskName job) allJobs) of
+        Just flow -> runJob Redis conn flow (argument job)
+        Nothing -> throwError "no such task"
+
 -- | Resume a job
 resumeJob ::
      forall a b ex. (Store a, Exception ex)
