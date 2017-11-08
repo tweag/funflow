@@ -159,7 +159,7 @@ putSym_ k x = do
 
 -- | Store a value under a symbol, and return it again
 putSym :: Store a => T.Text -> a -> RFlowM a
-putSym n x = putSym n x >> return x
+putSym n x = putSym_ n x >> return x
 
 -- | The `Flow` arrow interpreter
 runJob :: forall c ex a b. (Coordinator c, Exception ex)
