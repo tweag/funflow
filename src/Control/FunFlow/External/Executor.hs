@@ -3,7 +3,7 @@
 module Control.FunFlow.External.Executor where
 
 import           Control.Exception                    (IOException, try)
-import           Control.FunFlow.ContentStore
+import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
@@ -28,13 +28,13 @@ data ExecutionResult =
   | Failure TimeSpec Int
 
 -- | Execute an individual task.
-execute :: ContentStore -> TaskDescription -> IO ExecutionResult
+execute :: CS.ContentStore -> TaskDescription -> IO ExecutionResult
 execute store td = do
-  instruction <- constructIfMissing store (td ^. tdOutput)
+  instruction <- CS.constructIfMissing store (td ^. tdOutput)
   case instruction of
-    Wait -> return Cached
-    Consume _ -> return Cached
-    Construct fp -> let
+    CS.Wait -> return Cached
+    CS.Consume _ -> return Cached
+    CS.Construct fp -> let
         defaultProc = proc (T.unpack $ td ^. tdTask . etCommand)
                        (T.unpack <$> td ^. tdTask . etParams)
         procSpec out = defaultProc {
@@ -54,17 +54,17 @@ execute store td = do
         mp <- try $ createProcess $ procSpec out
         case mp of
           Left (_ex :: IOException) -> do
-            removeFailed store (td ^. tdOutput)
+            CS.removeFailed store (td ^. tdOutput)
             return $ Failure (diffTimeSpec start start) 2
           Right (_, _, _, ph) -> do
             exitCode <- waitForProcess ph
             end <- getTime Monotonic
             case exitCode of
               ExitSuccess   -> do
-                markComplete store (td ^. tdOutput)
+                CS.markComplete store (td ^. tdOutput)
                 return $ Success (diffTimeSpec start end)
               ExitFailure i -> do
-                removeFailed store (td ^. tdOutput)
+                CS.removeFailed store (td ^. tdOutput)
                 return $ Failure (diffTimeSpec start end) i
 
 -- | Execute tasks forever
@@ -76,7 +76,7 @@ executeLoop :: forall c. Coordinator c
 executeLoop _ cfg sroot = do
   hook :: Hook c <- initialise cfg
   executor <- Executor <$> getHostName
-  store <- initialize sroot
+  store <- CS.initialize sroot
 
   -- Types of completion/status updates
   let fromCache = Completed $ ExecutionInfo executor 0
