@@ -87,6 +87,7 @@ cpFlow = external $ \h -> ExternalTask
 dockerFlow :: SimpleFlow ContentHash ContentHash
 dockerFlow = docker $ \input -> Docker.Config
   { Docker.image = "busybox"
+  , Docker.optImageID = Just "6ad733544a63"
   , Docker.input = Docker.SingleInput input
   , Docker.command = "sh"
   , Docker.args = ["-c", "cat /input/out /input/out > /output/out"]
