@@ -47,6 +47,9 @@ named n f = effect $ Named n f
 external :: ContentHashable a => (a -> ExternalTask) -> Flow eff ex a ContentHash
 external = effect . External
 
+wrap :: eff a b -> Flow eff ex a b
+wrap = effect . Wrapped
+
 putInStore :: (ContentHashable a, Store a) => Flow eff ex a ContentHash
 putInStore = effect $ PutInStore
 getFromStore :: (ContentHashable a, Store a) => Flow eff ex ContentHash (Maybe a)
