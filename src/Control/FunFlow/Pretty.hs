@@ -10,7 +10,7 @@ import           Control.FunFlow.Diagram
 import qualified Data.Text               as T
 import           Text.PrettyPrint
 
-ppFlow :: Flow ex a b -> Doc
+ppFlow :: Flow eff ex a b -> Doc
 ppFlow = ppDiagram . toDiagram where
   ppDiagram :: forall ex a b. Diagram ex a b -> Doc
   ppDiagram (Node (NodeProperties (lbl:_)) _ _)    = text . T.unpack $ lbl
@@ -20,5 +20,5 @@ ppFlow = ppDiagram . toDiagram where
   ppDiagram (Fanin f g) = parens $ ppDiagram f <+>  text "|||" <+> ppDiagram g
   ppDiagram (Catch f g) = parens $ ppDiagram f <+>  text "catch" <+> ppDiagram g
 
-showFlow :: Flow ex a b -> String
+showFlow :: Flow eff ex a b -> String
 showFlow = render . ppFlow

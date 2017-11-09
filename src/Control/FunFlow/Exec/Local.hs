@@ -53,7 +53,7 @@ putSym k x = do
   put $ (fs, M.insert k (encode x) ctx)
 
 
-runTillDone :: Exception ex => Flow ex a b -> a -> IO b
+runTillDone :: Exception ex => Flow eff ex a b -> a -> IO b
 runTillDone f x = go M.empty where
   go st0 = do
     ey <- resumeFlow f x st0
@@ -62,8 +62,8 @@ runTillDone f x = go M.empty where
       Left (err, st1) -> do putStrLn $ "Flow failed with "++ show err
                             go st1
 
-resumeFlow :: forall ex a b. Exception ex
-           => Flow ex a b -> a -> PureCtx -> IO (Either (ex, PureCtx) b)
+resumeFlow :: forall eff ex a b. Exception ex
+           => Flow eff ex a b -> a -> PureCtx -> IO (Either (ex, PureCtx) b)
 resumeFlow f ini ctx = do
   (eres, st) <- runStateT (runExceptT $ runLFlowM $ proceedFlow f ini) (initFreshers, ctx)
   case eres of
@@ -75,7 +75,7 @@ puttingSym :: Store a => T.Text -> a -> LFlowM ex a
 puttingSym n x = putSym n x >> return x
 
 
-proceedFlow :: Exception ex => Flow ex a b -> a -> LFlowM ex b
+proceedFlow :: Exception ex => Flow eff ex a b -> a -> LFlowM ex b
 proceedFlow flow input = runKleisli (eval proceedFlow' flow) input
   where
     proceedFlow' (Named n' f) = Kleisli $ \x -> do

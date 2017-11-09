@@ -12,7 +12,7 @@ import           Control.FunFlow.Diagram
 import           Data.Monoid             ((<>))
 import qualified Data.Text               as T
 
-collectNames :: forall ex a b. Flow ex a b -> [T.Text]
+collectNames :: forall eff ex a b. Flow eff ex a b -> [T.Text]
 collectNames flow = collectNames' $ toDiagram flow
   where
     collectNames' :: forall a1 b1. Diagram ex a1 b1 -> [T.Text]

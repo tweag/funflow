@@ -13,20 +13,20 @@
 module Control.FunFlow.Exec.RedisJobs where
 
 import           Control.FunFlow.Exec.Redis
-import           Data.Either                     (rights)
-import           Data.Maybe                      (catMaybes)
+import           Data.Either                (rights)
+import           Data.Maybe                 (catMaybes)
 
 import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Monad.Except
 import           Control.Monad.State.Strict
+import qualified Data.ByteString.Char8      as BS8
 import           Data.Store
-import qualified Data.Text                            as T
-import qualified Database.Redis                       as R
-import           Lens.Micro.Platform
+import qualified Data.Text                  as T
+import qualified Database.Redis             as R
 import           GHC.Generics
-import qualified Data.ByteString.Char8           as BS8
+import           Lens.Micro.Platform
 
 type JobId = Integer
 
@@ -82,8 +82,8 @@ getJobById jid = do
 
 -- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
 queueLoop ::
-     forall a b ex. (Store a, Exception ex)
-  => [(T.Text, Flow ex a b)]
+     forall a b eff ex. (Store a, Exception ex)
+  => [(T.Text, Flow eff ex a b)]
   -> RFlowM ()
 queueLoop allJobs = forever go
   where
@@ -95,8 +95,8 @@ queueLoop allJobs = forever go
         whenJust mjob $ resumeJob allJobs
 
 runJobById ::
-     forall a b ex. (Store a, Exception ex)
-     => [(T.Text, Flow ex a b)]
+     forall a b eff ex. (Store a, Exception ex)
+     => [(T.Text, Flow eff ex a b)]
      -> JobId
      -> RFlowM b
 runJobById allJobs jid = do
@@ -108,12 +108,12 @@ runJobById allJobs jid = do
       conn <- snd <$> get
       case (lookup (taskName job) allJobs) of
         Just flow -> runJob Redis conn flow (argument job)
-        Nothing -> throwError "no such task"
+        Nothing   -> throwError "no such task"
 
 -- | Resume a job
 resumeJob ::
-     forall a b ex. (Store a, Exception ex)
-  => [(T.Text, Flow ex a b)]
+     forall a b eff ex. (Store a, Exception ex)
+  => [(T.Text, Flow eff ex a b)]
   -> Job a
   -> RFlowM ()
 resumeJob allJobs job = do

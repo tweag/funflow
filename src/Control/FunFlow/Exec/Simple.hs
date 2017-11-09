@@ -2,36 +2,43 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
-module Control.FunFlow.Exec.Simple where
+module Control.FunFlow.Exec.Simple
+  ( runFlow
+  , runSimpleFlow
+  ) where
 
 import           Control.Arrow                        (Kleisli (..), runKleisli)
-import           Control.Arrow.Free                   (eval)
+import           Control.Arrow.Free                   (eval, type (~>))
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
-import           Control.Monad.Catch                  (Exception, try)
+import           Control.Monad.Catch                  ( SomeException
+                                                      , Exception, try)
 import qualified Data.ByteString                      as BS
 import           Data.Store                           (decode, encode)
 import           System.FilePath                      ((</>))
 
 -- | Simple evaulation of a flow
-runFlow :: forall c ex a b. (Coordinator c, Exception ex)
+runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
         -> Config c
         -> FilePath -- ^ Path to content store
-        -> Flow ex a b
+        -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
+        -> Flow eff ex a b
         -> a
         -> IO (Either ex b)
-runFlow _ cfg sroot flow input = do
+runFlow _ cfg sroot runWrapped flow input = do
     hook <- initialise cfg
     store <- CS.initialize sroot
     try $ runKleisli (eval (runFlow' hook store) flow) input
   where
-    runFlow' :: Hook c -> CS.ContentStore -> Flow' a1 b1 -> Kleisli IO a1 b1
+    runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> Kleisli IO a1 b1
     runFlow' _ _ (Step f) = Kleisli $ \x -> f x
     runFlow' _ _ (Named _ f) = Kleisli $ \x -> return $ f x
     runFlow' po _ (External toTask) = Kleisli $ \x -> do
@@ -62,3 +69,14 @@ runFlow _ cfg sroot flow input = do
             case decode bs of
               Right res -> return $ Just res
               Left _    -> return Nothing
+    runFlow' _ _ (Wrapped w) = runWrapped w
+
+runSimpleFlow :: forall c a b. (Coordinator c)
+        => c
+        -> Config c
+        -> FilePath -- ^ Path to content store
+        -> SimpleFlow a b
+        -> a
+        -> IO (Either SomeException b)
+runSimpleFlow c ccfg sroot flow input =
+  runFlow c ccfg sroot runNoEffect flow input

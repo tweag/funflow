@@ -13,30 +13,31 @@ import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.Pretty
 import           Control.FunFlow.Steps
-import           Control.Monad.Catch                         (Exception)
+import           Control.Monad.Catch                         (Exception,
+                                                              SomeException,
+                                                              toException)
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
 import           System.Posix.Temp                           (mkdtemp)
 
-newtype MyEx = MyEx [Char]
-  deriving Show
-instance Exception MyEx
+mkError :: String -> SomeException
+mkError = toException . userError
 
-myFlow :: Flow MyEx () Bool
+myFlow :: SimpleFlow () Bool
 myFlow = proc () -> do
   age <- promptFor -< "How old are you"
   returnA -< age > (65::Int)
 
-flow2 :: Flow MyEx () (Double,Double)
+flow2 :: SimpleFlow () (Double,Double)
 flow2 = proc () -> do
-  r1 <- worstBernoulli MyEx -< 0.1
-  r2 <- worstBernoulli MyEx -< 0.2
+  r1 <- worstBernoulli mkError -< 0.1
+  r2 <- worstBernoulli mkError -< 0.2
   returnA -< (r1,r2)
 
-flow2caught :: Flow MyEx () (Double,Double)
+flow2caught :: SimpleFlow () (Double,Double)
 flow2caught = retry 100 0 flow2
 
-flow3 :: Flow MyEx [Int] [Int]
+flow3 :: SimpleFlow [Int] [Int]
 flow3 = mapA (arr (+1))
 
 allJobs = [("job1", flow2)]
@@ -44,13 +45,13 @@ allJobs = [("job1", flow2)]
 main :: IO ()
 main = do
   storeDir <- mkdtemp "test"
-  res <- runFlow MemoryCoordinator () storeDir flow2 ()
+  res <- runSimpleFlow MemoryCoordinator () storeDir flow2 ()
   print res
-  res' <- runFlow MemoryCoordinator () storeDir flow2caught ()
+  res' <- runSimpleFlow MemoryCoordinator () storeDir flow2caught ()
   print res'
   putStrLn $ showFlow myFlow
   putStrLn $ showFlow flow2
-  res1 <- runFlow MemoryCoordinator () storeDir flow3 [1..10]
+  res1 <- runSimpleFlow MemoryCoordinator () storeDir flow3 [1..10]
   print res1
 -- main = redisTest
 
@@ -62,7 +63,7 @@ redisTest = let
       , R.connectAuth = Nothing
       }
     someString = "Hello World" :: T.Text
-    flow :: Flow MyEx T.Text ContentHash
+    flow :: SimpleFlow T.Text ContentHash
     flow = external $ \t -> ExternalTask {
         _etCommand = "/run/current-system/sw/bin/echo"
       , _etParams = [t]
@@ -70,5 +71,5 @@ redisTest = let
       }
   in do
     storeDir <- mkdtemp "test"
-    out <- runFlow Redis redisConf storeDir flow someString
+    out <- runSimpleFlow Redis redisConf storeDir flow someString
     print out
