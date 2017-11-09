@@ -14,6 +14,7 @@ import           Control.Exception               (SomeException)
 import           Control.FunFlow.ContentHashable
 import           Control.FunFlow.Diagram
 import           Control.FunFlow.External
+import qualified Control.FunFlow.External.Docker as Docker
 import           Data.Proxy                      (Proxy (..))
 import           Data.Store
 import qualified Data.Text                       as T
@@ -49,6 +50,9 @@ external = effect . External
 
 wrap :: eff a b -> Flow eff ex a b
 wrap = effect . Wrapped
+
+docker :: ContentHashable a => (a -> Docker.Config) -> Flow eff ex a ContentHash
+docker f = external $ Docker.toExternal . f
 
 putInStore :: (ContentHashable a, Store a) => Flow eff ex a ContentHash
 putInStore = effect $ PutInStore

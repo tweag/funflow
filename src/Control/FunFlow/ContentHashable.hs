@@ -1,7 +1,10 @@
 {-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE LambdaCase           #-}
 {-# LANGUAGE MagicHash            #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeSynonymInstances #-}
@@ -44,8 +47,12 @@ import qualified Data.ByteString               as BS
 import           Data.ByteString.Builder.Extra (defaultChunkSize)
 import qualified Data.ByteString.Char8         as C8
 import qualified Data.ByteString.Lazy          as BSL
+import           Data.Functor.Contravariant
 import           Data.Int
 import           Data.List                     (sort)
+import           Data.Map                      (Map)
+import qualified Data.Map                      as Map
+import           Data.Store                    (Store (..), peekException)
 import qualified Data.Text                     as T
 import qualified Data.Text.Array               as TA
 import qualified Data.Text.Internal            as T
@@ -54,7 +61,7 @@ import           Data.Typeable
 import           Data.Word
 import           Foreign.Marshal.Utils         (with)
 import           Foreign.Ptr                   (castPtr)
-import           Foreign.Storable
+import           Foreign.Storable              (Storable, sizeOf)
 import           GHC.Fingerprint
 import           GHC.Generics
 import           GHC.Integer.GMP.Internals     (BigNat (..), Integer (..))
@@ -71,7 +78,14 @@ import           System.IO                     (IOMode (ReadMode),
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Generic, Show)
+
+instance Store ContentHash where
+  size = contramap toBytes size
+  peek = fromBytes <$> peek >>= \case
+    Nothing -> peekException "Store ContentHash: Illegal digest"
+    Just x -> return x
+  poke = poke . toBytes
 
 toBytes :: ContentHash -> BS.ByteString
 toBytes (ContentHash digest) = convert digest
@@ -163,6 +177,9 @@ contentHashUpdate_text ctx (T.Text arr off_ len_) =
       off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
       len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
 
+-- XXX: Consider hashing the corresponding store contents instead.
+instance ContentHashable ContentHash where
+  contentHashUpdate ctx (ContentHash chash) = return $ hashUpdate ctx chash
 
 instance ContentHashable Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
@@ -229,6 +246,12 @@ instance ContentHashable TL.Text where
     flip contentHashUpdate_fingerprint s
     >=> pure . flip (TL.foldlChunks contentHashUpdate_text) s $ ctx
 
+instance (Typeable k, Typeable v, ContentHashable k, ContentHashable v)
+  => ContentHashable (Map k v) where
+  contentHashUpdate ctx m =
+    flip contentHashUpdate_fingerprint m
+    >=> flip contentHashUpdate (Map.toList m) $ ctx
+
 instance ContentHashable a => ContentHashable [a] where
   contentHashUpdate = foldM contentHashUpdate
 
@@ -238,6 +261,8 @@ instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashab
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d, ContentHashable e) => ContentHashable (a, b, c, d, e)
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d, ContentHashable e, ContentHashable f) => ContentHashable (a, b, c, d, e, f)
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d, ContentHashable e, ContentHashable f, ContentHashable g) => ContentHashable (a, b, c, d, e, f, g)
+
+instance ContentHashable a => ContentHashable (Maybe a)
 
 instance (ContentHashable a, ContentHashable b) => ContentHashable (Either a b)
 

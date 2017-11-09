@@ -66,7 +66,7 @@ redisTest = let
     flow :: SimpleFlow T.Text ContentHash
     flow = external $ \t -> ExternalTask {
         _etCommand = "/run/current-system/sw/bin/echo"
-      , _etParams = [t]
+      , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
   in do

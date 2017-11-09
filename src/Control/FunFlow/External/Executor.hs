@@ -8,12 +8,16 @@ import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad                        (forever)
+import           Control.Monad.IO.Class               (liftIO)
+import           Control.Monad.Trans.Maybe
 import qualified Data.Text                            as T
 import           Network.HostName
 import           System.Clock
 import           System.Exit                          (ExitCode (..))
 import           System.FilePath                      ((</>))
 import           System.IO                            (IOMode (..), openFile)
+import           System.Posix.Env                     (getEnv)
+import           System.Posix.User
 import           System.Process
 
 data ExecutionResult =
@@ -39,25 +43,43 @@ execute store td = do
     CS.Wait -> return AlreadyRunning
     CS.Consume _ -> return Cached
     CS.Construct fp -> let
-        defaultProc = proc (T.unpack $ td ^. tdTask . etCommand)
-                       (T.unpack <$> td ^. tdTask . etParams)
-        procSpec out = defaultProc {
+        cmd = T.unpack $ td ^. tdTask . etCommand
+        procSpec params out = (proc cmd $ T.unpack <$> params) {
             cwd = Just fp
           , close_fds = True
             -- Error output should be displayed on our stderr stream
           , std_err = Inherit
           , std_out = out
           }
+        convParam = ConvParam
+          { convPath = \h -> MaybeT (CS.lookup store h)
+          , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
+          , convUid = liftIO $ getEffectiveUserID
+          , convGid = liftIO $ getEffectiveGroupID
+          , convOut = pure fp
+          }
       in do
+        mbParams <- runMaybeT $
+          traverse (paramToText convParam) (td ^. tdTask . etParams)
+        params <- case mbParams of
+          -- XXX: Should we block here?
+          Nothing -> fail "A parameter was not ready"
+          Just params -> return params
+
         out <-
           if (td ^. tdTask . etWriteToStdOut)
           then UseHandle <$> openFile (fp </> "out") WriteMode
           else return Inherit
 
         start <- getTime Monotonic
-        mp <- try $ createProcess $ procSpec out
+        let theProc = procSpec params out
+        -- XXX: Do proper logging
+        putStrLn $ "Executing: " ++ show theProc
+        mp <- try $ createProcess theProc
         case mp of
-          Left (_ex :: IOException) -> do
+          Left (ex :: IOException) -> do
+            -- XXX: Do proper logging
+            putStrLn $ "Failed: " ++ show ex
             CS.removeFailed store (td ^. tdOutput)
             return $ Failure (diffTimeSpec start start) 2
           Right (_, _, _, ph) -> do
