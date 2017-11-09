@@ -16,17 +16,27 @@ import           System.Posix.Types              (CGid, CUid)
 -- | Component of a parameter
 data ParamField
   = ParamText !T.Text
+    -- ^ Text component.
   | ParamPath !ContentHash
+    -- | Reference to a path to a content store item.
   | ParamEnv !T.Text
+    -- ^ Reference to an environment variable.
   | ParamUid
+    -- ^ Reference to the effective user ID of the executor.
   | ParamGid
+    -- ^ Reference to the effective group ID of the executor.
   | ParamOut
+    -- ^ Reference to the output path in the content store.
   deriving Generic
 
 instance ContentHashable ParamField
 instance Store ParamField
 
 -- | A parameter to an external task
+--
+-- The runtime values to external references, e.g. environment variables,
+-- should not significantly influence the result of the external task.
+-- In particular, the content hash will not depend on these runtime values.
 newtype Param = Param [ParamField]
   deriving (Generic, Monoid, Semigroup)
 
@@ -36,12 +46,18 @@ instance IsString Param where
 instance ContentHashable Param
 instance Store Param
 
+-- | Converter of path components.
 data ConvParam f = ConvParam
   { convPath :: ContentHash -> f FilePath
+    -- ^ Resolve a reference to a content store item.
   , convEnv :: T.Text -> f T.Text
+    -- ^ Resolve an environment variable.
   , convUid :: f CUid
+    -- ^ Resolve the effective user ID.
   , convGid :: f CGid
+    -- ^ Resolve the effective group ID.
   , convOut :: f FilePath
+    -- ^ Resolve the output path in the content store.
   }
 
 paramFieldToText :: Applicative f
@@ -64,18 +80,23 @@ stringParam str = Param [ParamText (T.pack str)]
 textParam :: T.Text -> Param
 textParam txt = Param [ParamText txt]
 
+-- | Reference to a path to a content store item.
 pathParam :: ContentHash -> Param
 pathParam chash = Param [ParamPath chash]
 
+-- | Reference to an environment variable.
 envParam :: T.Text -> Param
 envParam env = Param [ParamEnv env]
 
+-- | Reference to the effective user ID of the executor.
 uidParam :: Param
 uidParam = Param [ParamUid]
 
+-- | Reference to the effective group ID of the executor.
 gidParam :: Param
 gidParam = Param [ParamGid]
 
+-- | Reference to the output path in the content store.
 outParam :: Param
 outParam = Param [ParamOut]
 
