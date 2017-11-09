@@ -24,6 +24,7 @@ instance ContentHashable Bind
 
 data Config = Config
   { image :: T.Text
+  , optImageID :: Maybe T.Text
   , input :: Bind
   , command :: FilePath
   , args :: [T.Text]
@@ -39,7 +40,7 @@ toExternal cfg = ExternalTask
       [ "run"
       , "--user=" <> uidParam
       ] ++ mounts ++
-      [ textParam (image cfg)
+      [ imageArg
       , stringParam (command cfg)
       ] ++ map textParam (args cfg)
   , _etWriteToStdOut = False
@@ -55,3 +56,6 @@ toExternal cfg = ExternalTask
         [ mount chash ("/input" </> dest)
         | (dest, chash) <- Map.toList cmap
         ]
+    imageArg = textParam $ case optImageID cfg of
+      Nothing -> image cfg
+      Just id' -> image cfg <> ":" <> id'

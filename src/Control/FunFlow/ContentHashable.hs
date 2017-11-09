@@ -262,6 +262,8 @@ instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashab
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d, ContentHashable e, ContentHashable f) => ContentHashable (a, b, c, d, e, f)
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d, ContentHashable e, ContentHashable f, ContentHashable g) => ContentHashable (a, b, c, d, e, f, g)
 
+instance ContentHashable a => ContentHashable (Maybe a)
+
 instance (ContentHashable a, ContentHashable b) => ContentHashable (Either a b)
 
 
