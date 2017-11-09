@@ -21,7 +21,7 @@ data FlowAssertion where
   FlowAssertion :: (Eq b, Show b)
                 => String -- test name
                 -> a  -- input
-                -> Flow SomeException a b -- the flow to test
+                -> SimpleFlow a b -- the flow to test
                 -> Maybe b --expected output - Nothing for expected failure
                 -> IO () -- test setup action
                 -> FlowAssertion
@@ -29,13 +29,13 @@ data FlowAssertion where
 mkError :: String -> SomeException
 mkError = toException . userError
 
-flow2 :: Flow SomeException () (Double,Double)
+flow2 :: SimpleFlow () (Double,Double)
 flow2 = proc () -> do
   r1 <- worstBernoulli mkError -< 0.2
   r2 <- worstBernoulli mkError -< 0.3
   returnA -< (r1,r2)
 
-flow2caught :: Flow SomeException () (Double,Double)
+flow2caught :: SimpleFlow () (Double,Double)
 flow2caught = retry 100 0 flow2
 
 flowAssertions :: [FlowAssertion]
@@ -56,7 +56,7 @@ testFlowAssertion (FlowAssertion nm x flw expect before) =
   testCase nm $ do
     store <- mkdtemp "test"
     before
-    res <- runFlow MemoryCoordinator () store flw x
+    res <- runSimpleFlow MemoryCoordinator () store flw x
     assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion

@@ -24,6 +24,7 @@ module Control.Arrow.Free
     -- * Arrow functions
   , mapA
   , filterA
+  , type (~>)
   ) where
 
 import           Control.Arrow

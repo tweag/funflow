@@ -162,16 +162,16 @@ putSym :: Store a => T.Text -> a -> RFlowM a
 putSym n x = putSym_ n x >> return x
 
 -- | The `Flow` arrow interpreter
-runJob :: forall c ex a b. (Coordinator c, Exception ex)
+runJob :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
         -> Hook c
-        -> Flow ex a b
+        -> Flow eff ex a b
         -> a
         -> RFlowM b
 runJob _ hook flow input = do
     runAsyncA (eval (runJob' hook) flow) input
   where
-    runJob' :: Hook c -> Flow' a1 b1
+    runJob' :: Hook c -> Flow' eff a1 b1
             -> AsyncA (ExceptT String (StateT FlowST R.Redis)) a1 b1
     runJob' _ (Step f) = AsyncA $ \x -> do
       n <- fresh
