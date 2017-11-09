@@ -33,7 +33,8 @@ instance ContentHashable Config
 
 toExternal :: Config -> ExternalTask
 toExternal cfg = ExternalTask
-  { _etCommand = "/run/current-system/sw/bin/docker"
+  -- XXX: Allow to configure the path to the docker executable.
+  { _etCommand = "docker"
   , _etParams =
       [ "run"
       , "--user=" <> uidParam
