@@ -4,6 +4,7 @@
 module Control.FunFlow.External.Docker where
 
 import           Control.FunFlow.ContentHashable
+import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.External
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
@@ -14,10 +15,10 @@ import           System.FilePath
 
 data Bind
   -- | Single input, will get mounted to @/input@ on the image.
-  = SingleInput ContentHash
+  = SingleInput CS.Item
   -- | Multiple inputs, each gets mouted into a subdirectory under
   -- @/input@ as described by the given mapping.
-  | MultiInput (Map FilePath ContentHash)
+  | MultiInput (Map FilePath CS.Item)
   deriving Generic
 
 instance ContentHashable Bind

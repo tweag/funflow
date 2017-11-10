@@ -5,6 +5,7 @@
 module Control.FunFlow.External where
 
 import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
+import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Lens.TH
 import           Data.Semigroup
 import           Data.Store                      (Store)
@@ -17,7 +18,7 @@ import           System.Posix.Types              (CGid, CUid)
 data ParamField
   = ParamText !T.Text
     -- ^ Text component.
-  | ParamPath !ContentHash
+  | ParamPath !CS.Item
     -- | Reference to a path to a content store item.
   | ParamEnv !T.Text
     -- ^ Reference to an environment variable.
@@ -48,7 +49,7 @@ instance Store Param
 
 -- | Converter of path components.
 data ConvParam f = ConvParam
-  { convPath :: ContentHash -> f FilePath
+  { convPath :: CS.Item -> f FilePath
     -- ^ Resolve a reference to a content store item.
   , convEnv :: T.Text -> f T.Text
     -- ^ Resolve an environment variable.
@@ -63,7 +64,7 @@ data ConvParam f = ConvParam
 paramFieldToText :: Applicative f
   => ConvParam f -> ParamField -> f T.Text
 paramFieldToText _ (ParamText txt) = pure txt
-paramFieldToText c (ParamPath chash) = T.pack <$> convPath c chash
+paramFieldToText c (ParamPath item) = T.pack <$> convPath c item
 paramFieldToText c (ParamEnv env) = convEnv c env
 paramFieldToText c ParamUid = T.pack . show <$> convUid c
 paramFieldToText c ParamGid = T.pack . show <$> convGid c
@@ -81,8 +82,8 @@ textParam :: T.Text -> Param
 textParam txt = Param [ParamText txt]
 
 -- | Reference to a path to a content store item.
-pathParam :: ContentHash -> Param
-pathParam chash = Param [ParamPath chash]
+pathParam :: CS.Item -> Param
+pathParam item = Param [ParamPath item]
 
 -- | Reference to an environment variable.
 envParam :: T.Text -> Param

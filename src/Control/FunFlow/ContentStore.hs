@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE NamedFieldPuns  #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -39,6 +40,8 @@ module Control.FunFlow.ContentStore
   , Instruction (..)
   , StoreError (..)
   , ContentStore
+  , Item
+  , itemPath
   , root
   , initialize
   , allSubtrees
@@ -65,7 +68,9 @@ import           Control.Monad                   (filterM)
 import           Data.Bits                       (complement)
 import           Data.List                       (foldl')
 import           Data.Maybe                      (catMaybes)
+import qualified Data.Store
 import           Data.Typeable                   (Typeable)
+import           GHC.Generics                    (Generic)
 import           System.Directory                (createDirectory,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
@@ -75,8 +80,10 @@ import           System.FilePath                 ((</>))
 import           System.Posix.Files
 import           System.Posix.Types
 
-import           Control.FunFlow.ContentHashable (ContentHash, hashToPath,
-                                                  pathToHash)
+import           Control.FunFlow.ContentHashable (ContentHash,
+                                                  ContentHashable (..),
+                                                  DirectoryContent (..),
+                                                  hashToPath, pathToHash)
 
 
 -- | Status of a subtree in the store.
@@ -97,7 +104,7 @@ data Instruction
   -- and is now marked as under construction.
   | Wait
   -- ^ The subtree is already under construction.
-  | Consume FilePath
+  | Consume Item
   -- ^ The subtree is already complete and ready for consumption.
   deriving (Eq, Show)
 
@@ -123,6 +130,16 @@ data ContentStore = ContentStore
   -- XXX: Could be replaced by a file-locks per subtree
   --      if it becomes a bottleneck.
   }
+
+-- | A completed item in the 'ContentStore'.
+newtype Item = Item { itemPath :: FilePath }
+  deriving (Eq, Show, Generic)
+
+instance ContentHashable Item where
+  contentHashUpdate ctx item =
+    contentHashUpdate ctx (DirectoryContent (itemPath item))
+
+instance Data.Store.Store Item
 
 -- | The root directory of the store.
 root :: ContentStore -> FilePath
@@ -171,12 +188,12 @@ isComplete :: ContentStore -> ContentHash -> IO Bool
 isComplete store hash = (== Complete) <$> query store hash
 
 -- | Get the file-path of a subtree if it is complete.
-lookup :: ContentStore -> ContentHash -> IO (Maybe FilePath)
+lookup :: ContentStore -> ContentHash -> IO (Maybe Item)
 lookup store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Missing -> return Nothing
     UnderConstruction -> return Nothing
-    Complete -> return $ Just (toStorePath store hash)
+    Complete -> return $ Just (Item (toStorePath store hash))
 
 -- | Atomically query the state of a subtree
 -- and mark it as under construction if missing.
@@ -184,7 +201,7 @@ constructIfMissing :: ContentStore -> ContentHash -> IO Instruction
 constructIfMissing store hash = withStoreLock store $
   let dir = toStorePath store hash in
   internalQuery store hash >>= \case
-    Complete -> return $ Consume dir
+    Complete -> return $ Consume (Item dir)
     UnderConstruction -> return Wait
     Missing -> withWritableStore store $ do
       createDirectory dir
@@ -208,13 +225,15 @@ markUnderConstruction store hash = withStoreLock store $
       return dir
 
 -- | Mark a subtree that was under construction as complete.
-markComplete :: ContentStore -> ContentHash -> IO ()
+markComplete :: ContentStore -> ContentHash -> IO Item
 markComplete store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Missing -> throwIO (NotUnderConstruction hash)
     Complete -> throwIO (AlreadyComplete hash)
-    UnderConstruction -> withWritableStore store $
-      unsetWritableRecursively (toStorePath store hash)
+    UnderConstruction -> withWritableStore store $ do
+      let dir = toStorePath store hash
+      unsetWritableRecursively dir
+      return $ Item dir
 
 -- | Remove a subtree that was under construction.
 --
