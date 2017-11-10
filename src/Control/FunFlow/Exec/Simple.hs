@@ -8,6 +8,7 @@
 
 module Control.FunFlow.Exec.Simple
   ( runFlow
+  , runFlowEx
   , runSimpleFlow
   ) where
 
@@ -25,18 +26,18 @@ import           Data.Store                           (decode, encode)
 import           System.FilePath                      ((</>))
 
 -- | Simple evaulation of a flow
-runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
-        => c
-        -> Config c
-        -> FilePath -- ^ Path to content store
-        -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
-        -> Flow eff ex a b
-        -> a
-        -> IO (Either ex b)
-runFlow _ cfg sroot runWrapped flow input = do
+runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
+          => c
+          -> Config c
+          -> FilePath -- ^ Path to content store
+          -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
+          -> Flow eff ex a b
+          -> a
+          -> IO b
+runFlowEx _ cfg sroot runWrapped flow input = do
     hook <- initialise cfg
     store <- CS.initialize sroot
-    try $ runKleisli (eval (runFlow' hook store) flow) input
+    runKleisli (eval (runFlow' hook store) flow) input
   where
     runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> Kleisli IO a1 b1
     runFlow' _ _ (Step f) = Kleisli $ \x -> f x
@@ -70,6 +71,17 @@ runFlow _ cfg sroot runWrapped flow input = do
               Right res -> return $ Just res
               Left _    -> return Nothing
     runFlow' _ _ (Wrapped w) = runWrapped w
+
+runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
+        => c
+        -> Config c
+        -> FilePath -- ^ Path to content store
+        -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
+        -> Flow eff ex a b
+        -> a
+        -> IO (Either ex b)
+runFlow c cfg sroot runWrapped flow input =
+  try $ runFlowEx c cfg sroot runWrapped flow input
 
 runSimpleFlow :: forall c a b. (Coordinator c)
         => c
