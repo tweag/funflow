@@ -177,10 +177,6 @@ contentHashUpdate_text ctx (T.Text arr off_ len_) =
       off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
       len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
 
--- XXX: Consider hashing the corresponding store contents instead.
-instance ContentHashable ContentHash where
-  contentHashUpdate ctx (ContentHash chash) = return $ hashUpdate ctx chash
-
 instance ContentHashable Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
 

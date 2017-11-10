@@ -57,14 +57,14 @@ runFlowEx _ cfg sroot runWrapped flow input = do
             file = fp </> "out"
           in do
             BS.writeFile file $ encode x
-            CS.markComplete store chash
+            _ <- CS.markComplete store chash
             return chash
     runFlow' _ store GetFromStore = Kleisli $ \chash -> do
       mfp <- CS.lookup store chash
       case mfp of
         Nothing -> return Nothing
-        Just fp -> let
-            file = fp </> "out"
+        Just item -> let
+            file = CS.itemPath item </> "out"
           in do
             bs <- BS.readFile file
             case decode bs of

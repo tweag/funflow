@@ -52,7 +52,7 @@ execute store td = do
           , std_out = out
           }
         convParam = ConvParam
-          { convPath = \h -> MaybeT (CS.lookup store h)
+          { convPath = pure . CS.itemPath
           , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
           , convUid = liftIO $ getEffectiveUserID
           , convGid = liftIO $ getEffectiveGroupID
@@ -87,7 +87,7 @@ execute store td = do
             end <- getTime Monotonic
             case exitCode of
               ExitSuccess   -> do
-                CS.markComplete store (td ^. tdOutput)
+                _ <- CS.markComplete store (td ^. tdOutput)
                 return $ Success (diffTimeSpec start end)
               ExitFailure i -> do
                 CS.removeFailed store (td ^. tdOutput)

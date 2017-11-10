@@ -24,7 +24,9 @@ data Flow' eff a b where
   Step    :: Store b => (a -> IO b) -> Flow' eff a b
   Named   :: Store b => T.Text -> (a -> b) -> Flow' eff a b
   External :: ContentHashable a => (a -> ExternalTask) -> Flow' eff a ContentHash
+  -- XXX: Return 'ContentStore.Item'.
   PutInStore :: (ContentHashable a, Store a) => Flow' eff a ContentHash
+  -- XXX: Take 'ContentStore.Item'.
   GetFromStore :: (ContentHashable a, Store a) => Flow' eff ContentHash (Maybe a)
   Wrapped :: eff a b -> Flow' eff a b
 
