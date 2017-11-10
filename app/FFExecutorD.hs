@@ -5,10 +5,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeOperators      #-}
 
-import           Control.FunFlow.Exec.Redis
+import           Control.FunFlow.External.Coordinator.Redis
 import           Control.FunFlow.External.Executor
-import qualified Data.ByteString                   as BS
-import qualified Database.Redis                    as R
+import qualified Data.ByteString                            as BS
+import qualified Database.Redis                             as R
 import           Options.Generic
 
 data Config w = Config {

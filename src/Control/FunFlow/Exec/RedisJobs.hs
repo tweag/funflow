@@ -13,18 +13,19 @@
 module Control.FunFlow.Exec.RedisJobs where
 
 import           Control.FunFlow.Exec.Redis
-import           Data.Either                (rights)
-import           Data.Maybe                 (catMaybes)
+import           Control.FunFlow.External.Coordinator.Redis
+import           Data.Either                                (rights)
+import           Data.Maybe                                 (catMaybes)
 
 import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Monad.Except
 import           Control.Monad.State.Strict
-import qualified Data.ByteString.Char8      as BS8
+import qualified Data.ByteString.Char8                      as BS8
 import           Data.Store
-import qualified Data.Text                  as T
-import qualified Database.Redis             as R
+import qualified Data.Text                                  as T
+import qualified Database.Redis                             as R
 import           GHC.Generics
 import           Lens.Micro.Platform
 
