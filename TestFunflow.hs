@@ -6,11 +6,11 @@ import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable             (ContentHash)
-import           Control.FunFlow.Exec.Local
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator.Memory
+import           Control.FunFlow.External.Coordinator.Redis
 import           Control.FunFlow.Pretty
 import           Control.FunFlow.Steps
 import           Control.Monad.Catch                         (Exception,
