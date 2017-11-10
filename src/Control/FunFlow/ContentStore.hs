@@ -13,8 +13,7 @@
 -- 'Control.FunFlow.ContentStore.Complete'.
 -- The state of subtrees is persisted on the file system.
 --
--- The store is thread-safe, but may not be controlled by multiple processes
--- at the same time.
+-- The store is thread-safe and multi-process safe.
 --
 -- It is assumed that the user that the process is running under is the owner
 -- of the store root, or has permission to create it if missing.
@@ -70,6 +69,7 @@ import           Data.List                       (foldl')
 import           Data.Maybe                      (catMaybes)
 import qualified Data.Store
 import           Data.Typeable                   (Typeable)
+import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
 import           GHC.Generics                    (Generic)
 import           System.Directory                (createDirectory,
                                                   createDirectoryIfMissing,
@@ -78,6 +78,7 @@ import           System.Directory                (createDirectory,
                                                   removePathForcibly)
 import           System.FilePath                 ((</>))
 import           System.Posix.Files
+import           System.Posix.IO
 import           System.Posix.Types
 
 import           Control.FunFlow.ContentHashable (ContentHash,
@@ -126,9 +127,11 @@ data ContentStore = ContentStore
   , storeLock :: MVar ()
   -- ^ One global lock on store metadata to ensure thread safety.
   -- The lock is taken when subtree state is changed or queried.
-  --
-  -- XXX: Could be replaced by a file-locks per subtree
-  --      if it becomes a bottleneck.
+  , storeLockFd :: Fd
+  -- ^ One exclusive file lock to ensure multi-processing safety.
+  -- Note, that file locks are shared between threads in a process,
+  -- so that the file lock needs to be complemented by an `MVar`
+  -- for thread-safety.
   }
 
 -- | A completed item in the 'ContentStore'.
@@ -155,6 +158,7 @@ initialize :: FilePath -> IO ContentStore
 initialize root' = do
   storeRoot <- makeAbsolute root'
   createDirectoryIfMissing True storeRoot
+  storeLockFd <- createFile (lockPath storeRoot) ownerWriteMode
   setFileMode storeRoot readOnlyRootDirMode
   storeLock <- newMVar ()
   return ContentStore {..}
@@ -193,13 +197,13 @@ lookup store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Missing -> return Nothing
     UnderConstruction -> return Nothing
-    Complete -> return $ Just (Item (toStorePath store hash))
+    Complete -> return $ Just (Item (storePath store hash))
 
 -- | Atomically query the state of a subtree
 -- and mark it as under construction if missing.
 constructIfMissing :: ContentStore -> ContentHash -> IO Instruction
 constructIfMissing store hash = withStoreLock store $
-  let dir = toStorePath store hash in
+  let dir = storePath store hash in
   internalQuery store hash >>= \case
     Complete -> return $ Consume (Item dir)
     UnderConstruction -> return Wait
@@ -219,7 +223,7 @@ markUnderConstruction store hash = withStoreLock store $
     Complete -> throwIO (AlreadyComplete hash)
     UnderConstruction -> throwIO (AlreadyUnderConstruction hash)
     Missing -> withWritableStore store $ do
-      let dir = toStorePath store hash
+      let dir = storePath store hash
       createDirectory dir
       setDirWritable dir
       return dir
@@ -231,7 +235,7 @@ markComplete store hash = withStoreLock store $
     Missing -> throwIO (NotUnderConstruction hash)
     Complete -> throwIO (AlreadyComplete hash)
     UnderConstruction -> withWritableStore store $ do
-      let dir = toStorePath store hash
+      let dir = storePath store hash
       unsetWritableRecursively dir
       return $ Item dir
 
@@ -245,7 +249,7 @@ removeFailed store hash = withStoreLock store $
     Missing -> throwIO (NotUnderConstruction hash)
     Complete -> throwIO (AlreadyComplete hash)
     UnderConstruction -> withWritableStore store $
-      removePathForcibly (toStorePath store hash)
+      removePathForcibly (storePath store hash)
 
 -- | Remove a subtree independent of its state.
 -- Do nothing if it doesn't exist.
@@ -254,23 +258,50 @@ removeFailed store hash = withStoreLock store $
 -- will attempt to access the subtree afterwards.
 removeForcibly :: ContentStore -> ContentHash -> IO ()
 removeForcibly store hash = withStoreLock store $ withWritableStore store $
-  removePathForcibly (toStorePath store hash)
+  removePathForcibly (storePath store hash)
 
 
 ----------------------------------------------------------------------
 -- Internals
 
--- | Return the full store path to the given hash.
-toStorePath :: ContentStore -> ContentHash -> FilePath
-toStorePath ContentStore {storeRoot} hash = storeRoot </> hashToPath hash
+lockPath :: FilePath -> FilePath
+lockPath = (</> "lock")
 
+makeLockDesc :: LockRequest -> FileLock
+makeLockDesc req = (req, AbsoluteSeek, COff 0, COff 1)
+
+acquireStoreFileLock :: ContentStore -> IO ()
+acquireStoreFileLock ContentStore {storeLockFd} = do
+  let lockDesc = makeLockDesc WriteLock
+  waitToSetLock storeLockFd lockDesc
+
+releaseStoreFileLock :: ContentStore -> IO ()
+releaseStoreFileLock ContentStore {storeLockFd} = do
+  let lockDesc = makeLockDesc Unlock
+  setLock storeLockFd lockDesc
+
+-- | Holds an exclusive write lock on the global lock file
+-- for the duration of the given action.
+withStoreFileLock :: ContentStore -> IO a -> IO a
+withStoreFileLock store =
+  bracket_ (acquireStoreFileLock store) (releaseStoreFileLock store)
+
+-- | Holds a lock on the global 'MVar' and on the global lock file
+-- for the duration of the given action.
 withStoreLock :: ContentStore -> IO a -> IO a
-withStoreLock store action = withMVar (storeLock store) $ \() -> action
+withStoreLock store action =
+  withMVar (storeLock store) $ \() ->
+    withStoreFileLock store $
+      action
+
+-- | Return the full store path to the given hash.
+storePath :: ContentStore -> ContentHash -> FilePath
+storePath ContentStore {storeRoot} hash = storeRoot </> hashToPath hash
 
 -- | Query the state of a subtree without taking a lock.
 internalQuery :: ContentStore -> ContentHash -> IO Status
 internalQuery store hash =
-  let dir = toStorePath store hash in
+  let dir = storePath store hash in
   doesDirectoryExist dir >>= \case
     False -> return Missing
     True -> isWritable dir >>= \case
