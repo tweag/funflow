@@ -29,7 +29,7 @@ If you would like to cache a pure computation in the same way as an effectful `S
 Both the input and the output types of named workflows are subject to the same restrictions as steps, that is they have to be in the Store type class. Naming workflows has two effects:
 
 * Named workflows are cached so they will not be repeated if the calculation is restarted. 
-* Names given to workflows htlp when you are logging or visualising the dependency graph
+* Names given to workflows help when you are logging or visualising the dependency graph
 
 ## Wiring 
 
