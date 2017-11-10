@@ -40,9 +40,9 @@ execute :: CS.ContentStore -> TaskDescription -> IO ExecutionResult
 execute store td = do
   instruction <- CS.constructIfMissing store (td ^. tdOutput)
   case instruction of
-    CS.Wait -> return AlreadyRunning
-    CS.Consume _ -> return Cached
-    CS.Construct fp -> let
+    CS.Pending () -> return AlreadyRunning
+    CS.Complete _ -> return Cached
+    CS.Missing fp -> let
         cmd = T.unpack $ td ^. tdTask . etCommand
         procSpec params out = (proc cmd $ T.unpack <$> params) {
             cwd = Just fp
@@ -102,14 +102,13 @@ executeLoop :: forall c. Coordinator c
 executeLoop _ cfg sroot = do
   hook :: Hook c <- initialise cfg
   executor <- Executor <$> getHostName
-  store <- CS.initialize sroot
 
   -- Types of completion/status updates
   let fromCache = Completed $ ExecutionInfo executor 0
       afterTime t = Completed $ ExecutionInfo executor t
       afterFailure t i = Failed (ExecutionInfo executor t) i
 
-  forever $ do
+  CS.withStore sroot $ \store -> forever $ do
     mtask <- popTask hook executor
     case mtask of
       Nothing -> return ()
