@@ -251,6 +251,7 @@ instance (Typeable k, Typeable v, ContentHashable k, ContentHashable v)
 instance ContentHashable a => ContentHashable [a] where
   contentHashUpdate = foldM contentHashUpdate
 
+instance ContentHashable ()
 instance (ContentHashable a, ContentHashable b) => ContentHashable (a, b)
 instance (ContentHashable a, ContentHashable b, ContentHashable c) => ContentHashable (a, b, c)
 instance (ContentHashable a, ContentHashable b, ContentHashable c, ContentHashable d) => ContentHashable (a, b, c, d)
