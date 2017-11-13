@@ -1,7 +1,10 @@
-{-# LANGUAGE DeriveGeneric   #-}
-{-# LANGUAGE LambdaCase      #-}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE RecursiveDo         #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 
 -- | Hash addressed store in file system.
@@ -9,7 +12,7 @@
 -- A store associates a 'Control.FunFlow.ContentHashable.ContentHash'
 -- with a directory subtree. A subtree can be either
 -- 'Control.FunFlow.ContentStore.Missing',
--- 'Control.FunFlow.ContentStore.UnderConstruction', or
+-- 'Control.FunFlow.ContentStore.Pending, or
 -- 'Control.FunFlow.ContentStore.Complete'.
 -- The state of subtrees is persisted on the file system.
 --
@@ -20,7 +23,7 @@
 --
 -- It is assumed that the store root and its immediate contents are not modified
 -- externally. The contents of subtrees may be modified externally while the
--- subtree is marked as under construction.
+-- subtree is marked as pending.
 --
 -- __Implementation note:__
 --
@@ -28,31 +31,36 @@
 -- namely whether it exists and whether it is writable.
 --
 -- @
---   exists   writable          state
---   ---------------------------------------
---                             missing
---     X          X       under construction
---     X                       complete
+--   exists   writable    state
+--   ----------------------------
+--                       missing
+--     X          X      pending
+--     X                 complete
 -- @
 module Control.FunFlow.ContentStore
   ( Status (..)
-  , Instruction (..)
+  , Status_
+  , Update (..)
   , StoreError (..)
   , ContentStore
   , Item
   , itemPath
   , root
-  , initialize
+  , open
+  , close
+  , withStore
   , allSubtrees
   , subtrees
-  , subtreesUnderConstruction
+  , subtreesPending
   , query
   , isMissing
-  , isUnderConstruction
+  , isPending
   , isComplete
   , lookup
+  , lookupOrWait
+  , constructOrWait
   , constructIfMissing
-  , markUnderConstruction
+  , markPending
   , markComplete
   , removeFailed
   , removeForcibly
@@ -61,9 +69,12 @@ module Control.FunFlow.ContentStore
 
 import           Prelude                         hiding (lookup)
 
+import           Control.Concurrent              (threadDelay)
+import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception               (Exception, bracket_, throwIO)
-import           Control.Monad                   (filterM)
+import           Control.Exception               (Exception, bracket, bracket_,
+                                                  catch, throwIO)
+import           Control.Monad                   (filterM, forever, void)
 import           Data.Bits                       (complement)
 import           Data.List                       (foldl')
 import           Data.Maybe                      (catMaybes)
@@ -77,6 +88,7 @@ import           System.Directory                (createDirectory,
                                                   listDirectory, makeAbsolute,
                                                   removePathForcibly)
 import           System.FilePath                 ((</>))
+import           System.INotify
 import           System.Posix.Files
 import           System.Posix.IO
 import           System.Posix.Types
@@ -88,32 +100,30 @@ import           Control.FunFlow.ContentHashable (ContentHash,
 
 
 -- | Status of a subtree in the store.
-data Status
-  = Missing
+data Status missing pending complete
+  = Missing missing
   -- ^ The subtree does not exist, yet.
-  | UnderConstruction
+  | Pending pending
   -- ^ The subtree is under construction and not ready for consumption.
-  | Complete
+  | Complete complete
   -- ^ The subtree is complete and ready for consumption.
   deriving (Eq, Show)
 
--- | Instruction to the caller on what to do after calling
--- 'Control.FunFlow.ContentStore.constructIfMissing'.
-data Instruction
-  = Construct FilePath
-  -- ^ The subtree was previously missing
-  -- and is now marked as under construction.
-  | Wait
-  -- ^ The subtree is already under construction.
-  | Consume Item
-  -- ^ The subtree is already complete and ready for consumption.
+type Status_ = Status () () ()
+
+-- | Update about the status of a pending subtree.
+data Update
+  = Completed Item
+  -- ^ The item is now completed and ready for consumption.
+  | Failed
+  -- ^ Constructing the item failed.
   deriving (Eq, Show)
 
 -- | Errors that can occur when interacting with the store.
 data StoreError
-  = NotUnderConstruction ContentHash
+  = NotPending ContentHash
   -- ^ A subtree is not under construction when it should be.
-  | AlreadyUnderConstruction ContentHash
+  | AlreadyPending ContentHash
   -- ^ A subtree is already under construction when it should be missing.
   | AlreadyComplete ContentHash
   -- ^ A subtree is already complete when it shouldn't be.
@@ -132,6 +142,8 @@ data ContentStore = ContentStore
   -- Note, that file locks are shared between threads in a process,
   -- so that the file lock needs to be complemented by an `MVar`
   -- for thread-safety.
+  , storeINotify :: INotify
+  -- ^ Used to watch for updates on store items.
   }
 
 -- | A completed item in the 'ContentStore'.
@@ -148,20 +160,37 @@ instance Data.Store.Store Item
 root :: ContentStore -> FilePath
 root = storeRoot
 
--- | @initialize root@ initializes a store under the given root directory.
+-- | @open root@ opens a store under the given root directory.
 --
 -- The root directory is created if necessary.
 --
 -- It is not safe to have multiple store objects
 -- refer to the same root directory.
-initialize :: FilePath -> IO ContentStore
-initialize root' = do
+open :: FilePath -> IO ContentStore
+open root' = do
   storeRoot <- makeAbsolute root'
   createDirectoryIfMissing True storeRoot
   storeLockFd <- createFile (lockPath storeRoot) ownerWriteMode
   setFileMode storeRoot readOnlyRootDirMode
   storeLock <- newMVar ()
+  storeINotify <- initINotify
   return ContentStore {..}
+
+-- | Free the resources associated with the given store object.
+--
+-- The store object may not be used afterwards.
+close :: ContentStore -> IO ()
+close store = do
+  takeMVar (storeLock store)
+  closeFd (storeLockFd store)
+  killINotify (storeINotify store)
+
+-- | Open the under the given root and perform the given action.
+-- Closes the store once the action is complete
+--
+-- See also: 'Control.FunFlow.ContentStore.open'
+withStore :: FilePath -> (ContentStore -> IO a) -> IO a
+withStore root' = bracket (open root') close
 
 -- | List all subtrees that are complete or under construction.
 allSubtrees :: ContentStore -> IO [ContentHash]
@@ -173,56 +202,91 @@ subtrees :: ContentStore -> IO [ContentHash]
 subtrees store = filterM (isComplete store) =<< allSubtrees store
 
 -- | List all subtrees under construction.
-subtreesUnderConstruction :: ContentStore -> IO [ContentHash]
-subtreesUnderConstruction store =
-  filterM (isUnderConstruction store) =<< allSubtrees store
+subtreesPending :: ContentStore -> IO [ContentHash]
+subtreesPending store =
+  filterM (isPending store) =<< allSubtrees store
 
 -- | Query for the state of a subtree.
-query :: ContentStore -> ContentHash -> IO Status
+query :: ContentStore -> ContentHash -> IO (Status () () ())
 query store hash = withStoreLock store $
   internalQuery store hash
 
 isMissing :: ContentStore -> ContentHash -> IO Bool
-isMissing store hash = (== Missing) <$> query store hash
+isMissing store hash = (== Missing ()) <$> query store hash
 
-isUnderConstruction :: ContentStore -> ContentHash -> IO Bool
-isUnderConstruction store hash = (== UnderConstruction) <$> query store hash
+isPending :: ContentStore -> ContentHash -> IO Bool
+isPending store hash = (== Pending ()) <$> query store hash
 
 isComplete :: ContentStore -> ContentHash -> IO Bool
-isComplete store hash = (== Complete) <$> query store hash
+isComplete store hash = (== Complete ()) <$> query store hash
 
--- | Get the file-path of a subtree if it is complete.
-lookup :: ContentStore -> ContentHash -> IO (Maybe Item)
+-- | Query a subtree and return it if completed.
+lookup :: ContentStore -> ContentHash -> IO (Status () () Item)
 lookup store hash = withStoreLock store $
   internalQuery store hash >>= \case
-    Missing -> return Nothing
-    UnderConstruction -> return Nothing
-    Complete -> return $ Just (Item (storePath store hash))
+    Missing () -> return $ Missing ()
+    Pending () -> return $ Pending ()
+    Complete () -> return $ Complete (Item (storePath store hash))
+
+-- | Query a subtree and return it if completed.
+-- Return an 'Control.Concurrent.Async' to await updates,
+-- if it is already under construction.
+lookupOrWait
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status () (Async Update) Item)
+lookupOrWait store hash = withStoreLock store $
+  let dir = storePath store hash in
+  internalQuery store hash >>= \case
+    Complete () -> return $ Complete (Item dir)
+    Missing () -> return $ Missing ()
+    Pending () -> Pending <$> internalWatchPending store hash
 
 -- | Atomically query the state of a subtree
 -- and mark it as under construction if missing.
-constructIfMissing :: ContentStore -> ContentHash -> IO Instruction
+-- Return an 'Control.Concurrent.Async' to await updates,
+-- if it is already under construction.
+constructOrWait
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status FilePath (Async Update) Item)
+constructOrWait store hash = withStoreLock store $
+  let dir = storePath store hash in
+  internalQuery store hash >>= \case
+    Complete () -> return $ Complete (Item dir)
+    Missing () -> withWritableStore store $ do
+      createDirectory dir
+      setDirWritable dir
+      return $ Missing dir
+    Pending () -> Pending <$> internalWatchPending store hash
+
+-- | Atomically query the state of a subtree
+-- and mark it as under construction if missing.
+constructIfMissing
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status FilePath () Item)
 constructIfMissing store hash = withStoreLock store $
   let dir = storePath store hash in
   internalQuery store hash >>= \case
-    Complete -> return $ Consume (Item dir)
-    UnderConstruction -> return Wait
-    Missing -> withWritableStore store $ do
+    Complete () -> return $ Complete (Item dir)
+    Pending () -> return $ Pending ()
+    Missing () -> withWritableStore store $ do
       createDirectory dir
       setDirWritable dir
-      return $ Construct dir
+      return $ Missing dir
 
 -- | Mark a non-existent subtree as under construction.
 --
 -- Creates the destination directory and returns its path.
 --
 -- See also: 'Control.FunFlow.ContentStore.constructIfMissing'.
-markUnderConstruction :: ContentStore -> ContentHash -> IO FilePath
-markUnderConstruction store hash = withStoreLock store $
+markPending :: ContentStore -> ContentHash -> IO FilePath
+markPending store hash = withStoreLock store $
   internalQuery store hash >>= \case
-    Complete -> throwIO (AlreadyComplete hash)
-    UnderConstruction -> throwIO (AlreadyUnderConstruction hash)
-    Missing -> withWritableStore store $ do
+    Complete () -> throwIO (AlreadyComplete hash)
+    Pending () -> throwIO (AlreadyPending hash)
+    Missing () -> withWritableStore store $ do
       let dir = storePath store hash
       createDirectory dir
       setDirWritable dir
@@ -232,9 +296,9 @@ markUnderConstruction store hash = withStoreLock store $
 markComplete :: ContentStore -> ContentHash -> IO Item
 markComplete store hash = withStoreLock store $
   internalQuery store hash >>= \case
-    Missing -> throwIO (NotUnderConstruction hash)
-    Complete -> throwIO (AlreadyComplete hash)
-    UnderConstruction -> withWritableStore store $ do
+    Missing () -> throwIO (NotPending hash)
+    Complete () -> throwIO (AlreadyComplete hash)
+    Pending () -> withWritableStore store $ do
       let dir = storePath store hash
       unsetWritableRecursively dir
       return $ Item dir
@@ -246,9 +310,9 @@ markComplete store hash = withStoreLock store $
 removeFailed :: ContentStore -> ContentHash -> IO ()
 removeFailed store hash = withStoreLock store $
   internalQuery store hash >>= \case
-    Missing -> throwIO (NotUnderConstruction hash)
-    Complete -> throwIO (AlreadyComplete hash)
-    UnderConstruction -> withWritableStore store $
+    Missing () -> throwIO (NotPending hash)
+    Complete () -> throwIO (AlreadyComplete hash)
+    Pending () -> withWritableStore store $
       removePathForcibly (storePath store hash)
 
 -- | Remove a subtree independent of its state.
@@ -299,14 +363,64 @@ storePath :: ContentStore -> ContentHash -> FilePath
 storePath ContentStore {storeRoot} hash = storeRoot </> hashToPath hash
 
 -- | Query the state of a subtree without taking a lock.
-internalQuery :: ContentStore -> ContentHash -> IO Status
+internalQuery :: ContentStore -> ContentHash -> IO (Status () () ())
 internalQuery store hash =
   let dir = storePath store hash in
   doesDirectoryExist dir >>= \case
-    False -> return Missing
+    False -> return $ Missing ()
     True -> isWritable dir >>= \case
-      False -> return Complete
-      True -> return UnderConstruction
+      False -> return $ Complete ()
+      True -> return $ Pending ()
+
+-- | Watch the given subtree under construction.
+-- The returned 'Async' completes after the subtree is completed or failed.
+internalWatchPending
+  :: ContentStore
+  -> ContentHash
+  -> IO (Async Update)
+internalWatchPending store hash = do
+  let dir = storePath store hash
+  -- Add an inotify watch and give a signal on relevant events.
+  let inotify = storeINotify store
+      mask = [Attrib, MoveSelf, DeleteSelf, OnlyDir]
+  signal <- newEmptyMVar
+  -- Signal the listener. If the 'MVar' is full,
+  -- the listener didn't handle earlier signals, yet.
+  let giveSignal = void $ tryPutMVar signal ()
+  watch <- addWatch inotify mask dir $ \case
+    Attributes True Nothing -> giveSignal
+    MovedSelf True -> giveSignal
+    DeletedSelf -> giveSignal
+    _ -> return ()
+  -- Additionally, poll on regular intervals.
+  -- Inotify doesn't cover all cases, e.g. network filesystems.
+  let tenMinutes = 10 * 60 * 1000000
+  ticker <- async $ forever $ threadDelay tenMinutes >> giveSignal
+  let stopWatching = do
+        cancel ticker
+        -- When calling `addWatch` on a path that is already being watched,
+        -- inotify will not create a new watch, but amend the existing watch
+        -- and return the same watch descriptor.
+        -- Therefore, the watch might already have been removed at this point,
+        -- which will cause an 'IOError'.
+        -- Fortunately, all event handlers to a file are called at once.
+        -- So, that removing the watch here will not cause another handler
+        -- to miss out on the event.
+        -- Note, that this may change when adding different event handlers,
+        -- that remove the watch under different conditions.
+        removeWatch watch `catch` \(_::IOError) -> return ()
+  -- Listen to the signal asynchronously,
+  -- and query the status when it fires.
+  -- If the status changed, fill in the update.
+  update <- newEmptyMVar
+  let loop = takeMVar signal >> query store hash >>= \case
+        Pending () -> loop
+        Complete () -> tryPutMVar update $ Completed (Item dir)
+        Missing () -> tryPutMVar update Failed
+  void $ async loop
+  -- Wait for the update asynchronously.
+  -- Stop watching when it arrives.
+  async $ takeMVar update <* stopWatching
 
 setRootDirWritable :: ContentStore -> IO ()
 setRootDirWritable ContentStore {storeRoot} =

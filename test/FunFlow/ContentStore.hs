@@ -4,6 +4,7 @@ module FunFlow.ContentStore
   ( tests
   ) where
 
+import           Control.Concurrent.Async
 import           Control.Exception.Safe          (tryAny)
 import           Control.FunFlow.ContentHashable (contentHash)
 import           Control.FunFlow.ContentStore    (ContentStore)
@@ -19,20 +20,20 @@ import           Test.Tasty.HUnit
 tests :: TestTree
 tests = testGroup "Content Store"
 
-  [ testCase "initialize fresh store" $
+  [ testCase "initialise fresh store" $
     withTmpDir $ \dir -> do
       let root = dir </> "store"
-      void $ ContentStore.initialize root
-      doesDirectoryExist root
-        @? "store root exists"
+      ContentStore.withStore root $ \_ ->
+        doesDirectoryExist root
+          @? "store root exists"
 
-  , testCase "initialize existing store" $
+  , testCase "initialise existing store" $
     withTmpDir $ \dir -> do
       let root = dir </> "store"
       createDirectory root
-      void $ ContentStore.initialize root
-      doesDirectoryExist root
-        @? "store root exists"
+      ContentStore.withStore root $ \_ ->
+        doesDirectoryExist root
+          @? "store root exists"
 
   , testCase "store is not writable" $
     withEmptyStore $ \store -> do
@@ -47,18 +48,18 @@ tests = testGroup "Content Store"
       hash <- contentHash ("test" :: String)
 
       missing <- ContentStore.query store hash
-      missing @?= ContentStore.Missing
-      nothing <- ContentStore.lookup store hash
-      nothing @?= Nothing
+      missing @?= ContentStore.Missing ()
+      missing' <- ContentStore.lookup store hash
+      missing' @?= ContentStore.Missing ()
 
-      subtree <- ContentStore.markUnderConstruction store hash
+      subtree <- ContentStore.markPending store hash
       let dir = subtree </> "dir"
           file = dir </> "file"
           expectedContent = "Hello World"
-      underConstruction <- ContentStore.query store hash
-      underConstruction @?= ContentStore.UnderConstruction
-      nothing' <- ContentStore.lookup store hash
-      nothing' @?= Nothing
+      pending <- ContentStore.query store hash
+      pending @?= ContentStore.Pending ()
+      pending' <- ContentStore.lookup store hash
+      pending' @?= ContentStore.Pending ()
       doesDirectoryExist subtree
         @? "subtree exists"
       writable <$> getPermissions subtree
@@ -71,9 +72,9 @@ tests = testGroup "Content Store"
 
       item <- ContentStore.markComplete store hash
       complete <- ContentStore.query store hash
-      complete @?= ContentStore.Complete
-      justItem <- ContentStore.lookup store hash
-      justItem @?= Just item
+      complete @?= ContentStore.Complete ()
+      complete' <- ContentStore.lookup store hash
+      complete' @?= ContentStore.Complete item
       doesDirectoryExist subtree
         @? "subtree exists"
       not . writable <$> getPermissions subtree
@@ -88,6 +89,102 @@ tests = testGroup "Content Store"
         content <- readFile file
         content @?= expectedContent
 
+  , testCase "await construction" $
+    withEmptyStore $ \store -> do
+      hash <- contentHash ("test" :: String)
+
+      ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Pending _ ->
+          assertFailure "missing already under construction"
+        ContentStore.Complete _ ->
+          assertFailure "missing already complete"
+        ContentStore.Missing _ ->
+          return ()
+
+      a <- ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Missing _ -> do
+          assertFailure "under construction still missing"
+          undefined
+        ContentStore.Complete _ -> do
+          assertFailure "under construction already complete"
+          undefined
+        ContentStore.Pending a ->
+          return a
+
+      b <- ContentStore.lookupOrWait store hash >>= \case
+        ContentStore.Missing _ -> do
+          assertFailure "under construction still missing"
+          undefined
+        ContentStore.Complete _ -> do
+          assertFailure "under construction already complete"
+          undefined
+        ContentStore.Pending b ->
+          return b
+
+      item <- ContentStore.markComplete store hash
+
+      item' <- wait a
+      item' @?= ContentStore.Completed item
+
+      item'' <- wait b
+      item'' @?= ContentStore.Completed item
+
+      ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Missing _ -> do
+          assertFailure "complete still missing"
+        ContentStore.Pending _ -> do
+          assertFailure "complete still under construction"
+        ContentStore.Complete _ -> do
+          return ()
+
+  , testCase "await failure" $
+    withEmptyStore $ \store -> do
+      hash <- contentHash ("test" :: String)
+
+      ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Pending _ ->
+          assertFailure "missing already under construction"
+        ContentStore.Complete _ ->
+          assertFailure "missing already complete"
+        ContentStore.Missing _ ->
+          return ()
+
+      a <- ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Missing _ -> do
+          assertFailure "under construction still missing"
+          undefined
+        ContentStore.Complete _ -> do
+          assertFailure "under construction already complete"
+          undefined
+        ContentStore.Pending a ->
+          return a
+
+      b <- ContentStore.lookupOrWait store hash >>= \case
+        ContentStore.Missing _ -> do
+          assertFailure "under construction still missing"
+          undefined
+        ContentStore.Complete _ -> do
+          assertFailure "under construction already complete"
+          undefined
+        ContentStore.Pending b ->
+          return b
+
+      ContentStore.removeFailed store hash
+
+      item' <- wait a
+      item' @?= ContentStore.Failed
+
+      item'' <- wait b
+      item'' @?= ContentStore.Failed
+
+      ContentStore.constructOrWait store hash >>= \case
+        ContentStore.Pending _ -> do
+          assertFailure "failed still under construction"
+        ContentStore.Complete _ -> do
+          assertFailure "failed already complete"
+        ContentStore.Missing _ -> do
+          return ()
+
   , testCase "construct if missing" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
@@ -95,29 +192,29 @@ tests = testGroup "Content Store"
           expectedContent = "Hello World"
 
       ContentStore.constructIfMissing store hash >>= \case
-        ContentStore.Wait ->
+        ContentStore.Pending () ->
           assertFailure "missing already under construction"
-        ContentStore.Consume _ ->
+        ContentStore.Complete _ ->
           assertFailure "missing already complete"
-        ContentStore.Construct subtree -> do
+        ContentStore.Missing subtree -> do
           writable <$> getPermissions subtree
             @? "under construction not writable"
           writeFile (subtree </> file) expectedContent
 
       ContentStore.constructIfMissing store hash >>= \case
-        ContentStore.Construct _ ->
+        ContentStore.Missing _ ->
           assertFailure "under construction still missing"
-        ContentStore.Consume _ ->
+        ContentStore.Complete _ ->
           assertFailure "under construction already complete"
-        ContentStore.Wait ->
+        ContentStore.Pending () ->
           void $ ContentStore.markComplete store hash
 
       ContentStore.constructIfMissing store hash >>= \case
-        ContentStore.Construct _ ->
+        ContentStore.Missing _ ->
           assertFailure "complete still missing"
-        ContentStore.Wait ->
+        ContentStore.Pending () ->
           assertFailure "complete still under construction"
-        ContentStore.Consume item -> do
+        ContentStore.Complete item -> do
           let subtree = ContentStore.itemPath item
           not . writable <$> getPermissions (subtree </> file)
             @? "complete still writable"
@@ -127,7 +224,7 @@ tests = testGroup "Content Store"
   , testCase "remove failed" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      subtree <- ContentStore.markUnderConstruction store hash
+      subtree <- ContentStore.markPending store hash
       ContentStore.removeFailed store hash
       not <$> doesDirectoryExist subtree
         @? "subtree was removed"
@@ -135,7 +232,7 @@ tests = testGroup "Content Store"
   , testCase "forcibly remove" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      subtree <- ContentStore.markUnderConstruction store hash
+      subtree <- ContentStore.markPending store hash
 
       ContentStore.removeForcibly store hash
       not <$> doesDirectoryExist subtree
@@ -145,7 +242,7 @@ tests = testGroup "Content Store"
       not <$> doesDirectoryExist subtree
         @? "remove missing"
 
-      subtree' <- ContentStore.markUnderConstruction store hash
+      subtree' <- ContentStore.markPending store hash
       void $ ContentStore.markComplete store hash
       ContentStore.removeForcibly store hash
       not <$> doesDirectoryExist subtree'
@@ -157,23 +254,23 @@ tests = testGroup "Content Store"
       hash <- contentHash ("test" :: String)
 
       do
-        store <- ContentStore.initialize root
-        void $ ContentStore.markUnderConstruction store hash
+        ContentStore.withStore root $ \store ->
+          void $ ContentStore.markPending store hash
 
       -- Imagine the process terminates and the store is closed
 
       do
-        store <- ContentStore.initialize root
-        underConstruction <- ContentStore.query store hash
-        underConstruction @?= ContentStore.UnderConstruction
-        void $ ContentStore.markComplete store hash
+        ContentStore.withStore root $ \store -> do
+          underConstruction <- ContentStore.query store hash
+          underConstruction @?= ContentStore.Pending ()
+          void $ ContentStore.markComplete store hash
 
       -- Imagine the process terminates and the store is closed
 
       do
-        store <- ContentStore.initialize root
-        complete <- ContentStore.query store hash
-        complete @?= ContentStore.Complete
+        ContentStore.withStore root $ \store -> do
+          complete <- ContentStore.query store hash
+          complete @?= ContentStore.Complete ()
 
   , testCase "mark complete before under construction fails" $
     withEmptyStore $ \store -> do
@@ -184,7 +281,7 @@ tests = testGroup "Content Store"
   , testCase "mark complete after complete fails" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      void $ ContentStore.markUnderConstruction store hash
+      void $ ContentStore.markPending store hash
       void $ ContentStore.markComplete store hash
       ContentStore.markComplete store hash
         `shouldFail` "complete after complete"
@@ -192,16 +289,16 @@ tests = testGroup "Content Store"
   , testCase "mark under construction after under construction fails" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      void $ ContentStore.markUnderConstruction store hash
-      void $ ContentStore.markUnderConstruction store hash
+      void $ ContentStore.markPending store hash
+      void $ ContentStore.markPending store hash
         `shouldFail` "under construction after under construction"
 
   , testCase "mark under construction after complete fails" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      void $ ContentStore.markUnderConstruction store hash
+      void $ ContentStore.markPending store hash
       void $ ContentStore.markComplete store hash
-      void $ ContentStore.markUnderConstruction store hash
+      void $ ContentStore.markPending store hash
         `shouldFail` "under construction after complete"
 
   , testCase "remove missing fails" $
@@ -213,7 +310,7 @@ tests = testGroup "Content Store"
   , testCase "remove complete fails" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      void $ ContentStore.markUnderConstruction store hash
+      void $ ContentStore.markPending store hash
       void $ ContentStore.markComplete store hash
       ContentStore.removeFailed store hash
         `shouldFail` "remove complete"
@@ -221,7 +318,7 @@ tests = testGroup "Content Store"
   , testCase "list store contents" $
     withEmptyStore $ \store -> do
       [a, b, c, d] <- mapM contentHash ["a", "b", "c", "d" :: String]
-      void $ mapM (ContentStore.markUnderConstruction store) [a, b, c, d]
+      void $ mapM (ContentStore.markPending store) [a, b, c, d]
       mapM_ (ContentStore.markComplete store) [a, b]
 
       all' <- ContentStore.allSubtrees store
@@ -231,7 +328,7 @@ tests = testGroup "Content Store"
       complete <- ContentStore.subtrees store
       Set.fromList complete @?= Set.fromList [a, b]
 
-      underContsruction <- ContentStore.subtreesUnderConstruction store
+      underContsruction <- ContentStore.subtreesPending store
       Set.fromList underContsruction @?= Set.fromList [c, d]
 
   ]
@@ -246,4 +343,4 @@ withTmpDir = withSystemTempDirectory "funflow-teset"
 
 withEmptyStore :: (ContentStore -> IO a) -> IO a
 withEmptyStore k = withTmpDir $ \dir ->
-  ContentStore.initialize (dir </> "store") >>= k
+  ContentStore.withStore (dir </> "store") k

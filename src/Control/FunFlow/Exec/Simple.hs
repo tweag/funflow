@@ -14,6 +14,7 @@ module Control.FunFlow.Exec.Simple
 
 import           Control.Arrow                        (Kleisli (..), runKleisli)
 import           Control.Arrow.Free                   (eval, type (~>))
+import           Control.Concurrent.Async             (wait)
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore         as CS
@@ -36,8 +37,8 @@ runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
           -> IO b
 runFlowEx _ cfg sroot runWrapped flow input = do
     hook <- initialise cfg
-    store <- CS.initialize sroot
-    runKleisli (eval (runFlow' hook store) flow) input
+    CS.withStore sroot $ \store ->
+      runKleisli (eval (runFlow' hook store) flow) input
   where
     runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> Kleisli IO a1 b1
     runFlow' _ _ (Step f) = Kleisli $ \x -> f x
@@ -49,19 +50,35 @@ runFlowEx _ cfg sroot runWrapped flow input = do
       return chash
     runFlow' _ store PutInStore = Kleisli $ \x -> do
       chash <- contentHash x
-      instruction <- CS.constructIfMissing store chash
+      instruction <- CS.constructOrWait store chash
       case instruction of
-        CS.Wait -> return chash
-        CS.Consume _ -> return chash
-        CS.Construct fp -> let
+        CS.Pending a -> do
+          update <- wait a
+          case update of
+            CS.Completed _ -> return chash
+            CS.Failed ->
+              -- XXX: Should we retry locally?
+              fail "Remote process failed to construct item"
+        CS.Complete _ -> return chash
+        CS.Missing fp -> let
             file = fp </> "out"
           in do
             BS.writeFile file $ encode x
             _ <- CS.markComplete store chash
             return chash
     runFlow' _ store GetFromStore = Kleisli $ \chash -> do
-      mfp <- CS.lookup store chash
-      case mfp of
+      instruction <- CS.lookupOrWait store chash
+      mItem <- case instruction of
+        CS.Missing () -> return Nothing
+        CS.Complete item -> return (Just item)
+        CS.Pending a -> do
+          update <- wait a
+          case update of
+            CS.Completed item -> return (Just item)
+            CS.Failed ->
+              -- XXX: Should we fail instead?
+              return Nothing
+      case mItem of
         Nothing -> return Nothing
         Just item -> let
             file = CS.itemPath item </> "out"
