@@ -12,6 +12,7 @@ import           Control.Arrow.Free
 import           Control.Category                ((.))
 import           Control.Exception               (SomeException)
 import           Control.FunFlow.ContentHashable
+import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.Diagram
 import           Control.FunFlow.External
 import qualified Control.FunFlow.External.Docker as Docker
@@ -23,11 +24,9 @@ import           Prelude                         hiding (id, (.))
 data Flow' eff a b where
   Step    :: Store b => (a -> IO b) -> Flow' eff a b
   Named   :: Store b => T.Text -> (a -> b) -> Flow' eff a b
-  External :: ContentHashable a => (a -> ExternalTask) -> Flow' eff a ContentHash
-  -- XXX: Return 'ContentStore.Item'.
-  PutInStore :: (ContentHashable a, Store a) => Flow' eff a ContentHash
-  -- XXX: Take 'ContentStore.Item'.
-  GetFromStore :: (ContentHashable a, Store a) => Flow' eff ContentHash (Maybe a)
+  External :: ContentHashable a => (a -> ExternalTask) -> Flow' eff a CS.Item
+  PutInStore :: ContentHashable a => (FilePath -> a -> IO ()) -> Flow' eff a CS.Item
+  GetFromStore :: ContentHashable a => (FilePath -> IO a) -> Flow' eff CS.Item a
   Wrapped :: eff a b -> Flow' eff a b
 
 type Flow eff ex = ErrorChoice ex (Flow' eff)
@@ -47,19 +46,19 @@ step = effect . Step
 named :: Store b => T.Text -> (a -> b) -> Flow eff ex a b
 named n f = effect $ Named n f
 
-external :: ContentHashable a => (a -> ExternalTask) -> Flow eff ex a ContentHash
+external :: ContentHashable a => (a -> ExternalTask) -> Flow eff ex a CS.Item
 external = effect . External
 
 wrap :: eff a b -> Flow eff ex a b
 wrap = effect . Wrapped
 
-docker :: ContentHashable a => (a -> Docker.Config) -> Flow eff ex a ContentHash
+docker :: ContentHashable a => (a -> Docker.Config) -> Flow eff ex a CS.Item
 docker f = external $ Docker.toExternal . f
 
-putInStore :: (ContentHashable a, Store a) => Flow eff ex a ContentHash
-putInStore = effect $ PutInStore
-getFromStore :: (ContentHashable a, Store a) => Flow eff ex ContentHash (Maybe a)
-getFromStore = effect $ GetFromStore
+putInStore :: ContentHashable a => (FilePath -> a -> IO ()) -> Flow eff ex a CS.Item
+putInStore = effect . PutInStore
+getFromStore :: ContentHashable a => (FilePath -> IO a) -> Flow eff ex CS.Item a
+getFromStore = effect . GetFromStore
 
 
 -- | Convert a flow to a diagram, for inspection/pretty printing

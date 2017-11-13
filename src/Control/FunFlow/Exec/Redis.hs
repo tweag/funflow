@@ -133,4 +133,5 @@ runJob _ hook flow input = do
       chash <- liftIO $ CHash.contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
-      return chash
+      -- XXX: Make Redis executor store aware
+      undefined
