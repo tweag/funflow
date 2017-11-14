@@ -1,5 +1,3 @@
-{-# LANGUAGE Arrows                    #-}
-{-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE EmptyDataDecls            #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
@@ -65,7 +63,7 @@ getFromStore = effect . GetFromStore
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow eff ex a b -> Diagram ex a b
-toDiagram flow = eval toDiagram' flow where
+toDiagram = eval toDiagram' where
   toDiagram' (Named n f)  = node f [n]
   toDiagram' _
       = Node emptyNodeProperties (Proxy :: Proxy a1) (Proxy :: Proxy b1)
