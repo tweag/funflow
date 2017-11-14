@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows              #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,9 +23,6 @@ import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, try)
-import qualified Data.ByteString                      as BS
-import           Data.Store                           (decode, encode)
-import           System.FilePath                      ((</>))
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
@@ -43,50 +41,33 @@ runFlowEx _ cfg sroot runWrapped flow input = do
     runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> Kleisli IO a1 b1
     runFlow' _ _ (Step f) = Kleisli $ \x -> f x
     runFlow' _ _ (Named _ f) = Kleisli $ \x -> return $ f x
-    runFlow' po _ (External toTask) = Kleisli $ \x -> do
+    runFlow' po store (External toTask) = Kleisli $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
-      return chash
-    runFlow' _ store PutInStore = Kleisli $ \x -> do
+      CS.lookupOrWait store chash >>= \case
+        CS.Missing _ -> fail "Remote process failed to construct item"
+        CS.Pending a -> wait a >>= \case
+          CS.Failed -> fail "Remote process failed to construct item"
+          CS.Completed item -> return item
+        CS.Complete item -> return item
+    runFlow' _ store (PutInStore f) = Kleisli $ \x -> do
       chash <- contentHash x
       instruction <- CS.constructOrWait store chash
       case instruction of
         CS.Pending a -> do
           update <- wait a
           case update of
-            CS.Completed _ -> return chash
+            CS.Completed item -> return item
             CS.Failed ->
               -- XXX: Should we retry locally?
               fail "Remote process failed to construct item"
-        CS.Complete _ -> return chash
-        CS.Missing fp -> let
-            file = fp </> "out"
-          in do
-            BS.writeFile file $ encode x
-            _ <- CS.markComplete store chash
-            return chash
-    runFlow' _ store GetFromStore = Kleisli $ \chash -> do
-      instruction <- CS.lookupOrWait store chash
-      mItem <- case instruction of
-        CS.Missing () -> return Nothing
-        CS.Complete item -> return (Just item)
-        CS.Pending a -> do
-          update <- wait a
-          case update of
-            CS.Completed item -> return (Just item)
-            CS.Failed ->
-              -- XXX: Should we fail instead?
-              return Nothing
-      case mItem of
-        Nothing -> return Nothing
-        Just item -> let
-            file = CS.itemPath item </> "out"
-          in do
-            bs <- BS.readFile file
-            case decode bs of
-              Right res -> return $ Just res
-              Left _    -> return Nothing
+        CS.Complete item -> return item
+        CS.Missing fp -> do
+          f fp x
+          CS.markComplete store chash
+    runFlow' _ _ (GetFromStore f) = Kleisli $ \item ->
+      f $ CS.itemPath item
     runFlow' _ _ (Wrapped w) = runWrapped w
 
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)

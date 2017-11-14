@@ -6,6 +6,7 @@ import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable             (ContentHash)
+import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External
@@ -63,7 +64,7 @@ redisTest = let
       , R.connectAuth = Nothing
       }
     someString = "Hello World" :: T.Text
-    flow :: SimpleFlow T.Text ContentHash
+    flow :: SimpleFlow T.Text CS.Item
     flow = external $ \t -> ExternalTask {
         _etCommand = "/run/current-system/sw/bin/echo"
       , _etParams = [textParam t]
