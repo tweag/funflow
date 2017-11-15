@@ -78,7 +78,7 @@ import           Control.Monad.Catch             (MonadMask, bracket)
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 import           Data.Bits                       (complement)
 import           Data.List                       (foldl')
-import           Data.Maybe                      (catMaybes)
+import           Data.Maybe                      (mapMaybe)
 import qualified Data.Store
 import           Data.Typeable                   (Typeable)
 import           GHC.Generics                    (Generic)
@@ -196,7 +196,7 @@ withStore root' = bracket (liftIO $ open root') (liftIO . close)
 -- | List all subtrees that are complete or under construction.
 allSubtrees :: ContentStore -> IO [ContentHash]
 allSubtrees ContentStore {storeRoot} =
-  catMaybes . map pathToHash <$> listDirectory storeRoot
+  mapMaybe pathToHash <$> listDirectory storeRoot
 
 -- | List all complete subtrees.
 subtrees :: ContentStore -> IO [ContentHash]
