@@ -3,9 +3,7 @@
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE RecursiveDo         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-
 
 -- | Hash addressed store in file system.
 --
@@ -73,10 +71,10 @@ import           Prelude                         hiding (lookup)
 import           Control.Concurrent              (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception               (Exception, bracket_,
-                                                  catch, throwIO)
+import           Control.Exception               (Exception, bracket_, catch,
+                                                  throwIO)
 import           Control.Monad                   (filterM, forever, void)
-import Control.Monad.Catch (MonadMask, bracket)
+import           Control.Monad.Catch             (MonadMask, bracket)
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 import           Data.Bits                       (complement)
 import           Data.List                       (foldl')
