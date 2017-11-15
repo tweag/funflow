@@ -40,7 +40,7 @@ data ExecutionResult =
     --   TODO where should logs go?
   | Failure TimeSpec Int
 
-  -- | Execute an individual task.
+-- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = do
   instruction <- lift $ CS.constructIfMissing store (td ^. tdOutput)

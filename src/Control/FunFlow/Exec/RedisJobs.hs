@@ -1,20 +1,15 @@
-{-# LANGUAGE Arrows                     #-}
 {-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module Control.FunFlow.Exec.RedisJobs where
 
 import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.External.Coordinator.Redis
-import           Control.Lens hiding (argument)
+import           Control.Lens                               hiding (argument)
 import           Data.Either                                (rights)
 import           Data.Maybe                                 (catMaybes)
 
@@ -77,8 +72,7 @@ getJobById jid = do
   let jobIdNm = BS8.pack $ "job_" ++ show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
-    Left _err -> do
-      return Nothing
+    Left _err -> return Nothing
     Right job -> return $ Just job
 
 -- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
