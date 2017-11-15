@@ -58,6 +58,7 @@ module Control.FunFlow.ContentStore
   , isComplete
   , lookup
   , lookupOrWait
+  , waitUntilComplete
   , constructOrWait
   , constructIfMissing
   , markPending
@@ -241,6 +242,17 @@ lookupOrWait store hash = withStoreLock store $
     Complete () -> return $ Complete (Item dir)
     Missing () -> return $ Missing ()
     Pending () -> Pending <$> internalWatchPending store hash
+
+-- | Query a subtree and block, if necessary, until it is completed or failed.
+-- Returns 'Nothing' if the subtree is not in the store
+-- and the subtree, otherwise.
+waitUntilComplete :: ContentStore -> ContentHash -> IO (Maybe Item)
+waitUntilComplete store hash = lookupOrWait store hash >>= \case
+  Complete item -> return $ Just item
+  Missing () -> return Nothing
+  Pending a -> wait a >>= \case
+    Completed item -> return $ Just item
+    Failed -> return $ Nothing
 
 -- | Atomically query the state of a subtree
 -- and mark it as under construction if missing.
