@@ -4,7 +4,7 @@ import Control.Monad (unless)
 import Control.Monad.Except
 import Data.Store
 import Data.ByteString (ByteString)
-import Lens.Micro.Platform
+import Control.Lens
 
 mdecode :: Store a => Maybe ByteString -> Either String a
 mdecode (Nothing) = Left "no value"
