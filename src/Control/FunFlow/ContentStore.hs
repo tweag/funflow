@@ -72,16 +72,18 @@ import           Prelude                         hiding (lookup)
 import           Control.Concurrent              (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception               (Exception, bracket, bracket_,
+import           Control.Exception               (Exception, bracket_,
                                                   catch, throwIO)
 import           Control.Monad                   (filterM, forever, void)
+import Control.Monad.Catch (MonadMask, bracket)
+import           Control.Monad.IO.Class          (MonadIO, liftIO)
 import           Data.Bits                       (complement)
 import           Data.List                       (foldl')
 import           Data.Maybe                      (catMaybes)
 import qualified Data.Store
 import           Data.Typeable                   (Typeable)
-import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
 import           GHC.Generics                    (Generic)
+import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
 import           System.Directory                (createDirectory,
                                                   createDirectoryIfMissing,
                                                   doesDirectoryExist,
@@ -132,12 +134,12 @@ instance Exception StoreError
 
 -- | A hash addressed store on the file system.
 data ContentStore = ContentStore
-  { storeRoot :: FilePath
+  { storeRoot    :: FilePath
   -- ^ Subtrees are stored directly under this directory.
-  , storeLock :: MVar ()
+  , storeLock    :: MVar ()
   -- ^ One global lock on store metadata to ensure thread safety.
   -- The lock is taken when subtree state is changed or queried.
-  , storeLockFd :: Fd
+  , storeLockFd  :: Fd
   -- ^ One exclusive file lock to ensure multi-processing safety.
   -- Note, that file locks are shared between threads in a process,
   -- so that the file lock needs to be complemented by an `MVar`
@@ -189,8 +191,8 @@ close store = do
 -- Closes the store once the action is complete
 --
 -- See also: 'Control.FunFlow.ContentStore.open'
-withStore :: FilePath -> (ContentStore -> IO a) -> IO a
-withStore root' = bracket (open root') close
+withStore :: (MonadIO m, MonadMask m) => FilePath -> (ContentStore -> m a) -> m a
+withStore root' = bracket (liftIO $ open root') (liftIO . close)
 
 -- | List all subtrees that are complete or under construction.
 allSubtrees :: ContentStore -> IO [ContentHash]
