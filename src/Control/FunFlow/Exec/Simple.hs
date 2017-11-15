@@ -45,12 +45,9 @@ runFlowEx _ cfg sroot runWrapped flow input = do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
-      CS.lookupOrWait store chash >>= \case
-        CS.Missing _ -> fail "Remote process failed to construct item"
-        CS.Pending a -> wait a >>= \case
-          CS.Failed -> fail "Remote process failed to construct item"
-          CS.Completed item -> return item
-        CS.Complete item -> return item
+      CS.waitUntilComplete store chash >>= \case
+        Nothing -> fail "Remote process failed to construct item"
+        Just item -> return item
     runFlow' _ store (PutInStore f) = Kleisli $ \x -> do
       chash <- contentHash x
       instruction <- CS.constructOrWait store chash
