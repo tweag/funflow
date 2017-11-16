@@ -45,14 +45,15 @@ allJobs = [("job1", flow2)]
 
 main :: IO ()
 main = do
-  storeDir <- mkdtemp "test"
-  res <- runSimpleFlow MemoryCoordinator () storeDir flow2 ()
+  memHook <- createMemoryCoordinator
+  storeDir <- mkdtemp "test_output"
+  res <- runSimpleFlow MemoryCoordinator memHook storeDir flow2 ()
   print res
-  res' <- runSimpleFlow MemoryCoordinator () storeDir flow2caught ()
+  res' <- runSimpleFlow MemoryCoordinator memHook storeDir flow2caught ()
   print res'
   putStrLn $ showFlow myFlow
   putStrLn $ showFlow flow2
-  res1 <- runSimpleFlow MemoryCoordinator () storeDir flow3 [1..10]
+  res1 <- runSimpleFlow MemoryCoordinator memHook storeDir flow3 [1..10]
   print res1
 -- main = redisTest
 
@@ -71,6 +72,6 @@ redisTest = let
       , _etWriteToStdOut = True
       }
   in do
-    storeDir <- mkdtemp "test"
+    storeDir <- mkdtemp "test_output"
     out <- runSimpleFlow Redis redisConf storeDir flow someString
     print out
