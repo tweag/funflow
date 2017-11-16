@@ -54,9 +54,10 @@ setup = do ex <- doesFileExist "/tmp/lazarus_note"
 testFlowAssertion :: FlowAssertion -> TestTree
 testFlowAssertion (FlowAssertion nm x flw expect before) =
   testCase nm $ do
-    store <- mkdtemp "test"
+    hook <- createMemoryCoordinator
+    store <- mkdtemp "test_output_"
     before
-    res <- runSimpleFlow MemoryCoordinator () store flw x
+    res <- runSimpleFlow MemoryCoordinator hook store flw x
     assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion

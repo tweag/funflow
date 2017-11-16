@@ -26,16 +26,19 @@ data MemHook = MemHook {
 
 makeLenses ''MemHook
 
-instance Coordinator MemoryCoordinator where
-  type Config MemoryCoordinator = ()
-  type Hook MemoryCoordinator = MemHook
-
-  initialise () = liftIO . atomically $ do
+createMemoryCoordinator :: IO MemHook
+createMemoryCoordinator =  liftIO . atomically $ do
     taskQueue <- newTVar mempty
     executionQueue <- newTVar mempty
     return $ MemHook taskQueue executionQueue
 
-  submitTask mh td = liftIO $ do
+instance Coordinator MemoryCoordinator where
+  type Config MemoryCoordinator = MemHook
+  type Hook MemoryCoordinator = MemHook
+
+  initialise = return
+
+  submitTask mh td = liftIO $
     atomically $
       modifyTVar (mh ^. mhTaskQueue) (td : )
 
@@ -77,7 +80,7 @@ instance Coordinator MemoryCoordinator where
               M.insert (td ^. tdOutput) taskStatus eq
             return $ Just td
 
-  updateTaskStatus mh tid stat = liftIO . atomically $ do
+  updateTaskStatus mh tid stat = liftIO . atomically $
     modifyTVar (mh ^. mhExecutionQueue) $ \eq ->
       if M.member tid eq
       then M.insert tid stat eq
