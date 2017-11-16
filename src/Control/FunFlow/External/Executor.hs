@@ -4,6 +4,7 @@
 -- | Executor for external tasks.
 module Control.FunFlow.External.Executor where
 
+import           Control.Concurrent                   (threadDelay)
 import           Control.Exception                    (IOException, bracket,
                                                        try)
 import qualified Control.FunFlow.ContentStore         as CS
@@ -121,10 +122,12 @@ executeLoop _ cfg sroot = do
           afterFailure t i = Failed (ExecutionInfo executor t) i
 
       CS.withStore sroot $ \store -> forever $ do
+        $(logTM) InfoS "Awaiting task from coordinator."
         mtask <- popTask hook executor
         case mtask of
-          Nothing -> return ()
+          Nothing -> lift $ threadDelay 1000000
           Just task -> do
+            $(logTM) InfoS . ls $ "Executing task: " ++ show (_tdOutput task)
             res <- execute store task
             case res of
               Cached      -> updateTaskStatus hook (task ^. tdOutput) fromCache
