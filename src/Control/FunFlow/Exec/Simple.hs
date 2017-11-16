@@ -9,16 +9,19 @@ module Control.FunFlow.Exec.Simple
   ( runFlow
   , runFlowEx
   , runSimpleFlow
+  , withSimpleLocalRunner
   ) where
 
 import           Control.Arrow.Async
 import           Control.Arrow.Free                   (eval, type (~>))
-import           Control.Concurrent.Async             (wait)
+import           Control.Concurrent.Async             (wait, withAsync)
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
+import           Control.FunFlow.External.Coordinator.Memory
+import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, try)
 
@@ -85,3 +88,17 @@ runSimpleFlow :: forall c a b. (Coordinator c)
         -> IO (Either SomeException b)
 runSimpleFlow c ccfg sroot flow input =
   runFlow c ccfg sroot runNoEffect flow input
+
+-- | Create a full pipeline runner locally. This includes an executor for
+--   executing external tasks.
+--   This function is specialised to `SimpleFlow` since in cases where
+--   a custom term algebra is in use, we assume that probably a centralised
+--   coordinator and external runners may be desired as well.
+withSimpleLocalRunner :: FilePath -- ^ Path to content store
+                      -> ((SimpleFlow a b -> a -> IO (Either SomeException b))
+                           -> IO c)
+                      -> IO c
+withSimpleLocalRunner storePath action = do
+  memHook <- createMemoryCoordinator
+  withAsync (executeLoop MemoryCoordinator memHook storePath) $ \_ ->
+    action $ runSimpleFlow MemoryCoordinator memHook storePath
