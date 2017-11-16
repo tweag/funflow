@@ -1,5 +1,3 @@
-{-# LANGUAGE Arrows              #-}
-{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -13,7 +11,7 @@ module Control.FunFlow.Exec.Simple
   , runSimpleFlow
   ) where
 
-import           Control.Arrow                        (Kleisli (..), runKleisli)
+import           Control.Arrow.Async
 import           Control.Arrow.Free                   (eval, type (~>))
 import           Control.Concurrent.Async             (wait)
 import           Control.FunFlow.Base
@@ -29,26 +27,26 @@ runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
           => c
           -> Config c
           -> FilePath -- ^ Path to content store
-          -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
+          -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
           -> Flow eff ex a b
           -> a
           -> IO b
 runFlowEx _ cfg sroot runWrapped flow input = do
     hook <- initialise cfg
     CS.withStore sroot $ \store ->
-      runKleisli (eval (runFlow' hook store) flow) input
+      runAsyncA (eval (runFlow' hook store) flow) input
   where
-    runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> Kleisli IO a1 b1
-    runFlow' _ _ (Step f) = Kleisli $ \x -> f x
-    runFlow' _ _ (Named _ f) = Kleisli $ \x -> return $ f x
-    runFlow' po store (External toTask) = Kleisli $ \x -> do
+    runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> AsyncA IO a1 b1
+    runFlow' _ _ (Step f) = AsyncA $ \x -> f x
+    runFlow' _ _ (Named _ f) = AsyncA $ \x -> return $ f x
+    runFlow' po store (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
       CS.waitUntilComplete store chash >>= \case
         Nothing -> fail "Remote process failed to construct item"
         Just item -> return item
-    runFlow' _ store (PutInStore f) = Kleisli $ \x -> do
+    runFlow' _ store (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
       instruction <- CS.constructOrWait store chash
       case instruction of
@@ -63,7 +61,7 @@ runFlowEx _ cfg sroot runWrapped flow input = do
         CS.Missing fp -> do
           f fp x
           CS.markComplete store chash
-    runFlow' _ _ (GetFromStore f) = Kleisli $ \item ->
+    runFlow' _ _ (GetFromStore f) = AsyncA $ \item ->
       f $ CS.itemPath item
     runFlow' _ _ (Wrapped w) = runWrapped w
 
@@ -71,7 +69,7 @@ runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
         -> Config c
         -> FilePath -- ^ Path to content store
-        -> (eff ~> Kleisli IO) -- ^ Natural transformation from wrapped effects
+        -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
         -> Flow eff ex a b
         -> a
         -> IO (Either ex b)
