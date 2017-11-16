@@ -19,6 +19,7 @@ import           Control.Monad.Catch                         (Exception,
                                                               toException)
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
+import           System.FilePath                             ((</>))
 import           System.Posix.Temp                           (mkdtemp)
 
 mkError :: String -> SomeException
@@ -56,6 +57,24 @@ main = do
   res1 <- runSimpleFlow MemoryCoordinator memHook storeDir flow3 [1..10]
   print res1
 -- main = redisTest
+  externalTest
+
+externalTest :: IO ()
+externalTest = let
+    someString = "External test"
+    exFlow = external $ \t -> ExternalTask
+      { _etCommand = "/run/current-system/sw/bin/echo"
+      , _etParams = [textParam t]
+      , _etWriteToStdOut = True
+      }
+    flow = exFlow >>> getFromStore (\d -> readFile $ d </> "out")
+  in do
+    storeDir <- mkdtemp "test_output_external_"
+    withSimpleLocalRunner storeDir $ \run -> do
+      out <- run flow someString
+      case out of
+        Left err     -> print err
+        Right outStr -> putStrLn outStr
 
 redisTest :: IO ()
 redisTest = let
