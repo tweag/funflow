@@ -41,8 +41,8 @@ runFlowEx _ cfg store runWrapped flow input = do
     runAsyncA (eval (runFlow' hook) flow) input
   where
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA IO a1 b1
-    runFlow' _ (Step f) = AsyncA $ \x -> f x
-    runFlow' _ (Named _ f) = AsyncA $ \x -> return $ f x
+    runFlow' _ (Step _ f) = AsyncA $ \x -> return $ f x
+    runFlow' _ (StepIO _ f) = AsyncA $ \x -> f x
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
@@ -74,7 +74,7 @@ runFlowEx _ cfg store runWrapped flow input = do
       CS.lookupAlias store alias
     runFlow' _ AssignAliasInStore = AsyncA $ \(alias, item) ->
       CS.assignAlias store alias item
-    runFlow' _ (Wrapped w) = runWrapped w
+    runFlow' _ (Wrapped _ w) = runWrapped w
 
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c

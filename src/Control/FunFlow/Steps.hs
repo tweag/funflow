@@ -23,18 +23,18 @@ import           System.Random
 
 promptFor :: Read a => Flow eff ex String a
 promptFor = proc s -> do
-     () <- step putStr -< (s++"> ")
-     s' <- step (const getLine) -< ()
+     () <- stepIO putStr -< (s++"> ")
+     s' <- stepIO (const getLine) -< ()
      returnA -< read s'
 
 printS :: Show a => Flow eff ex a ()
-printS = step $ \s-> print s
+printS = stepIO $ \s-> print s
 
 failStep :: Flow eff ex () ()
-failStep = step $ \_ -> fail "failStep"
+failStep = stepIO $ \_ -> fail "failStep"
 
 worstBernoulli :: Exception ex => (String -> ex) -> Flow eff ex Double Double
-worstBernoulli errorC = step $ \p -> do
+worstBernoulli errorC = stepIO $ \p -> do
   r <- randomRIO (0,1)
   if r < p
     then return r
@@ -43,14 +43,14 @@ worstBernoulli errorC = step $ \p -> do
 -- | pause for a given number of seconds. Thread through a value to ensure
 --   delay does not happen inparallel with other processing
 pauseWith :: Store a => Flow eff ex (Int, a) a
-pauseWith = step $ \(secs,a) -> do
+pauseWith = stepIO $ \(secs,a) -> do
   threadDelay (secs*1000000)
   return a
 
 -- | on first invocation die and leave a suicide note
 --   on second invocation it is resurrected and destroys suicide note, returning contents
 melancholicLazarus :: Flow eff ex String String
-melancholicLazarus = step $ \s -> do
+melancholicLazarus = stepIO $ \s -> do
   let fnm = [absfile|/tmp/lazarus_note|]
   ex <- doesFileExist fnm
   if ex
@@ -65,7 +65,7 @@ melancholicLazarus = step $ \s -> do
 retry :: forall eff ex a b. (Exception ex, Store a)
       => Int -> Int -> Flow eff ex a b -> Flow eff ex a b
 retry 0 _ f = f
-retry n secs f = catch f $ proc (x, (_ :: ex)) -> do
+retry n secs f = catch f $ proc (x, _ :: ex) -> do
   x1 <- pauseWith -< (secs,x)
   x2 <- retry (n-1) secs f -< x1
   returnA -< x2
