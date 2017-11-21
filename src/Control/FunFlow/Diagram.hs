@@ -54,6 +54,6 @@ instance ArrowError ex (Diagram ex) where
   f `catch` g = Catch f g
 
 -- | Construct a labelled node
-node :: forall a b ex. (a -> b) -> [T.Text] -> (Diagram ex) a b
+node :: forall arr a b ex. Arrow arr => arr a b -> [T.Text] -> (Diagram ex) a b
 node _ lbls = Node props (Proxy :: Proxy a) (Proxy :: Proxy b)
   where props = NodeProperties lbls

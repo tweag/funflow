@@ -1,15 +1,10 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE Arrows                     #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 module Control.FunFlow.Exec.Redis where
 
@@ -109,26 +104,26 @@ runJob _ hook flow input = do
   where
     runJob' :: Hook c -> Flow' eff a1 b1
             -> AsyncA (ExceptT String (StateT FlowST R.Redis)) a1 b1
-    runJob' _ (Step f) = AsyncA $ \x -> do
-      n <- fresh
-      mv <- lookupSym n
-      case mv of
-        Just y -> return y
-        Nothing -> do
-          ey <-
-            liftIO $
-            fmap Right (f x) `catch`
-            (\e -> return $ Left (e::SomeException) )
-          case ey of
-            Right y  -> putSym n y
-            Left err -> do
-              throwError $ show err
-    runJob' _ (Named n' f) = AsyncA $ \x -> do
-      n <- (n' <>) <$> fresh
-      mv <- lookupSym n
-      case mv of
-        Just y  -> return y
-        Nothing -> putSym n $ f x
+    runJob' _ (StepIO _ f) = AsyncA $ \x -> liftIO $ f x
+      -- n <- fresh
+      -- mv <- lookupSym n
+      -- case mv of
+      --   Just y -> return y
+      --   Nothing -> do
+      --     ey <-
+      --       liftIO $
+      --       fmap Right (f x) `catch`
+      --       (\e -> return $ Left (e::SomeException) )
+      --     case ey of
+      --       Right y  -> putSym n y
+      --       Left err -> do
+      --         throwError $ show err
+    runJob' _ (Step (name -> Just n') f) = AsyncA $ \x -> return $ f x
+      -- n <- (n' <>) <$> fresh
+      -- mv <- lookupSym n
+      -- case mv of
+      --   Just y  -> return y
+      --   Nothing -> putSym n $ f x
     runJob' po (External toTask) = AsyncA $ \x -> do
       chash <- liftIO $ CHash.contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
