@@ -17,6 +17,7 @@ import           Control.FunFlow.Steps
 import           Control.Monad.Catch                         (Exception,
                                                               SomeException,
                                                               toException)
+import           Data.Monoid                                 ((<>))
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
 import           System.FilePath                             ((</>))
@@ -58,6 +59,7 @@ main = do
   print res1
 -- main = redisTest
   externalTest
+  storeTest
 
 externalTest :: IO ()
 externalTest = let
@@ -75,6 +77,31 @@ externalTest = let
       case out of
         Left err     -> print err
         Right outStr -> putStrLn outStr
+
+storeTest :: IO ()
+storeTest = let
+    string1 = "First line\n"
+    string2 = "Second line\n"
+    exFlow = external $ \(a, b) -> ExternalTask
+      { _etCommand = "/run/current-system/sw/bin/cat"
+      , _etParams = [pathParam a <> "/out", pathParam b <> "/out"]
+      , _etWriteToStdOut = True
+      }
+    flow = proc (s1, s2) -> do
+      f1 <- putInStore (\d s -> writeFile (d </> "out") s) -< s1
+      s1' <- getFromStore (\d -> readFile $ d </> "out") -< f1
+      f2 <- putInStore (\d s -> writeFile (d </> "out") s) -< s2
+      s2' <- getFromStore (\d -> readFile $ d </> "out") -< f2
+      f12 <- exFlow -< (f1, f2)
+      s12 <- getFromStore (\d -> readFile $ d </> "out") -< f12
+      returnA -< s12 == s1' <> s2'
+  in do
+    storeDir <- mkdtemp "test_output_store_"
+    withSimpleLocalRunner storeDir $ \run -> do
+      out <- run flow (string1, string2)
+      case out of
+        Left err -> print err
+        Right b  -> print b
 
 redisTest :: IO ()
 redisTest = let
