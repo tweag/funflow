@@ -17,10 +17,11 @@ import           Control.FunFlow.Steps
 import           Control.Monad.Catch                         (Exception,
                                                               SomeException,
                                                               toException)
+import           Data.Monoid                                 ((<>))
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
-import           System.FilePath                             ((</>))
-import           System.Posix.Temp                           (mkdtemp)
+import           Path
+import           Path.IO
 
 mkError :: String -> SomeException
 mkError = toException . userError
@@ -45,9 +46,8 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do
+main = withSystemTempDir "test_output" $ \storeDir -> do
   memHook <- createMemoryCoordinator
-  storeDir <- mkdtemp "test_output"
   res <- runSimpleFlow MemoryCoordinator memHook storeDir flow2 ()
   print res
   res' <- runSimpleFlow MemoryCoordinator memHook storeDir flow2caught ()
@@ -58,6 +58,7 @@ main = do
   print res1
 -- main = redisTest
   externalTest
+  storeTest
 
 externalTest :: IO ()
 externalTest = let
@@ -67,14 +68,37 @@ externalTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-    flow = exFlow >>> getFromStore (\d -> readFile $ d </> "out")
-  in do
-    storeDir <- mkdtemp "test_output_external_"
+    flow = exFlow >>> readOutFile
+  in withSystemTempDir "test_output_external_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
       out <- run flow someString
       case out of
         Left err     -> print err
         Right outStr -> putStrLn outStr
+
+storeTest :: IO ()
+storeTest = let
+    string1 = "First line\n"
+    string2 = "Second line\n"
+    exFlow = external $ \(a, b) -> ExternalTask
+      { _etCommand = "/run/current-system/sw/bin/cat"
+      , _etParams = [pathParam a <> "/out", pathParam b <> "/out"]
+      , _etWriteToStdOut = True
+      }
+    flow = proc (s1, s2) -> do
+      f1 <- writeOutFile -< s1
+      s1' <- readOutFile -< f1
+      f2 <- writeOutFile -< s2
+      s2' <- readOutFile -< f2
+      f12 <- exFlow -< (f1, f2)
+      s12 <- readOutFile -< f12
+      returnA -< s12 == s1' <> s2'
+  in withSystemTempDir "test_output_store_" $ \storeDir -> do
+    withSimpleLocalRunner storeDir $ \run -> do
+      out <- run flow (string1, string2)
+      case out of
+        Left err -> print err
+        Right b  -> print b
 
 redisTest :: IO ()
 redisTest = let
@@ -90,7 +114,6 @@ redisTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-  in do
-    storeDir <- mkdtemp "test_output"
+  in withSystemTempDir "test_output" $ \storeDir -> do
     out <- runSimpleFlow Redis redisConf storeDir flow someString
     print out

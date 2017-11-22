@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 -- | Executor for external tasks.
@@ -17,9 +18,9 @@ import           Control.Monad.Trans.Maybe
 import qualified Data.Text                            as T
 import           Katip                                as K
 import           Network.HostName
+import           Path
 import           System.Clock
 import           System.Exit                          (ExitCode (..))
-import           System.FilePath                      ((</>))
 import           System.IO                            (IOMode (..), openFile,
                                                        stdout)
 import           System.Posix.Env                     (getEnv)
@@ -51,7 +52,7 @@ execute store td = do
     CS.Missing fp -> let
         cmd = T.unpack $ td ^. tdTask . etCommand
         procSpec params out = (proc cmd $ T.unpack <$> params) {
-            cwd = Just fp
+            cwd = Just (fromAbsDir fp)
           , close_fds = True
             -- Error output should be displayed on our stderr stream
           , std_err = Inherit
@@ -73,8 +74,9 @@ execute store td = do
           Just params -> return params
 
         out <- lift $
+          let fp' = fromAbsFile $ fp </> [relfile|out|] in
           if td ^. tdTask . etWriteToStdOut
-          then UseHandle <$> openFile (fp </> "out") WriteMode
+          then UseHandle <$> openFile fp' WriteMode
           else return Inherit
 
         start <- lift $ getTime Monotonic
@@ -102,7 +104,7 @@ execute store td = do
 executeLoop :: forall c. Coordinator c
             => c
             -> Config c
-            -> FilePath
+            -> Path Abs Dir
             -> IO ()
 executeLoop _ cfg sroot = do
   handleScribe <- mkHandleScribe ColorIfTerminal stdout InfoS V2

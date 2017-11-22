@@ -17,6 +17,7 @@ import qualified Control.FunFlow.External.Docker as Docker
 import           Data.Proxy                      (Proxy (..))
 import           Data.Store
 import qualified Data.Text                       as T
+import           Path
 import           Prelude                         hiding (id, (.))
 
 data Flow' eff a b where
@@ -24,9 +25,9 @@ data Flow' eff a b where
   Named   :: Store b => T.Text -> (a -> b) -> Flow' eff a b
   External :: ContentHashable a => (a -> ExternalTask) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
-  PutInStore :: ContentHashable a => (FilePath -> a -> IO ()) -> Flow' eff a CS.Item
+  PutInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
-  GetFromStore :: ContentHashable a => (FilePath -> IO a) -> Flow' eff CS.Item a
+  GetFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
   Wrapped :: eff a b -> Flow' eff a b
 
 type Flow eff ex = ErrorChoice ex (Flow' eff)
@@ -55,9 +56,9 @@ wrap = effect . Wrapped
 docker :: ContentHashable a => (a -> Docker.Config) -> Flow eff ex a CS.Item
 docker f = external $ Docker.toExternal . f
 
-putInStore :: ContentHashable a => (FilePath -> a -> IO ()) -> Flow eff ex a CS.Item
+putInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
 putInStore = effect . PutInStore
-getFromStore :: ContentHashable a => (FilePath -> IO a) -> Flow eff ex CS.Item a
+getFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
 getFromStore = effect . GetFromStore
 
 

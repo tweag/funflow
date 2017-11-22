@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -72,23 +73,22 @@ import           Control.Concurrent              (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception               (Exception, bracket_, catch,
-                                                  throwIO)
+                                                  displayException, throwIO)
 import           Control.Monad                   (filterM, forever, void)
 import           Control.Monad.Catch             (MonadMask, bracket)
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 import           Data.Bits                       (complement)
+import           Data.Functor.Contravariant
 import           Data.List                       (foldl')
 import           Data.Maybe                      (mapMaybe)
 import qualified Data.Store
 import           Data.Typeable                   (Typeable)
 import           GHC.Generics                    (Generic)
 import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
-import           System.Directory                (createDirectory,
-                                                  createDirectoryIfMissing,
-                                                  doesDirectoryExist,
-                                                  listDirectory, makeAbsolute,
-                                                  removePathForcibly)
-import           System.FilePath                 ((</>))
+import           System.Directory                (removePathForcibly)
+import           Path
+import           Path.IO
+import           System.FilePath                 (dropTrailingPathSeparator)
 import           System.INotify
 import           System.Posix.Files
 import           System.Posix.IO
@@ -133,7 +133,7 @@ instance Exception StoreError
 
 -- | A hash addressed store on the file system.
 data ContentStore = ContentStore
-  { storeRoot    :: FilePath
+  { storeRoot    :: Path Abs Dir
   -- ^ Subtrees are stored directly under this directory.
   , storeLock    :: MVar ()
   -- ^ One global lock on store metadata to ensure thread safety.
@@ -148,17 +148,24 @@ data ContentStore = ContentStore
   }
 
 -- | A completed item in the 'ContentStore'.
-newtype Item = Item { itemPath :: FilePath }
+newtype Item = Item { itemPath :: Path Abs Dir }
   deriving (Eq, Show, Generic)
 
 instance ContentHashable Item where
   contentHashUpdate ctx item =
     contentHashUpdate ctx (DirectoryContent (itemPath item))
 
-instance Data.Store.Store Item
+instance Data.Store.Store Item where
+  size = contramap (fromAbsDir . itemPath) Data.Store.size
+  poke item = Data.Store.poke $ fromAbsDir $ itemPath item
+  peek = do
+    eDir <- parseAbsDir <$> Data.Store.peek
+    case eDir of
+      Left e -> fail $ displayException e
+      Right dir -> return $ Item dir
 
 -- | The root directory of the store.
-root :: ContentStore -> FilePath
+root :: ContentStore -> Path Abs Dir
 root = storeRoot
 
 -- | @open root@ opens a store under the given root directory.
@@ -167,12 +174,11 @@ root = storeRoot
 --
 -- It is not safe to have multiple store objects
 -- refer to the same root directory.
-open :: FilePath -> IO ContentStore
-open root' = do
-  storeRoot <- makeAbsolute root'
-  createDirectoryIfMissing True storeRoot
-  storeLockFd <- createFile (lockPath storeRoot) ownerWriteMode
-  setFileMode storeRoot readOnlyRootDirMode
+open :: Path Abs Dir -> IO ContentStore
+open storeRoot = do
+  createDirIfMissing True storeRoot
+  storeLockFd <- createFile (fromAbsFile $ lockPath storeRoot) ownerWriteMode
+  setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
   storeLock <- newMVar ()
   storeINotify <- initINotify
   return ContentStore {..}
@@ -190,13 +196,16 @@ close store = do
 -- Closes the store once the action is complete
 --
 -- See also: 'Control.FunFlow.ContentStore.open'
-withStore :: (MonadIO m, MonadMask m) => FilePath -> (ContentStore -> m a) -> m a
+withStore :: (MonadIO m, MonadMask m)
+  => Path Abs Dir -> (ContentStore -> m a) -> m a
 withStore root' = bracket (liftIO $ open root') (liftIO . close)
 
 -- | List all subtrees that are complete or under construction.
 allSubtrees :: ContentStore -> IO [ContentHash]
 allSubtrees ContentStore {storeRoot} =
-  mapMaybe pathToHash <$> listDirectory storeRoot
+  mapMaybe conv . fst <$> listDir storeRoot
+  where
+    conv = pathToHash . dropTrailingPathSeparator . fromRelDir . dirname
 
 -- | List all complete subtrees.
 subtrees :: ContentStore -> IO [ContentHash]
@@ -261,13 +270,13 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
 constructOrWait
   :: ContentStore
   -> ContentHash
-  -> IO (Status FilePath (Async Update) Item)
+  -> IO (Status (Path Abs Dir) (Async Update) Item)
 constructOrWait store hash = withStoreLock store $
   let dir = storePath store hash in
   internalQuery store hash >>= \case
     Complete () -> return $ Complete (Item dir)
     Missing () -> withWritableStore store $ do
-      createDirectory dir
+      createDir dir
       setDirWritable dir
       return $ Missing dir
     Pending () -> Pending <$> internalWatchPending store hash
@@ -277,14 +286,14 @@ constructOrWait store hash = withStoreLock store $
 constructIfMissing
   :: ContentStore
   -> ContentHash
-  -> IO (Status FilePath () Item)
+  -> IO (Status (Path Abs Dir) () Item)
 constructIfMissing store hash = withStoreLock store $
   let dir = storePath store hash in
   internalQuery store hash >>= \case
     Complete () -> return $ Complete (Item dir)
     Pending () -> return $ Pending ()
     Missing () -> withWritableStore store $ do
-      createDirectory dir
+      createDir dir
       setDirWritable dir
       return $ Missing dir
 
@@ -293,14 +302,14 @@ constructIfMissing store hash = withStoreLock store $
 -- Creates the destination directory and returns its path.
 --
 -- See also: 'Control.FunFlow.ContentStore.constructIfMissing'.
-markPending :: ContentStore -> ContentHash -> IO FilePath
+markPending :: ContentStore -> ContentHash -> IO (Path Abs Dir)
 markPending store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete () -> throwIO (AlreadyComplete hash)
     Pending () -> throwIO (AlreadyPending hash)
     Missing () -> withWritableStore store $ do
       let dir = storePath store hash
-      createDirectory dir
+      createDir dir
       setDirWritable dir
       return dir
 
@@ -325,7 +334,7 @@ removeFailed store hash = withStoreLock store $
     Missing () -> throwIO (NotPending hash)
     Complete () -> throwIO (AlreadyComplete hash)
     Pending () -> withWritableStore store $
-      removePathForcibly (storePath store hash)
+      removePathForcibly (fromAbsDir $ storePath store hash)
 
 -- | Remove a subtree independent of its state.
 -- Do nothing if it doesn't exist.
@@ -334,14 +343,14 @@ removeFailed store hash = withStoreLock store $
 -- will attempt to access the subtree afterwards.
 removeForcibly :: ContentStore -> ContentHash -> IO ()
 removeForcibly store hash = withStoreLock store $ withWritableStore store $
-  removePathForcibly (storePath store hash)
+  removePathForcibly (fromAbsDir $ storePath store hash)
 
 
 ----------------------------------------------------------------------
 -- Internals
 
-lockPath :: FilePath -> FilePath
-lockPath = (</> "lock")
+lockPath :: Path Abs Dir -> Path Abs File
+lockPath = (</> [relfile|lock|])
 
 makeLockDesc :: LockRequest -> FileLock
 makeLockDesc req = (req, AbsoluteSeek, COff 0, COff 1)
@@ -371,14 +380,14 @@ withStoreLock store action =
       action
 
 -- | Return the full store path to the given hash.
-storePath :: ContentStore -> ContentHash -> FilePath
+storePath :: ContentStore -> ContentHash -> Path Abs Dir
 storePath ContentStore {storeRoot} hash = storeRoot </> hashToPath hash
 
 -- | Query the state of a subtree without taking a lock.
 internalQuery :: ContentStore -> ContentHash -> IO (Status () () ())
 internalQuery store hash =
   let dir = storePath store hash in
-  doesDirectoryExist dir >>= \case
+  doesDirExist dir >>= \case
     False -> return $ Missing ()
     True -> isWritable dir >>= \case
       False -> return $ Complete ()
@@ -399,7 +408,7 @@ internalWatchPending store hash = do
   -- Signal the listener. If the 'MVar' is full,
   -- the listener didn't handle earlier signals, yet.
   let giveSignal = void $ tryPutMVar signal ()
-  watch <- addWatch inotify mask dir $ \case
+  watch <- addWatch inotify mask (fromAbsDir dir) $ \case
     Attributes True Nothing -> giveSignal
     MovedSelf True -> giveSignal
     DeletedSelf -> giveSignal
@@ -436,14 +445,14 @@ internalWatchPending store hash = do
 
 setRootDirWritable :: ContentStore -> IO ()
 setRootDirWritable ContentStore {storeRoot} =
-  setFileMode storeRoot writableRootDirMode
+  setFileMode (fromAbsDir storeRoot) writableRootDirMode
 
 writableRootDirMode :: FileMode
 writableRootDirMode = writableDirMode
 
 setRootDirReadOnly :: ContentStore -> IO ()
 setRootDirReadOnly ContentStore {storeRoot} =
-  setFileMode storeRoot readOnlyRootDirMode
+  setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
 
 readOnlyRootDirMode :: FileMode
 readOnlyRootDirMode = writableDirMode `intersectFileModes` allButWritableMode
@@ -452,11 +461,11 @@ withWritableStore :: ContentStore -> IO a -> IO a
 withWritableStore store =
   bracket_ (setRootDirWritable store) (setRootDirReadOnly store)
 
-isWritable :: FilePath -> IO Bool
-isWritable fp = fileAccess fp False True False
+isWritable :: Path Abs Dir -> IO Bool
+isWritable fp = fileAccess (fromAbsDir fp) False True False
 
-setDirWritable :: FilePath -> IO ()
-setDirWritable fp = setFileMode fp writableDirMode
+setDirWritable :: Path Abs Dir -> IO ()
+setDirWritable fp = setFileMode (fromAbsDir fp) writableDirMode
 
 writableDirMode :: FileMode
 writableDirMode = foldl' unionFileModes nullFileMode
@@ -466,30 +475,18 @@ writableDirMode = foldl' unionFileModes nullFileMode
   ]
 
 -- | Unset write permissions on the given path.
-unsetWritable :: FilePath -> IO ()
+unsetWritable :: Path Abs t -> IO ()
 unsetWritable fp = do
-  mode <- fileMode <$> getFileStatus fp
-  setFileMode fp $ mode `intersectFileModes` allButWritableMode
+  mode <- fileMode <$> getFileStatus (toFilePath fp)
+  setFileMode (toFilePath fp) $ mode `intersectFileModes` allButWritableMode
 
 allButWritableMode :: FileMode
 allButWritableMode = complement $ foldl' unionFileModes nullFileMode
   [ownerWriteMode, groupWriteMode, otherWriteMode]
 
 -- | Unset write permissions on all items in a directory tree recursively.
-unsetWritableRecursively :: FilePath -> IO ()
-unsetWritableRecursively = mapFSTree unsetWritable unsetWritable
-
--- | @mapFSTree fDir fFile fp@ visits every item under the path @fp@ recursively
--- (including @fp@) and applies @fDir@ to directory paths and @fFile@ to
--- file paths.
---
--- Assumes that the path exists, either as directory or as file.
--- Symlinks are treated as files.
-mapFSTree :: (FilePath -> IO ()) -> (FilePath -> IO ()) -> FilePath -> IO ()
-mapFSTree fDir fFile fp = doesDirectoryExist fp >>= \case
-  False -> fFile fp
-  True -> do
-    fDir fp
-    entries <- listDirectory fp
-    let fps = map (fp </>) entries
-    mapM_ (mapFSTree fDir fFile) fps
+unsetWritableRecursively :: Path Abs Dir -> IO ()
+unsetWritableRecursively = walkDir $ \dir _ files -> do
+  mapM_ unsetWritable files
+  unsetWritable dir
+  return $ WalkExclude []

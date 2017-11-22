@@ -12,6 +12,7 @@ import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
 import           GHC.Generics                    (Generic)
+import           Path
 import           System.Posix.Types              (CGid, CUid)
 
 -- | Component of a parameter
@@ -49,7 +50,7 @@ instance Store Param
 
 -- | Converter of path components.
 data ConvParam f = ConvParam
-  { convPath :: CS.Item -> f FilePath
+  { convPath :: CS.Item -> f (Path Abs Dir)
     -- ^ Resolve a reference to a content store item.
   , convEnv :: T.Text -> f T.Text
     -- ^ Resolve an environment variable.
@@ -57,18 +58,18 @@ data ConvParam f = ConvParam
     -- ^ Resolve the effective user ID.
   , convGid :: f CGid
     -- ^ Resolve the effective group ID.
-  , convOut :: f FilePath
+  , convOut :: f (Path Abs Dir)
     -- ^ Resolve the output path in the content store.
   }
 
 paramFieldToText :: Applicative f
   => ConvParam f -> ParamField -> f T.Text
 paramFieldToText _ (ParamText txt) = pure txt
-paramFieldToText c (ParamPath item) = T.pack <$> convPath c item
+paramFieldToText c (ParamPath item) = T.pack . fromAbsDir <$> convPath c item
 paramFieldToText c (ParamEnv env) = convEnv c env
 paramFieldToText c ParamUid = T.pack . show <$> convUid c
 paramFieldToText c ParamGid = T.pack . show <$> convGid c
-paramFieldToText c ParamOut = T.pack <$> convOut c
+paramFieldToText c ParamOut = T.pack . fromAbsDir <$> convOut c
 
 -- | Transform a parameter to text using the given converter.
 paramToText :: Applicative f
