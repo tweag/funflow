@@ -1,7 +1,6 @@
 {-# LANGUAGE Arrows            #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
 
 import           Control.Arrow
 import           Control.Arrow.Free
@@ -69,9 +68,7 @@ externalTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-    flow =
-      exFlow
-      >>> getFromStore (\d -> readFile $ fromAbsFile $ d </> [relfile|out|])
+    flow = exFlow >>> readOutFile
   in withSystemTempDir "test_output_external_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
       out <- run flow someString
@@ -88,14 +85,13 @@ storeTest = let
       , _etParams = [pathParam a <> "/out", pathParam b <> "/out"]
       , _etWriteToStdOut = True
       }
-    out = [relfile|out|]
     flow = proc (s1, s2) -> do
-      f1 <- putInStore (\d s -> writeFile (fromAbsFile $ d </> out) s) -< s1
-      s1' <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f1
-      f2 <- putInStore (\d s -> writeFile (fromAbsFile $ d </> out) s) -< s2
-      s2' <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f2
+      f1 <- writeOutFile -< s1
+      s1' <- readOutFile -< f1
+      f2 <- writeOutFile -< s2
+      s2' <- readOutFile -< f2
       f12 <- exFlow -< (f1, f2)
-      s12 <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f12
+      s12 <- readOutFile -< f12
       returnA -< s12 == s1' <> s2'
   in withSystemTempDir "test_output_store_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
