@@ -104,9 +104,9 @@ execute store td = do
 executeLoop :: forall c. Coordinator c
             => c
             -> Config c
-            -> Path Abs Dir
+            -> CS.ContentStore
             -> IO ()
-executeLoop _ cfg sroot = do
+executeLoop _ cfg store = do
   handleScribe <- mkHandleScribe ColorIfTerminal stdout InfoS V2
   let mkLogEnv = registerScribe "stdout" handleScribe defaultScribeSettings =<< initLogEnv "FFExecutorD" "production"
   bracket mkLogEnv closeScribes $ \le -> do
@@ -123,7 +123,7 @@ executeLoop _ cfg sroot = do
           afterTime t = Completed $ ExecutionInfo executor t
           afterFailure t i = Failed (ExecutionInfo executor t) i
 
-      CS.withStore sroot $ \store -> forever $ do
+      forever $ do
         $(logTM) InfoS "Awaiting task from coordinator."
         mtask <- popTask hook executor
         case mtask of

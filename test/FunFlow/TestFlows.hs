@@ -7,6 +7,7 @@ module FunFlow.TestFlows where
 import           Control.Arrow
 import           Control.Exception
 import           Control.FunFlow.Base
+import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.Steps
 import           Control.Monad                               (when)
 import           Path
@@ -54,11 +55,13 @@ setup = do ex <- doesFileExist [absfile|/tmp/lazarus_note|]
 
 testFlowAssertion :: FlowAssertion -> TestTree
 testFlowAssertion (FlowAssertion nm x flw expect before) =
-  testCase nm $ withSystemTempDir "test_output_" $ \store -> do
-    hook <- createMemoryCoordinator
-    before
-    res <- runSimpleFlow MemoryCoordinator hook store flw x
-    assertFlowResult expect res
+  testCase nm $
+    withSystemTempDir "test_output_" $ \storeDir ->
+    CS.withStore storeDir $ \store -> do
+      hook <- createMemoryCoordinator
+      before
+      res <- runSimpleFlow MemoryCoordinator hook store flw x
+      assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion
 assertFlowResult expect res =
