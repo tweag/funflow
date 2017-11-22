@@ -5,6 +5,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeOperators      #-}
 
+import qualified Control.FunFlow.ContentStore               as CS
 import           Control.FunFlow.External.Coordinator.Redis
 import           Control.FunFlow.External.Executor
 import qualified Data.ByteString                            as BS
@@ -33,4 +34,4 @@ main = do
 
   -- XXX: Improve handling of invalid paths.
   storePath' <- parseAbsDir (storePath config)
-  executeLoop Redis redisConf storePath'
+  CS.withStore storePath' $ executeLoop Redis redisConf

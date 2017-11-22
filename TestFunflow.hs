@@ -46,19 +46,21 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = withSystemTempDir "test_output" $ \storeDir -> do
-  memHook <- createMemoryCoordinator
-  res <- runSimpleFlow MemoryCoordinator memHook storeDir flow2 ()
-  print res
-  res' <- runSimpleFlow MemoryCoordinator memHook storeDir flow2caught ()
-  print res'
-  putStrLn $ showFlow myFlow
-  putStrLn $ showFlow flow2
-  res1 <- runSimpleFlow MemoryCoordinator memHook storeDir flow3 [1..10]
-  print res1
--- main = redisTest
-  externalTest
-  storeTest
+main =
+  withSystemTempDir "test_output" $ \storeDir ->
+  CS.withStore storeDir $ \store -> do
+    memHook <- createMemoryCoordinator
+    res <- runSimpleFlow MemoryCoordinator memHook store flow2 ()
+    print res
+    res' <- runSimpleFlow MemoryCoordinator memHook store flow2caught ()
+    print res'
+    putStrLn $ showFlow myFlow
+    putStrLn $ showFlow flow2
+    res1 <- runSimpleFlow MemoryCoordinator memHook store flow3 [1..10]
+    print res1
+--  main = redisTest
+    externalTest
+    storeTest
 
 externalTest :: IO ()
 externalTest = let
@@ -114,6 +116,7 @@ redisTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-  in withSystemTempDir "test_output" $ \storeDir -> do
-    out <- runSimpleFlow Redis redisConf storeDir flow someString
-    print out
+  in withSystemTempDir "test_output" $ \storeDir ->
+    CS.withStore storeDir $ \store -> do
+      out <- runSimpleFlow Redis redisConf store flow someString
+      print out

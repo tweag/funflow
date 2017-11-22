@@ -31,27 +31,26 @@ import           Path
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
           => c
           -> Config c
-          -> Path Abs Dir -- ^ Path to content store
+          -> CS.ContentStore
           -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
           -> Flow eff ex a b
           -> a
           -> IO b
-runFlowEx _ cfg sroot runWrapped flow input = do
+runFlowEx _ cfg store runWrapped flow input = do
     hook <- initialise cfg
-    CS.withStore sroot $ \store ->
-      runAsyncA (eval (runFlow' hook store) flow) input
+    runAsyncA (eval (runFlow' hook) flow) input
   where
-    runFlow' :: Hook c -> CS.ContentStore -> Flow' eff a1 b1 -> AsyncA IO a1 b1
-    runFlow' _ _ (Step f) = AsyncA $ \x -> f x
-    runFlow' _ _ (Named _ f) = AsyncA $ \x -> return $ f x
-    runFlow' po store (External toTask) = AsyncA $ \x -> do
+    runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA IO a1 b1
+    runFlow' _ (Step f) = AsyncA $ \x -> f x
+    runFlow' _ (Named _ f) = AsyncA $ \x -> return $ f x
+    runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
       KnownTask _ <- awaitTask po chash
       CS.waitUntilComplete store chash >>= \case
         Nothing -> fail "Remote process failed to construct item"
         Just item -> return item
-    runFlow' _ store (PutInStore f) = AsyncA $ \x -> do
+    runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
       instruction <- CS.constructOrWait store chash
       case instruction of
@@ -69,30 +68,30 @@ runFlowEx _ cfg sroot runWrapped flow input = do
             CS.markComplete store chash
           `onException`
           CS.removeFailed store chash
-    runFlow' _ _ (GetFromStore f) = AsyncA $ \item ->
+    runFlow' _ (GetFromStore f) = AsyncA $ \item ->
       f $ CS.itemPath item
-    runFlow' _ _ (Wrapped w) = runWrapped w
+    runFlow' _ (Wrapped w) = runWrapped w
 
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
         -> Config c
-        -> Path Abs Dir -- ^ Path to content store
+        -> CS.ContentStore
         -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
         -> Flow eff ex a b
         -> a
         -> IO (Either ex b)
-runFlow c cfg sroot runWrapped flow input =
-  try $ runFlowEx c cfg sroot runWrapped flow input
+runFlow c cfg store runWrapped flow input =
+  try $ runFlowEx c cfg store runWrapped flow input
 
 runSimpleFlow :: forall c a b. (Coordinator c)
         => c
         -> Config c
-        -> Path Abs Dir -- ^ Path to content store
+        -> CS.ContentStore
         -> SimpleFlow a b
         -> a
         -> IO (Either SomeException b)
-runSimpleFlow c ccfg sroot flow input =
-  runFlow c ccfg sroot runNoEffect flow input
+runSimpleFlow c ccfg store flow input =
+  runFlow c ccfg store runNoEffect flow input
 
 -- | Create a full pipeline runner locally. This includes an executor for
 --   executing external tasks.
@@ -103,7 +102,8 @@ withSimpleLocalRunner :: Path Abs Dir -- ^ Path to content store
                       -> ((SimpleFlow a b -> a -> IO (Either SomeException b))
                            -> IO c)
                       -> IO c
-withSimpleLocalRunner storePath action = do
-  memHook <- createMemoryCoordinator
-  withAsync (executeLoop MemoryCoordinator memHook storePath) $ \_ ->
-    action $ runSimpleFlow MemoryCoordinator memHook storePath
+withSimpleLocalRunner storePath action =
+  CS.withStore storePath $ \store -> do
+    memHook <- createMemoryCoordinator
+    withAsync (executeLoop MemoryCoordinator memHook store) $ \_ ->
+      action $ runSimpleFlow MemoryCoordinator memHook store
