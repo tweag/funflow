@@ -1,5 +1,6 @@
-{-# LANGUAGE Arrows #-}
-{-# LANGUAGE GADTs  #-}
+{-# LANGUAGE Arrows      #-}
+{-# LANGUAGE GADTs       #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module FunFlow.TestFlows where
 
@@ -8,8 +9,8 @@ import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Steps
 import           Control.Monad                               (when)
-import           System.Directory
-import           System.Posix.Temp                           (mkdtemp)
+import           Path
+import           Path.IO
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -48,14 +49,13 @@ flowAssertions =
   ]
 
 setup :: IO ()
-setup = do ex <- doesFileExist "/tmp/lazarus_note"
-           when ex $ removeFile "/tmp/lazarus_note"
+setup = do ex <- doesFileExist [absfile|/tmp/lazarus_note|]
+           when ex $ removeFile [absfile|/tmp/lazarus_note|]
 
 testFlowAssertion :: FlowAssertion -> TestTree
 testFlowAssertion (FlowAssertion nm x flw expect before) =
-  testCase nm $ do
+  testCase nm $ withSystemTempDir "test_output_" $ \store -> do
     hook <- createMemoryCoordinator
-    store <- mkdtemp "test_output_"
     before
     res <- runSimpleFlow MemoryCoordinator hook store flw x
     assertFlowResult expect res

@@ -1,4 +1,6 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase       #-}
+{-# LANGUAGE QuasiQuotes      #-}
+{-# LANGUAGE TypeApplications #-}
 
 module FunFlow.ContentStore
   ( tests
@@ -11,9 +13,8 @@ import           Control.FunFlow.ContentStore    (ContentStore)
 import qualified Control.FunFlow.ContentStore    as ContentStore
 import           Control.Monad                   (void)
 import qualified Data.Set                        as Set
-import           System.Directory
-import           System.FilePath                 ((</>))
-import           System.IO.Temp
+import           Path
+import           Path.IO
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -22,25 +23,25 @@ tests = testGroup "Content Store"
 
   [ testCase "initialise fresh store" $
     withTmpDir $ \dir -> do
-      let root = dir </> "store"
+      let root = dir </> [reldir|store|]
       ContentStore.withStore root $ \_ ->
-        doesDirectoryExist root
+        doesDirExist @IO root
           @? "store root exists"
 
   , testCase "initialise existing store" $
     withTmpDir $ \dir -> do
-      let root = dir </> "store"
-      createDirectory root
+      let root = dir </> [reldir|store|]
+      createDir root
       ContentStore.withStore root $ \_ ->
-        doesDirectoryExist root
+        doesDirExist @IO root
           @? "store root exists"
 
   , testCase "store is not writable" $
     withEmptyStore $ \store -> do
       let root = ContentStore.root store
-      not . writable <$> getPermissions root
+      not . writable <$> getPermissions @IO root
         @? "store not writable"
-      writeFile (root </> "test") "Hello world"
+      writeFile (fromAbsFile $ root </> [relfile|test|]) "Hello world"
         `shouldFail` "can't create file in store"
 
   , testCase "subtree stages" $
@@ -53,21 +54,21 @@ tests = testGroup "Content Store"
       missing' @?= ContentStore.Missing ()
 
       subtree <- ContentStore.markPending store hash
-      let dir = subtree </> "dir"
-          file = dir </> "file"
+      let dir = subtree </> [reldir|dir|]
+          file = dir </> [relfile|file|]
           expectedContent = "Hello World"
       pending <- ContentStore.query store hash
       pending @?= ContentStore.Pending ()
       pending' <- ContentStore.lookup store hash
       pending' @?= ContentStore.Pending ()
-      doesDirectoryExist subtree
+      doesDirExist @IO subtree
         @? "subtree exists"
-      writable <$> getPermissions subtree
+      writable <$> getPermissions @IO subtree
         @? "subtree is writable"
-      createDirectory dir
-      writeFile file expectedContent
+      createDir dir
+      writeFile (fromAbsFile file) expectedContent
       do
-        content <- readFile file
+        content <- readFile (fromAbsFile file)
         content @?= expectedContent
 
       item <- ContentStore.markComplete store hash
@@ -75,18 +76,18 @@ tests = testGroup "Content Store"
       complete @?= ContentStore.Complete ()
       complete' <- ContentStore.lookup store hash
       complete' @?= ContentStore.Complete item
-      doesDirectoryExist subtree
+      doesDirExist @IO subtree
         @? "subtree exists"
-      not . writable <$> getPermissions subtree
+      not . writable <$> getPermissions @IO subtree
         @? "subtree is not writable"
-      not . writable <$> getPermissions file
+      not . writable <$> getPermissions @IO file
         @? "file is not writable"
-      createDirectory (subtree </> "another")
+      createDir (subtree </> [reldir|another|])
         `shouldFail` "can't create folder in complete subtree"
-      writeFile file "Another message"
+      writeFile (fromAbsFile file) "Another message"
         `shouldFail` "can't write to complete file"
       do
-        content <- readFile file
+        content <- readFile (fromAbsFile file)
         content @?= expectedContent
 
   , testCase "await construction" $
@@ -188,7 +189,7 @@ tests = testGroup "Content Store"
   , testCase "construct if missing" $
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
-      let file = "file"
+      let file = [relfile|file|]
           expectedContent = "Hello World"
 
       ContentStore.constructIfMissing store hash >>= \case
@@ -197,9 +198,9 @@ tests = testGroup "Content Store"
         ContentStore.Complete _ ->
           assertFailure "missing already complete"
         ContentStore.Missing subtree -> do
-          writable <$> getPermissions subtree
+          writable <$> getPermissions @IO subtree
             @? "under construction not writable"
-          writeFile (subtree </> file) expectedContent
+          writeFile (fromAbsFile $ subtree </> file) expectedContent
 
       ContentStore.constructIfMissing store hash >>= \case
         ContentStore.Missing _ ->
@@ -216,9 +217,9 @@ tests = testGroup "Content Store"
           assertFailure "complete still under construction"
         ContentStore.Complete item -> do
           let subtree = ContentStore.itemPath item
-          not . writable <$> getPermissions (subtree </> file)
+          not . writable <$> getPermissions @IO (subtree </> file)
             @? "complete still writable"
-          content <- readFile (subtree </> file)
+          content <- readFile (fromAbsFile $ subtree </> file)
           content @?= expectedContent
 
   , testCase "remove failed" $
@@ -226,7 +227,7 @@ tests = testGroup "Content Store"
       hash <- contentHash ("test" :: String)
       subtree <- ContentStore.markPending store hash
       ContentStore.removeFailed store hash
-      not <$> doesDirectoryExist subtree
+      not <$> doesDirExist @IO subtree
         @? "subtree was removed"
 
   , testCase "forcibly remove" $
@@ -235,22 +236,22 @@ tests = testGroup "Content Store"
       subtree <- ContentStore.markPending store hash
 
       ContentStore.removeForcibly store hash
-      not <$> doesDirectoryExist subtree
+      not <$> doesDirExist @IO subtree
         @? "remove under construction"
 
       ContentStore.removeForcibly store hash
-      not <$> doesDirectoryExist subtree
+      not <$> doesDirExist @IO subtree
         @? "remove missing"
 
       subtree' <- ContentStore.markPending store hash
       void $ ContentStore.markComplete store hash
       ContentStore.removeForcibly store hash
-      not <$> doesDirectoryExist subtree'
+      not <$> doesDirExist @IO subtree'
         @? "remove complete"
 
   , testCase "subtree state is persisted" $
     withTmpDir $ \dir -> do
-      let root = dir </> "store"
+      let root = dir </> [reldir|store|]
       hash <- contentHash ("test" :: String)
 
       do
@@ -338,9 +339,9 @@ shouldFail m msg = tryAny m >>= \case
   Left _ -> return ()
   Right _ -> assertFailure msg
 
-withTmpDir :: (FilePath -> IO a) -> IO a
-withTmpDir = withSystemTempDirectory "funflow-teset"
+withTmpDir :: (Path Abs Dir -> IO a) -> IO a
+withTmpDir = withSystemTempDir "funflow-teset"
 
 withEmptyStore :: (ContentStore -> IO a) -> IO a
 withEmptyStore k = withTmpDir $ \dir ->
-  ContentStore.withStore (dir </> "store") k
+  ContentStore.withStore (dir </> [reldir|store|]) k

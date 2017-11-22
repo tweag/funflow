@@ -1,6 +1,7 @@
 {-# LANGUAGE Arrows            #-}
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 import           Control.Arrow
 import           Control.Arrow.Free
@@ -20,8 +21,8 @@ import           Control.Monad.Catch                         (Exception,
 import           Data.Monoid                                 ((<>))
 import qualified Data.Text                                   as T
 import qualified Database.Redis                              as R
-import           System.FilePath                             ((</>))
-import           System.Posix.Temp                           (mkdtemp)
+import           Path
+import           Path.IO
 
 mkError :: String -> SomeException
 mkError = toException . userError
@@ -46,9 +47,8 @@ flow3 = mapA (arr (+1))
 allJobs = [("job1", flow2)]
 
 main :: IO ()
-main = do
+main = withSystemTempDir "test_output" $ \storeDir -> do
   memHook <- createMemoryCoordinator
-  storeDir <- mkdtemp "test_output"
   res <- runSimpleFlow MemoryCoordinator memHook storeDir flow2 ()
   print res
   res' <- runSimpleFlow MemoryCoordinator memHook storeDir flow2caught ()
@@ -69,9 +69,10 @@ externalTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-    flow = exFlow >>> getFromStore (\d -> readFile $ d </> "out")
-  in do
-    storeDir <- mkdtemp "test_output_external_"
+    flow =
+      exFlow
+      >>> getFromStore (\d -> readFile $ fromAbsFile $ d </> [relfile|out|])
+  in withSystemTempDir "test_output_external_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
       out <- run flow someString
       case out of
@@ -87,16 +88,16 @@ storeTest = let
       , _etParams = [pathParam a <> "/out", pathParam b <> "/out"]
       , _etWriteToStdOut = True
       }
+    out = [relfile|out|]
     flow = proc (s1, s2) -> do
-      f1 <- putInStore (\d s -> writeFile (d </> "out") s) -< s1
-      s1' <- getFromStore (\d -> readFile $ d </> "out") -< f1
-      f2 <- putInStore (\d s -> writeFile (d </> "out") s) -< s2
-      s2' <- getFromStore (\d -> readFile $ d </> "out") -< f2
+      f1 <- putInStore (\d s -> writeFile (fromAbsFile $ d </> out) s) -< s1
+      s1' <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f1
+      f2 <- putInStore (\d s -> writeFile (fromAbsFile $ d </> out) s) -< s2
+      s2' <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f2
       f12 <- exFlow -< (f1, f2)
-      s12 <- getFromStore (\d -> readFile $ d </> "out") -< f12
+      s12 <- getFromStore (\d -> readFile $ fromAbsFile $ d </> out) -< f12
       returnA -< s12 == s1' <> s2'
-  in do
-    storeDir <- mkdtemp "test_output_store_"
+  in withSystemTempDir "test_output_store_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
       out <- run flow (string1, string2)
       case out of
@@ -117,7 +118,6 @@ redisTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-  in do
-    storeDir <- mkdtemp "test_output"
+  in withSystemTempDir "test_output" $ \storeDir -> do
     out <- runSimpleFlow Redis redisConf storeDir flow someString
     print out

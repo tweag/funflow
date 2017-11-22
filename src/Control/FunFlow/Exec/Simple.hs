@@ -24,12 +24,13 @@ import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, try)
+import           Path
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
           => c
           -> Config c
-          -> FilePath -- ^ Path to content store
+          -> Path Abs Dir -- ^ Path to content store
           -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
           -> Flow eff ex a b
           -> a
@@ -71,7 +72,7 @@ runFlowEx _ cfg sroot runWrapped flow input = do
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
         -> Config c
-        -> FilePath -- ^ Path to content store
+        -> Path Abs Dir -- ^ Path to content store
         -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
         -> Flow eff ex a b
         -> a
@@ -82,7 +83,7 @@ runFlow c cfg sroot runWrapped flow input =
 runSimpleFlow :: forall c a b. (Coordinator c)
         => c
         -> Config c
-        -> FilePath -- ^ Path to content store
+        -> Path Abs Dir -- ^ Path to content store
         -> SimpleFlow a b
         -> a
         -> IO (Either SomeException b)
@@ -94,7 +95,7 @@ runSimpleFlow c ccfg sroot flow input =
 --   This function is specialised to `SimpleFlow` since in cases where
 --   a custom term algebra is in use, we assume that probably a centralised
 --   coordinator and external runners may be desired as well.
-withSimpleLocalRunner :: FilePath -- ^ Path to content store
+withSimpleLocalRunner :: Path Abs Dir -- ^ Path to content store
                       -> ((SimpleFlow a b -> a -> IO (Either SomeException b))
                            -> IO c)
                       -> IO c

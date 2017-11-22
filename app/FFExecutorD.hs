@@ -10,6 +10,7 @@ import           Control.FunFlow.External.Executor
 import qualified Data.ByteString                            as BS
 import qualified Database.Redis                             as R
 import           Options.Generic
+import           Path
 
 data Config w = Config {
     storePath :: w ::: FilePath <?> "Path to the root of the content store."
@@ -30,4 +31,6 @@ main = do
     , R.connectAuth = redisAuth config
     }
 
-  executeLoop Redis redisConf (storePath config)
+  -- XXX: Improve handling of invalid paths.
+  storePath' <- parseAbsDir (storePath config)
+  executeLoop Redis redisConf storePath'

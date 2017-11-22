@@ -71,8 +71,8 @@ import           GHC.Prim                      (ByteArray#,
                                                 sizeofByteArray#)
 import           GHC.Ptr                       (Ptr (Ptr))
 import           GHC.Types                     (IO (IO), Int (I#), Word (W#))
-import           System.Directory              (doesFileExist, listDirectory)
-import           System.FilePath               ((</>))
+import qualified Path
+import qualified Path.IO
 import           System.IO                     (IOMode (ReadMode),
                                                 withBinaryFile)
 
@@ -94,8 +94,13 @@ fromBytes :: BS.ByteString -> Maybe ContentHash
 fromBytes bs = ContentHash <$> digestFromByteString bs
 
 -- | File path appropriate encoding of a hash
-hashToPath :: ContentHash -> FilePath
-hashToPath = C8.unpack . convertToBase Base64URLUnpadded . unContentHash
+hashToPath :: ContentHash -> Path.Path Path.Rel Path.Dir
+hashToPath (ContentHash h) =
+  case Path.parseRelDir $ C8.unpack $ convertToBase Base64URLUnpadded h of
+    Nothing -> error
+      "[ContentHashable.hashToPath]\
+      \ Failed to convert hash to directory name"
+    Just dir -> dir
 
 
 -- | Inverse of 'hashToPath' if given a valid input.
@@ -302,15 +307,41 @@ instance (GContentHashable a, GContentHashable b) => GContentHashable (a :+: b) 
 --   gContentHashUpdate ctx x = _ (unComp1 x)
 
 
+instance ContentHashable (Path.Path Path.Abs Path.File) where
+  contentHashUpdate ctx fp =
+    flip contentHashUpdate_fingerprint fp
+    >=> flip contentHashUpdate (Path.fromAbsFile fp)
+    $ ctx
+
+instance ContentHashable (Path.Path Path.Rel Path.File) where
+  contentHashUpdate ctx fp =
+    flip contentHashUpdate_fingerprint fp
+    >=> flip contentHashUpdate (Path.fromRelFile fp)
+    $ ctx
+
+instance ContentHashable (Path.Path Path.Abs Path.Dir) where
+  contentHashUpdate ctx fp =
+    flip contentHashUpdate_fingerprint fp
+    >=> flip contentHashUpdate (Path.fromAbsDir fp)
+    $ ctx
+
+instance ContentHashable (Path.Path Path.Rel Path.Dir) where
+  contentHashUpdate ctx fp =
+    flip contentHashUpdate_fingerprint fp
+    >=> flip contentHashUpdate (Path.fromRelDir fp)
+    $ ctx
+
+
 -- | Path to a regular file
 --
 -- Only the file's content is taken into account when generating the content hash.
 -- The path itself is ignored.
-newtype FileContent = FileContent FilePath
+newtype FileContent = FileContent (Path.Path Path.Abs Path.File)
 
 instance ContentHashable FileContent where
 
-  contentHashUpdate ctx (FileContent fp) = contentHashUpdate_binaryFile ctx fp
+  contentHashUpdate ctx (FileContent fp) =
+    contentHashUpdate_binaryFile ctx (Path.fromAbsFile fp)
 
 
 -- | Path to a directory
@@ -318,18 +349,21 @@ instance ContentHashable FileContent where
 -- Only the contents of the directory and their path relative to the directory
 -- are taken into account when generating the content hash.
 -- The path to the directory is ignored.
-newtype DirectoryContent = DirectoryContent FilePath
+newtype DirectoryContent = DirectoryContent (Path.Path Path.Abs Path.Dir)
 
 instance ContentHashable DirectoryContent where
 
-  contentHashUpdate ctx0 (DirectoryContent root) = foldM go ctx0 =<< sort <$> listDirectory root
+  contentHashUpdate ctx0 (DirectoryContent dir0) = do
+    (dirs, files) <- Path.IO.listDir dir0
+    ctx' <- foldM hashFile ctx0 (sort files)
+    foldM hashDir ctx' (sort dirs)
     where
-      go ctx curr = do
-        let fp = root </> curr
-            ctx' = hashUpdate ctx (C8.pack curr)
+      hashFile ctx fp =
         -- XXX: Do we need to treat symbolic links specially?
-        isFile <- doesFileExist fp
-        if isFile then
-          contentHashUpdate ctx' $ FileContent fp
-        else do
-          contentHashUpdate ctx' $ DirectoryContent fp
+        flip contentHashUpdate (Path.filename fp)
+        >=> flip contentHashUpdate (FileContent fp)
+        $ ctx
+      hashDir ctx dir =
+        flip contentHashUpdate (Path.dirname dir)
+        >=> flip contentHashUpdate (DirectoryContent dir)
+        $ ctx
