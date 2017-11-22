@@ -23,7 +23,8 @@ import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
-                                                      , Exception, try)
+                                                      , Exception, onException
+                                                      , try)
 import           Path
 
 -- | Simple evaulation of a flow
@@ -62,9 +63,12 @@ runFlowEx _ cfg sroot runWrapped flow input = do
               -- XXX: Should we retry locally?
               fail "Remote process failed to construct item"
         CS.Complete item -> return item
-        CS.Missing fp -> do
-          f fp x
-          CS.markComplete store chash
+        CS.Missing fp ->
+          do
+            f fp x
+            CS.markComplete store chash
+          `onException`
+          CS.removeFailed store chash
     runFlow' _ _ (GetFromStore f) = AsyncA $ \item ->
       f $ CS.itemPath item
     runFlow' _ _ (Wrapped w) = runWrapped w
