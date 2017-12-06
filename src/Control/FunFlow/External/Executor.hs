@@ -59,7 +59,7 @@ execute store td = do
           , std_out = out
           }
         convParam = ConvParam
-          { convPath = pure . CS.itemPath
+          { convPath = pure . CS.itemPath store
           , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
           , convUid = lift getEffectiveUserID
           , convGid = lift getEffectiveGroupID
