@@ -14,7 +14,7 @@ module Control.FunFlow.ContentHashable
   ( ContentHash
   , toBytes
   , fromBytes
-  , ContentHashable(..)
+  , ContentHashable (..)
   , contentHashUpdate_binaryFile
   , contentHashUpdate_byteArray#
   , contentHashUpdate_fingerprint
