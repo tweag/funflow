@@ -14,7 +14,7 @@ module Control.FunFlow.ContentHashable
   ( ContentHash
   , toBytes
   , fromBytes
-  , ContentHashable(..)
+  , ContentHashable (..)
   , contentHashUpdate_binaryFile
   , contentHashUpdate_byteArray#
   , contentHashUpdate_fingerprint
@@ -24,6 +24,8 @@ module Control.FunFlow.ContentHashable
   , FileContent (..)
   , DirectoryContent (..)
 
+  , encodeHash
+  , decodeHash
   , hashToPath
   , pathToHash
 
@@ -94,12 +96,24 @@ fromBytes :: BS.ByteString -> Maybe ContentHash
 fromBytes bs = ContentHash <$> digestFromByteString bs
 
 -- | File path appropriate encoding of a hash
+encodeHash :: ContentHash -> BS.ByteString
+encodeHash = convertToBase Base64URLUnpadded . toBytes
+
+-- | Inverse of 'encodeHash' if given a valid input.
+--
+-- prop> decodeHash (encodeHash x) = Just x
+decodeHash :: BS.ByteString -> Maybe ContentHash
+decodeHash bs = case convertFromBase Base64URLUnpadded bs of
+  Left _ -> Nothing
+  Right x -> fromBytes x
+
+-- | File path appropriate encoding of a hash
 hashToPath :: ContentHash -> Path.Path Path.Rel Path.Dir
-hashToPath (ContentHash h) =
-  case Path.parseRelDir $ C8.unpack $ convertToBase Base64URLUnpadded h of
+hashToPath h =
+  case Path.parseRelDir $ C8.unpack $ encodeHash h of
     Nothing -> error
-      "[ContentHashable.hashToPath]\
-      \ Failed to convert hash to directory name"
+      "[ContentHashable.hashToPath] \
+      \Failed to convert hash to directory name"
     Just dir -> dir
 
 
@@ -107,9 +121,7 @@ hashToPath (ContentHash h) =
 --
 -- prop> pathToHash (hashToPath x) = Just x
 pathToHash :: FilePath -> Maybe ContentHash
-pathToHash fp = case convertFromBase Base64URLUnpadded (C8.pack fp) of
-  Left  _ -> Nothing
-  Right x -> ContentHash <$> digestFromByteString (x :: BS.ByteString)
+pathToHash = decodeHash . C8.pack
 
 
 class ContentHashable a where

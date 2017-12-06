@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -8,12 +9,17 @@
 
 -- | Hash addressed store in file system.
 --
--- A store associates a 'Control.FunFlow.ContentHashable.ContentHash'
--- with a directory subtree. A subtree can be either
+-- Associates a key ('Control.FunFlow.ContentHashable.ContentHash')
+-- with an item in the store. An item can either be
 -- 'Control.FunFlow.ContentStore.Missing',
--- 'Control.FunFlow.ContentStore.Pending, or
+-- 'Control.FunFlow.ContentStore.Pending', or
 -- 'Control.FunFlow.ContentStore.Complete'.
--- The state of subtrees is persisted on the file system.
+-- The state is persisted in the file system.
+--
+-- Items are stored under a path derived from their hash. Therefore,
+-- there can be no two copies of the same item in the store.
+-- If two keys are associated with the same item, then there will be
+-- only one copy of that item in the store.
 --
 -- The store is thread-safe and multi-process safe.
 --
@@ -21,36 +27,32 @@
 -- of the store root, or has permission to create it if missing.
 --
 -- It is assumed that the store root and its immediate contents are not modified
--- externally. The contents of subtrees may be modified externally while the
--- subtree is marked as pending.
+-- externally. The contents of pending items may be modified externally.
 --
--- __Implementation note:__
+-- __Implementation notes:__
 --
--- Two file-system features are used to persist the state of a subtree,
--- namely whether it exists and whether it is writable.
+-- The hash of an item can only be determined once it is completed.
+-- If that hash already exists in the store, then the new item is discarded.
 --
--- @
---   exists   writable    state
---   ----------------------------
---                       missing
---     X          X      pending
---     X                 complete
--- @
+-- Store state is persisted in the file-system:
+--
+-- * Pending items are stored writable under the path @pending-\<key>@.
+-- * Complete items are stored read-only under the path @item-\<hash>@,
+--   with a link under @complete-\<key>@ pointing to that directory.
 module Control.FunFlow.ContentStore
-  ( Status (..)
-  , Status_
-  , Update (..)
-  , StoreError (..)
-  , ContentStore
-  , Item
-  , itemPath
-  , root
+  (
+  -- * Open/Close
+    withStore
   , open
   , close
-  , withStore
-  , allSubtrees
-  , subtrees
-  , subtreesPending
+
+  -- * List Contents
+  , listAll
+  , listPending
+  , listComplete
+  , listItems
+
+  -- * Query/Lookup
   , query
   , isMissing
   , isPending
@@ -58,12 +60,29 @@ module Control.FunFlow.ContentStore
   , lookup
   , lookupOrWait
   , waitUntilComplete
+
+  -- * Construct Items
   , constructOrWait
   , constructIfMissing
   , markPending
   , markComplete
+
+  -- * Remove Contents
   , removeFailed
   , removeForcibly
+  , removeItemForcibly
+
+  -- * Accessors
+  , itemPath
+  , root
+
+  -- * Types
+  , ContentStore
+  , Item
+  , Status (..)
+  , Status_
+  , Update (..)
+  , StoreError (..)
   ) where
 
 
@@ -73,15 +92,20 @@ import           Control.Concurrent              (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception               (Exception, bracket_, catch,
-                                                  displayException, throwIO)
-import           Control.Monad                   (filterM, forever, void)
+                                                  throwIO)
+import           Control.Lens
+import           Control.Monad                   ((<=<), (>=>), forever, void)
 import           Control.Monad.Catch             (MonadMask, bracket)
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
+import           Crypto.Hash                     (hashUpdate)
 import           Data.Bits                       (complement)
-import           Data.Functor.Contravariant
-import           Data.List                       (foldl')
-import           Data.Maybe                      (mapMaybe)
+import qualified Data.ByteString.Char8           as C8
+import           Data.Foldable                   (asum)
+import           Data.List                       (foldl', stripPrefix)
+import           Data.Maybe                      (fromMaybe)
+import           Data.Monoid                     ((<>))
 import qualified Data.Store
+import           Data.String                     (IsString)
 import           Data.Typeable                   (Typeable)
 import           GHC.Generics                    (Generic)
 import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
@@ -97,22 +121,24 @@ import           System.Posix.Types
 import           Control.FunFlow.ContentHashable (ContentHash,
                                                   ContentHashable (..),
                                                   DirectoryContent (..),
-                                                  hashToPath, pathToHash)
+                                                  contentHashUpdate_fingerprint,
+                                                  encodeHash, pathToHash,
+                                                  toBytes)
 
 
--- | Status of a subtree in the store.
+-- | Status of an item in the store.
 data Status missing pending complete
   = Missing missing
-  -- ^ The subtree does not exist, yet.
+  -- ^ The item does not exist, yet.
   | Pending pending
-  -- ^ The subtree is under construction and not ready for consumption.
+  -- ^ The item is under construction and not ready for consumption.
   | Complete complete
-  -- ^ The subtree is complete and ready for consumption.
+  -- ^ The item is complete and ready for consumption.
   deriving (Eq, Show)
 
 type Status_ = Status () () ()
 
--- | Update about the status of a pending subtree.
+-- | Update about the status of a pending item.
 data Update
   = Completed Item
   -- ^ The item is now completed and ready for consumption.
@@ -123,21 +149,25 @@ data Update
 -- | Errors that can occur when interacting with the store.
 data StoreError
   = NotPending ContentHash
-  -- ^ A subtree is not under construction when it should be.
+  -- ^ An item is not under construction when it should be.
   | AlreadyPending ContentHash
-  -- ^ A subtree is already under construction when it should be missing.
+  -- ^ An item is already under construction when it should be missing.
   | AlreadyComplete ContentHash
-  -- ^ A subtree is already complete when it shouldn't be.
+  -- ^ An item is already complete when it shouldn't be.
+  | CorruptedLink ContentHash FilePath
+  -- ^ The link under the given hash points to an invalid path.
   deriving (Show, Typeable)
 instance Exception StoreError
 
 -- | A hash addressed store on the file system.
 data ContentStore = ContentStore
   { storeRoot    :: Path Abs Dir
-  -- ^ Subtrees are stored directly under this directory.
+  -- ^ Root directory of the content store.
+  -- The process must be able to create this directory if missing,
+  -- change permissions, and create files and directories within.
   , storeLock    :: MVar ()
   -- ^ One global lock on store metadata to ensure thread safety.
-  -- The lock is taken when subtree state is changed or queried.
+  -- The lock is taken when item state is changed or queried.
   , storeLockFd  :: Fd
   -- ^ One exclusive file lock to ensure multi-processing safety.
   -- Note, that file locks are shared between threads in a process,
@@ -148,25 +178,24 @@ data ContentStore = ContentStore
   }
 
 -- | A completed item in the 'ContentStore'.
-newtype Item = Item { itemPath :: Path Abs Dir }
-  deriving (Eq, Show, Generic)
+data Item = Item { itemHash :: ContentHash }
+  deriving (Eq, Ord, Show, Generic)
 
 instance ContentHashable Item where
   contentHashUpdate ctx item =
-    contentHashUpdate ctx (DirectoryContent (itemPath item))
+    flip contentHashUpdate_fingerprint item
+    >=> pure . flip hashUpdate (toBytes $ itemHash item)
+    $ ctx
 
-instance Data.Store.Store Item where
-  size = contramap (fromAbsDir . itemPath) Data.Store.size
-  poke item = Data.Store.poke $ fromAbsDir $ itemPath item
-  peek = do
-    eDir <- parseAbsDir <$> Data.Store.peek
-    case eDir of
-      Left e -> fail $ displayException e
-      Right dir -> return $ Item dir
+instance Data.Store.Store Item
 
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir
 root = storeRoot
+
+-- | The store path of a completed item.
+itemPath :: ContentStore -> Item -> Path Abs Dir
+itemPath store = mkItemPath store . itemHash
 
 -- | @open root@ opens a store under the given root directory.
 --
@@ -192,7 +221,7 @@ close store = do
   closeFd (storeLockFd store)
   killINotify (storeINotify store)
 
--- | Open the under the given root and perform the given action.
+-- | Open the store under the given root and perform the given action.
 -- Closes the store once the action is complete
 --
 -- See also: 'Control.FunFlow.ContentStore.open'
@@ -200,61 +229,82 @@ withStore :: (MonadIO m, MonadMask m)
   => Path Abs Dir -> (ContentStore -> m a) -> m a
 withStore root' = bracket (liftIO $ open root') (liftIO . close)
 
--- | List all subtrees that are complete or under construction.
-allSubtrees :: ContentStore -> IO [ContentHash]
-allSubtrees ContentStore {storeRoot} =
-  mapMaybe conv . fst <$> listDir storeRoot
+-- | List all elements in the store
+-- @(pending keys, completed keys, completed items)@.
+listAll :: ContentStore -> IO ([ContentHash], [ContentHash], [Item])
+listAll ContentStore {storeRoot} =
+  foldr go ([], [], []) . fst <$> listDir storeRoot
   where
-    conv = pathToHash . dropTrailingPathSeparator . fromRelDir . dirname
+    go d prev@(builds, outs, items) = fromMaybe prev $ asum
+      [ parsePending d >>= \x -> Just (x:builds, outs, items)
+      , parseComplete d >>= \x -> Just (builds, x:outs, items)
+      , parseItem d >>= \x -> Just (builds, outs, x:items)
+      ]
+    parsePending :: Path Abs Dir -> Maybe ContentHash
+    parsePending = pathToHash <=< stripPrefix pendingPrefix . extractDir
+    parseComplete :: Path Abs Dir -> Maybe ContentHash
+    parseComplete = pathToHash <=< stripPrefix completePrefix . extractDir
+    parseItem :: Path Abs Dir -> Maybe Item
+    parseItem = fmap Item . pathToHash <=< stripPrefix itemPrefix . extractDir
+    extractDir :: Path Abs Dir -> FilePath
+    extractDir = dropTrailingPathSeparator . fromRelDir . dirname
 
--- | List all complete subtrees.
-subtrees :: ContentStore -> IO [ContentHash]
-subtrees store = filterM (isComplete store) =<< allSubtrees store
+-- | List all pending keys in the store.
+listPending :: ContentStore -> IO [ContentHash]
+listPending = fmap (^._1) . listAll
 
--- | List all subtrees under construction.
-subtreesPending :: ContentStore -> IO [ContentHash]
-subtreesPending store =
-  filterM (isPending store) =<< allSubtrees store
+-- | List all completed keys in the store.
+listComplete :: ContentStore -> IO [ContentHash]
+listComplete = fmap (^._2) . listAll
 
--- | Query for the state of a subtree.
+-- | List all completed items in the store.
+listItems :: ContentStore -> IO [Item]
+listItems = fmap (^._3) . listAll
+
+-- | Query the state of the item under the given key.
 query :: ContentStore -> ContentHash -> IO (Status () () ())
 query store hash = withStoreLock store $
-  internalQuery store hash
+  internalQuery store hash >>= pure . \case
+    Missing _ -> Missing ()
+    Pending _ -> Pending ()
+    Complete _ -> Complete ()
 
+-- | Check if there is no complete or pending item under the given key.
 isMissing :: ContentStore -> ContentHash -> IO Bool
 isMissing store hash = (== Missing ()) <$> query store hash
 
+-- | Check if there is a pending item under the given key.
 isPending :: ContentStore -> ContentHash -> IO Bool
 isPending store hash = (== Pending ()) <$> query store hash
 
+-- | Check if there is a completed item under the given key.
 isComplete :: ContentStore -> ContentHash -> IO Bool
 isComplete store hash = (== Complete ()) <$> query store hash
 
--- | Query a subtree and return it if completed.
+-- | Query the state under the given key and return the item if completed.
+-- Doesn't block if the item is pending.
 lookup :: ContentStore -> ContentHash -> IO (Status () () Item)
 lookup store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Missing () -> return $ Missing ()
-    Pending () -> return $ Pending ()
-    Complete () -> return $ Complete (Item (storePath store hash))
+    Pending _ -> return $ Pending ()
+    Complete item -> return $ Complete item
 
--- | Query a subtree and return it if completed.
--- Return an 'Control.Concurrent.Async' to await updates,
--- if it is already under construction.
+-- | Query the state under the given key and return the item if completed.
+-- Return an 'Control.Concurrent.Async' to await an update, if pending.
 lookupOrWait
   :: ContentStore
   -> ContentHash
   -> IO (Status () (Async Update) Item)
 lookupOrWait store hash = withStoreLock store $
-  let dir = storePath store hash in
   internalQuery store hash >>= \case
-    Complete () -> return $ Complete (Item dir)
+    Complete item -> return $ Complete item
     Missing () -> return $ Missing ()
-    Pending () -> Pending <$> internalWatchPending store hash
+    Pending _ -> Pending <$> internalWatchPending store hash
 
--- | Query a subtree and block, if necessary, until it is completed or failed.
--- Returns 'Nothing' if the subtree is not in the store
--- and the subtree, otherwise.
+-- | Query the state under the given key and return the item once completed.
+-- Blocks if the item is pending.
+-- Returns 'Nothing' if the item is missing, or failed to be completed.
 waitUntilComplete :: ContentStore -> ContentHash -> IO (Maybe Item)
 waitUntilComplete store hash = lookupOrWait store hash >>= \case
   Complete item -> return $ Just item
@@ -263,88 +313,111 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
     Completed item -> return $ Just item
     Failed -> return $ Nothing
 
--- | Atomically query the state of a subtree
--- and mark it as under construction if missing.
--- Return an 'Control.Concurrent.Async' to await updates,
--- if it is already under construction.
+-- | Atomically query the state under the given key and mark pending if missing.
+-- Return an 'Control.Concurrent.Async' to await updates, if already pending.
 constructOrWait
   :: ContentStore
   -> ContentHash
   -> IO (Status (Path Abs Dir) (Async Update) Item)
 constructOrWait store hash = withStoreLock store $
-  let dir = storePath store hash in
   internalQuery store hash >>= \case
-    Complete () -> return $ Complete (Item dir)
-    Missing () -> withWritableStore store $ do
-      createDir dir
-      setDirWritable dir
-      return $ Missing dir
-    Pending () -> Pending <$> internalWatchPending store hash
+    Complete item -> return $ Complete item
+    Missing () -> withWritableStore store $
+      Missing <$> createBuildDir store hash
+    Pending _ -> Pending <$> internalWatchPending store hash
 
--- | Atomically query the state of a subtree
--- and mark it as under construction if missing.
+-- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
   :: ContentStore
   -> ContentHash
   -> IO (Status (Path Abs Dir) () Item)
 constructIfMissing store hash = withStoreLock store $
-  let dir = storePath store hash in
   internalQuery store hash >>= \case
-    Complete () -> return $ Complete (Item dir)
-    Pending () -> return $ Pending ()
-    Missing () -> withWritableStore store $ do
-      createDir dir
-      setDirWritable dir
-      return $ Missing dir
+    Complete item -> return $ Complete item
+    Pending _ -> return $ Pending ()
+    Missing () -> withWritableStore store $
+      Missing <$> createBuildDir store hash
 
--- | Mark a non-existent subtree as under construction.
+-- | Mark a non-existent item as pending.
 --
--- Creates the destination directory and returns its path.
+-- Creates the build directory and returns its path.
 --
 -- See also: 'Control.FunFlow.ContentStore.constructIfMissing'.
 markPending :: ContentStore -> ContentHash -> IO (Path Abs Dir)
 markPending store hash = withStoreLock store $
   internalQuery store hash >>= \case
-    Complete () -> throwIO (AlreadyComplete hash)
-    Pending () -> throwIO (AlreadyPending hash)
-    Missing () -> withWritableStore store $ do
-      let dir = storePath store hash
-      createDir dir
-      setDirWritable dir
-      return dir
+    Complete _ -> throwIO (AlreadyComplete hash)
+    Pending _ -> throwIO (AlreadyPending hash)
+    Missing () -> withWritableStore store $
+      createBuildDir store hash
 
--- | Mark a subtree that was under construction as complete.
+-- | Mark a pending item as complete.
 markComplete :: ContentStore -> ContentHash -> IO Item
-markComplete store hash = withStoreLock store $
-  internalQuery store hash >>= \case
-    Missing () -> throwIO (NotPending hash)
-    Complete () -> throwIO (AlreadyComplete hash)
-    Pending () -> withWritableStore store $ do
-      let dir = storePath store hash
-      unsetWritableRecursively dir
-      return $ Item dir
+markComplete store inHash = withStoreLock store $
+  internalQuery store inHash >>= \case
+    Missing () -> throwIO (NotPending inHash)
+    Complete _ -> throwIO (AlreadyComplete inHash)
+    Pending build -> withWritableStore store $ do
+      unsetWritableRecursively build
+      -- XXX: Hashing large data can take some time,
+      --   could we avoid locking the store for all that time?
+      -- XXX: Take executable bit of files into account.
+      outHash <- contentHash (DirectoryContent build)
+      let out = mkItemPath store outHash
+          link' = mkCompletePath store inHash
+      doesDirExist out >>= \case
+        True -> removeDir build
+        False -> renameDir build out
+      rel <- makeRelative (parent link') out
+      let from' = dropTrailingPathSeparator $ fromAbsDir link'
+          to' = dropTrailingPathSeparator $ fromRelDir rel
+      createSymbolicLink to' from'
+      pure $! Item outHash
 
--- | Remove a subtree that was under construction.
+-- | Remove a pending item.
 --
 -- It is the callers responsibility to ensure that no other threads or processes
--- will attempt to access the subtree afterwards.
+-- will attempt to access the item's contents afterwards.
 removeFailed :: ContentStore -> ContentHash -> IO ()
 removeFailed store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Missing () -> throwIO (NotPending hash)
-    Complete () -> throwIO (AlreadyComplete hash)
-    Pending () -> withWritableStore store $
-      removePathForcibly (fromAbsDir $ storePath store hash)
+    Complete _ -> throwIO (AlreadyComplete hash)
+    Pending build -> withWritableStore store $
+      removePathForcibly (fromAbsDir build)
 
--- | Remove a subtree independent of its state.
--- Do nothing if it doesn't exist.
+-- | Remove a key association independent of the corresponding item state.
+-- Do nothing if no item exists under the given key.
 --
 -- It is the callers responsibility to ensure that no other threads or processes
--- will attempt to access the subtree afterwards.
+-- will attempt to access the contents afterwards.
+--
+-- Note, this will leave an orphan item behind if no other keys point to it.
+-- There is no garbage collection mechanism in place at the moment.
 removeForcibly :: ContentStore -> ContentHash -> IO ()
 removeForcibly store hash = withStoreLock store $ withWritableStore store $
-  removePathForcibly (fromAbsDir $ storePath store hash)
+  internalQuery store hash >>= \case
+    Missing () -> pure ()
+    Pending build -> removePathForcibly (fromAbsDir build)
+    Complete _out ->
+      removePathForcibly $
+        dropTrailingPathSeparator $ fromAbsDir $ mkCompletePath store hash
+      -- XXX: This will leave orphan store items behind.
+      --   Add GC in some form.
 
+-- | Remove a completed item in the store.
+-- Do nothing if not completed.
+--
+-- It is the callers responsibility to ensure that no other threads or processes
+-- will attempt to access the contents afterwards.
+--
+-- Note, this will leave keys pointing to that item dangling.
+-- There is no garbage collection mechanism in place at the moment.
+removeItemForcibly :: ContentStore -> Item -> IO ()
+removeItemForcibly store item = withStoreLock store $ withWritableStore store $
+  removePathForcibly (fromAbsDir $ itemPath store item)
+  -- XXX: Remove dangling links.
+  --   Add back-references in some form.
 
 ----------------------------------------------------------------------
 -- Internals
@@ -379,28 +452,72 @@ withStoreLock store action =
     withStoreFileLock store $
       action
 
--- | Return the full store path to the given hash.
-storePath :: ContentStore -> ContentHash -> Path Abs Dir
-storePath ContentStore {storeRoot} hash = storeRoot </> hashToPath hash
+prefixHashPath :: C8.ByteString -> ContentHash -> Path Rel Dir
+prefixHashPath pref hash
+  | Just dir <- Path.parseRelDir $ C8.unpack $ pref <> encodeHash hash
+  = dir
+  | otherwise = error
+      "[Control.FunFlow.ContentStore.prefixHashPath] \
+      \Failed to construct hash path."
 
--- | Query the state of a subtree without taking a lock.
-internalQuery :: ContentStore -> ContentHash -> IO (Status () () ())
-internalQuery store hash =
-  let dir = storePath store hash in
-  doesDirExist dir >>= \case
-    False -> return $ Missing ()
-    True -> isWritable dir >>= \case
-      False -> return $ Complete ()
-      True -> return $ Pending ()
+pendingPrefix, completePrefix, itemPrefix :: IsString s => s
+pendingPrefix = "pending-"
+completePrefix = "complete-"
+itemPrefix = "item-"
 
--- | Watch the given subtree under construction.
--- The returned 'Async' completes after the subtree is completed or failed.
+-- | Return the full build path for the given input hash.
+mkPendingPath :: ContentStore -> ContentHash -> Path Abs Dir
+mkPendingPath ContentStore {storeRoot} hash =
+  storeRoot </> prefixHashPath pendingPrefix hash
+
+-- | Return the full link path for the given input hash.
+mkCompletePath :: ContentStore -> ContentHash -> Path Abs Dir
+mkCompletePath ContentStore {storeRoot} hash =
+  storeRoot </> prefixHashPath completePrefix hash
+
+-- | Return the full store path to the given output hash.
+mkItemPath :: ContentStore -> ContentHash -> Path Abs Dir
+mkItemPath ContentStore {storeRoot} hash =
+  storeRoot </> prefixHashPath itemPrefix hash
+
+-- | Query the state under the given key without taking a lock.
+internalQuery
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status () (Path Abs Dir) Item)
+internalQuery store inHash = do
+  let build = mkPendingPath store inHash
+      link' = mkCompletePath store inHash
+  buildExists <- doesDirExist build
+  if buildExists then
+    pure $! Pending build
+  else do
+    linkExists <- doesDirExist link'
+    if linkExists then do
+      out <- readSymbolicLink
+        (dropTrailingPathSeparator $ fromAbsDir link')
+      case pathToHash =<< stripPrefix itemPrefix out of
+        Nothing -> throwIO $ CorruptedLink inHash out
+        Just outHash -> return $ Complete (Item outHash)
+    else
+      pure $! Missing ()
+
+-- | Create the build directory for the given input hash.
+createBuildDir :: ContentStore -> ContentHash -> IO (Path Abs Dir)
+createBuildDir store hash = do
+  let dir = mkPendingPath store hash
+  createDir dir
+  setDirWritable dir
+  return dir
+
+-- | Watch the build directory of the pending item under the given key.
+-- The returned 'Async' completes after the item is completed or failed.
 internalWatchPending
   :: ContentStore
   -> ContentHash
   -> IO (Async Update)
 internalWatchPending store hash = do
-  let dir = storePath store hash
+  let build = mkPendingPath store hash
   -- Add an inotify watch and give a signal on relevant events.
   let inotify = storeINotify store
       mask = [Attrib, MoveSelf, DeleteSelf, OnlyDir]
@@ -408,7 +525,7 @@ internalWatchPending store hash = do
   -- Signal the listener. If the 'MVar' is full,
   -- the listener didn't handle earlier signals, yet.
   let giveSignal = void $ tryPutMVar signal ()
-  watch <- addWatch inotify mask (fromAbsDir dir) $ \case
+  watch <- addWatch inotify mask (fromAbsDir build) $ \case
     Attributes True Nothing -> giveSignal
     MovedSelf True -> giveSignal
     DeletedSelf -> giveSignal
@@ -434,9 +551,10 @@ internalWatchPending store hash = do
   -- and query the status when it fires.
   -- If the status changed, fill in the update.
   update <- newEmptyMVar
-  let loop = takeMVar signal >> query store hash >>= \case
-        Pending () -> loop
-        Complete () -> tryPutMVar update $ Completed (Item dir)
+  let query' = withStoreLock store $ internalQuery store hash
+      loop = takeMVar signal >> query' >>= \case
+        Pending _ -> loop
+        Complete item -> tryPutMVar update $ Completed item
         Missing () -> tryPutMVar update Failed
   void $ async loop
   -- Wait for the update asynchronously.
@@ -460,9 +578,6 @@ readOnlyRootDirMode = writableDirMode `intersectFileModes` allButWritableMode
 withWritableStore :: ContentStore -> IO a -> IO a
 withWritableStore store =
   bracket_ (setRootDirWritable store) (setRootDirReadOnly store)
-
-isWritable :: Path Abs Dir -> IO Bool
-isWritable fp = fileAccess (fromAbsDir fp) False True False
 
 setDirWritable :: Path Abs Dir -> IO ()
 setDirWritable fp = setFileMode (fromAbsDir fp) writableDirMode

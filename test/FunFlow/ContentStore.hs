@@ -12,6 +12,7 @@ import           Control.FunFlow.ContentHashable (contentHash)
 import           Control.FunFlow.ContentStore    (ContentStore)
 import qualified Control.FunFlow.ContentStore    as ContentStore
 import           Control.Monad                   (void)
+import           Data.Maybe                      (catMaybes)
 import qualified Data.Set                        as Set
 import           Path
 import           Path.IO
@@ -62,9 +63,9 @@ tests = testGroup "Content Store"
       pending' <- ContentStore.lookup store hash
       pending' @?= ContentStore.Pending ()
       doesDirExist @IO subtree
-        @? "subtree exists"
+        @? "pending subtree exists"
       writable <$> getPermissions @IO subtree
-        @? "subtree is writable"
+        @? "pending subtree is writable"
       createDir dir
       writeFile (fromAbsFile file) expectedContent
       do
@@ -72,22 +73,24 @@ tests = testGroup "Content Store"
         content @?= expectedContent
 
       item <- ContentStore.markComplete store hash
+      let itemDir = ContentStore.itemPath store item
+          file' = itemDir </> [relfile|dir/file|]
       complete <- ContentStore.query store hash
       complete @?= ContentStore.Complete ()
       complete' <- ContentStore.lookup store hash
       complete' @?= ContentStore.Complete item
-      doesDirExist @IO subtree
-        @? "subtree exists"
-      not . writable <$> getPermissions @IO subtree
-        @? "subtree is not writable"
-      not . writable <$> getPermissions @IO file
-        @? "file is not writable"
-      createDir (subtree </> [reldir|another|])
+      doesDirExist @IO itemDir
+        @? "complete subtree exists"
+      not . writable <$> getPermissions @IO itemDir
+        @? "complete subtree is not writable"
+      not . writable <$> getPermissions @IO file'
+        @? "complete file is not writable"
+      createDir (itemDir </> [reldir|another|])
         `shouldFail` "can't create folder in complete subtree"
-      writeFile (fromAbsFile file) "Another message"
+      writeFile (fromAbsFile file') "Another message"
         `shouldFail` "can't write to complete file"
       do
-        content <- readFile (fromAbsFile file)
+        content <- readFile (fromAbsFile file')
         content @?= expectedContent
 
   , testCase "await construction" $
@@ -216,7 +219,7 @@ tests = testGroup "Content Store"
         ContentStore.Pending () ->
           assertFailure "complete still under construction"
         ContentStore.Complete item -> do
-          let subtree = ContentStore.itemPath item
+          let subtree = ContentStore.itemPath store item
           not . writable <$> getPermissions @IO (subtree </> file)
             @? "complete still writable"
           content <- readFile (fromAbsFile $ subtree </> file)
@@ -322,15 +325,19 @@ tests = testGroup "Content Store"
       void $ mapM (ContentStore.markPending store) [a, b, c, d]
       mapM_ (ContentStore.markComplete store) [a, b]
 
-      all' <- ContentStore.allSubtrees store
+      (pendings, completes, items) <- ContentStore.listAll store
+      let all' = pendings ++ completes
       Set.fromList all' @?= Set.fromList [a, b, c, d]
       Set.size (Set.fromList all') @?= 4
 
-      complete <- ContentStore.subtrees store
+      underContsruction <- ContentStore.listPending store
+      Set.fromList underContsruction @?= Set.fromList [c, d]
+
+      complete <- ContentStore.listComplete store
       Set.fromList complete @?= Set.fromList [a, b]
 
-      underContsruction <- ContentStore.subtreesPending store
-      Set.fromList underContsruction @?= Set.fromList [c, d]
+      items' <- catMaybes <$> mapM (ContentStore.waitUntilComplete store) [a, b]
+      Set.fromList items @?= Set.fromList items'
 
   ]
 
@@ -340,7 +347,7 @@ shouldFail m msg = tryAny m >>= \case
   Right _ -> assertFailure msg
 
 withTmpDir :: (Path Abs Dir -> IO a) -> IO a
-withTmpDir = withSystemTempDir "funflow-teset"
+withTmpDir = withSystemTempDir "funflow-test"
 
 withEmptyStore :: (ContentStore -> IO a) -> IO a
 withEmptyStore k = withTmpDir $ \dir ->
