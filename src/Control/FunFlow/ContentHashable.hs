@@ -35,48 +35,51 @@ module Control.FunFlow.ContentHashable
   ) where
 
 
-import           Control.Monad                 (foldM, (>=>))
-import           Crypto.Hash                   (Context, Digest, SHA256,
-                                                digestFromByteString,
-                                                hashFinalize, hashInit,
-                                                hashUpdate)
-import           Data.Bits                     (shiftL)
-import           Data.ByteArray                (Bytes, MemView (MemView),
-                                                allocAndFreeze, convert)
-import           Data.ByteArray.Encoding       (Base (Base64URLUnpadded),
-                                                convertFromBase, convertToBase)
-import qualified Data.ByteString               as BS
-import           Data.ByteString.Builder.Extra (defaultChunkSize)
-import qualified Data.ByteString.Char8         as C8
-import qualified Data.ByteString.Lazy          as BSL
+import           Control.Monad                    (foldM, mzero, (>=>))
+import           Crypto.Hash                      (Context, Digest, SHA256,
+                                                   digestFromByteString,
+                                                   hashFinalize, hashInit,
+                                                   hashUpdate)
+import           Data.Bits                        (shiftL)
+import           Data.ByteArray                   (Bytes, MemView (MemView),
+                                                   allocAndFreeze, convert)
+import           Data.ByteArray.Encoding          (Base (Base64URLUnpadded),
+                                                   convertFromBase,
+                                                   convertToBase)
+import qualified Data.ByteString                  as BS
+import           Data.ByteString.Builder.Extra    (defaultChunkSize)
+import qualified Data.ByteString.Char8            as C8
+import qualified Data.ByteString.Lazy             as BSL
 import           Data.Functor.Contravariant
 import           Data.Int
-import           Data.List                     (sort)
-import           Data.Map                      (Map)
-import qualified Data.Map                      as Map
-import           Data.Store                    (Store (..), peekException)
-import qualified Data.Text                     as T
-import qualified Data.Text.Array               as TA
-import qualified Data.Text.Internal            as T
-import qualified Data.Text.Lazy                as TL
+import           Data.List                        (sort)
+import           Data.Map                         (Map)
+import qualified Data.Map                         as Map
+import           Data.Store                       (Store (..), peekException)
+import qualified Data.Text                        as T
+import qualified Data.Text.Array                  as TA
+import qualified Data.Text.Internal               as T
+import qualified Data.Text.Lazy                   as TL
 import           Data.Typeable
 import           Data.Word
-import           Foreign.Marshal.Utils         (with)
-import           Foreign.Ptr                   (castPtr)
-import           Foreign.Storable              (Storable, sizeOf)
+import qualified Database.SQLite.Simple.FromField as SQL
+import qualified Database.SQLite.Simple.ToField   as SQL
+import           Foreign.Marshal.Utils            (with)
+import           Foreign.Ptr                      (castPtr)
+import           Foreign.Storable                 (Storable, sizeOf)
 import           GHC.Fingerprint
 import           GHC.Generics
-import           GHC.Integer.GMP.Internals     (BigNat (..), Integer (..))
-import           GHC.Natural                   (Natural (..))
-import           GHC.Prim                      (ByteArray#,
-                                                copyByteArrayToAddr#,
-                                                sizeofByteArray#)
-import           GHC.Ptr                       (Ptr (Ptr))
-import           GHC.Types                     (IO (IO), Int (I#), Word (W#))
+import           GHC.Integer.GMP.Internals        (BigNat (..), Integer (..))
+import           GHC.Natural                      (Natural (..))
+import           GHC.Prim                         (ByteArray#,
+                                                   copyByteArrayToAddr#,
+                                                   sizeofByteArray#)
+import           GHC.Ptr                          (Ptr (Ptr))
+import           GHC.Types                        (IO (IO), Int (I#), Word (W#))
 import qualified Path
 import qualified Path.IO
-import           System.IO                     (IOMode (ReadMode),
-                                                withBinaryFile)
+import           System.IO                        (IOMode (ReadMode),
+                                                   withBinaryFile)
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
@@ -88,6 +91,16 @@ instance Store ContentHash where
     Nothing -> peekException "Store ContentHash: Illegal digest"
     Just x -> return x
   poke = poke . toBytes
+
+instance SQL.FromField ContentHash where
+  fromField f = do
+    bs <- SQL.fromField f
+    case decodeHash bs of
+      Just h  -> pure h
+      Nothing -> mzero
+
+instance SQL.ToField ContentHash where
+  toField = SQL.toField . encodeHash
 
 toBytes :: ContentHash -> BS.ByteString
 toBytes = convert . unContentHash
@@ -104,7 +117,7 @@ encodeHash = convertToBase Base64URLUnpadded . toBytes
 -- prop> decodeHash (encodeHash x) = Just x
 decodeHash :: BS.ByteString -> Maybe ContentHash
 decodeHash bs = case convertFromBase Base64URLUnpadded bs of
-  Left _ -> Nothing
+  Left _  -> Nothing
   Right x -> fromBytes x
 
 -- | File path appropriate encoding of a hash
