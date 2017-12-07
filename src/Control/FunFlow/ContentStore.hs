@@ -1,11 +1,12 @@
-{-# LANGUAGE DeriveGeneric       #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE PatternSynonyms     #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- | Hash addressed store in file system.
 --
@@ -72,6 +73,11 @@ module Control.FunFlow.ContentStore
   , removeForcibly
   , removeItemForcibly
 
+  -- * Aliases
+  , assignAlias
+  , lookupAlias
+  , removeAlias
+
   -- * Accessors
   , itemPath
   , root
@@ -79,6 +85,7 @@ module Control.FunFlow.ContentStore
   -- * Types
   , ContentStore
   , Item
+  , Alias (..)
   , Status (..)
   , Status_
   , Update (..)
@@ -86,44 +93,48 @@ module Control.FunFlow.ContentStore
   ) where
 
 
-import           Prelude                         hiding (lookup)
+import           Prelude                          hiding (lookup)
 
-import           Control.Concurrent              (threadDelay)
+import           Control.Concurrent               (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception               (Exception, bracket_, catch,
-                                                  throwIO)
+import           Control.Exception                (Exception, bracket_, catch,
+                                                   throwIO)
 import           Control.Lens
-import           Control.Monad                   ((<=<), (>=>), forever, void)
-import           Control.Monad.Catch             (MonadMask, bracket)
-import           Control.Monad.IO.Class          (MonadIO, liftIO)
-import           Crypto.Hash                     (hashUpdate)
-import           Data.Bits                       (complement)
-import qualified Data.ByteString.Char8           as C8
-import           Data.Foldable                   (asum)
-import           Data.List                       (foldl', stripPrefix)
-import           Data.Maybe                      (fromMaybe)
-import           Data.Monoid                     ((<>))
+import           Control.Monad                    (forever, void, (<=<), (>=>))
+import           Control.Monad.Catch              (MonadMask, bracket)
+import           Control.Monad.IO.Class           (MonadIO, liftIO)
+import           Crypto.Hash                      (hashUpdate)
+import           Data.Bits                        (complement)
+import qualified Data.ByteString.Char8            as C8
+import           Data.Foldable                    (asum)
+import           Data.List                        (foldl', stripPrefix)
+import           Data.Maybe                       (fromMaybe, listToMaybe)
+import           Data.Monoid                      ((<>))
 import qualified Data.Store
-import           Data.String                     (IsString)
-import           Data.Typeable                   (Typeable)
-import           GHC.Generics                    (Generic)
-import           GHC.IO.Device                   (SeekMode (AbsoluteSeek))
-import           System.Directory                (removePathForcibly)
+import           Data.String                      (IsString)
+import qualified Data.Text                        as T
+import           Data.Typeable                    (Typeable)
+import qualified Database.SQLite.Simple           as SQL
+import qualified Database.SQLite.Simple.FromField as SQL
+import qualified Database.SQLite.Simple.ToField   as SQL
+import           GHC.Generics                     (Generic)
+import           GHC.IO.Device                    (SeekMode (AbsoluteSeek))
 import           Path
 import           Path.IO
-import           System.FilePath                 (dropTrailingPathSeparator)
+import           System.Directory                 (removePathForcibly)
+import           System.FilePath                  (dropTrailingPathSeparator)
 import           System.INotify
 import           System.Posix.Files
 import           System.Posix.IO
 import           System.Posix.Types
 
-import           Control.FunFlow.ContentHashable (ContentHash,
-                                                  ContentHashable (..),
-                                                  DirectoryContent (..),
-                                                  contentHashUpdate_fingerprint,
-                                                  encodeHash, pathToHash,
-                                                  toBytes)
+import           Control.FunFlow.ContentHashable  (ContentHash,
+                                                   ContentHashable (..),
+                                                   DirectoryContent (..),
+                                                   contentHashUpdate_fingerprint,
+                                                   encodeHash, pathToHash,
+                                                   toBytes)
 
 
 -- | Status of an item in the store.
@@ -175,6 +186,8 @@ data ContentStore = ContentStore
   -- for thread-safety.
   , storeINotify :: INotify
   -- ^ Used to watch for updates on store items.
+  , storeDb      :: SQL.Connection
+  -- ^ Connection to the metadata SQLite database.
   }
 
 -- | A completed item in the 'ContentStore'.
@@ -188,6 +201,9 @@ instance ContentHashable Item where
     $ ctx
 
 instance Data.Store.Store Item
+
+newtype Alias = Alias { unAlias :: T.Text }
+  deriving (ContentHashable, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
 
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir
@@ -207,6 +223,14 @@ open :: Path Abs Dir -> IO ContentStore
 open storeRoot = do
   createDirIfMissing True storeRoot
   storeLockFd <- createFile (fromAbsFile $ lockPath storeRoot) ownerWriteMode
+  storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
+  SQL.execute_ storeDb
+    "CREATE TABLE IF NOT EXISTS\
+    \  aliases\
+    \  ( hash TEXT PRIMARY KEY\
+    \  , dest TEXT NOT NULL\
+    \  , name TEXT NOT NULL\
+    \  )"
   setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
   storeLock <- newMVar ()
   storeINotify <- initINotify
@@ -220,6 +244,7 @@ close store = do
   takeMVar (storeLock store)
   closeFd (storeLockFd store)
   killINotify (storeINotify store)
+  SQL.close (storeDb store)
 
 -- | Open the store under the given root and perform the given action.
 -- Closes the store once the action is complete
@@ -419,11 +444,54 @@ removeItemForcibly store item = withStoreLock store $ withWritableStore store $
   -- XXX: Remove dangling links.
   --   Add back-references in some form.
 
+-- | Link the given alias to the given item.
+-- If the alias existed before it is overwritten.
+assignAlias :: ContentStore -> Alias -> Item -> IO ()
+assignAlias store alias item =
+  withStoreLock store $ withWritableStore store $ do
+    hash <- contentHash alias
+    SQL.executeNamed (storeDb store)
+      "INSERT OR REPLACE INTO\
+      \  aliases\
+      \ VALUES\
+      \  (:hash, :dest, :name)"
+      [ ":hash" SQL.:= hash
+      , ":dest" SQL.:= itemHash item
+      , ":name" SQL.:= alias
+      ]
+
+-- | Lookup an item under the given alias.
+-- Returns 'Nothing' if the alias does not exist.
+lookupAlias :: ContentStore -> Alias -> IO (Maybe Item)
+lookupAlias store alias =
+  withStoreLock store $ do
+    hash <- contentHash alias
+    r <- SQL.queryNamed (storeDb store)
+      "SELECT dest FROM aliases\
+      \ WHERE\
+      \  hash = :hash"
+      [ ":hash" SQL.:= hash ]
+    pure $! listToMaybe $ Item . SQL.fromOnly <$> r
+
+-- | Remove the given alias.
+removeAlias :: ContentStore -> Alias -> IO ()
+removeAlias store alias =
+  withStoreLock store $ withWritableStore store $ do
+    hash <- contentHash alias
+    SQL.executeNamed (storeDb store)
+      "DELETE FROM aliases\
+      \ WHERE\
+      \  hash = :hash"
+      [ ":hash" SQL.:= hash ]
+
 ----------------------------------------------------------------------
 -- Internals
 
 lockPath :: Path Abs Dir -> Path Abs File
 lockPath = (</> [relfile|lock|])
+
+dbPath :: Path Abs Dir -> Path Abs File
+dbPath = (</> [relfile|metadata.db|])
 
 makeLockDesc :: LockRequest -> FileLock
 makeLockDesc req = (req, AbsoluteSeek, COff 0, COff 1)
@@ -497,7 +565,7 @@ internalQuery store inHash = do
       out <- readSymbolicLink
         (dropTrailingPathSeparator $ fromAbsDir link')
       case pathToHash =<< stripPrefix itemPrefix out of
-        Nothing -> throwIO $ CorruptedLink inHash out
+        Nothing      -> throwIO $ CorruptedLink inHash out
         Just outHash -> return $ Complete (Item outHash)
     else
       pure $! Missing ()

@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase       #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes      #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -338,6 +339,54 @@ tests = testGroup "Content Store"
 
       items' <- catMaybes <$> mapM (ContentStore.waitUntilComplete store) [a, b]
       Set.fromList items @?= Set.fromList items'
+
+  , testCase "store aliases" $
+    withEmptyStore $ \store -> do
+      let fp = [relfile|test|]
+          contentA = "itemA"
+          contentB = "itemB"
+      itemA <- do
+        hash <- contentHash ("a" :: String)
+        dir <- ContentStore.markPending store hash
+        writeFile (fromAbsFile $ dir </> fp) contentA
+        ContentStore.markComplete store hash
+      itemB <- do
+        hash <- contentHash ("b" :: String)
+        dir <- ContentStore.markPending store hash
+        writeFile (fromAbsFile $ dir </> fp) contentB
+        ContentStore.markComplete store hash
+      let aliasA = ContentStore.Alias "aliasA"
+          aliasB = ContentStore.Alias "aliasB"
+
+      do
+        r <- ContentStore.lookupAlias store aliasA
+        r @?= Nothing
+
+      ContentStore.assignAlias store aliasA itemA
+      ContentStore.assignAlias store aliasB itemB
+      do
+        r <- ContentStore.lookupAlias store aliasA
+        r @?= Just itemA
+      do
+        r <- ContentStore.lookupAlias store aliasB
+        r @?= Just itemB
+
+      ContentStore.assignAlias store aliasB itemA
+      do
+        r <- ContentStore.lookupAlias store aliasA
+        r @?= Just itemA
+      do
+        r <- ContentStore.lookupAlias store aliasB
+        r @?= Just itemA
+
+      ContentStore.removeAlias store aliasA
+      ContentStore.removeAlias store aliasB
+      do
+        r <- ContentStore.lookupAlias store aliasA
+        r @?= Nothing
+      do
+        r <- ContentStore.lookupAlias store aliasB
+        r @?= Nothing
 
   ]
 
