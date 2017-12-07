@@ -90,7 +90,7 @@ instance Store ContentHash where
   poke = poke . toBytes
 
 toBytes :: ContentHash -> BS.ByteString
-toBytes (ContentHash digest) = convert digest
+toBytes = convert . unContentHash
 
 fromBytes :: BS.ByteString -> Maybe ContentHash
 fromBytes bs = ContentHash <$> digestFromByteString bs
