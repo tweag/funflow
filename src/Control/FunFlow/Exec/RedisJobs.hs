@@ -51,8 +51,8 @@ sparkJob :: Store a => T.Text -> a -> RFlowM JobId
 sparkJob nm x = do
   jid :: JobId <- redis $ R.incr "jobfresh"
   let job = Job jid nm JobQueue Nothing x
-  _ <- redis $ R.rpush "jobs_queue" [encode jid]
   _ <- redis $ R.set (BS8.pack $ "job_" ++ show jid) (encode job)
+  _ <- redis $ R.rpush "jobs_queue" [encode jid]
   return jid
 
 -- | Get all the jobs by status
@@ -64,7 +64,7 @@ getJobsByStatus js = do
           JobQueue   -> "jobs_queue"
           JobDone    -> "jobs_done"
           JobError   -> "jobs_error"
-  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))+
+  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
   fmap catMaybes $ mapM getJobById $ rights jids
 
 -- | Get a job by job ID
