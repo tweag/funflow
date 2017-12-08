@@ -14,6 +14,7 @@ import           Data.Either                                (rights)
 import           Data.Maybe                                 (catMaybes)
 
 import           Control.Exception
+import           Control.Concurrent
 import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Monad.Except
@@ -63,7 +64,7 @@ getJobsByStatus js = do
           JobQueue   -> "jobs_queue"
           JobDone    -> "jobs_done"
           JobError   -> "jobs_error"
-  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))
+  jids <- map decode <$> redis (R.lrange queueNm 0 (-1))+
   fmap catMaybes $ mapM getJobById $ rights jids
 
 -- | Get a job by job ID
@@ -72,7 +73,8 @@ getJobById jid = do
   let jobIdNm = BS8.pack $ "job_" ++ show jid
   mjob <- redis $ R.get jobIdNm
   case mdecode mjob of
-    Left _err -> return Nothing
+    Left err -> do liftIO $ putStrLn $ "job error: "++err
+                   return Nothing
     Right job -> return $ Just job
 
 -- | Loop forever, looking for new jobs that have been put on the waiting queue, and run them.
@@ -85,6 +87,7 @@ queueLoop allJobs = forever go
     go = do
       mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
       whenRight (mdecode mkj) $ \jid -> do
+        liftIO $ threadDelay (100000)
         mjob <- getJobById jid
         --liftIO $ putStrLn $ "queueLoop got job id "++ show (jid,fmap jobId mjob)
         whenJust mjob $ resumeJob allJobs
