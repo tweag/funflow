@@ -28,6 +28,8 @@ data Flow' eff a b where
   PutInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
   GetFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
+  LookupAliasInStore :: Flow' eff CS.Alias (Maybe CS.Item)
+  AssignAliasInStore :: Flow' eff (CS.Alias, CS.Item) ()
   Wrapped :: eff a b -> Flow' eff a b
 
 type Flow eff ex = ErrorChoice ex (Flow' eff)
@@ -60,6 +62,11 @@ putInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a
 putInStore = effect . PutInStore
 getFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
 getFromStore = effect . GetFromStore
+
+lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
+lookupAliasInStore = effect LookupAliasInStore
+assignAliasInStore :: Flow eff ex (CS.Alias, CS.Item) ()
+assignAliasInStore = effect AssignAliasInStore
 
 
 -- | Convert a flow to a diagram, for inspection/pretty printing

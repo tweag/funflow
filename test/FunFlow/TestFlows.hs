@@ -1,6 +1,7 @@
-{-# LANGUAGE Arrows      #-}
-{-# LANGUAGE GADTs       #-}
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE Arrows            #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 module FunFlow.TestFlows where
 
@@ -40,6 +41,25 @@ flow2 = proc () -> do
 flow2caught :: SimpleFlow () (Double,Double)
 flow2caught = retry 100 0 flow2
 
+aliasFlow :: SimpleFlow () (Maybe String, Maybe String)
+aliasFlow = proc () -> do
+  let alias = CS.Alias "alias"
+  mb1 <- lookupAliasInStore -< alias
+  r1 <- case mb1 of
+    Nothing -> do
+      item <- writeOutFile -< "test"
+      assignAliasInStore -< (alias, item)
+      returnA -< Nothing
+    Just item ->
+      arr Just <<< readOutFile -< item
+  mb2 <- lookupAliasInStore -< alias
+  r2 <- case mb2 of
+    Nothing ->
+      returnA -< Nothing
+    Just item ->
+      arr Just <<< readOutFile -< item
+  returnA -< (r1, r2)
+
 flowAssertions :: [FlowAssertion]
 flowAssertions =
   [ FlowAssertion "death" "foo" melancholicLazarus Nothing setup
@@ -47,6 +67,7 @@ flowAssertions =
   , FlowAssertion "bernoulli_once" 0.2 (retry 20 0 $ worstBernoulli mkError >>^ (<2.0)) (Just True) (return ())
   , FlowAssertion "bernoulli_twice" () (flow2caught >>^ snd >>^ (<2.0)) (Just True) (return ())
   , FlowAssertion "failStep" () failStep Nothing (return ())
+  , FlowAssertion "aliasFlow" () aliasFlow (Just (Nothing, Just "test")) (return ())
   ]
 
 setup :: IO ()

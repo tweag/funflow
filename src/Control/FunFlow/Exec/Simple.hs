@@ -70,6 +70,10 @@ runFlowEx _ cfg store runWrapped flow input = do
           CS.removeFailed store chash
     runFlow' _ (GetFromStore f) = AsyncA $ \item ->
       f $ CS.itemPath store item
+    runFlow' _ LookupAliasInStore = AsyncA $ \alias ->
+      CS.lookupAlias store alias
+    runFlow' _ AssignAliasInStore = AsyncA $ \(alias, item) ->
+      CS.assignAlias store alias item
     runFlow' _ (Wrapped w) = runWrapped w
 
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
