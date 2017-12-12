@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
@@ -25,6 +26,7 @@ import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, onException
                                                       , try)
+import qualified Data.ByteString                      as BS
 import           Path
 
 -- | Simple evaulation of a flow
@@ -40,9 +42,41 @@ runFlowEx _ cfg store runWrapped flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
+    simpleOutPath item = toFilePath
+      $ CS.itemPath store item </> [relfile|out|]
+    withStoreCache :: forall i o. Cacher i o -> i -> (i -> IO o) -> IO o
+    withStoreCache NoCache i f = f i
+    withStoreCache c i f = do
+      let chash = cacherKey c i (cacherUniqueIdent c)
+      instruction <- CS.constructOrWait store chash
+      case instruction of
+        CS.Pending a -> do
+          update <- wait a
+          case update of
+            CS.Completed item -> do
+              bs <- BS.readFile $ simpleOutPath item
+              return . cacherReadValue c $ bs
+            CS.Failed ->
+              -- XXX: Should we retry locally?
+              fail "Remote process failed to construct item"
+        CS.Complete item -> do
+          bs <- BS.readFile $ simpleOutPath item
+          return . cacherReadValue c $ bs
+        CS.Missing fp ->
+          do
+            res <- f i
+            BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                        . cacherStoreValue c $ res
+            _ <- CS.markComplete store chash
+            return res
+          `onException`
+            CS.removeFailed store chash
+
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA IO a1 b1
-    runFlow' _ (Step _ f) = AsyncA $ \x -> return $ f x
-    runFlow' _ (StepIO _ f) = AsyncA $ \x -> f x
+    runFlow' _ (Step props f) = AsyncA $ \x ->
+      withStoreCache (cache props) x $ return . f
+    runFlow' _ (StepIO props f) = AsyncA $ \x ->
+      withStoreCache (cache props) x f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)

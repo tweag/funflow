@@ -2,23 +2,25 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module FunFlow.TestFlows where
 
 import           Control.Arrow
 import           Control.Exception
 import           Control.FunFlow.Base
+import           Control.FunFlow.Cache.TH
 import qualified Control.FunFlow.ContentStore                as CS
-import           Control.FunFlow.Steps
-import           Control.Monad                               (when)
-import           Path
-import           Path.IO
-import           Test.Tasty
-import           Test.Tasty.HUnit
-
-import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External.Coordinator.Memory
+import           Control.FunFlow.Steps
+import           Control.Monad                               (when)
+import           Data.Default                                (def)
+import           Path
+import           Path.IO
+import           System.Random
+import           Test.Tasty
+import           Test.Tasty.HUnit
 
 data FlowAssertion where
   FlowAssertion :: (Eq b, Show b)
@@ -60,6 +62,14 @@ aliasFlow = proc () -> do
       arr Just <<< readOutFile -< item
   returnA -< (r1, r2)
 
+flowCached :: SimpleFlow () Bool
+flowCached = let
+    randomStep = stepIO' (def { cache = $(defaultCacherLoc (0 :: Int))}) $ const (randomIO :: IO Int)
+  in proc () -> do
+    t1 <- randomStep -< ()
+    t2 <- randomStep -< ()
+    returnA -< (t1 == t2)
+
 flowAssertions :: [FlowAssertion]
 flowAssertions =
   [ FlowAssertion "death" "foo" melancholicLazarus Nothing setup
@@ -68,6 +78,7 @@ flowAssertions =
   , FlowAssertion "bernoulli_twice" () (flow2caught >>^ snd >>^ (<2.0)) (Just True) (return ())
   , FlowAssertion "failStep" () failStep Nothing (return ())
   , FlowAssertion "aliasFlow" () aliasFlow (Just (Nothing, Just "test")) (return ())
+  , FlowAssertion "cachingFlow" () flowCached (Just True) (return ())
   ]
 
 setup :: IO ()
