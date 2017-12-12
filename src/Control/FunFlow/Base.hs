@@ -1,5 +1,5 @@
 {-# LANGUAGE EmptyDataDecls            #-}
-{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
@@ -20,7 +20,9 @@ import           Control.FunFlow.External
 import qualified Control.FunFlow.External.Docker as Docker
 import           Data.ByteString                 (ByteString)
 import           Data.Default
+import           Data.Functor.Identity
 import           Data.Proxy                      (Proxy (..))
+import qualified Data.Store as Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
@@ -33,15 +35,30 @@ data Cacher i o =
       --   that the same input does not give the same cache key for
       --   different steps.
       cacherUniqueIdent :: Int
-    , cacherKey         :: i -> Int
+      -- | Function to encode the input and the identity into a content
+      --   hash.
+    , cacherKey         :: i -> Int -> ContentHash
     , cacherStoreValue  :: o -> ByteString
-    , cacherReadValue   :: ByteString -> Maybe o
+      -- | Attempt to read the cache value back. May throw exceptions.
+    , cacherReadValue   :: ByteString -> o
     }
+
+defaultCacherWithIdent :: (Store.Store o, ContentHashable Identity i)
+                       => Int -- ^ Seed for the cacher
+                       -> Cacher i o
+defaultCacherWithIdent ident = Cache
+  { cacherUniqueIdent = ident
+  , cacherKey = \i ident' -> runIdentity $ contentHash (ident', i)
+  , cacherStoreValue = Store.encode
+  , cacherReadValue = Store.decodeEx
+  }
 
 data Properties i o = Properties
   { -- | Name of this step. Used when describing the step in diagrams
     --   or other reporting.
     name  :: Maybe T.Text
+    -- | Specify whether this step can be cached or not and, if so,
+    --   how to do so.
   , cache :: Cacher i o
   }
 
