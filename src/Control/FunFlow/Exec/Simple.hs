@@ -1,3 +1,4 @@
+{-# LANGUAGE Arrows               #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -13,6 +14,7 @@ module Control.FunFlow.Exec.Simple
   , withSimpleLocalRunner
   ) where
 
+import           Control.Arrow (returnA)
 import           Control.Arrow.Async
 import           Control.Arrow.Free                   (eval, type (~>))
 import           Control.Concurrent.Async             (wait, withAsync)
@@ -44,39 +46,49 @@ runFlowEx _ cfg store runWrapped flow input = do
   where
     simpleOutPath item = toFilePath
       $ CS.itemPath store item </> [relfile|out|]
-    withStoreCache :: forall i o. Cacher i o -> i -> (i -> IO o) -> IO o
-    withStoreCache NoCache i f = f i
-    withStoreCache c i f = do
-      let chash = cacherKey c i (cacherUniqueIdent c)
-      instruction <- CS.constructOrWait store chash
-      case instruction of
-        CS.Pending a -> do
-          update <- wait a
-          case update of
-            CS.Completed item -> do
+    withStoreCache :: forall i o. Cacher i o
+                   -> AsyncA IO i o -> AsyncA IO i o
+    withStoreCache NoCache f = f
+    withStoreCache c f = let
+        chashOf i = cacherKey c i (cacherUniqueIdent c)
+        checkStore = AsyncA $ \chash -> do
+          instruction <- CS.constructOrWait store chash
+          case instruction of
+            CS.Pending a -> do
+              update <- wait a
+              case update of
+                CS.Completed item -> do
+                  bs <- BS.readFile $ simpleOutPath item
+                  return . Right . cacherReadValue c $ bs
+                CS.Failed ->
+                  -- XXX: Should we retry locally?
+                  fail "Remote process failed to construct item"
+            CS.Complete item -> do
               bs <- BS.readFile $ simpleOutPath item
-              return . cacherReadValue c $ bs
-            CS.Failed ->
-              -- XXX: Should we retry locally?
-              fail "Remote process failed to construct item"
-        CS.Complete item -> do
-          bs <- BS.readFile $ simpleOutPath item
-          return . cacherReadValue c $ bs
-        CS.Missing fp ->
+              return . Right . cacherReadValue c $ bs
+            CS.Missing fp -> return $ Left fp
+        writeStore = AsyncA $ \(chash, fp, res) ->
           do
-            res <- f i
-            BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                        . cacherStoreValue c $ res
-            _ <- CS.markComplete store chash
-            return res
-          `onException`
-            CS.removeFailed store chash
+             BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                         . cacherStoreValue c $ res
+             _ <- CS.markComplete store chash
+             return res
+           `onException`
+             CS.removeFailed store chash
+      in proc i -> do
+        let chash = chashOf i
+        mcontents <- checkStore -< chash
+        case mcontents of
+          Right contents -> returnA -< contents
+          Left fp -> do
+            res <- f -< i
+            writeStore -< (chash, fp, res)
 
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA IO a1 b1
-    runFlow' _ (Step props f) = AsyncA $ \x ->
-      withStoreCache (cache props) x $ return . f
-    runFlow' _ (StepIO props f) = AsyncA $ \x ->
-      withStoreCache (cache props) x f
+    runFlow' _ (Step props f) = withStoreCache (cache props)
+      $ AsyncA $ \x -> return $ f x
+    runFlow' _ (StepIO props f) = withStoreCache (cache props)
+      $ AsyncA f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
       submitTask po $ TaskDescription chash (toTask x)
@@ -108,7 +120,8 @@ runFlowEx _ cfg store runWrapped flow input = do
       CS.lookupAlias store alias
     runFlow' _ AssignAliasInStore = AsyncA $ \(alias, item) ->
       CS.assignAlias store alias item
-    runFlow' _ (Wrapped _ w) = runWrapped w
+    runFlow' _ (Wrapped props w) = withStoreCache (cache props)
+      $ runWrapped w
 
 runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         => c
