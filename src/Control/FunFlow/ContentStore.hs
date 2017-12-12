@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PatternSynonyms            #-}
@@ -194,7 +196,7 @@ data ContentStore = ContentStore
 data Item = Item { itemHash :: ContentHash }
   deriving (Eq, Ord, Show, Generic)
 
-instance ContentHashable Item where
+instance Monad m => ContentHashable m Item where
   contentHashUpdate ctx item =
     flip contentHashUpdate_fingerprint item
     >=> pure . flip hashUpdate (toBytes $ itemHash item)
@@ -203,7 +205,7 @@ instance ContentHashable Item where
 instance Data.Store.Store Item
 
 newtype Alias = Alias { unAlias :: T.Text }
-  deriving (ContentHashable, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
+  deriving (ContentHashable IO, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
 
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir

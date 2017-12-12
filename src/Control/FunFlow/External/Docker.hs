@@ -1,5 +1,7 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Control.FunFlow.External.Docker where
 
@@ -21,17 +23,17 @@ data Bind
   | MultiInput (Map FilePath CS.Item)
   deriving Generic
 
-instance ContentHashable Bind
+instance Monad m => ContentHashable m Bind
 
 data Config = Config
-  { image :: T.Text
+  { image      :: T.Text
   , optImageID :: Maybe T.Text
-  , input :: Bind
-  , command :: FilePath
-  , args :: [T.Text]
+  , input      :: Bind
+  , command    :: FilePath
+  , args       :: [T.Text]
   } deriving Generic
 
-instance ContentHashable Config
+instance Monad m => ContentHashable m Config
 
 toExternal :: Config -> ExternalTask
 toExternal cfg = ExternalTask
@@ -58,5 +60,5 @@ toExternal cfg = ExternalTask
         | (dest, chash) <- Map.toList cmap
         ]
     imageArg = textParam $ case optImageID cfg of
-      Nothing -> image cfg
+      Nothing  -> image cfg
       Just id' -> image cfg <> ":" <> id'

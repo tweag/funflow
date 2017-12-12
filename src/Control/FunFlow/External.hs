@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TemplateHaskell            #-}
 -- | Definition of external tasks
 module Control.FunFlow.External where
@@ -31,7 +33,7 @@ data ParamField
     -- ^ Reference to the output path in the content store.
   deriving Generic
 
-instance ContentHashable ParamField
+instance Monad m => ContentHashable m ParamField
 instance Store ParamField
 
 -- | A parameter to an external task
@@ -45,31 +47,31 @@ newtype Param = Param [ParamField]
 instance IsString Param where
   fromString s = Param [ParamText (fromString s)]
 
-instance ContentHashable Param
+instance Monad m => ContentHashable m Param
 instance Store Param
 
 -- | Converter of path components.
 data ConvParam f = ConvParam
   { convPath :: CS.Item -> f (Path Abs Dir)
     -- ^ Resolve a reference to a content store item.
-  , convEnv :: T.Text -> f T.Text
+  , convEnv  :: T.Text -> f T.Text
     -- ^ Resolve an environment variable.
-  , convUid :: f CUid
+  , convUid  :: f CUid
     -- ^ Resolve the effective user ID.
-  , convGid :: f CGid
+  , convGid  :: f CGid
     -- ^ Resolve the effective group ID.
-  , convOut :: f (Path Abs Dir)
+  , convOut  :: f (Path Abs Dir)
     -- ^ Resolve the output path in the content store.
   }
 
 paramFieldToText :: Applicative f
   => ConvParam f -> ParamField -> f T.Text
-paramFieldToText _ (ParamText txt) = pure txt
+paramFieldToText _ (ParamText txt)  = pure txt
 paramFieldToText c (ParamPath item) = T.pack . fromAbsDir <$> convPath c item
-paramFieldToText c (ParamEnv env) = convEnv c env
-paramFieldToText c ParamUid = T.pack . show <$> convUid c
-paramFieldToText c ParamGid = T.pack . show <$> convGid c
-paramFieldToText c ParamOut = T.pack . fromAbsDir <$> convOut c
+paramFieldToText c (ParamEnv env)   = convEnv c env
+paramFieldToText c ParamUid         = T.pack . show <$> convUid c
+paramFieldToText c ParamGid         = T.pack . show <$> convGid c
+paramFieldToText c ParamOut         = T.pack . fromAbsDir <$> convOut c
 
 -- | Transform a parameter to text using the given converter.
 paramToText :: Applicative f
@@ -115,7 +117,7 @@ data ExternalTask = ExternalTask {
   , _etWriteToStdOut :: Bool
 } deriving Generic
 
-instance ContentHashable ExternalTask
+instance Monad m => ContentHashable m ExternalTask
 instance Store ExternalTask
 
 data TaskDescription = TaskDescription {

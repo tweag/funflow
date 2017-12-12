@@ -1,4 +1,6 @@
 {-# LANGUAGE EmptyDataDecls            #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE OverloadedStrings         #-}
@@ -19,7 +21,6 @@ import qualified Control.FunFlow.External.Docker as Docker
 import           Data.ByteString                 (ByteString)
 import           Data.Default
 import           Data.Proxy                      (Proxy (..))
-import           Data.Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
@@ -53,11 +54,11 @@ instance Default (Properties i o) where
 data Flow' eff a b where
   Step :: Properties a b -> (a -> b) -> Flow' eff a b
   StepIO :: Properties a b -> (a -> IO b) -> Flow' eff a b
-  External :: ContentHashable a => (a -> ExternalTask) -> Flow' eff a CS.Item
+  External :: ContentHashable IO a => (a -> ExternalTask) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
-  PutInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
+  PutInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
-  GetFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
+  GetFromStore :: ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
   LookupAliasInStore :: Flow' eff CS.Alias (Maybe CS.Item)
   AssignAliasInStore :: Flow' eff (CS.Alias, CS.Item) ()
   Wrapped :: Properties a b -> eff a b -> Flow' eff a b
@@ -88,7 +89,7 @@ stepIO' props = effect . StepIO props
 named :: T.Text -> (a -> b) -> Flow eff ex a b
 named n = step' (def { name = Just n})
 
-external :: ContentHashable a => (a -> ExternalTask) -> Flow eff ex a CS.Item
+external ::  ContentHashable IO a => (a -> ExternalTask) -> Flow eff ex a CS.Item
 external = effect . External
 
 wrap :: eff a b -> Flow eff ex a b
@@ -97,12 +98,12 @@ wrap = effect . Wrapped def
 wrap' :: Properties a b -> eff a b -> Flow eff ex a b
 wrap' p eff = effect $ Wrapped p eff
 
-docker :: ContentHashable a => (a -> Docker.Config) -> Flow eff ex a CS.Item
+docker ::  ContentHashable IO a => (a -> Docker.Config) -> Flow eff ex a CS.Item
 docker f = external $ Docker.toExternal . f
 
-putInStore :: ContentHashable a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
+putInStore ::  ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
 putInStore = effect . PutInStore
-getFromStore :: ContentHashable a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
+getFromStore ::  ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
 getFromStore = effect . GetFromStore
 
 lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
