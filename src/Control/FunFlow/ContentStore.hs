@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -9,6 +10,7 @@
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 
 -- | Hash addressed store in file system.
 --
@@ -87,6 +89,8 @@ module Control.FunFlow.ContentStore
   -- * Types
   , ContentStore
   , Item
+  , Content (..)
+  , (^</>)
   , Alias (..)
   , Status (..)
   , Status_
@@ -102,6 +106,7 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception                (Exception, bracket_, catch,
                                                    throwIO)
+import           Control.FunFlow.Orphans          ()
 import           Control.Lens
 import           Control.Monad                    (forever, void, (<=<), (>=>))
 import           Control.Monad.Catch              (MonadMask, bracket)
@@ -203,6 +208,38 @@ instance Monad m => ContentHashable m Item where
     $ ctx
 
 instance Data.Store.Store Item
+
+-- | File or directory within a content store 'Item'.
+data Content t where
+  All :: Item -> Content Dir
+  (:</>) :: Item -> Path Rel t -> Content t
+infixr 5 :</>
+deriving instance Eq (Content t)
+deriving instance Show (Content t)
+instance Monad m => ContentHashable m (Content Dir) where
+  contentHashUpdate ctx x = case x of
+    All i ->
+      flip contentHashUpdate_fingerprint x
+      >=> flip contentHashUpdate i
+      $ ctx
+    i :</> p ->
+      flip contentHashUpdate_fingerprint x
+      >=> flip contentHashUpdate i
+      >=> flip contentHashUpdate p
+      $ ctx
+instance Monad m => ContentHashable m (Content File) where
+  contentHashUpdate ctx x = case x of
+    i :</> p ->
+      flip contentHashUpdate_fingerprint x
+      >=> flip contentHashUpdate i
+      >=> flip contentHashUpdate p
+      $ ctx
+
+-- | Append to the path within a store item.
+(^</>) :: Content Dir -> Path Rel t -> Content t
+All item ^</> path = item :</> path
+(item :</> dir) ^</> path = item :</> dir </> path
+infixl 4 ^</>
 
 newtype Alias = Alias { unAlias :: T.Text }
   deriving (ContentHashable IO, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
