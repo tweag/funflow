@@ -37,10 +37,13 @@ runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
           -> Config c
           -> CS.ContentStore
           -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
+          -> Int -- ^ Flow configuration identity. This forms part of the caching
+                 --   system and is used to disambiguate the same flow run in
+                 --   multiple configurations.
           -> Flow eff ex a b
           -> a
           -> IO b
-runFlowEx _ cfg store runWrapped flow input = do
+runFlowEx _ cfg store runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
@@ -50,7 +53,7 @@ runFlowEx _ cfg store runWrapped flow input = do
                    -> AsyncA IO i o -> AsyncA IO i o
     withStoreCache NoCache f = f
     withStoreCache c f = let
-        chashOf i = cacherKey c i (cacherUniqueIdent c)
+        chashOf i = cacherKey c confIdent i
         checkStore = AsyncA $ \chash -> do
           instruction <- CS.constructOrWait store chash
           case instruction of
@@ -128,11 +131,14 @@ runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
         -> Config c
         -> CS.ContentStore
         -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
+        -> Int -- ^ Flow configuration identity. This forms part of the caching
+               --   system and is used to disambiguate the same flow run in
+               --   multiple configurations.
         -> Flow eff ex a b
         -> a
         -> IO (Either ex b)
-runFlow c cfg store runWrapped flow input =
-  try $ runFlowEx c cfg store runWrapped flow input
+runFlow c cfg store runWrapped confIdent flow input =
+  try $ runFlowEx c cfg store runWrapped confIdent flow input
 
 runSimpleFlow :: forall c a b. (Coordinator c)
         => c
@@ -142,7 +148,7 @@ runSimpleFlow :: forall c a b. (Coordinator c)
         -> a
         -> IO (Either SomeException b)
 runSimpleFlow c ccfg store flow input =
-  runFlow c ccfg store runNoEffect flow input
+  runFlow c ccfg store runNoEffect 12345 flow input
 
 -- | Create a full pipeline runner locally. This includes an executor for
 --   executing external tasks.

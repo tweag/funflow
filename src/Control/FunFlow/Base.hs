@@ -31,13 +31,12 @@ import           Prelude                         hiding (id, (.))
 data Cacher i o =
     NoCache -- ^ This step cannot be cached (default).
   | Cache
-    { -- | A unique identifier included in the cache key to ensure
-      --   that the same input does not give the same cache key for
-      --   different steps.
-      cacherUniqueIdent :: Int
-      -- | Function to encode the input and the identity into a content
+    { -- | Function to encode the input into a content
       --   hash.
-    , cacherKey         :: i -> Int -> ContentHash
+      --   This function additionally takes an
+      --   'identities' which gets incorporated into
+      --   the cacher.
+      cacherKey         :: Int -> i -> ContentHash
     , cacherStoreValue  :: o -> ByteString
       -- | Attempt to read the cache value back. May throw exceptions.
     , cacherReadValue   :: ByteString -> o
@@ -47,8 +46,7 @@ defaultCacherWithIdent :: (Store.Store o, ContentHashable Identity i)
                        => Int -- ^ Seed for the cacher
                        -> Cacher i o
 defaultCacherWithIdent ident = Cache
-  { cacherUniqueIdent = ident
-  , cacherKey = \i ident' -> runIdentity $ contentHash (ident', i)
+  { cacherKey = \i ident' -> runIdentity $ contentHash (ident', ident, i)
   , cacherStoreValue = Store.encode
   , cacherReadValue = Store.decodeEx
   }
