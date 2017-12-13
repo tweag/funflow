@@ -92,7 +92,14 @@ import           System.IO.Unsafe                 (unsafePerformIO)
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic)
+
+instance Show ContentHash where
+  showsPrec d h = showParen (d > app_prec)
+    $ showString "ContentHash \""
+    . (showString $ C8.unpack $ encodeHash h)
+    . showString "\""
+    where app_prec = 10
 
 instance Store ContentHash where
   size = contramap toBytes size
