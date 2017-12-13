@@ -20,6 +20,7 @@ import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Monad.Catch             (throwM)
 import           Data.Store
 import           Data.Typeable                   (Typeable)
+import qualified Data.Yaml                       as Yaml
 import           GHC.Conc                        (threadDelay)
 import           Path
 import           Path.IO
@@ -121,3 +122,18 @@ writeString = putInStoreAt $ writeFile . fromAbsFile
 -- | Create and write into a file named @out@ within the given item.
 writeString_ :: Flow eff ex String (CS.Content File)
 writeString_ = Control.FunFlow.Steps.writeString <<< arr (, [relfile|out|])
+
+-- | Read a YAML file from the given file in the store.
+readYaml :: Yaml.FromJSON a
+  => SimpleFlow (CS.Content File) (Either Yaml.ParseException a)
+readYaml = getFromStore (Yaml.decodeFileEither . fromAbsFile)
+
+-- | Write a YAML file under the given name to the store.
+writeYaml :: (ContentHashable IO a, Yaml.ToJSON a)
+  => SimpleFlow (a, Path Rel File) (CS.Content File)
+writeYaml = putInStoreAt $ Yaml.encodeFile . fromAbsFile
+
+-- | Write a YAML file named @out.yaml@ to the store.
+writeYaml_ :: (ContentHashable IO a, Yaml.ToJSON a)
+  => SimpleFlow a (CS.Content File)
+writeYaml_ = writeYaml <<< arr (, [relfile|out.yaml|])
