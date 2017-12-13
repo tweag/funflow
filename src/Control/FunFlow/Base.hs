@@ -106,7 +106,7 @@ stepIO' props = effect . StepIO props
 named :: T.Text -> (a -> b) -> Flow eff ex a b
 named n = step' (def { name = Just n})
 
-external ::  ContentHashable IO a => (a -> ExternalTask) -> Flow eff ex a CS.Item
+external :: ContentHashable IO a => (a -> ExternalTask) -> Flow eff ex a CS.Item
 external = effect . External
 
 wrap :: eff a b -> Flow eff ex a b
@@ -115,12 +115,12 @@ wrap = effect . Wrapped def
 wrap' :: Properties a b -> eff a b -> Flow eff ex a b
 wrap' p eff = effect $ Wrapped p eff
 
-docker ::  ContentHashable IO a => (a -> Docker.Config) -> Flow eff ex a CS.Item
+docker :: ContentHashable IO a => (a -> Docker.Config) -> Flow eff ex a CS.Item
 docker f = external $ Docker.toExternal . f
 
-putInStore ::  ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
+putInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
 putInStore = effect . PutInStore
-getFromStore ::  ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
+getFromStore :: ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
 getFromStore = effect . GetFromStore
 
 lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)

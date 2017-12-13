@@ -335,25 +335,25 @@ instance (GContentHashable m a, GContentHashable m b) => GContentHashable m (a :
 --   gContentHashUpdate ctx x = _ (unComp1 x)
 
 
-instance ContentHashable IO (Path.Path Path.Abs Path.File) where
+instance Monad m => ContentHashable m (Path.Path Path.Abs Path.File) where
   contentHashUpdate ctx fp =
     flip contentHashUpdate_fingerprint fp
     >=> flip contentHashUpdate (Path.fromAbsFile fp)
     $ ctx
 
-instance ContentHashable IO (Path.Path Path.Rel Path.File) where
+instance Monad m => ContentHashable m (Path.Path Path.Rel Path.File) where
   contentHashUpdate ctx fp =
     flip contentHashUpdate_fingerprint fp
     >=> flip contentHashUpdate (Path.fromRelFile fp)
     $ ctx
 
-instance ContentHashable IO (Path.Path Path.Abs Path.Dir) where
+instance Monad m => ContentHashable m (Path.Path Path.Abs Path.Dir) where
   contentHashUpdate ctx fp =
     flip contentHashUpdate_fingerprint fp
     >=> flip contentHashUpdate (Path.fromAbsDir fp)
     $ ctx
 
-instance ContentHashable IO (Path.Path Path.Rel Path.Dir) where
+instance Monad m => ContentHashable m (Path.Path Path.Rel Path.Dir) where
   contentHashUpdate ctx fp =
     flip contentHashUpdate_fingerprint fp
     >=> flip contentHashUpdate (Path.fromRelDir fp)
