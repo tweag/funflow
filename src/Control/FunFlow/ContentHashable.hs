@@ -41,6 +41,7 @@ import           Crypto.Hash                      (Context, Digest, SHA256,
                                                    digestFromByteString,
                                                    hashFinalize, hashInit,
                                                    hashUpdate)
+import qualified Data.Aeson                    as Aeson
 import           Data.Bits                        (shiftL)
 import           Data.ByteArray                   (Bytes, MemView (MemView),
                                                    allocAndFreeze, convert)
@@ -53,15 +54,20 @@ import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
 import           Data.Functor.Contravariant
 import           Data.Int
+import qualified Data.HashMap.Lazy             as HashMap
+import qualified Data.HashSet                  as HashSet
 import           Data.List                        (sort)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
+import           Data.Ratio
+import           Data.Scientific
 import           Data.Store                       (Store (..), peekException)
 import qualified Data.Text                        as T
 import qualified Data.Text.Array                  as TA
 import qualified Data.Text.Internal               as T
 import qualified Data.Text.Lazy                   as TL
 import           Data.Typeable
+import qualified Data.Vector                      as V
 import           Data.Word
 import qualified Database.SQLite.Simple.FromField as SQL
 import qualified Database.SQLite.Simple.ToField   as SQL
@@ -232,6 +238,19 @@ instance Monad m => ContentHashable m Word64 where contentHashUpdate = contentHa
 instance Monad m => ContentHashable m Float where contentHashUpdate = contentHashUpdate_primitive
 instance Monad m => ContentHashable m Double where contentHashUpdate = contentHashUpdate_primitive
 
+instance (ContentHashable m n, Typeable n) => ContentHashable m (Ratio n) where
+  contentHashUpdate ctx x =
+    flip contentHashUpdate_fingerprint x
+    >=> flip contentHashUpdate (numerator x)
+    >=> flip contentHashUpdate (denominator x)
+    $ ctx
+
+instance Monad m => ContentHashable m Scientific where
+  contentHashUpdate ctx x =
+    flip contentHashUpdate_fingerprint x
+    >=> flip contentHashUpdate (toRational x)
+    $ ctx
+
 instance Monad m => ContentHashable m Integer where
   contentHashUpdate ctx n = ($ ctx) $
     flip contentHashUpdate_fingerprint n >=> case n of
@@ -281,8 +300,23 @@ instance (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v)
     flip contentHashUpdate_fingerprint m
     >=> flip contentHashUpdate (Map.toList m) $ ctx
 
+instance (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v)
+  => ContentHashable m (HashMap.HashMap k v) where
+  contentHashUpdate ctx m =
+    flip contentHashUpdate_fingerprint m
+    >=> flip contentHashUpdate (HashMap.toList m) $ ctx
+
+instance (Typeable v, ContentHashable m v)
+  => ContentHashable m (HashSet.HashSet v) where
+  contentHashUpdate ctx s =
+    flip contentHashUpdate_fingerprint s
+    >=> flip contentHashUpdate (HashSet.toList s) $ ctx
+
 instance ContentHashable m a => ContentHashable m [a] where
   contentHashUpdate = foldM contentHashUpdate
+
+instance ContentHashable m a => ContentHashable m (V.Vector a) where
+  contentHashUpdate = V.foldM' contentHashUpdate
 
 instance Monad m => ContentHashable m ()
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (a, b)
@@ -295,6 +329,8 @@ instance (Monad m, ContentHashable m a, ContentHashable m b, ContentHashable m c
 instance ContentHashable m a => ContentHashable m (Maybe a)
 
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (Either a b)
+
+instance Monad m => ContentHashable m Aeson.Value
 
 
 class Monad m => GContentHashable m f where
