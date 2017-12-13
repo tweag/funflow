@@ -75,7 +75,7 @@ data Flow' eff a b where
   -- XXX: Constrain allowed user actions.
   PutInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
-  GetFromStore :: ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
+  GetFromStore :: (Path Abs Dir -> IO a) -> Flow' eff CS.Item a
   LookupAliasInStore :: Flow' eff CS.Alias (Maybe CS.Item)
   AssignAliasInStore :: Flow' eff (CS.Alias, CS.Item) ()
   Wrapped :: Properties a b -> eff a b -> Flow' eff a b
@@ -120,7 +120,7 @@ docker f = external $ Docker.toExternal . f
 
 putInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
 putInStore = effect . PutInStore
-getFromStore :: ContentHashable IO a => (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
+getFromStore :: (Path Abs Dir -> IO a) -> Flow eff ex CS.Item a
 getFromStore = effect . GetFromStore
 
 lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
