@@ -70,7 +70,7 @@ externalTest = let
       , _etParams = [textParam t]
       , _etWriteToStdOut = True
       }
-    flow = exFlow >>> readOutFile
+    flow = exFlow >>> readString_
   in withSystemTempDir "test_output_external_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do
       out <- run flow someString
@@ -84,16 +84,16 @@ storeTest = let
     string2 = "Second line\n"
     exFlow = external $ \(a, b) -> ExternalTask
       { _etCommand = "/run/current-system/sw/bin/cat"
-      , _etParams = [pathParam a <> "/out", pathParam b <> "/out"]
+      , _etParams = [contentParam a, contentParam b]
       , _etWriteToStdOut = True
       }
     flow = proc (s1, s2) -> do
-      f1 <- writeOutFile -< s1
-      s1' <- readOutFile -< f1
-      f2 <- writeOutFile -< s2
-      s2' <- readOutFile -< f2
+      f1 <- writeString_ -< s1
+      s1' <- readString -< f1
+      f2 <- writeString_ -< s2
+      s2' <- readString -< f2
       f12 <- exFlow -< (f1, f2)
-      s12 <- readOutFile -< f12
+      s12 <- readString_ -< f12
       returnA -< s12 == s1' <> s2'
   in withSystemTempDir "test_output_store_" $ \storeDir -> do
     withSimpleLocalRunner storeDir $ \run -> do

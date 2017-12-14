@@ -10,6 +10,7 @@ import           Control.Arrow
 import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Cache.TH
+import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External.Coordinator.Memory
@@ -49,17 +50,17 @@ aliasFlow = proc () -> do
   mb1 <- lookupAliasInStore -< alias
   r1 <- case mb1 of
     Nothing -> do
-      item <- writeOutFile -< "test"
+      item :</> _path <- writeString_ -< "test"
       assignAliasInStore -< (alias, item)
       returnA -< Nothing
     Just item ->
-      arr Just <<< readOutFile -< item
+      arr Just <<< readString_ -< item
   mb2 <- lookupAliasInStore -< alias
   r2 <- case mb2 of
     Nothing ->
       returnA -< Nothing
     Just item ->
-      arr Just <<< readOutFile -< item
+      arr Just <<< readString_ -< item
   returnA -< (r1, r2)
 
 flowCached :: SimpleFlow () Bool
