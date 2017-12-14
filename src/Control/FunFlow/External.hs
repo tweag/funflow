@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE TemplateHaskell            #-}
@@ -87,6 +88,12 @@ textParam txt = Param [ParamText txt]
 -- | Reference to a path to a content store item.
 pathParam :: CS.Item -> Param
 pathParam item = Param [ParamPath item]
+
+-- | Reference to a path to a file or directory within a store item.
+contentParam :: CS.Content t -> Param
+contentParam (CS.All item) = pathParam item
+contentParam (item CS.:</> path) =
+  pathParam item <> stringParam (toFilePath path)
 
 -- | Reference to an environment variable.
 envParam :: T.Text -> Param

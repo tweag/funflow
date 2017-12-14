@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
@@ -11,11 +12,15 @@ import           Control.Arrow
 import           Control.Arrow.Free              (catch)
 import           Control.Exception               (Exception)
 import           Control.FunFlow.Base
-import           Control.FunFlow.ContentHashable ( DirectoryContent (..)
+import           Control.FunFlow.ContentHashable ( ContentHashable
+                                                 , DirectoryContent (..)
                                                  , FileContent (..) )
+import           Control.FunFlow.ContentStore    (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Monad.Catch             (throwM)
 import           Data.Store
+import           Data.Typeable                   (Typeable)
+import qualified Data.Yaml                       as Yaml
 import           GHC.Conc                        (threadDelay)
 import           Path
 import           Path.IO
@@ -70,32 +75,65 @@ retry n secs f = catch f $ proc (x, _ :: ex) -> do
   x2 <- retry (n-1) secs f -< x1
   returnA -< x2
 
+putInStoreAt :: (ContentHashable IO a, Typeable t)
+  => (Path Abs t -> a -> IO ()) -> Flow eff ex (a, Path Rel t) (CS.Content t)
+putInStoreAt f = proc (a, p) -> do
+  item <- putInStore (\d (a, p) -> do
+      createDirIfMissing True (parent $ d </> p)
+      f (d </> p) a
+    ) -< (a, p)
+  returnA -< item :</> p
+
 -- | @copyFileToStore (fIn, fOut)@ copies the contents of @fIn@ into the store
 -- under the relative path @fOut@ within the subtree.
-copyFileToStore :: Flow eff ex (FileContent, Path Rel File) CS.Item
-copyFileToStore = putInStore $ \d (FileContent inFP, outFP) -> do
-  createDirIfMissing True (parent $ d </> outFP)
-  copyFile inFP (d </> outFP)
+copyFileToStore :: Flow eff ex (FileContent, Path Rel File) (CS.Content File)
+copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 
 -- | @copyDirToStore (dIn, Nothing)@ copies the contents of @dIn@ into the store
 -- right under the subtree.
 --
 -- | @copyDirToStore (dIn, Just dOut)@ copies the contents of @dIn@ into the store
 -- under relative path @dOut@ within the subtree
-copyDirToStore :: Flow eff ex (DirectoryContent, Maybe (Path Rel Dir)) CS.Item
-copyDirToStore = putInStore $ \d (DirectoryContent inDir, mbOutDir) ->
+copyDirToStore :: Flow eff ex (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
+copyDirToStore = proc (inDir, mbOutDir) -> do
   case mbOutDir of
-    Nothing -> copyDirRecur inDir d
-    Just outDir -> do
-      createDirIfMissing True (parent $ d </> outDir)
-      copyDirRecur inDir (d </> outDir)
+    Nothing -> do
+      item <- putInStore (\d (DirectoryContent inDir) ->
+          copyDirRecur inDir d
+        ) -< inDir
+      returnA -< CS.All item
+    Just outDir ->
+      putInStoreAt (\p (DirectoryContent inDir) ->
+          copyDirRecur inDir p
+        ) -< (inDir, outDir)
 
--- | Read the contents of the file named @out@ within the given subtree.
-readOutFile :: Flow eff ex CS.Item String
-readOutFile = getFromStore $ \d ->
-  readFile (fromAbsFile $ d </> [relfile|out|])
+-- | Read the contents of the given file in the store.
+readString :: Flow eff ex (CS.Content File) String
+readString = getFromStore $ readFile . fromAbsFile
 
--- | Create and write into a file named @out@ within the subtree.
-writeOutFile :: Flow eff ex String CS.Item
-writeOutFile = putInStore $ \d s ->
-  writeFile (fromAbsFile $ d </> [relfile|out|]) s
+-- | Read the contents of a file named @out@ within the given item.
+readString_ :: Flow eff ex CS.Item String
+readString_ = arr (:</> [relfile|out|]) >>> readString
+
+-- | Create and write into a file under the given path in the store.
+writeString :: Flow eff ex (String, Path Rel File) (CS.Content File)
+writeString = putInStoreAt $ writeFile . fromAbsFile
+
+-- | Create and write into a file named @out@ within the given item.
+writeString_ :: Flow eff ex String (CS.Content File)
+writeString_ = Control.FunFlow.Steps.writeString <<< arr (, [relfile|out|])
+
+-- | Read a YAML file from the given file in the store.
+readYaml :: Yaml.FromJSON a
+  => SimpleFlow (CS.Content File) (Either Yaml.ParseException a)
+readYaml = getFromStore (Yaml.decodeFileEither . fromAbsFile)
+
+-- | Write a YAML file under the given name to the store.
+writeYaml :: (ContentHashable IO a, Yaml.ToJSON a)
+  => SimpleFlow (a, Path Rel File) (CS.Content File)
+writeYaml = putInStoreAt $ Yaml.encodeFile . fromAbsFile
+
+-- | Write a YAML file named @out.yaml@ to the store.
+writeYaml_ :: (ContentHashable IO a, Yaml.ToJSON a)
+  => SimpleFlow a (CS.Content File)
+writeYaml_ = writeYaml <<< arr (, [relfile|out.yaml|])
