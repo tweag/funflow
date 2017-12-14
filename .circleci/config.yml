@@ -2,11 +2,14 @@ version: 2
 jobs:
   build:
     docker:
-      - image: fpco/stack
+      - image: fpco/stack-build
     steps:
       - checkout
       - restore_cache:
           key: stack-deps-{{ checksum "stack.yaml" }}
+      - run:
+          name: Setup build toolchain
+          command: stack setup
       - run:
           name: Building dependencies
           command: stack build --only-snapshot --prefetch
@@ -22,4 +25,4 @@ jobs:
           command: stack test --pedantic --no-run-tests
       - run:
           name: Running tests
-          command: stack test
+          command: stack test funflow:unit-tests

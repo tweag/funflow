@@ -5,22 +5,15 @@
 import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.FunFlow.Base
-import           Control.FunFlow.ContentHashable             (ContentHash)
 import qualified Control.FunFlow.ContentStore                as CS
-import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator.Memory
-import           Control.FunFlow.External.Coordinator.Redis
 import           Control.FunFlow.Pretty
 import           Control.FunFlow.Steps
-import           Control.Monad.Catch                         (Exception,
-                                                              SomeException,
+import           Control.Monad.Catch                         (SomeException,
                                                               toException)
 import           Data.Monoid                                 ((<>))
-import qualified Data.Text                                   as T
-import qualified Database.Redis                              as R
-import           Path
 import           Path.IO
 
 mkError :: String -> SomeException
@@ -42,8 +35,6 @@ flow2caught = retry 100 0 flow2
 
 flow3 :: SimpleFlow [Int] [Int]
 flow3 = mapA (arr (+1))
-
-allJobs = [("job1", flow2)]
 
 main :: IO ()
 main =
@@ -101,22 +92,3 @@ storeTest = let
       case out of
         Left err -> print err
         Right b  -> print b
-
-redisTest :: IO ()
-redisTest = let
-    redisConf = R.defaultConnectInfo {
-        R.connectHost = "10.233.2.2"
-      , R.connectPort = R.PortNumber . fromIntegral $ 6379
-      , R.connectAuth = Nothing
-      }
-    someString = "Hello World" :: T.Text
-    flow :: SimpleFlow T.Text CS.Item
-    flow = external $ \t -> ExternalTask {
-        _etCommand = "/run/current-system/sw/bin/echo"
-      , _etParams = [textParam t]
-      , _etWriteToStdOut = True
-      }
-  in withSystemTempDir "test_output" $ \storeDir ->
-    CS.withStore storeDir $ \store -> do
-      out <- runSimpleFlow Redis redisConf store flow someString
-      print out

@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE ViewPatterns               #-}
 
 module Control.FunFlow.Exec.Redis where
 
@@ -118,7 +117,7 @@ runJob _ hook flow input = do
       --       Right y  -> putSym n y
       --       Left err -> do
       --         throwError $ show err
-    runJob' _ (Step (name -> Just n') f) = AsyncA $ \x -> return $ f x
+    runJob' _ (Step _ f) = AsyncA $ \x -> return $ f x
       -- n <- (n' <>) <$> fresh
       -- mv <- lookupSym n
       -- case mv of
@@ -130,3 +129,4 @@ runJob _ hook flow input = do
       KnownTask _ <- awaitTask po chash
       -- XXX: Make Redis executor store aware
       undefined
+    runJob' _ _ = undefined
