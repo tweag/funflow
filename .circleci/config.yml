@@ -1,0 +1,25 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: fpco/stack
+    steps:
+      - checkout
+      - restore_cache:
+          key: stack-deps-{{ checksum "stack.yaml" }}
+      - run:
+          name: Building dependencies
+          command: stack build --only-snapshot --prefetch
+      - save_cache:
+          paths:
+            - "~/.stack"
+          key: stack-deps-{{ checksum "stack.yaml" }}
+      - run:
+          name: Building
+          command: stack build --pedantic
+      - run:
+          name: Building tests
+          command: stack test --pedantic --no-run-tests
+      - run:
+          name: Running tests
+          command: stack test
