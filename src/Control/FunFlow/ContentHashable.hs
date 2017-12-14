@@ -78,6 +78,7 @@ import           GHC.Prim                         (ByteArray#,
 import           GHC.Ptr                          (Ptr (Ptr))
 import           GHC.Types                        (IO (IO), Int (I#), Word (W#))
 import qualified Path
+import qualified Path.Internal
 import qualified Path.IO
 import           System.IO                        (IOMode (ReadMode),
                                                    withBinaryFile)
@@ -335,28 +336,10 @@ instance (GContentHashable m a, GContentHashable m b) => GContentHashable m (a :
 --   gContentHashUpdate ctx x = _ (unComp1 x)
 
 
-instance Monad m => ContentHashable m (Path.Path Path.Abs Path.File) where
-  contentHashUpdate ctx fp =
-    flip contentHashUpdate_fingerprint fp
-    >=> flip contentHashUpdate (Path.fromAbsFile fp)
-    $ ctx
-
-instance Monad m => ContentHashable m (Path.Path Path.Rel Path.File) where
-  contentHashUpdate ctx fp =
-    flip contentHashUpdate_fingerprint fp
-    >=> flip contentHashUpdate (Path.fromRelFile fp)
-    $ ctx
-
-instance Monad m => ContentHashable m (Path.Path Path.Abs Path.Dir) where
-  contentHashUpdate ctx fp =
-    flip contentHashUpdate_fingerprint fp
-    >=> flip contentHashUpdate (Path.fromAbsDir fp)
-    $ ctx
-
-instance Monad m => ContentHashable m (Path.Path Path.Rel Path.Dir) where
-  contentHashUpdate ctx fp =
-    flip contentHashUpdate_fingerprint fp
-    >=> flip contentHashUpdate (Path.fromRelDir fp)
+instance (Monad m, Typeable b, Typeable t) => ContentHashable m (Path.Path b t) where
+  contentHashUpdate ctx p@(Path.Internal.Path fp) =
+    flip contentHashUpdate_fingerprint p
+    >=> flip contentHashUpdate fp
     $ ctx
 
 
