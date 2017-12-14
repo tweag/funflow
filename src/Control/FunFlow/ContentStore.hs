@@ -105,7 +105,7 @@ import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception                   (Exception, bracket_,
-                                                      catch, throwIO)
+                                                      throwIO)
 import           Control.FunFlow.ContentStore.Notify
 import           Control.FunFlow.Orphans             ()
 import           Control.Lens
@@ -626,7 +626,7 @@ internalWatchPending
   -> IO (Async Update)
 internalWatchPending store hash = do
   let build = mkPendingPath store hash
-  -- Add an inotify watch and give a signal on relevant events.
+  -- Add an inotify/kqueue watch and give a signal on relevant events.
   let notifier = storeNotifier store
   signal <- newEmptyMVar
   -- Signal the listener. If the 'MVar' is full,
@@ -634,22 +634,12 @@ internalWatchPending store hash = do
   let giveSignal = void $ tryPutMVar signal ()
   watch <- addDirWatch notifier (fromAbsDir build) giveSignal
   -- Additionally, poll on regular intervals.
-  -- Inotify doesn't cover all cases, e.g. network filesystems.
+  -- Inotify/Kqueue don't cover all cases, e.g. network filesystems.
   let tenMinutes = 10 * 60 * 1000000
   ticker <- async $ forever $ threadDelay tenMinutes >> giveSignal
   let stopWatching = do
         cancel ticker
-        -- When calling `addWatch` on a path that is already being watched,
-        -- inotify will not create a new watch, but amend the existing watch
-        -- and return the same watch descriptor.
-        -- Therefore, the watch might already have been removed at this point,
-        -- which will cause an 'IOError'.
-        -- Fortunately, all event handlers to a file are called at once.
-        -- So, that removing the watch here will not cause another handler
-        -- to miss out on the event.
-        -- Note, that this may change when adding different event handlers,
-        -- that remove the watch under different conditions.
-        removeDirWatch watch `catch` \(_::IOError) -> return ()
+        removeDirWatch watch
   -- Listen to the signal asynchronously,
   -- and query the status when it fires.
   -- If the status changed, fill in the update.
