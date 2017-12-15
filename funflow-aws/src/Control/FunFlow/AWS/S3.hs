@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeOperators         #-}
 module Control.FunFlow.AWS.S3 where
 
 import qualified Aws
@@ -13,6 +14,7 @@ import           Control.Lens
 import           Control.Monad                   ((>=>))
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
+import           Data.Constraint
 import           Data.Reflection
 import qualified Data.Text                       as T
 import           GHC.Generics                    (Generic)
@@ -35,6 +37,15 @@ makeLenses ''ObjectInBucket
 
 instance FromJSON (ObjectInBucket S3.Object)
 instance ToJSON (ObjectInBucket S3.Object)
+
+class ObjectReference a where
+  objectReference :: a -> S3.Object
+
+instance ObjectReference S3.Object where
+  objectReference = id
+
+instance ObjectReference S3.ObjectInfo where
+  objectReference = S3.objectKey
 
 -- | An S3 object is hashable whenever we have sufficient configuration to
 --   access said object. To deal with this, we use reflection to reify a value
@@ -68,6 +79,12 @@ instance (Given Aws.Configuration)
         >=> flip contentHashUpdate (a ^. oibObject)
         >=> flip contentHashUpdate (S3.omETag md)
           $ ctx
+
+-- | Reified instance of the implication to allow us to use this as a
+--   constraint.
+instance (Given Aws.Configuration)
+         :=> ContentHashable IO (ObjectInBucket S3.Object) where
+  ins = Sub Dict
 
 -- | When we already have `ObjectInfo` (because we have, for example, queried
 --   the bucket), we can calculate the 'ContentHash' directly without recourse
