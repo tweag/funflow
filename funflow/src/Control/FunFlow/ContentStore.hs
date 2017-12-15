@@ -83,6 +83,7 @@ module Control.FunFlow.ContentStore
   , removeAlias
 
   -- * Accessors
+  , itemHash
   , itemPath
   , root
 
