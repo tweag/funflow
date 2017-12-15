@@ -45,7 +45,7 @@ import qualified Data.Aeson                    as Aeson
 import           Data.Bits                        (shiftL)
 import           Data.ByteArray                   (Bytes, MemView (MemView),
                                                    allocAndFreeze, convert)
-import           Data.ByteArray.Encoding          (Base (Base64URLUnpadded),
+import           Data.ByteArray.Encoding          (Base (Base16),
                                                    convertFromBase,
                                                    convertToBase)
 import qualified Data.ByteString                  as BS
@@ -92,7 +92,14 @@ import           System.IO.Unsafe                 (unsafePerformIO)
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
-  deriving (Eq, Ord, Generic, Show)
+  deriving (Eq, Ord, Generic)
+
+instance Show ContentHash where
+  showsPrec d h = showParen (d > app_prec)
+    $ showString "ContentHash \""
+    . (showString $ C8.unpack $ encodeHash h)
+    . showString "\""
+    where app_prec = 10
 
 instance Store ContentHash where
   size = contramap toBytes size
@@ -117,15 +124,18 @@ toBytes = convert . unContentHash
 fromBytes :: BS.ByteString -> Maybe ContentHash
 fromBytes bs = ContentHash <$> digestFromByteString bs
 
+hashEncoding :: Base
+hashEncoding = Base16
+
 -- | File path appropriate encoding of a hash
 encodeHash :: ContentHash -> BS.ByteString
-encodeHash = convertToBase Base64URLUnpadded . toBytes
+encodeHash = convertToBase hashEncoding . toBytes
 
 -- | Inverse of 'encodeHash' if given a valid input.
 --
 -- prop> decodeHash (encodeHash x) = Just x
 decodeHash :: BS.ByteString -> Maybe ContentHash
-decodeHash bs = case convertFromBase Base64URLUnpadded bs of
+decodeHash bs = case convertFromBase hashEncoding bs of
   Left _  -> Nothing
   Right x -> fromBytes x
 

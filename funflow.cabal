@@ -48,6 +48,8 @@ Library
                    , Control.FunFlow.Exec.Simple
                    , Control.FunFlow.Exec.Redis
                    , Control.FunFlow.Exec.RedisJobs
+   Other-modules:
+                     Control.FunFlow.ContentStore.Notify
    Build-depends:
                  base                    >= 4.6 && <5
                , aeson                   >= 1.2.3.0
@@ -55,7 +57,6 @@ Library
                , clock
                , constraints
                , data-default
-               , hinotify
                , scientific
                , store
                , text
@@ -92,6 +93,15 @@ Library
                , unix
                , vector
                , yaml
+   if os(linux)
+     CPP-options: -DOS_Linux
+     Other-modules: Control.FunFlow.ContentStore.Notify.Linux
+     Build-depends: hinotify
+   else
+     if os(darwin) || os(freebsd)
+       CPP-options: -DOS_BSD
+       Other-modules: Control.FunFlow.ContentStore.Notify.BSD
+       Build-depends: kqueue
 
 Executable ffexecutord
   default-language:  Haskell2010
@@ -110,6 +120,7 @@ Test-suite test-funflow
   default-language:  Haskell2010
 
   main-is: TestFunflow.hs
+  ghc-options:        -Wall -threaded
   build-depends:       base >=4.6 && <5
                      , funflow
                      , filepath
@@ -128,7 +139,7 @@ Test-suite unit-tests
   other-modules:      FunFlow.ContentStore
                       FunFlow.TestFlows
                       Control.Arrow.Async.Tests
-  ghc-options:        -Wall
+  ghc-options:        -Wall -threaded
   build-depends:      base
                     , async
                     , containers

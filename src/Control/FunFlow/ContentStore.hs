@@ -99,49 +99,50 @@ module Control.FunFlow.ContentStore
   ) where
 
 
-import           Prelude                          hiding (lookup)
+import           Prelude                             hiding (lookup)
 
-import           Control.Concurrent               (threadDelay)
+import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception                (Exception, bracket_, catch,
-                                                   throwIO)
-import           Control.FunFlow.Orphans          ()
+import           Control.Exception                   (Exception, bracket_,
+                                                      throwIO)
+import           Control.FunFlow.ContentStore.Notify
+import           Control.FunFlow.Orphans             ()
 import           Control.Lens
-import           Control.Monad                    (forever, void, (<=<), (>=>))
-import           Control.Monad.Catch              (MonadMask, bracket)
-import           Control.Monad.IO.Class           (MonadIO, liftIO)
-import           Crypto.Hash                      (hashUpdate)
-import           Data.Bits                        (complement)
-import qualified Data.ByteString.Char8            as C8
-import           Data.Foldable                    (asum)
-import           Data.List                        (foldl', stripPrefix)
-import           Data.Maybe                       (fromMaybe, listToMaybe)
-import           Data.Monoid                      ((<>))
+import           Control.Monad                       (forever, void, (<=<),
+                                                      (>=>))
+import           Control.Monad.Catch                 (MonadMask, bracket)
+import           Control.Monad.IO.Class              (MonadIO, liftIO)
+import           Crypto.Hash                         (hashUpdate)
+import           Data.Bits                           (complement)
+import qualified Data.ByteString.Char8               as C8
+import           Data.Foldable                       (asum)
+import           Data.List                           (foldl', stripPrefix)
+import           Data.Maybe                          (fromMaybe, listToMaybe)
+import           Data.Monoid                         ((<>))
 import qualified Data.Store
-import           Data.String                      (IsString)
-import qualified Data.Text                        as T
-import           Data.Typeable                    (Typeable)
-import qualified Database.SQLite.Simple           as SQL
-import qualified Database.SQLite.Simple.FromField as SQL
-import qualified Database.SQLite.Simple.ToField   as SQL
-import           GHC.Generics                     (Generic)
-import           GHC.IO.Device                    (SeekMode (AbsoluteSeek))
+import           Data.String                         (IsString)
+import qualified Data.Text                           as T
+import           Data.Typeable                       (Typeable)
+import qualified Database.SQLite.Simple              as SQL
+import qualified Database.SQLite.Simple.FromField    as SQL
+import qualified Database.SQLite.Simple.ToField      as SQL
+import           GHC.Generics                        (Generic)
+import           GHC.IO.Device                       (SeekMode (AbsoluteSeek))
 import           Path
 import           Path.IO
-import           System.Directory                 (removePathForcibly)
-import           System.FilePath                  (dropTrailingPathSeparator)
-import           System.INotify
+import           System.Directory                    (removePathForcibly)
+import           System.FilePath                     (dropTrailingPathSeparator)
 import           System.Posix.Files
 import           System.Posix.IO
 import           System.Posix.Types
 
-import           Control.FunFlow.ContentHashable  (ContentHash,
-                                                   ContentHashable (..),
-                                                   DirectoryContent (..),
-                                                   contentHashUpdate_fingerprint,
-                                                   encodeHash, pathToHash,
-                                                   toBytes)
+import           Control.FunFlow.ContentHashable     (ContentHash,
+                                                      ContentHashable (..),
+                                                      DirectoryContent (..),
+                                                      contentHashUpdate_fingerprint,
+                                                      encodeHash, pathToHash,
+                                                      toBytes)
 
 
 -- | Status of an item in the store.
@@ -179,21 +180,21 @@ instance Exception StoreError
 
 -- | A hash addressed store on the file system.
 data ContentStore = ContentStore
-  { storeRoot    :: Path Abs Dir
+  { storeRoot     :: Path Abs Dir
   -- ^ Root directory of the content store.
   -- The process must be able to create this directory if missing,
   -- change permissions, and create files and directories within.
-  , storeLock    :: MVar ()
+  , storeLock     :: MVar ()
   -- ^ One global lock on store metadata to ensure thread safety.
   -- The lock is taken when item state is changed or queried.
-  , storeLockFd  :: Fd
+  , storeLockFd   :: Fd
   -- ^ One exclusive file lock to ensure multi-processing safety.
   -- Note, that file locks are shared between threads in a process,
   -- so that the file lock needs to be complemented by an `MVar`
   -- for thread-safety.
-  , storeINotify :: INotify
+  , storeNotifier :: Notifier
   -- ^ Used to watch for updates on store items.
-  , storeDb      :: SQL.Connection
+  , storeDb       :: SQL.Connection
   -- ^ Connection to the metadata SQLite database.
   }
 
@@ -272,7 +273,7 @@ open storeRoot = do
     \  )"
   setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
   storeLock <- newMVar ()
-  storeINotify <- initINotify
+  storeNotifier <- initNotifier
   return ContentStore {..}
 
 -- | Free the resources associated with the given store object.
@@ -282,7 +283,7 @@ close :: ContentStore -> IO ()
 close store = do
   takeMVar (storeLock store)
   closeFd (storeLockFd store)
-  killINotify (storeINotify store)
+  killNotifier (storeNotifier store)
   SQL.close (storeDb store)
 
 -- | Open the store under the given root and perform the given action.
@@ -625,35 +626,20 @@ internalWatchPending
   -> IO (Async Update)
 internalWatchPending store hash = do
   let build = mkPendingPath store hash
-  -- Add an inotify watch and give a signal on relevant events.
-  let inotify = storeINotify store
-      mask = [Attrib, MoveSelf, DeleteSelf, OnlyDir]
+  -- Add an inotify/kqueue watch and give a signal on relevant events.
+  let notifier = storeNotifier store
   signal <- newEmptyMVar
   -- Signal the listener. If the 'MVar' is full,
   -- the listener didn't handle earlier signals, yet.
   let giveSignal = void $ tryPutMVar signal ()
-  watch <- addWatch inotify mask (fromAbsDir build) $ \case
-    Attributes True Nothing -> giveSignal
-    MovedSelf True -> giveSignal
-    DeletedSelf -> giveSignal
-    _ -> return ()
+  watch <- addDirWatch notifier (fromAbsDir build) giveSignal
   -- Additionally, poll on regular intervals.
-  -- Inotify doesn't cover all cases, e.g. network filesystems.
+  -- Inotify/Kqueue don't cover all cases, e.g. network filesystems.
   let tenMinutes = 10 * 60 * 1000000
   ticker <- async $ forever $ threadDelay tenMinutes >> giveSignal
   let stopWatching = do
         cancel ticker
-        -- When calling `addWatch` on a path that is already being watched,
-        -- inotify will not create a new watch, but amend the existing watch
-        -- and return the same watch descriptor.
-        -- Therefore, the watch might already have been removed at this point,
-        -- which will cause an 'IOError'.
-        -- Fortunately, all event handlers to a file are called at once.
-        -- So, that removing the watch here will not cause another handler
-        -- to miss out on the event.
-        -- Note, that this may change when adding different event handlers,
-        -- that remove the watch under different conditions.
-        removeWatch watch `catch` \(_::IOError) -> return ()
+        removeDirWatch watch
   -- Listen to the signal asynchronously,
   -- and query the status when it fires.
   -- If the status changed, fill in the update.
