@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 module Control.FunFlow.AWS.S3 where
@@ -8,25 +9,32 @@ import qualified Aws
 import qualified Aws.S3                          as S3
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
-import           Control.Monad.Trans.Resource (runResourceT)
 import           Control.Lens
 import           Control.Monad                   ((>=>))
+import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
 import           Data.Reflection
 import qualified Data.Text                       as T
 import           GHC.Generics                    (Generic)
-import           Network.HTTP.Conduit            (newManager, tlsManagerSettings)
+import           Network.HTTP.Conduit            (newManager,
+                                                  tlsManagerSettings)
 
 -- | Reference to an object in an S3 bucket
-data ObjectInBucket = ObjectInBucket
-  { _oibBucket :: T.Text
-  , _oibObject :: T.Text
+--
+--   Objects can be referenced in a few ways, so this
+--   type is parametrised over the object reference.
+--   Currently, this is expected to be:
+--   - S3.Object (alias for Text)
+--   - S3.ObjectInfo
+data ObjectInBucket obj = ObjectInBucket
+  { _oibBucket :: S3.Bucket
+  , _oibObject :: obj
   } deriving (Show, Generic)
 
 makeLenses ''ObjectInBucket
 
-instance FromJSON ObjectInBucket
-instance ToJSON ObjectInBucket
+instance FromJSON (ObjectInBucket S3.Object)
+instance ToJSON (ObjectInBucket S3.Object)
 
 -- | An S3 object is hashable whenever we have sufficient configuration to
 --   access said object. To deal with this, we use reflection to reify a value
@@ -44,7 +52,7 @@ instance ToJSON ObjectInBucket
 --   uniqueness, but we may be better abolishing this to deduplicate files
 --   stored in multiple places.
 instance (Given Aws.Configuration)
-  => ContentHashable IO ObjectInBucket where
+  => ContentHashable IO (ObjectInBucket S3.Object) where
   contentHashUpdate ctx a = let
       s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
     in do
@@ -60,3 +68,13 @@ instance (Given Aws.Configuration)
         >=> flip contentHashUpdate (a ^. oibObject)
         >=> flip contentHashUpdate (S3.omETag md)
           $ ctx
+
+-- | When we already have `ObjectInfo` (because we have, for example, queried
+--   the bucket), we can calculate the 'ContentHash' directly without recourse
+--   do S3, because we already know the S3 hash.
+instance Monad m => ContentHashable m (ObjectInBucket S3.ObjectInfo) where
+  contentHashUpdate ctx a =
+    flip contentHashUpdate (a ^. oibBucket)
+      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectKey)
+      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectETag)
+        $ ctx
