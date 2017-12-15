@@ -8,13 +8,9 @@ module Control.FunFlow.AWS.Effects where
 import qualified Aws
 import qualified Aws.S3                          as S3
 import           Control.FunFlow.AWS.S3
-import           Control.FunFlow.Base
-import           Control.FunFlow.ContentHashable
-import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Network.HTTP.Conduit            (newManager,
                                                   tlsManagerSettings)
-import           Path
 
 data AWSEffect i o where
   ListBucketContents :: AWSEffect S3.Bucket [ObjectInBucket S3.ObjectInfo]

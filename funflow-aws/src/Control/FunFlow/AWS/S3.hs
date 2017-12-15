@@ -8,7 +8,6 @@ module Control.FunFlow.AWS.S3 where
 
 import qualified Aws
 import qualified Aws.S3                          as S3
-import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import           Control.Lens
 import           Control.Monad                   ((>=>))
@@ -16,7 +15,6 @@ import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
 import           Data.Constraint
 import           Data.Reflection
-import qualified Data.Text                       as T
 import           GHC.Generics                    (Generic)
 import           Network.HTTP.Conduit            (newManager,
                                                   tlsManagerSettings)
