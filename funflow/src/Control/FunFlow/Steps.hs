@@ -1,29 +1,58 @@
-{-# LANGUAGE Arrows              #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
+{-# LANGUAGE Arrows                #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE QuasiQuotes           #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TupleSections         #-}
 
-module Control.FunFlow.Steps where
+module Control.FunFlow.Steps
+  ( -- * Error handling
+    retry
+    -- * Store manipulation
+  , putInStoreAt
+  , copyFileToStore
+  , copyDirToStore
+  , listDirContents
+  , mergeDirs
+  , mergeFiles
+  , readString
+  , readString_
+  , writeString
+  , writeString_
+  , readYaml
+  , writeYaml
+  , writeYaml_
+    -- * Testing and debugging
+  , promptFor
+  , printS
+  , failStep
+  , worstBernoulli
+  , pauseWith
+  , melancholicLazarus
+  )
+where
 
 import           Control.Arrow
-import           Control.Arrow.Free              (catch)
+import           Control.Arrow.Free              (catch, effect)
 import           Control.Exception               (Exception)
 import           Control.FunFlow.Base
-import           Control.FunFlow.ContentHashable ( ContentHashable
-                                                 , DirectoryContent (..)
-                                                 , FileContent (..) )
+import           Control.FunFlow.ContentHashable (ContentHashable,
+                                                  DirectoryContent (..),
+                                                  FileContent (..))
 import           Control.FunFlow.ContentStore    (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Monad.Catch             (throwM)
+import           Data.Foldable                   (for_)
 import           Data.Store
+import           Data.Traversable                (for)
 import           Data.Typeable                   (Typeable)
 import qualified Data.Yaml                       as Yaml
 import           GHC.Conc                        (threadDelay)
 import           Path
 import           Path.IO
+import           System.Posix.Files              (createLink)
 import           System.Random
 
 promptFor :: Read a => Flow eff ex String a
@@ -65,6 +94,9 @@ melancholicLazarus = stepIO $ \s -> do
     else do writeFile (fromAbsFile fnm) s
             fail "lazarus fail"
 
+internalManipulateStore :: (CS.ContentStore -> a -> IO b) -> Flow eff ex a b
+internalManipulateStore = effect . InternalManipulateStore
+
 -- | `retry n s f` reruns `f` on failure at most n times with a delay of `s`
 --   seconds between retries
 retry :: forall eff ex a b. (Exception ex, Store a)
@@ -95,7 +127,7 @@ copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 -- | @copyDirToStore (dIn, Just dOut)@ copies the contents of @dIn@ into the store
 -- under relative path @dOut@ within the subtree
 copyDirToStore :: Flow eff ex (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
-copyDirToStore = proc (inDir, mbOutDir) -> do
+copyDirToStore = proc (inDir, mbOutDir) ->
   case mbOutDir of
     Nothing -> do
       item <- putInStore (\d (DirectoryContent inDir) ->
@@ -106,6 +138,50 @@ copyDirToStore = proc (inDir, mbOutDir) -> do
       putInStoreAt (\p (DirectoryContent inDir) ->
           copyDirRecur inDir p
         ) -< (inDir, outDir)
+
+-- | List the contents of a directory within the store
+listDirContents :: Flow eff ex (CS.Content Dir)
+                               ([CS.Content Dir], [CS.Content File])
+listDirContents = internalManipulateStore
+  ( \store dir -> let
+        item = CS.contentItem dir
+        itemRoot = CS.itemPath store item
+      in do
+        (dirs, files) <- listDir $ CS.contentPath store dir
+        relDirs <- for dirs (stripProperPrefix itemRoot)
+        relFiles <- for files (stripProperPrefix itemRoot)
+        return ( (item :</>) <$> relDirs
+               , (item :</>) <$> relFiles
+               )
+  )
+
+-- | Merge a number of store directories together into a single output directory.
+--   This uses hardlinks to avoid duplicating the data on disk.
+mergeDirs :: Flow eff ex [CS.Content Dir] (CS.Content Dir)
+mergeDirs = proc inDirs -> do
+  paths <- internalManipulateStore
+    ( \store items -> return $ CS.contentPath store <$> items) -< inDirs
+  arr CS.All <<< putInStore
+    ( \d inDirs -> for_ inDirs $ \inDir -> do
+      (subDirs, files) <- listDirRecur inDir
+      for_ subDirs $ \absSubDir -> do
+        relSubDir <- stripProperPrefix inDir absSubDir
+        createDirIfMissing True (d </> relSubDir)
+      for_ files $ \absFile -> do
+        relFile <- stripProperPrefix inDir absFile
+        createLink (toFilePath absFile) (toFilePath $ d </> relFile)
+    ) -< paths
+
+-- | Merge a number of files into a single output directory.
+mergeFiles :: Flow eff ex [CS.Content File] (CS.Content Dir)
+mergeFiles = proc inFiles -> do
+  absFiles <- internalManipulateStore
+    ( \store items -> return $ CS.contentPath store <$> items) -< inFiles
+  arr CS.All <<< putInStore
+    (\d inFiles -> for_ inFiles $ \inFile ->
+      createLink (toFilePath inFile) (toFilePath $ d </> filename inFile)
+    ) -< absFiles
+
 
 -- | Read the contents of the given file in the store.
 readString :: Flow eff ex (CS.Content File) String

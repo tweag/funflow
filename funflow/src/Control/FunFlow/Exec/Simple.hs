@@ -120,6 +120,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     runFlow' _ (GetFromStore f) = AsyncA $ \case
       CS.All item -> f $ CS.itemPath store item
       item CS.:</> path -> f $ CS.itemPath store item </> path
+    runFlow' _ (InternalManipulateStore f) = AsyncA $ \i -> f store i
     runFlow' _ LookupAliasInStore = AsyncA $ \alias ->
       CS.lookupAlias store alias
     runFlow' _ AssignAliasInStore = AsyncA $ \(alias, item) ->

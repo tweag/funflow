@@ -17,6 +17,7 @@ import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.Steps
 import           Control.Monad                               (when)
 import           Data.Default                                (def)
+import           Data.List                                   (sort)
 import           Path
 import           Path.IO
 import           System.Random
@@ -71,6 +72,16 @@ flowCached = let
     t2 <- randomStep -< ()
     returnA -< (t1 == t2)
 
+-- | Test that we can merge directories within the content store.
+flowMerge :: SimpleFlow () Bool
+flowMerge = proc () -> do
+  f1 <- writeString -< ("Hello World",[relfile|a|] )
+  f2 <- writeString -< ("Goodbye World", [relfile|b|])
+  comb <- mergeFiles -< [f1, f2]
+  files <- arr (fmap CS.contentFilename) <<< arr snd <<< listDirContents -< comb
+  returnA -< (sort files == sort [[relfile|a|], [relfile|b|]])
+
+
 flowAssertions :: [FlowAssertion]
 flowAssertions =
   [ FlowAssertion "death" "foo" melancholicLazarus Nothing setup
@@ -80,6 +91,7 @@ flowAssertions =
   , FlowAssertion "failStep" () failStep Nothing (return ())
   , FlowAssertion "aliasFlow" () aliasFlow (Just (Nothing, Just "test")) (return ())
   , FlowAssertion "cachingFlow" () flowCached (Just True) (return ())
+  , FlowAssertion "mergingStoreItems" () flowMerge (Just True) (return ())
   ]
 
 setup :: IO ()

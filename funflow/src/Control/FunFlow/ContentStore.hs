@@ -85,6 +85,9 @@ module Control.FunFlow.ContentStore
   -- * Accessors
   , itemHash
   , itemPath
+  , contentPath
+  , contentItem
+  , contentFilename
   , root
 
   -- * Types
@@ -253,6 +256,19 @@ root = storeRoot
 -- | The store path of a completed item.
 itemPath :: ContentStore -> Item -> Path Abs Dir
 itemPath store = mkItemPath store . itemHash
+
+-- | Store item containing the given content.
+contentItem :: Content t -> Item
+contentItem (All i) = i
+contentItem (i :</> _) = i
+
+contentFilename :: Content File -> Path Rel File
+contentFilename (_ :</> relPath) = filename relPath
+
+-- | The absolute path to content within the store.
+contentPath :: ContentStore -> Content t -> Path Abs t
+contentPath store (All item) = itemPath store item
+contentPath store (item :</> dir) = itemPath store item </> dir
 
 -- | @open root@ opens a store under the given root directory.
 --
