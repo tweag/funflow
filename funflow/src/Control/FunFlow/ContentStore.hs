@@ -83,6 +83,7 @@ module Control.FunFlow.ContentStore
   , removeAlias
 
   -- * Accessors
+  , itemHash
   , itemPath
   , root
 
@@ -431,7 +432,7 @@ markComplete store inHash = withStoreLock store $
       let out = mkItemPath store outHash
           link' = mkCompletePath store inHash
       doesDirExist out >>= \case
-        True -> removeDir build
+        True -> removePathForcibly (fromAbsDir build)
         False -> renameDir build out
       rel <- makeRelative (parent link') out
       let from' = dropTrailingPathSeparator $ fromAbsDir link'
