@@ -74,6 +74,10 @@ data Flow' eff a b where
   PutInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
   GetFromStore :: (Path Abs t -> IO a) -> Flow' eff (CS.Content t) a
+  -- Internally manipulate the store. This should not be used by
+  -- client libraries.
+  InternalManipulateStore :: (CS.ContentStore -> a -> IO b)
+                          -> Flow' eff a b
   LookupAliasInStore :: Flow' eff CS.Alias (Maybe CS.Item)
   AssignAliasInStore :: Flow' eff (CS.Alias, CS.Item) ()
   Wrapped :: Properties a b -> eff a b -> Flow' eff a b
@@ -125,7 +129,6 @@ lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
 lookupAliasInStore = effect LookupAliasInStore
 assignAliasInStore :: Flow eff ex (CS.Alias, CS.Item) ()
 assignAliasInStore = effect AssignAliasInStore
-
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow eff ex a b -> Diagram ex a b
