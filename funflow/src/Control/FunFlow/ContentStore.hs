@@ -114,7 +114,6 @@ import           Control.Monad                       (forever, void, (<=<),
 import           Control.Monad.Catch                 (MonadMask, bracket)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
-import           Data.Bits                           (complement)
 import qualified Data.ByteString.Char8               as C8
 import           Data.Foldable                       (asum)
 import           Data.List                           (foldl', stripPrefix)
@@ -677,7 +676,7 @@ setDirWritable fp = setFileMode (fromAbsDir fp) writableDirMode
 
 writableDirMode :: FileMode
 writableDirMode = foldl' unionFileModes nullFileMode
-  [ directoryMode, ownerModes
+  [ ownerModes
   , groupReadMode, groupExecuteMode
   , otherReadMode, otherExecuteMode
   ]
@@ -689,8 +688,11 @@ unsetWritable fp = do
   setFileMode (toFilePath fp) $ mode `intersectFileModes` allButWritableMode
 
 allButWritableMode :: FileMode
-allButWritableMode = complement $ foldl' unionFileModes nullFileMode
-  [ownerWriteMode, groupWriteMode, otherWriteMode]
+allButWritableMode = foldl' unionFileModes nullFileMode
+  [ ownerReadMode, ownerExecuteMode
+  , groupReadMode, groupExecuteMode
+  , otherReadMode, otherExecuteMode
+  ]
 
 -- | Unset write permissions on all items in a directory tree recursively.
 unsetWritableRecursively :: Path Abs Dir -> IO ()

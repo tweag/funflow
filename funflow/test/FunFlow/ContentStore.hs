@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase       #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes      #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 
 module FunFlow.ContentStore
@@ -15,8 +16,11 @@ import qualified Control.FunFlow.ContentStore    as ContentStore
 import           Control.Monad                   (void)
 import           Data.Maybe                      (catMaybes)
 import qualified Data.Set                        as Set
+import           Numeric
 import           Path
 import           Path.IO
+import           System.Posix.Files
+import           System.Posix.User
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -41,6 +45,15 @@ tests = testGroup "Content Store"
   , testCase "store is not writable" $
     withEmptyStore $ \store -> do
       let root = ContentStore.root store
+      do
+        perms <- getPermissions @IO root
+        putStrLn ""
+        putStrLn $ "getPermissions: " ++ show perms
+        fm <- fileMode <$> getFileStatus (fromAbsDir root)
+        putStrLn $ "fileMode/getFileStatus: " ++ showOct fm ""
+        ruid <- getRealUserID
+        euid <- getEffectiveUserID
+        putStrLn $ "real UID: " ++ show ruid ++ "  eff UID: " ++ show euid
       not . writable <$> getPermissions @IO root
         @? "store not writable"
       writeFile (fromAbsFile $ root </> [relfile|test|]) "Hello world"
@@ -82,6 +95,16 @@ tests = testGroup "Content Store"
       complete' @?= ContentStore.Complete item
       doesDirExist @IO itemDir
         @? "complete subtree exists"
+
+      do
+        perms <- getPermissions @IO itemDir
+        putStrLn ""
+        putStrLn $ "getPermissions: " ++ show perms
+        fm <- fileMode <$> getFileStatus (fromAbsDir itemDir)
+        putStrLn $ "fileMode/getFileStatus: " ++ showOct fm ""
+        ruid <- getRealUserID
+        euid <- getEffectiveUserID
+        putStrLn $ "real UID: " ++ show ruid ++ "  eff UID: " ++ show euid
       not . writable <$> getPermissions @IO itemDir
         @? "complete subtree is not writable"
       not . writable <$> getPermissions @IO file'
@@ -221,6 +244,15 @@ tests = testGroup "Content Store"
           assertFailure "complete still under construction"
         ContentStore.Complete item -> do
           let subtree = ContentStore.itemPath store item
+          do
+            perms <- getPermissions @IO (subtree </> file)
+            putStrLn ""
+            putStrLn $ "getPermissions: " ++ show perms
+            fm <- fileMode <$> getFileStatus (fromAbsFile $ subtree </> file)
+            putStrLn $ "fileMode/getFileStatus: " ++ showOct fm ""
+            ruid <- getRealUserID
+            euid <- getEffectiveUserID
+            putStrLn $ "real UID: " ++ show ruid ++ "  eff UID: " ++ show euid
           not . writable <$> getPermissions @IO (subtree </> file)
             @? "complete still writable"
           content <- readFile (fromAbsFile $ subtree </> file)
