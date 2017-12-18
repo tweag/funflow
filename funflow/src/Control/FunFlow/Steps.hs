@@ -174,10 +174,14 @@ mergeDirs = proc inDirs -> do
 
 -- | Merge a number of files into a single output directory.
 mergeFiles :: Flow eff ex [CS.Content File] (CS.Content Dir)
-mergeFiles = mergeDirs <<< arr (fmap containingDir)
-  where
-    containingDir :: CS.Content File -> CS.Content Dir
-    containingDir (item :</> dir) = item :</> parent dir
+mergeFiles = proc inFiles -> do
+  absFiles <- internalManipulateStore
+    ( \store items -> return $ CS.contentPath store <$> items) -< inFiles
+  arr CS.All <<< putInStore
+    (\d inFiles -> for_ inFiles $ \inFile ->
+      createLink (toFilePath inFile) (toFilePath $ d </> filename inFile)
+    ) -< absFiles
+
 
 -- | Read the contents of the given file in the store.
 readString :: Flow eff ex (CS.Content File) String
