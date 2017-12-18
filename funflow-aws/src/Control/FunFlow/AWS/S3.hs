@@ -93,3 +93,9 @@ instance Monad m => ContentHashable m (ObjectInBucket S3.ObjectInfo) where
       >=> flip contentHashUpdate (a ^. oibObject . to S3.objectKey)
       >=> flip contentHashUpdate (a ^. oibObject . to S3.objectETag)
         $ ctx
+
+-- | Reified instance of the implication to allow us to use this as a
+--   constraint.
+instance (Given Aws.Configuration)
+         :=> ContentHashable IO (ObjectInBucket S3.ObjectInfo) where
+  ins = Sub Dict
