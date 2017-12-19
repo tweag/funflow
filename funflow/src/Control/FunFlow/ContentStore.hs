@@ -81,6 +81,7 @@ module Control.FunFlow.ContentStore
   , assignAlias
   , lookupAlias
   , removeAlias
+  , listAliases
 
   -- * Accessors
   , itemHash
@@ -105,6 +106,7 @@ module Control.FunFlow.ContentStore
 
 import           Prelude                             hiding (lookup)
 
+import           Control.Arrow                       (second)
 import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
@@ -540,6 +542,13 @@ removeAlias store alias =
       \ WHERE\
       \  hash = :hash"
       [ ":hash" SQL.:= hash ]
+
+-- | List all aliases and the respective items.
+listAliases :: ContentStore -> IO [(Alias, Item)]
+listAliases store = withStoreLock store $
+  fmap (map (second Item)) $
+    SQL.query_ (storeDb store)
+      "SELECT name, dest FROM aliases"
 
 ----------------------------------------------------------------------
 -- Internals
