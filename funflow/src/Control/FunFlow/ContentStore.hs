@@ -120,6 +120,7 @@ import           Control.Monad                       (forever, void, (<=<),
 import           Control.Monad.Catch                 (MonadMask, bracket)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
+import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
 import qualified Data.ByteString.Char8               as C8
 import           Data.Foldable                       (asum)
@@ -208,6 +209,8 @@ instance Monad m => ContentHashable m Item where
     >=> pure . flip hashUpdate (toBytes $ itemHash item)
     $ ctx
 
+instance FromJSON Item
+instance ToJSON Item
 instance Data.Store.Store Item
 
 -- | File or directory within a content store 'Item'.
@@ -255,7 +258,7 @@ itemPath store = mkItemPath store . itemHash
 
 -- | Store item containing the given content.
 contentItem :: Content t -> Item
-contentItem (All i) = i
+contentItem (All i)    = i
 contentItem (i :</> _) = i
 
 contentFilename :: Content File -> Path Rel File
@@ -263,7 +266,7 @@ contentFilename (_ :</> relPath) = filename relPath
 
 -- | The absolute path to content within the store.
 contentPath :: ContentStore -> Content t -> Path Abs t
-contentPath store (All item) = itemPath store item
+contentPath store (All item)      = itemPath store item
 contentPath store (item :</> dir) = itemPath store item </> dir
 
 -- | @open root@ opens a store under the given root directory.

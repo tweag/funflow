@@ -10,7 +10,9 @@
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-module Control.FunFlow.External.Coordinator.Redis where
+module Control.FunFlow.External.Coordinator.Redis
+  ( Redis (..)
+  ) where
 
 import qualified Control.FunFlow.ContentHashable      as CHash
 import           Control.FunFlow.External
