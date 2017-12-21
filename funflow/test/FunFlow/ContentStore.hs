@@ -17,6 +17,7 @@ import           Data.Maybe                      (catMaybes)
 import qualified Data.Set                        as Set
 import           Path
 import           Path.IO
+import           System.Posix.Files
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -41,10 +42,8 @@ tests = testGroup "Content Store"
   , testCase "store is not writable" $
     withEmptyStore $ \store -> do
       let root = ContentStore.root store
-      not . writable <$> getPermissions @IO root
+      isNotWritable root
         @? "store not writable"
-      writeFile (fromAbsFile $ root </> [relfile|test|]) "Hello world"
-        `shouldFail` "can't create file in store"
 
   , testCase "subtree stages" $
     withEmptyStore $ \store -> do
@@ -65,7 +64,7 @@ tests = testGroup "Content Store"
       pending' @?= ContentStore.Pending ()
       doesDirExist @IO subtree
         @? "pending subtree exists"
-      writable <$> getPermissions @IO subtree
+      isWritable subtree
         @? "pending subtree is writable"
       createDir dir
       writeFile (fromAbsFile file) expectedContent
@@ -82,14 +81,10 @@ tests = testGroup "Content Store"
       complete' @?= ContentStore.Complete item
       doesDirExist @IO itemDir
         @? "complete subtree exists"
-      not . writable <$> getPermissions @IO itemDir
+      isNotWritable itemDir
         @? "complete subtree is not writable"
-      not . writable <$> getPermissions @IO file'
+      isNotWritable file'
         @? "complete file is not writable"
-      createDir (itemDir </> [reldir|another|])
-        `shouldFail` "can't create folder in complete subtree"
-      writeFile (fromAbsFile file') "Another message"
-        `shouldFail` "can't write to complete file"
       do
         content <- readFile (fromAbsFile file')
         content @?= expectedContent
@@ -202,7 +197,7 @@ tests = testGroup "Content Store"
         ContentStore.Complete _ ->
           assertFailure "missing already complete"
         ContentStore.Missing subtree -> do
-          writable <$> getPermissions @IO subtree
+          isWritable subtree
             @? "under construction not writable"
           writeFile (fromAbsFile $ subtree </> file) expectedContent
 
@@ -221,7 +216,7 @@ tests = testGroup "Content Store"
           assertFailure "complete still under construction"
         ContentStore.Complete item -> do
           let subtree = ContentStore.itemPath store item
-          not . writable <$> getPermissions @IO (subtree </> file)
+          isNotWritable (subtree </> file)
             @? "complete still writable"
           content <- readFile (fromAbsFile $ subtree </> file)
           content @?= expectedContent
@@ -401,3 +396,18 @@ withTmpDir = withSystemTempDir "funflow-test"
 withEmptyStore :: (ContentStore -> IO a) -> IO a
 withEmptyStore k = withTmpDir $ \dir ->
   ContentStore.withStore (dir </> [reldir|store|]) k
+
+isNotWritable :: Path Abs t -> IO Bool
+isNotWritable path = do
+  mode <- fileMode <$> getFileStatus (toFilePath path)
+  return $! nullFileMode == (mode `intersectFileModes` writeModes)
+  where
+    writeModes =
+      ownerWriteMode
+      `unionFileModes`
+      groupWriteMode
+      `unionFileModes`
+      otherWriteMode
+
+isWritable :: Path Abs t -> IO Bool
+isWritable = fmap not . isNotWritable
