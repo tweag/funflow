@@ -23,7 +23,7 @@ instance Store TimeSpec
 -- | Information about an executor capable of running tasks. Currently this
 --   is just a newtype wrapper around hostname.
 newtype Executor = Executor HostName
-  deriving Store
+  deriving (Show, Store)
 
 data TaskStatus =
     -- | Task is in the queue and has not begun executing
@@ -32,6 +32,7 @@ data TaskStatus =
   | Completed ExecutionInfo
     -- | Task has failed with failure count
   | Failed ExecutionInfo Int
+  deriving Show
 
 data TaskInfo =
     KnownTask TaskStatus
@@ -40,7 +41,7 @@ data TaskInfo =
 data ExecutionInfo = ExecutionInfo {
     _eiExecutor :: Executor
   , _eiElapsed  :: TimeSpec
-  }
+  } deriving Show
 
 class Coordinator c where
   type Config c

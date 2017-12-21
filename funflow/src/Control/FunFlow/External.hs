@@ -10,6 +10,7 @@ module Control.FunFlow.External where
 import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Lens.TH
+import           Data.Aeson                      (FromJSON, ToJSON)
 import           Data.Semigroup
 import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
@@ -35,6 +36,8 @@ data ParamField
   deriving Generic
 
 instance Monad m => ContentHashable m ParamField
+instance FromJSON ParamField
+instance ToJSON ParamField
 instance Store ParamField
 
 -- | A parameter to an external task
@@ -49,6 +52,8 @@ instance IsString Param where
   fromString s = Param [ParamText (fromString s)]
 
 instance Monad m => ContentHashable m Param
+instance FromJSON Param
+instance ToJSON Param
 instance Store Param
 
 -- | Converter of path components.
@@ -125,6 +130,8 @@ data ExternalTask = ExternalTask {
 } deriving Generic
 
 instance Monad m => ContentHashable m ExternalTask
+instance FromJSON ExternalTask
+instance ToJSON ExternalTask
 instance Store ExternalTask
 
 data TaskDescription = TaskDescription {

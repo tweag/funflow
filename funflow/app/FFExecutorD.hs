@@ -5,33 +5,83 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeOperators      #-}
 
-import qualified Control.FunFlow.ContentStore               as CS
+import           Control.Applicative
+import qualified Control.FunFlow.ContentStore                as CS
+import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.External.Coordinator.Redis
+import           Control.FunFlow.External.Coordinator.SQLite
 import           Control.FunFlow.External.Executor
-import qualified Data.ByteString                            as BS
-import qualified Database.Redis                             as R
-import           Options.Generic
+import           Data.Monoid                                 ((<>))
+import qualified Database.Redis                              as R
+import qualified Options.Applicative                         as Opt
 import           Path
 
-data Config w = Config {
-    storePath :: w ::: FilePath <?> "Path to the root of the content store."
-  , redisHost :: w ::: String <?> "Host for the Redis instance."
-  , redisPort :: w ::: Int <?> "Port for the Redis instance."
-  , redisAuth :: w ::: Maybe BS.ByteString <?> "Password, if needed."
-} deriving Generic
 
-instance ParseRecord (Config Wrapped)
-deriving instance Show (Config Unwrapped)
+data UseCoord
+  = UseRedis (Config Redis)
+  | UseSQLite FilePath
+
+data Args = Args
+  { storePath   :: FilePath
+  , coordinator :: UseCoord
+  }
+
+argsParser :: Opt.Parser Args
+argsParser = Opt.subparser
+  $  Opt.command "redis"
+      (Opt.info
+        (redisParser Opt.<**> Opt.helper)
+        (Opt.progDesc "Use Redis coordinator."))
+  <> Opt.command "sqlite"
+      (Opt.info
+        (sqliteParser Opt.<**> Opt.helper)
+        (Opt.progDesc "Use SQLite coordinator."))
+  <> Opt.metavar "COORDINATOR"
+  <> Opt.commandGroup "Available coordinators:"
+  where
+    storeParser = Opt.strArgument
+      $  Opt.metavar "STOREDIR"
+      <> Opt.help "Path to the root of the content store."
+    redisParser = useRedis
+      <$> storeParser
+      <*> Opt.strArgument
+        (  Opt.metavar "HOSTNAME"
+        <> Opt.help "Host for the Redis instance." )
+      <*> Opt.argument Opt.auto
+        (  Opt.metavar "PORT"
+        <> Opt.help "Port for the Redis instance." )
+      <*> optional (Opt.argument Opt.auto
+        (  Opt.metavar "PASSWORD"
+        <> Opt.help "Password for the Redis instance, if needed." ))
+    useRedis store host port pw = Args store $ UseRedis R.defaultConnectInfo
+      { R.connectHost = host
+      , R.connectPort = R.PortNumber port
+      , R.connectAuth = pw
+      }
+    sqliteParser = useSQLite
+      <$> storeParser
+      <*> Opt.strArgument
+        (  Opt.metavar "SQLFILE"
+        <> Opt.help "Path to SQLite database file." )
+    useSQLite store sqlite = Args store $ UseSQLite sqlite
+
+parseArgs :: IO Args
+parseArgs = Opt.execParser $ Opt.info (argsParser Opt.<**> Opt.helper)
+  $  Opt.fullDesc
+  <> Opt.progDesc
+      "Await and execute funflow external tasks on the given coordinator."
+  <> Opt.header "ffexecutord - Funflow task executor"
 
 main :: IO ()
 main = do
-  config <- unwrapRecord "ffexecutord"
-  let redisConf = R.defaultConnectInfo {
-      R.connectHost = redisHost config
-    , R.connectPort = R.PortNumber . fromIntegral $ redisPort config
-    , R.connectAuth = redisAuth config
-    }
+  config <- parseArgs
 
   -- XXX: Improve handling of invalid paths.
   storePath' <- parseAbsDir (storePath config)
-  CS.withStore storePath' $ executeLoop Redis redisConf
+  case coordinator config of
+    UseRedis redisConfig -> CS.withStore storePath' $
+      executeLoop Redis redisConfig
+    UseSQLite sqlitePath -> do
+      sqlitePath' <- parseAbsDir sqlitePath
+      CS.withStore storePath' $
+        executeLoop SQLite sqlitePath'

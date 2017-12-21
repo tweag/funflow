@@ -120,6 +120,7 @@ import           Control.Monad                       (forever, void, (<=<),
 import           Control.Monad.Catch                 (MonadMask, bracket)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
+import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
 import qualified Data.ByteString.Char8               as C8
 import           Data.Foldable                       (asum)
@@ -134,13 +135,11 @@ import qualified Database.SQLite.Simple              as SQL
 import qualified Database.SQLite.Simple.FromField    as SQL
 import qualified Database.SQLite.Simple.ToField      as SQL
 import           GHC.Generics                        (Generic)
-import           GHC.IO.Device                       (SeekMode (AbsoluteSeek))
 import           Path
 import           Path.IO
 import           System.Directory                    (removePathForcibly)
 import           System.FilePath                     (dropTrailingPathSeparator)
 import           System.Posix.Files
-import           System.Posix.IO
 import           System.Posix.Types
 
 import           Control.FunFlow.ContentHashable     (ContentHash,
@@ -149,6 +148,7 @@ import           Control.FunFlow.ContentHashable     (ContentHash,
                                                       contentHashUpdate_fingerprint,
                                                       encodeHash, pathToHash,
                                                       toBytes)
+import           Control.FunFlow.Lock
 
 
 -- | Status of an item in the store.
@@ -190,14 +190,9 @@ data ContentStore = ContentStore
   -- ^ Root directory of the content store.
   -- The process must be able to create this directory if missing,
   -- change permissions, and create files and directories within.
-  , storeLock     :: MVar ()
-  -- ^ One global lock on store metadata to ensure thread safety.
+  , storeLock     :: Lock
+  -- ^ Write lock on store metadata to ensure multi thread and process safety.
   -- The lock is taken when item state is changed or queried.
-  , storeLockFd   :: Fd
-  -- ^ One exclusive file lock to ensure multi-processing safety.
-  -- Note, that file locks are shared between threads in a process,
-  -- so that the file lock needs to be complemented by an `MVar`
-  -- for thread-safety.
   , storeNotifier :: Notifier
   -- ^ Used to watch for updates on store items.
   , storeDb       :: SQL.Connection
@@ -214,6 +209,8 @@ instance Monad m => ContentHashable m Item where
     >=> pure . flip hashUpdate (toBytes $ itemHash item)
     $ ctx
 
+instance FromJSON Item
+instance ToJSON Item
 instance Data.Store.Store Item
 
 -- | File or directory within a content store 'Item'.
@@ -261,7 +258,7 @@ itemPath store = mkItemPath store . itemHash
 
 -- | Store item containing the given content.
 contentItem :: Content t -> Item
-contentItem (All i) = i
+contentItem (All i)    = i
 contentItem (i :</> _) = i
 
 contentFilename :: Content File -> Path Rel File
@@ -269,7 +266,7 @@ contentFilename (_ :</> relPath) = filename relPath
 
 -- | The absolute path to content within the store.
 contentPath :: ContentStore -> Content t -> Path Abs t
-contentPath store (All item) = itemPath store item
+contentPath store (All item)      = itemPath store item
 contentPath store (item :</> dir) = itemPath store item </> dir
 
 -- | @open root@ opens a store under the given root directory.
@@ -281,27 +278,26 @@ contentPath store (item :</> dir) = itemPath store item </> dir
 open :: Path Abs Dir -> IO ContentStore
 open storeRoot = do
   createDirIfMissing True storeRoot
-  storeLockFd <- createFile (fromAbsFile $ lockPath storeRoot) ownerWriteMode
-  storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
-  SQL.execute_ storeDb
-    "CREATE TABLE IF NOT EXISTS\
-    \  aliases\
-    \  ( hash TEXT PRIMARY KEY\
-    \  , dest TEXT NOT NULL\
-    \  , name TEXT NOT NULL\
-    \  )"
-  setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
-  storeLock <- newMVar ()
-  storeNotifier <- initNotifier
-  return ContentStore {..}
+  storeLock <- openLock (lockPath storeRoot)
+  withLock storeLock $ do
+    storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
+    SQL.execute_ storeDb
+      "CREATE TABLE IF NOT EXISTS\
+      \  aliases\
+      \  ( hash TEXT PRIMARY KEY\
+      \  , dest TEXT NOT NULL\
+      \  , name TEXT NOT NULL\
+      \  )"
+    setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
+    storeNotifier <- initNotifier
+    return ContentStore {..}
 
 -- | Free the resources associated with the given store object.
 --
 -- The store object may not be used afterwards.
 close :: ContentStore -> IO ()
 close store = do
-  takeMVar (storeLock store)
-  closeFd (storeLockFd store)
+  closeLock (storeLock store)
   killNotifier (storeNotifier store)
   SQL.close (storeDb store)
 
@@ -559,32 +555,10 @@ lockPath = (</> [relfile|lock|])
 dbPath :: Path Abs Dir -> Path Abs File
 dbPath = (</> [relfile|metadata.db|])
 
-makeLockDesc :: LockRequest -> FileLock
-makeLockDesc req = (req, AbsoluteSeek, COff 0, COff 1)
-
-acquireStoreFileLock :: ContentStore -> IO ()
-acquireStoreFileLock ContentStore {storeLockFd} = do
-  let lockDesc = makeLockDesc WriteLock
-  waitToSetLock storeLockFd lockDesc
-
-releaseStoreFileLock :: ContentStore -> IO ()
-releaseStoreFileLock ContentStore {storeLockFd} = do
-  let lockDesc = makeLockDesc Unlock
-  setLock storeLockFd lockDesc
-
--- | Holds an exclusive write lock on the global lock file
--- for the duration of the given action.
-withStoreFileLock :: ContentStore -> IO a -> IO a
-withStoreFileLock store =
-  bracket_ (acquireStoreFileLock store) (releaseStoreFileLock store)
-
 -- | Holds a lock on the global 'MVar' and on the global lock file
 -- for the duration of the given action.
 withStoreLock :: ContentStore -> IO a -> IO a
-withStoreLock store action =
-  withMVar (storeLock store) $ \() ->
-    withStoreFileLock store $
-      action
+withStoreLock store = withLock (storeLock store)
 
 prefixHashPath :: C8.ByteString -> ContentHash -> Path Rel Dir
 prefixHashPath pref hash

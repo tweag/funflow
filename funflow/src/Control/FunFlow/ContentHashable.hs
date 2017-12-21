@@ -41,7 +41,8 @@ import           Crypto.Hash                      (Context, Digest, SHA256,
                                                    digestFromByteString,
                                                    hashFinalize, hashInit,
                                                    hashUpdate)
-import qualified Data.Aeson                    as Aeson
+import qualified Data.Aeson                       as Aeson
+import qualified Data.Aeson.Types                 as Aeson
 import           Data.Bits                        (shiftL)
 import           Data.ByteArray                   (Bytes, MemView (MemView),
                                                    allocAndFreeze, convert)
@@ -53,9 +54,9 @@ import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
 import           Data.Functor.Contravariant
+import qualified Data.HashMap.Lazy                as HashMap
+import qualified Data.HashSet                     as HashSet
 import           Data.Int
-import qualified Data.HashMap.Lazy             as HashMap
-import qualified Data.HashSet                  as HashSet
 import           Data.List                        (sort)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
@@ -64,6 +65,7 @@ import           Data.Scientific
 import           Data.Store                       (Store (..), peekException)
 import qualified Data.Text                        as T
 import qualified Data.Text.Array                  as TA
+import qualified Data.Text.Encoding               as TE
 import qualified Data.Text.Internal               as T
 import qualified Data.Text.Lazy                   as TL
 import           Data.Typeable
@@ -93,6 +95,15 @@ import           System.IO.Unsafe                 (unsafePerformIO)
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
   deriving (Eq, Ord, Generic)
+
+instance Aeson.FromJSON ContentHash where
+  parseJSON (Aeson.String s)
+    | Just h <- decodeHash (TE.encodeUtf8 s) = pure h
+    | otherwise = fail "Invalid hash encoding"
+  parseJSON invalid
+    = Aeson.typeMismatch "ContentHash" invalid
+instance Aeson.ToJSON ContentHash where
+  toJSON = Aeson.String . TE.decodeUtf8 . encodeHash
 
 instance Show ContentHash where
   showsPrec d h = showParen (d > app_prec)
