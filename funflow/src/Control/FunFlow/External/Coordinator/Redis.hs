@@ -35,8 +35,8 @@ instance Coordinator Redis where
   -- | Create a redis connection
   initialise = liftIO . R.connect
 
-  submitTask conn td = unlessM (isInProgress conn $ td ^. tdOutput) $
-    liftIO $ do
+  submitTask conn td =
+    liftIO $
       R.runRedis conn $ do
         void $ R.rpush "jobs_queue" [encode (jid, td ^. tdTask)]
         void $ R.set jid (encode Pending)

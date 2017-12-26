@@ -205,7 +205,7 @@ instance Coordinator SQLite where
 
   submitTask hook td = liftIO $
     withSQLite hook $ \conn -> SQL.executeNamed conn
-      "INSERT OR IGNORE INTO\
+      "INSERT OR REPLACE INTO\
       \  tasks (output, status, task)\
       \ VALUES\
       \  (:output, :status, :task)"

@@ -85,4 +85,3 @@ instance Coordinator MemoryCoordinator where
       if M.member tid eq
       then M.insert tid stat eq
       else error "Cannot update task status: task not executing."
-
