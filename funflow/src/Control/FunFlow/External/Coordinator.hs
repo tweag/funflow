@@ -51,7 +51,7 @@ class Coordinator c where
   initialise :: MonadIO m => Config c -> m (Hook c)
 
   -- | Submit a task to the task queue.
-  --   If this task is already known to the system and not completed, then
+  --   If this task is not currently running, then
   --   it should not be re-added to the task queue as a result of this call.
   submitTask :: MonadIO m => Hook c -> TaskDescription -> m ()
 

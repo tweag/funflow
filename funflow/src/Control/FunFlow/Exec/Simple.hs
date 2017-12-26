@@ -94,11 +94,16 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       $ AsyncA f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
-      submitTask po $ TaskDescription chash (toTask x)
-      KnownTask _ <- awaitTask po chash
-      CS.waitUntilComplete store chash >>= \case
-        Nothing -> fail "Remote process failed to construct item"
-        Just item -> return item
+      CS.constructOrWait store chash >>= \case
+        CS.Complete item -> return item
+        CS.Pending a -> wait a >>= \case
+          CS.Completed item -> return item
+          CS.Failed -> fail "Remote process failed to construct item"
+        CS.Missing _ -> do
+          submitTask po $ TaskDescription chash (toTask x)
+          CS.waitUntilComplete store chash >>= \case
+            Nothing -> fail "Remote process failed to construct item"
+            Just item -> return item
     runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
       instruction <- CS.constructOrWait store chash

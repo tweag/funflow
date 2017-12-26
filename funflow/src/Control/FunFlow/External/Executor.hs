@@ -47,60 +47,55 @@ data ExecutionResult =
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = do
-  instruction <- lift $ CS.constructIfMissing store (td ^. tdOutput)
-  case instruction of
-    CS.Pending () -> return AlreadyRunning
-    CS.Complete _ -> return Cached
-    CS.Missing fp -> let
-        cmd = T.unpack $ td ^. tdTask . etCommand
-        procSpec params out = (proc cmd $ T.unpack <$> params) {
-            cwd = Just (fromAbsDir fp)
-          , close_fds = True
-            -- Error output should be displayed on our stderr stream
-          , std_err = Inherit
-          , std_out = out
-          }
-        convParam = ConvParam
-          { convPath = pure . CS.itemPath store
-          , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
-          , convUid = lift getEffectiveUserID
-          , convGid = lift getEffectiveGroupID
-          , convOut = pure fp
-          }
-      in do
-        mbParams <- lift $ runMaybeT $
-          traverse (paramToText convParam) (td ^. tdTask . etParams)
-        params <- case mbParams of
-          -- XXX: Should we block here?
-          Nothing     -> fail "A parameter was not ready"
-          Just params -> return params
+  let
+    fp = CS.buildPath store (td ^. tdOutput)
+    cmd = T.unpack $ td ^. tdTask . etCommand
+    procSpec params out = (proc cmd $ T.unpack <$> params) {
+        cwd = Just (fromAbsDir fp)
+      , close_fds = True
+        -- Error output should be displayed on our stderr stream
+      , std_err = Inherit
+      , std_out = out
+      }
+    convParam = ConvParam
+      { convPath = pure . CS.itemPath store
+      , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
+      , convUid = lift getEffectiveUserID
+      , convGid = lift getEffectiveGroupID
+      , convOut = pure fp
+      }
+  mbParams <- lift $ runMaybeT $
+    traverse (paramToText convParam) (td ^. tdTask . etParams)
+  params <- case mbParams of
+    Nothing     -> fail "A parameter was not ready"
+    Just params -> return params
 
-        out <- lift $
-          let fp' = fromAbsFile $ fp </> [relfile|out|] in
-          if td ^. tdTask . etWriteToStdOut
-          then UseHandle <$> openFile fp' WriteMode
-          else return Inherit
+  out <- lift $
+    let fp' = fromAbsFile $ fp </> [relfile|out|] in
+    if td ^. tdTask . etWriteToStdOut
+    then UseHandle <$> openFile fp' WriteMode
+    else return Inherit
 
-        start <- lift $ getTime Monotonic
-        let theProc = procSpec params out
-        katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
-          $(logTM) InfoS "Executing"
-          mp <- lift $ try $ createProcess theProc
-          case mp of
-            Left (ex :: IOException) -> do
-              $(logTM) WarningS . ls $ "Failed: " ++ show ex
-              lift $ CS.removeFailed store (td ^. tdOutput)
-              return $ Failure (diffTimeSpec start start) 2
-            Right (_, _, _, ph) -> do
-              exitCode <- lift $ waitForProcess ph
-              end <- lift $ getTime Monotonic
-              case exitCode of
-                ExitSuccess   -> do
-                  _ <- lift $ CS.markComplete store (td ^. tdOutput)
-                  return $ Success (diffTimeSpec start end)
-                ExitFailure i -> do
-                  lift $ CS.removeFailed store (td ^. tdOutput)
-                  return $ Failure (diffTimeSpec start end) i
+  start <- lift $ getTime Monotonic
+  let theProc = procSpec params out
+  katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
+    $(logTM) InfoS "Executing"
+    mp <- lift $ try $ createProcess theProc
+    case mp of
+      Left (ex :: IOException) -> do
+        $(logTM) WarningS . ls $ "Failed: " ++ show ex
+        lift $ CS.removeFailed store (td ^. tdOutput)
+        return $ Failure (diffTimeSpec start start) 2
+      Right (_, _, _, ph) -> do
+        exitCode <- lift $ waitForProcess ph
+        end <- lift $ getTime Monotonic
+        case exitCode of
+          ExitSuccess   -> do
+            _ <- lift $ CS.markComplete store (td ^. tdOutput)
+            return $ Success (diffTimeSpec start end)
+          ExitFailure i -> do
+            lift $ CS.removeFailed store (td ^. tdOutput)
+            return $ Failure (diffTimeSpec start end) i
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
