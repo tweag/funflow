@@ -67,7 +67,7 @@ module Control.FunFlow.ContentStore
   , waitUntilComplete
 
   -- * Construct Items
-  , constructOrWait
+  , constructOrAsync
   , constructIfMissing
   , markPending
   , markComplete
@@ -402,11 +402,11 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
 
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Return an 'Control.Concurrent.Async' to await updates, if already pending.
-constructOrWait
+constructOrAsync
   :: ContentStore
   -> ContentHash
   -> IO (Status (Path Abs Dir) (Async Update) Item)
-constructOrWait store hash = withStoreLock store $
+constructOrAsync store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $

@@ -55,7 +55,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     withStoreCache c f = let
         chashOf i = cacherKey c confIdent i
         checkStore = AsyncA $ \chash -> do
-          instruction <- CS.constructOrWait store chash
+          instruction <- CS.constructOrAsync store chash
           case instruction of
             CS.Pending a -> do
               update <- wait a
@@ -94,7 +94,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       $ AsyncA f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
-      CS.constructOrWait store chash >>= \case
+      CS.constructOrAsync store chash >>= \case
         CS.Complete item -> return item
         CS.Pending a -> wait a >>= \case
           CS.Completed item -> return item
@@ -106,7 +106,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
             Just item -> return item
     runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
-      instruction <- CS.constructOrWait store chash
+      instruction <- CS.constructOrAsync store chash
       case instruction of
         CS.Pending a -> do
           update <- wait a
