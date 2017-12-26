@@ -665,8 +665,7 @@ internalWatchPending store hash = do
   watch <- addDirWatch notifier (fromAbsDir build) giveSignal
   -- Additionally, poll on regular intervals.
   -- Inotify/Kqueue don't cover all cases, e.g. network filesystems.
-  let tenMinutes = 10 * 60 * 1000000
-  ticker <- async $ forever $ threadDelay tenMinutes >> giveSignal
+  ticker <- async $ forever $ threadDelay 3007000 >> giveSignal
   let stopWatching = do
         cancel ticker
         removeDirWatch watch
