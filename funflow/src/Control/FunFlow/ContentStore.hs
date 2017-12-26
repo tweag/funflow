@@ -68,6 +68,7 @@ module Control.FunFlow.ContentStore
 
   -- * Construct Items
   , constructOrAsync
+  , constructOrWait
   , constructIfMissing
   , markPending
   , markComplete
@@ -132,6 +133,7 @@ import qualified Data.Store
 import           Data.String                         (IsString)
 import qualified Data.Text                           as T
 import           Data.Typeable                       (Typeable)
+import           Data.Void
 import qualified Database.SQLite.Simple              as SQL
 import qualified Database.SQLite.Simple.FromField    as SQL
 import qualified Database.SQLite.Simple.ToField      as SQL
@@ -182,6 +184,8 @@ data StoreError
   -- ^ An item is already complete when it shouldn't be.
   | CorruptedLink ContentHash FilePath
   -- ^ The link under the given hash points to an invalid path.
+  | FailedToConstruct ContentHash
+  -- ^ A failure occurred while waiting for the item to be constructed.
   deriving (Show, Typeable)
 instance Exception StoreError
 
@@ -412,6 +416,25 @@ constructOrAsync store hash = withStoreLock store $
     Missing () -> withWritableStore store $
       Missing <$> createBuildDir store hash
     Pending _ -> Pending <$> internalWatchPending store hash
+
+-- | Atomically query the state under the given key and mark pending if missing.
+-- Wait for the item to be completed, if already pending.
+-- Throws a 'FailedToConstruct' error if construction fails.
+constructOrWait
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status (Path Abs Dir) Void Item)
+constructOrWait store hash = constructOrAsync store hash >>= \case
+  Pending a -> wait a >>= \case
+    Completed item -> return $ Complete item
+    -- XXX: Consider extending 'Status' with a 'Failed' constructor.
+    --   If the store contains metadata as well, it could keep track of the
+    --   number of failed attempts and further details about the failure.
+    --   If an external task is responsible for the failure, the client could
+    --   choose to resubmit a certain number of times.
+    Failed -> throwIO $ FailedToConstruct hash
+  Complete item -> return $ Complete item
+  Missing dir -> return $ Missing dir
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
