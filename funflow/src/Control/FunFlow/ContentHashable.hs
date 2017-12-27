@@ -404,14 +404,16 @@ instance (Monad m, Typeable b, Typeable t) => ContentHashable m (Path.Path b t) 
 
 -- | Path to a regular file
 --
--- Only the file's content is taken into account when generating the content hash.
--- The path itself is ignored.
+-- Only the file's content and its executable permission is taken into account
+-- when generating the content hash. The path itself is ignored.
 newtype FileContent = FileContent (Path.Path Path.Abs Path.File)
 
 instance ContentHashable IO FileContent where
 
-  contentHashUpdate ctx (FileContent fp) =
-    contentHashUpdate_binaryFile ctx (Path.fromAbsFile fp)
+  contentHashUpdate ctx (FileContent fp) = do
+    exec <- Path.IO.executable <$> Path.IO.getPermissions fp
+    ctx' <- if exec then contentHashUpdate ctx () else pure ctx
+    contentHashUpdate_binaryFile ctx' (Path.fromAbsFile fp)
 
 
 -- | Path to a directory
