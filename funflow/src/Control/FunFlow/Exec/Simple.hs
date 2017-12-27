@@ -27,7 +27,7 @@ import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, onException
-                                                      , try)
+                                                      , throwM, try)
 import qualified Data.ByteString                      as BS
 import           Data.Void
 import           Path
@@ -90,9 +90,10 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
         CS.Pending void -> absurd void
         CS.Complete item -> return item
         CS.Missing _ -> do
-          submitTask po $ TaskDescription chash (toTask x)
+          let td = TaskDescription chash (toTask x)
+          submitTask po td
           CS.waitUntilComplete store chash >>= \case
-            Nothing -> fail "Remote process failed to construct item"
+            Nothing -> throwM $ ExternalTaskFailed td
             Just item -> return item
     runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x

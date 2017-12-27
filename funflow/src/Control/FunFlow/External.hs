@@ -7,6 +7,7 @@
 -- | Definition of external tasks
 module Control.FunFlow.External where
 
+import           Control.Exception
 import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Lens.TH
@@ -15,6 +16,7 @@ import           Data.Semigroup
 import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
+import           Data.Typeable                   (Typeable)
 import           GHC.Generics                    (Generic)
 import           Path
 import           System.Posix.Types              (CGid, CUid)
@@ -33,7 +35,7 @@ data ParamField
     -- ^ Reference to the effective group ID of the executor.
   | ParamOut
     -- ^ Reference to the output path in the content store.
-  deriving Generic
+  deriving (Generic, Show)
 
 instance Monad m => ContentHashable m ParamField
 instance FromJSON ParamField
@@ -46,7 +48,7 @@ instance Store ParamField
 -- should not significantly influence the result of the external task.
 -- In particular, the content hash will not depend on these runtime values.
 newtype Param = Param [ParamField]
-  deriving (Generic, Monoid, Semigroup)
+  deriving (Generic, Monoid, Semigroup, Show)
 
 instance IsString Param where
   fromString s = Param [ParamText (fromString s)]
@@ -127,7 +129,7 @@ data ExternalTask = ExternalTask {
     --   Otherwise, the task is assumed to write itself to files in its
     --   working directory.
   , _etWriteToStdOut :: Bool
-} deriving Generic
+} deriving (Generic, Show)
 
 instance Monad m => ContentHashable m ExternalTask
 instance FromJSON ExternalTask
@@ -137,7 +139,17 @@ instance Store ExternalTask
 data TaskDescription = TaskDescription {
     _tdOutput :: ContentHash
   , _tdTask   :: ExternalTask
-  } deriving Generic
+  } deriving (Generic, Show)
+
+data TaskError
+  = ExternalTaskFailed TaskDescription
+  deriving (Show, Typeable)
+instance Exception TaskError where
+  displayException (ExternalTaskFailed td) =
+    "External task failed to construct item '"
+    ++ show (_tdOutput td)
+    ++ "': "
+    ++ show (_tdTask td)
 
 makeLenses ''ExternalTask
 makeLenses ''TaskDescription
