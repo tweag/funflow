@@ -482,7 +482,6 @@ markComplete store inHash = withStoreLock store $
       unsetWritableRecursively build
       -- XXX: Hashing large data can take some time,
       --   could we avoid locking the store for all that time?
-      -- XXX: Take executable bit of files into account.
       outHash <- contentHash (DirectoryContent build)
       let out = mkItemPath store outHash
           link' = mkCompletePath store inHash
