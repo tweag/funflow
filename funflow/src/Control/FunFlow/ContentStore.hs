@@ -405,7 +405,13 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
     Failed -> return $ Nothing
 
 -- | Atomically query the state under the given key and mark pending if missing.
--- Return an 'Control.Concurrent.Async' to await updates, if already pending.
+--
+-- Returns @'Complete' item@ if the item is complete.
+-- Returns @'Pending' async@ if the item is pending, where @async@ is an
+-- 'Control.Concurrent.Async' to await updates on.
+-- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
+-- It should be constructed in the given @buildDir@,
+-- and then marked as complete using 'markComplete'.
 constructOrAsync
   :: ContentStore
   -> ContentHash
@@ -420,6 +426,11 @@ constructOrAsync store hash = withStoreLock store $
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Wait for the item to be completed, if already pending.
 -- Throws a 'FailedToConstruct' error if construction fails.
+--
+-- Returns @'Complete' item@ if the item is complete.
+-- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
+-- It should be constructed in the given @buildDir@,
+-- and then marked as complete using 'markComplete'.
 constructOrWait
   :: ContentStore
   -> ContentHash
