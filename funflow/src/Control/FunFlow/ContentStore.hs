@@ -697,8 +697,8 @@ getMetadataFile store hash file = withStoreLock store $ do
 ----------------------------------------------------------------------
 -- Internals
 
-lockPath :: Path Abs Dir -> Path Abs File
-lockPath = (</> [relfile|lock|])
+lockPath :: Path Abs Dir -> Path Abs Dir
+lockPath = (</> [reldir|lock|])
 
 dbPath :: Path Abs Dir -> Path Abs File
 dbPath = (</> [relfile|metadata.db|])
