@@ -84,6 +84,12 @@ module Control.FunFlow.ContentStore
   , removeAlias
   , listAliases
 
+  -- * Metadata
+  , setMetadata
+  , getMetadata
+  , createMetadataFile
+  , getMetadataFile
+
   -- * Accessors
   , buildPath
   , itemHash
@@ -113,12 +119,12 @@ import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception                   (Exception, bracket_,
-                                                      throwIO)
+                                                      displayException, throwIO)
 import           Control.FunFlow.ContentStore.Notify
 import           Control.FunFlow.Orphans             ()
 import           Control.Lens
-import           Control.Monad                       (forever, void, (<=<),
-                                                      (>=>))
+import           Control.Monad                       (forever, unless, void,
+                                                      when, (<=<), (>=>))
 import           Control.Monad.Catch                 (MonadMask, bracket)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
@@ -130,7 +136,7 @@ import           Data.List                           (foldl', stripPrefix)
 import           Data.Maybe                          (fromMaybe, listToMaybe)
 import           Data.Monoid                         ((<>))
 import qualified Data.Store
-import           Data.String                         (IsString)
+import           Data.String                         (IsString (..))
 import qualified Data.Text                           as T
 import           Data.Typeable                       (Typeable)
 import           Data.Void
@@ -142,6 +148,7 @@ import           Path
 import           Path.IO
 import           System.Directory                    (removePathForcibly)
 import           System.FilePath                     (dropTrailingPathSeparator)
+import           System.IO                           (Handle, IOMode (..), openFile)
 import           System.Posix.Files
 import           System.Posix.Types
 
@@ -186,8 +193,52 @@ data StoreError
   -- ^ The link under the given hash points to an invalid path.
   | FailedToConstruct ContentHash
   -- ^ A failure occurred while waiting for the item to be constructed.
+  | IncompatibleStoreVersion (Path Abs Dir) Int Int
+  -- ^ @IncompatibleStoreVersion storeDir actual expected@
+  --   The given store has a version number that is incompatible.
+  | MalformedMetadataEntry ContentHash SQL.SQLData
+  -- ^ @MalformedMetadataEntry hash key@
+  --   The metadata entry for the give @hash@, @key@ pair is malformed.
   deriving (Show, Typeable)
-instance Exception StoreError
+instance Exception StoreError where
+  displayException = \case
+    NotPending hash ->
+      "The following input hash is not pending '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "'."
+    AlreadyPending hash ->
+      "The following input hash is already pending '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "'."
+    AlreadyComplete hash ->
+      "The following input hash is already completed '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "'."
+    CorruptedLink hash fp ->
+      "The completed input hash '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "' points to an invalid store item '"
+      ++ fp
+      ++ "'."
+    FailedToConstruct hash ->
+      "Failed to construct the input hash '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "'."
+    IncompatibleStoreVersion storeDir actual expected ->
+      "The store in '"
+      ++ fromAbsDir storeDir
+      ++ "' has version "
+      ++ show actual
+      ++ ". This software expects version "
+      ++ show expected
+      ++ ". No automatic migration is available, \
+         \please use a fresh store location."
+    MalformedMetadataEntry hash key ->
+      "The metadtaa entry for hash '"
+      ++ C8.unpack (encodeHash hash)
+      ++ "' under key '"
+      ++ show key
+      ++ "' is malformed."
 
 -- | A hash addressed store on the file system.
 data ContentStore = ContentStore
@@ -290,16 +341,10 @@ open :: Path Abs Dir -> IO ContentStore
 open storeRoot = do
   createDirIfMissing True storeRoot
   storeLock <- openLock (lockPath storeRoot)
-  withLock storeLock $ do
+  withLock storeLock $ withWritableStoreRoot storeRoot $ do
     storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
-    SQL.execute_ storeDb
-      "CREATE TABLE IF NOT EXISTS\
-      \  aliases\
-      \  ( hash TEXT PRIMARY KEY\
-      \  , dest TEXT NOT NULL\
-      \  , name TEXT NOT NULL\
-      \  )"
-    setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
+    initDb storeRoot storeDb
+    createDirIfMissing True (metadataPath storeRoot)
     storeNotifier <- initNotifier
     return ContentStore {..}
 
@@ -420,7 +465,7 @@ constructOrAsync store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $
-      Missing <$> createBuildDir store hash
+      Missing <$> internalMarkPending store hash
     Pending _ -> Pending <$> internalWatchPending store hash
 
 -- | Atomically query the state under the given key and mark pending if missing.
@@ -457,7 +502,7 @@ constructIfMissing store hash = withStoreLock store $
     Complete item -> return $ Complete item
     Pending _ -> return $ Pending ()
     Missing () -> withWritableStore store $
-      Missing <$> createBuildDir store hash
+      Missing <$> internalMarkPending store hash
 
 -- | Mark a non-existent item as pending.
 --
@@ -470,7 +515,7 @@ markPending store hash = withStoreLock store $
     Complete _ -> throwIO (AlreadyComplete hash)
     Pending _ -> throwIO (AlreadyPending hash)
     Missing () -> withWritableStore store $
-      createBuildDir store hash
+      internalMarkPending store hash
 
 -- | Mark a pending item as complete.
 markComplete :: ContentStore -> ContentHash -> IO Item
@@ -480,6 +525,11 @@ markComplete store inHash = withStoreLock store $
     Complete _ -> throwIO (AlreadyComplete inHash)
     Pending build -> withWritableStore store $ do
       unsetWritableRecursively build
+      do
+        let metadataDir = mkMetadataDirPath store inHash
+        exists <- doesDirExist metadataDir
+        when exists $
+          unsetWritableRecursively metadataDir
       -- XXX: Hashing large data can take some time,
       --   could we avoid locking the store for all that time?
       -- XXX: Take executable bit of files into account.
@@ -493,6 +543,7 @@ markComplete store inHash = withStoreLock store $
       let from' = dropTrailingPathSeparator $ fromAbsDir link'
           to' = dropTrailingPathSeparator $ fromRelDir rel
       createSymbolicLink to' from'
+      addBackReference store inHash (Item outHash)
       pure $! Item outHash
 
 -- | Remove a pending item.
@@ -587,6 +638,63 @@ listAliases store = withStoreLock store $
     SQL.query_ (storeDb store)
       "SELECT name, dest FROM aliases"
 
+-- | Set a metadata entry on a pending item.
+setMetadata :: (SQL.ToField k, SQL.ToField v)
+  => ContentStore -> ContentHash -> k -> v -> IO ()
+setMetadata store hash k v = withStoreLock store $
+  internalQuery store hash >>= \case
+    Pending _ -> SQL.executeNamed (storeDb store)
+      "INSERT OR REPLACE INTO\
+      \  metadata (hash, key, value)\
+      \ VALUES\
+      \  (:hash, :key, :value)"
+      [ ":hash" SQL.:= hash
+      , ":key" SQL.:= k
+      , ":value" SQL.:= v
+      ]
+    _ -> throwIO $ NotPending hash
+
+-- | Retrieve a metadata entry on an item, or 'Nothing' if missing.
+getMetadata :: (SQL.ToField k, SQL.FromField v)
+  => ContentStore -> ContentHash -> k -> IO (Maybe v)
+getMetadata store hash k = withStoreLock store $ do
+  r <- SQL.queryNamed (storeDb store)
+    "SELECT FROM metadata\
+    \ WHERE\
+    \  ( hash = :hash\
+    \  , key = :key\
+    \  )"
+    [ ":hash" SQL.:= hash
+    , ":key" SQL.:= k
+    ]
+  case r of
+    [] -> pure Nothing
+    [[v]] -> pure $ Just v
+    _ -> throwIO $ MalformedMetadataEntry hash (SQL.toField k)
+
+-- | Create and open a new metadata file on a pending item in write mode.
+createMetadataFile
+  :: ContentStore -> ContentHash -> Path Rel File -> IO (Path Abs File, Handle)
+createMetadataFile store hash file = withStoreLock store $ do
+  internalQuery store hash >>= \case
+    Pending _ -> do
+      let path = mkMetadataFilePath store hash file
+      createDirIfMissing True (parent path)
+      handle <- openFile (fromAbsFile path) WriteMode
+      pure (path, handle)
+    _ -> throwIO $ NotPending hash
+
+-- | Return the path to a metadata file if it exists.
+getMetadataFile
+  :: ContentStore -> ContentHash -> Path Rel File -> IO (Maybe (Path Abs File))
+getMetadataFile store hash file = withStoreLock store $ do
+  let path = mkMetadataFilePath store hash file
+  exists <- doesFileExist path
+  if exists then
+    pure $ Just path
+  else
+    pure Nothing
+
 ----------------------------------------------------------------------
 -- Internals
 
@@ -595,6 +703,9 @@ lockPath = (</> [relfile|lock|])
 
 dbPath :: Path Abs Dir -> Path Abs File
 dbPath = (</> [relfile|metadata.db|])
+
+metadataPath :: Path Abs Dir -> Path Abs Dir
+metadataPath = (</> [reldir|metadata|])
 
 -- | Holds a lock on the global 'MVar' and on the global lock file
 -- for the duration of the given action.
@@ -609,9 +720,10 @@ prefixHashPath pref hash
       "[Control.FunFlow.ContentStore.prefixHashPath] \
       \Failed to construct hash path."
 
-pendingPrefix, completePrefix, itemPrefix :: IsString s => s
+pendingPrefix, completePrefix, hashPrefix, itemPrefix :: IsString s => s
 pendingPrefix = "pending-"
 completePrefix = "complete-"
+hashPrefix = "hash-"
 itemPrefix = "item-"
 
 -- | Return the full build path for the given input hash.
@@ -628,6 +740,17 @@ mkCompletePath ContentStore {storeRoot} hash =
 mkItemPath :: ContentStore -> ContentHash -> Path Abs Dir
 mkItemPath ContentStore {storeRoot} hash =
   storeRoot </> prefixHashPath itemPrefix hash
+
+-- | Return the full store path to the given metadata directory.
+mkMetadataDirPath :: ContentStore -> ContentHash -> Path Abs Dir
+mkMetadataDirPath ContentStore {storeRoot} hash =
+  metadataPath storeRoot </> prefixHashPath hashPrefix hash
+
+-- | Return the full store path to the given metadata file.
+mkMetadataFilePath
+  :: ContentStore -> ContentHash -> Path Rel File -> Path Abs File
+mkMetadataFilePath store hash file =
+  mkMetadataDirPath store hash </> file
 
 -- | Query the state under the given key without taking a lock.
 internalQuery
@@ -651,12 +774,17 @@ internalQuery store inHash = do
     else
       pure $! Missing ()
 
--- | Create the build directory for the given input hash.
-createBuildDir :: ContentStore -> ContentHash -> IO (Path Abs Dir)
-createBuildDir store hash = do
+-- | Create the build directory for the given input hash
+--   and make the metadata directory writable if it exists.
+internalMarkPending :: ContentStore -> ContentHash -> IO (Path Abs Dir)
+internalMarkPending store hash = do
   let dir = mkPendingPath store hash
   createDir dir
   setDirWritable dir
+  let metadataDir = mkMetadataDirPath store hash
+  metadirExists <- doesDirExist metadataDir
+  when metadirExists $
+    setWritableRecursively metadataDir
   return dir
 
 -- | Watch the build directory of the pending item under the given key.
@@ -694,23 +822,27 @@ internalWatchPending store hash = do
   -- Stop watching when it arrives.
   async $ takeMVar update <* stopWatching
 
-setRootDirWritable :: ContentStore -> IO ()
-setRootDirWritable ContentStore {storeRoot} =
+setRootDirWritable :: Path Abs Dir -> IO ()
+setRootDirWritable storeRoot =
   setFileMode (fromAbsDir storeRoot) writableRootDirMode
 
 writableRootDirMode :: FileMode
 writableRootDirMode = writableDirMode
 
-setRootDirReadOnly :: ContentStore -> IO ()
-setRootDirReadOnly ContentStore {storeRoot} =
+setRootDirReadOnly :: Path Abs Dir -> IO ()
+setRootDirReadOnly storeRoot =
   setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
 
 readOnlyRootDirMode :: FileMode
 readOnlyRootDirMode = writableDirMode `intersectFileModes` allButWritableMode
 
+withWritableStoreRoot :: Path Abs Dir -> IO a -> IO a
+withWritableStoreRoot storeRoot =
+  bracket_ (setRootDirWritable storeRoot) (setRootDirReadOnly storeRoot)
+
 withWritableStore :: ContentStore -> IO a -> IO a
-withWritableStore store =
-  bracket_ (setRootDirWritable store) (setRootDirReadOnly store)
+withWritableStore ContentStore {storeRoot} =
+  withWritableStoreRoot storeRoot
 
 setDirWritable :: Path Abs Dir -> IO ()
 setDirWritable fp = setFileMode (fromAbsDir fp) writableDirMode
@@ -722,6 +854,12 @@ writableDirMode = foldl' unionFileModes nullFileMode
   , otherReadMode, otherExecuteMode
   ]
 
+-- | Set write permissions on the given path.
+setWritable :: Path Abs t -> IO ()
+setWritable fp = do
+  mode <- fileMode <$> getFileStatus (toFilePath fp)
+  setFileMode (toFilePath fp) $ mode `unionFileModes` ownerWriteMode
+
 -- | Unset write permissions on the given path.
 unsetWritable :: Path Abs t -> IO ()
 unsetWritable fp = do
@@ -732,9 +870,73 @@ allButWritableMode :: FileMode
 allButWritableMode = complement $ foldl' unionFileModes nullFileMode
   [ownerWriteMode, groupWriteMode, otherWriteMode]
 
+-- | Set write permissions on all items in a directory tree recursively.
+setWritableRecursively :: Path Abs Dir -> IO ()
+setWritableRecursively = walkDir $ \dir _ files -> do
+  mapM_ setWritable files
+  setWritable dir
+  return $ WalkExclude []
+
 -- | Unset write permissions on all items in a directory tree recursively.
 unsetWritableRecursively :: Path Abs Dir -> IO ()
 unsetWritableRecursively = walkDir $ \dir _ files -> do
   mapM_ unsetWritable files
   unsetWritable dir
   return $ WalkExclude []
+
+storeVersion :: Int
+storeVersion = 1
+
+-- | Initialize the database.
+initDb :: Path Abs Dir -> SQL.Connection -> IO ()
+initDb storeDir db = do
+  [[version]] <- SQL.query_ db "PRAGMA user_version"
+  if version == 0 then
+    SQL.execute_ db $
+      "PRAGMA user_version = " <> fromString (show storeVersion)
+  else
+    unless (version == storeVersion) $
+      throwIO $ IncompatibleStoreVersion storeDir version storeVersion
+  -- Aliases to items.
+  SQL.execute_ db
+    "CREATE TABLE IF NOT EXISTS\
+    \  aliases\
+    \  ( hash TEXT PRIMARY KEY\
+    \  , dest TEXT NOT NULL\
+    \  , name TEXT NOT NULL\
+    \  )"
+  -- Back-references from items @dest@ to hashes @hash@.
+  SQL.execute_ db
+    "CREATE TABLE IF NOT EXISTS\
+    \  backrefs\
+    \  ( hash TEXT PRIMARY KEY\
+    \  , dest TEXT NOT NULL\
+    \  )"
+  -- Inputs @input@ to hashes @hash@.
+  -- SQL.execute_ db
+  --   "CREATE TABLE IF NOT EXISTS\
+  --   \  inputs\
+  --   \  ( hash TEXT NOT NULL\
+  --   \  , input TEXT NOT NULL\
+  --   \  , UNIQUE (hash, input)\
+  --   \  )"
+  -- Arbitrary metadata on hashes.
+  SQL.execute_ db
+    "CREATE TABLE IF NOT EXISTS\
+    \  metadata\
+    \  ( hash  TEXT NOT NULL\
+    \  , key   TEXT NOT NULL\
+    \  , value TEXT\
+    \  , PRIMARY KEY(hash, key)\
+    \  )"
+
+addBackReference :: ContentStore -> ContentHash -> Item -> IO ()
+addBackReference store inHash (Item outHash) =
+  SQL.executeNamed (storeDb store)
+    "INSERT OR REPLACE INTO\
+    \  backrefs (hash, dest)\
+    \ VALUES\
+    \  (:in, :out)"
+    [ ":in" SQL.:= inHash
+    , ":out" SQL.:= outHash
+    ]
