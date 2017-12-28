@@ -185,7 +185,7 @@ instance Coordinator SQLite where
 
   initialise dir = liftIO $ do
     createDirIfMissing True dir
-    lock <- openLock (dir </> [relfile|lock|])
+    lock <- openLock (dir </> [reldir|lock|])
     withLock lock $ do
       conn <- SQL.open $ fromAbsFile (dir </> [relfile|db.sqlite|])
       SQL.execute_ conn
