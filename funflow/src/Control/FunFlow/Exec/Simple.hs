@@ -93,8 +93,12 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           let td = TaskDescription chash (toTask x)
           submitTask po td
           CS.waitUntilComplete store chash >>= \case
-            Nothing -> throwM $ ExternalTaskFailed td
             Just item -> return item
+            Nothing -> do
+              ti <- taskInfo po chash
+              mbStdout <- CS.getMetadataFile store chash [relfile|stdout|]
+              mbStderr <- CS.getMetadataFile store chash [relfile|stderr|]
+              throwM $ ExternalTaskFailed td ti mbStdout mbStderr
     runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
       CS.constructOrWait store chash >>= \case
