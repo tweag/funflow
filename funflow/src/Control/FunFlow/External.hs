@@ -7,7 +7,6 @@
 -- | Definition of external tasks
 module Control.FunFlow.External where
 
-import           Control.Exception
 import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Lens.TH
@@ -16,7 +15,6 @@ import           Data.Semigroup
 import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
-import           Data.Typeable                   (Typeable)
 import           GHC.Generics                    (Generic)
 import           Path
 import           System.Posix.Types              (CGid, CUid)
@@ -140,16 +138,6 @@ data TaskDescription = TaskDescription {
     _tdOutput :: ContentHash
   , _tdTask   :: ExternalTask
   } deriving (Generic, Show)
-
-data TaskError
-  = ExternalTaskFailed TaskDescription
-  deriving (Show, Typeable)
-instance Exception TaskError where
-  displayException (ExternalTaskFailed td) =
-    "External task failed to construct item '"
-    ++ show (_tdOutput td)
-    ++ "': "
-    ++ show (_tdTask td)
 
 makeLenses ''ExternalTask
 makeLenses ''TaskDescription

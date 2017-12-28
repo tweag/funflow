@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeFamilyDependencies     #-}
 module Control.FunFlow.External.Coordinator where
 
+import           Control.Exception
 import           Control.FunFlow.ContentHashable (ContentHash)
 import           Control.FunFlow.External
 import           Control.Lens
@@ -13,9 +14,9 @@ import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
 import           Data.Store                      (Store)
 import           Data.Store.TH                   (makeStore)
-
-
+import           Data.Typeable                   (Typeable)
 import           Network.HostName
+import           Path
 import           System.Clock                    (TimeSpec)
 
 instance Store TimeSpec
@@ -37,11 +38,32 @@ data TaskStatus =
 data TaskInfo =
     KnownTask TaskStatus
   | UnknownTask
+  deriving Show
 
 data ExecutionInfo = ExecutionInfo {
     _eiExecutor :: Executor
   , _eiElapsed  :: TimeSpec
   } deriving Show
+
+data TaskError
+  = ExternalTaskFailed
+      TaskDescription
+      TaskInfo
+      (Maybe (Path Abs File))
+      (Maybe (Path Abs File))
+  deriving (Show, Typeable)
+instance Exception TaskError where
+  displayException (ExternalTaskFailed td ti mbStdout mbStderr) =
+    "External task failed to construct item '"
+    ++ show (_tdOutput td)
+    ++ "'. Task info: "
+    ++ show ti
+    ++ " stdout: "
+    ++ show mbStdout
+    ++ " stderr: "
+    ++ show mbStderr
+    ++ " Task: "
+    ++ show (_tdTask td)
 
 class Coordinator c where
   type Config c
