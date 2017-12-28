@@ -8,22 +8,25 @@ module Control.FunFlow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
 import           Control.Exception                    (IOException)
+import           Control.Concurrent.Async
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
-import           Control.Monad                        (forever)
+import           Control.Monad                        (forever, when)
 import           Control.Monad.Catch
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
+import qualified Data.ByteString                      as BS
 import qualified Data.Text                            as T
 import           Katip                                as K
 import           Network.HostName
 import           Path
+import           Path.IO
 import           System.Clock
 import           System.Exit                          (ExitCode (..))
-import           System.IO                            (IOMode (..), openFile,
-                                                       stdout)
+import           System.IO                            (Handle, IOMode (..),
+                                                       openFile, stderr, stdout)
 import           System.Posix.Env                     (getEnv)
 import           System.Posix.User
 import           System.Process
@@ -46,15 +49,24 @@ data ExecutionResult =
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = do
+  (fpOut, hOut) <- lift $
+    CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
+  (fpErr, hErr) <- lift $
+    CS.createMetadataFile store (td ^. tdOutput) [relfile|stderr|]
   let
+    withFollowOutput m
+      | td ^. tdTask . etWriteToStdOut
+      = withAsync (followFile fpErr stderr) $ \_ -> m
+      | otherwise
+      = withAsync (followFile fpErr stderr) $ \_ ->
+        withAsync (followFile fpOut stdout) $ \_ -> m
     fp = CS.buildPath store (td ^. tdOutput)
     cmd = T.unpack $ td ^. tdTask . etCommand
-    procSpec params out = (proc cmd $ T.unpack <$> params) {
+    procSpec params = (proc cmd $ T.unpack <$> params) {
         cwd = Just (fromAbsDir fp)
       , close_fds = True
-        -- Error output should be displayed on our stderr stream
-      , std_err = Inherit
-      , std_out = out
+      , std_err = UseHandle hErr
+      , std_out = UseHandle hOut
       }
     convParam = ConvParam
       { convPath = pure . CS.itemPath store
@@ -69,14 +81,8 @@ execute store td = do
     Nothing     -> fail "A parameter was not ready"
     Just params -> return params
 
-  out <- lift $
-    let fp' = fromAbsFile $ fp </> [relfile|out|] in
-    if td ^. tdTask . etWriteToStdOut
-    then UseHandle <$> openFile fp' WriteMode
-    else return Inherit
-
   start <- lift $ getTime Monotonic
-  let theProc = procSpec params out
+  let theProc = procSpec params
   katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
     $(logTM) InfoS "Executing"
     mp <- lift $ try $ createProcess theProc
@@ -85,16 +91,20 @@ execute store td = do
         $(logTM) WarningS . ls $ "Failed: " ++ show ex
         lift $ CS.removeFailed store (td ^. tdOutput)
         return $ Failure (diffTimeSpec start start) 2
-      Right (_, _, _, ph) -> do
-        exitCode <- lift $ waitForProcess ph
-        end <- lift $ getTime Monotonic
-        case exitCode of
-          ExitSuccess   -> do
-            _ <- lift $ CS.markComplete store (td ^. tdOutput)
-            return $ Success (diffTimeSpec start end)
-          ExitFailure i -> do
-            lift $ CS.removeFailed store (td ^. tdOutput)
-            return $ Failure (diffTimeSpec start end) i
+      Right (_, _, _, ph) -> lift $
+        -- Error output should be displayed on our stderr stream
+        withFollowOutput $ do
+          exitCode <- waitForProcess ph
+          end <- getTime Monotonic
+          case exitCode of
+            ExitSuccess   -> do
+              when (td ^. tdTask . etWriteToStdOut) $
+                copyFile fpOut (fp </> [relfile|out|])
+              _ <- CS.markComplete store (td ^. tdOutput)
+              return $ Success (diffTimeSpec start end)
+            ExitFailure i -> do
+              CS.removeFailed store (td ^. tdOutput)
+              return $ Failure (diffTimeSpec start end) i
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
@@ -141,3 +151,16 @@ executeLoop _ cfg store = do
               Success t   -> updateTaskStatus hook (task ^. tdOutput) $ afterTime t
               Failure t i -> updateTaskStatus hook (task ^. tdOutput) $ afterFailure t i
               AlreadyRunning -> return ()
+
+-- | @followFile in out@ follows the file @in@
+--   and prints contents to @out@ as they appear.
+--   The file must exist. Doesn't handle file truncation.
+followFile :: Path Abs File -> Handle -> IO ()
+followFile infile outhandle = do
+  inhandle <- openFile (fromAbsFile infile) ReadMode
+  forever $ do
+    some <- BS.hGetSome inhandle 4096
+    if BS.null some then
+      threadDelay 100000
+    else
+      BS.hPut outhandle some
