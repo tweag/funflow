@@ -7,13 +7,6 @@
 
 module Control.FunFlow.Exec.Redis where
 
-import           Control.Arrow.Async
-import           Control.Arrow.Free                   (eval)
-import           Control.Exception
-import           Control.FunFlow.Base
-import qualified Control.FunFlow.ContentHashable      as CHash
-import           Control.FunFlow.External
-import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.Utils
 import           Control.Monad.Base
 import           Control.Monad.Catch                  hiding (catch)
@@ -51,8 +44,8 @@ type FlowST = (NameSpace, R.Connection)
 
 -- | Run the RFlowM monad
 runRFlow :: R.Connection -> RFlowM a -> IO (Either String a)
-runRFlow conn mx = do
-  R.runRedis conn $ evalStateT (runExceptT mx) ("", conn)
+runRFlow conn mx = R.runRedis conn
+  $ evalStateT (runExceptT mx) ("", conn)
 
 -- | Use redis commands inside RFlowM
 redis :: R.Redis (Either R.Reply a) -> RFlowM a
@@ -90,43 +83,3 @@ putSym_ k x = do
 -- | Store a value under a symbol, and return it again
 putSym :: Store a => T.Text -> a -> RFlowM a
 putSym n x = putSym_ n x >> return x
-
--- | The `Flow` arrow interpreter
-runJob :: forall c eff ex a b. (Coordinator c, Exception ex)
-        => c
-        -> Hook c
-        -> Flow eff ex a b
-        -> a
-        -> RFlowM b
-runJob _ hook flow input = do
-    runAsyncA (eval (runJob' hook) flow) input
-  where
-    runJob' :: Hook c -> Flow' eff a1 b1
-            -> AsyncA (ExceptT String (StateT FlowST R.Redis)) a1 b1
-    runJob' _ (StepIO _ f) = AsyncA $ \x -> liftIO $ f x
-      -- n <- fresh
-      -- mv <- lookupSym n
-      -- case mv of
-      --   Just y -> return y
-      --   Nothing -> do
-      --     ey <-
-      --       liftIO $
-      --       fmap Right (f x) `catch`
-      --       (\e -> return $ Left (e::SomeException) )
-      --     case ey of
-      --       Right y  -> putSym n y
-      --       Left err -> do
-      --         throwError $ show err
-    runJob' _ (Step _ f) = AsyncA $ \x -> return $ f x
-      -- n <- (n' <>) <$> fresh
-      -- mv <- lookupSym n
-      -- case mv of
-      --   Just y  -> return y
-      --   Nothing -> putSym n $ f x
-    runJob' po (External toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ CHash.contentHash (x, toTask x)
-      submitTask po $ TaskDescription chash (toTask x)
-      KnownTask _ <- awaitTask po chash
-      -- XXX: Make Redis executor store aware
-      undefined
-    runJob' _ _ = undefined
