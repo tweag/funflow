@@ -6,7 +6,15 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 
-module Control.FunFlow.Jobs.Redis where
+module Control.FunFlow.Jobs.Redis
+  ( resumeJob
+  , sparkJob
+  , queueLoop
+  , finishJob
+  , getJobById
+  , getJobsByStatus
+  , runRFlow
+  )  where
 
 import           Control.Concurrent
 import           Control.Exception
@@ -22,10 +30,8 @@ import           Data.ByteString             (ByteString)
 import qualified Data.ByteString.Char8       as BS8
 import           Data.Either                 (rights)
 import           Data.Maybe                  (catMaybes)
-import           Data.Monoid                 ((<>))
 import           Data.Store
 import qualified Data.Text                   as T
-import qualified Data.Text.Encoding          as DTE
 import qualified Database.Redis              as R
 import           GHC.Generics
 
@@ -62,35 +68,6 @@ redis r = do
   case ex of
     Left rply -> throwError $ "redis: " ++ show rply
     Right x   -> return x
-
-fresh :: RFlowM T.Text
-fresh = do
-  n <- redis $ R.incr "fffresh"
-  return $ T.pack $ show (n :: Integer)
-
--- | Convert a key name to a redis key - using the current namespace
-nameForKey :: T.Text -> RFlowM ByteString
-nameForKey k = do
-  (ns, _) <- get
-  return $ ns <> "_" <> DTE.encodeUtf8 k
-
--- | Look up a value in the current namespace
-lookupSym :: Store a => T.Text -> RFlowM (Maybe a)
-lookupSym k = do
-  mv <- redis . R.get =<< nameForKey k
-  case mv of
-    Just v -> return $ eitherToMaybe $ decode v
-    _      -> return Nothing
-
--- | Store a value under a symbol in redis, discarding the result
-putSym_ :: Store a => T.Text -> a -> RFlowM ()
-putSym_ k x = do
-  _ <- redis . (`R.set` (encode x)) =<< nameForKey k
-  return ()
-
--- | Store a value under a symbol, and return it again
-putSym :: Store a => T.Text -> a -> RFlowM a
-putSym n x = putSym_ n x >> return x
 
 type JobId = Integer
 
