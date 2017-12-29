@@ -85,3 +85,9 @@ instance Coordinator Redis where
               _ <- R.set chashbytes (encode status)
               return . Just $ TaskDescription chash task
             Nothing    -> fail $ "Cannot decode content hash."
+
+  dropTasks conn = liftIO . R.runRedis conn $ do
+    job <- R.del ["jobs_queue"]
+    case job of
+      Left r -> fail $ "redis fail " ++ show r
+      Right _ -> return ()

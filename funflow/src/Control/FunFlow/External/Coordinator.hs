@@ -78,6 +78,9 @@ class Coordinator c where
   --   This should error for a task which is not running.
   updateTaskStatus :: MonadIO m => Hook c -> ContentHash -> TaskStatus -> m ()
 
+  -- | Remove all pending tasks from the queue.
+  dropTasks :: MonadIO m => Hook c -> m ()
+
 -- TH Splices
 
 makeLenses ''ExecutionInfo
