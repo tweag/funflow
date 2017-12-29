@@ -1,6 +1,8 @@
 FunFlow
 ========
 
+[![CircleCI](https://circleci.com/gh/tweag/funflow.svg?style=svg)](https://circleci.com/gh/tweag/funflow)
+
 FunFlow is a workflow framework for Haskell based on [arrows](https://www.haskell.org/arrows/). Individual steps are written as simple monadic functions (`a -> IO b`) and these are glued together with the arrow combinators or arrow syntax. Unlike many other workflow frameworks, steps have inputs and outputs and their wiring is used to automatically deduce dependencies. Thus, explicit declaration dependencies and contexts are no longer necessary.
 
 FunFlow provides:
