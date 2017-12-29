@@ -35,8 +35,8 @@ instance Coordinator Redis where
   -- | Create a redis connection
   initialise = liftIO . R.connect
 
-  submitTask conn td = unlessM (isInProgress conn $ td ^. tdOutput) $
-    liftIO $ do
+  submitTask conn td =
+    liftIO $
       R.runRedis conn $ do
         void $ R.rpush "jobs_queue" [encode (jid, td ^. tdTask)]
         void $ R.set jid (encode Pending)
@@ -85,3 +85,9 @@ instance Coordinator Redis where
               _ <- R.set chashbytes (encode status)
               return . Just $ TaskDescription chash task
             Nothing    -> fail $ "Cannot decode content hash."
+
+  dropTasks conn = liftIO . R.runRedis conn $ do
+    job <- R.del ["jobs_queue"]
+    case job of
+      Left r -> fail $ "redis fail " ++ show r
+      Right _ -> return ()

@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -6,17 +7,15 @@
 module Control.FunFlow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
-import           Control.Exception                    (IOException, bracket,
-                                                       try)
-import           Control.FunFlow.ContentHashable      (encodeHash)
+import           Control.Exception                    (IOException)
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad                        (forever)
+import           Control.Monad.Catch
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
-import qualified Data.ByteString.Char8                as C8
 import qualified Data.Text                            as T
 import           Katip                                as K
 import           Network.HostName
@@ -47,60 +46,55 @@ data ExecutionResult =
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = do
-  instruction <- lift $ CS.constructIfMissing store (td ^. tdOutput)
-  case instruction of
-    CS.Pending () -> return AlreadyRunning
-    CS.Complete _ -> return Cached
-    CS.Missing fp -> let
-        cmd = T.unpack $ td ^. tdTask . etCommand
-        procSpec params out = (proc cmd $ T.unpack <$> params) {
-            cwd = Just (fromAbsDir fp)
-          , close_fds = True
-            -- Error output should be displayed on our stderr stream
-          , std_err = Inherit
-          , std_out = out
-          }
-        convParam = ConvParam
-          { convPath = pure . CS.itemPath store
-          , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
-          , convUid = lift getEffectiveUserID
-          , convGid = lift getEffectiveGroupID
-          , convOut = pure fp
-          }
-      in do
-        mbParams <- lift $ runMaybeT $
-          traverse (paramToText convParam) (td ^. tdTask . etParams)
-        params <- case mbParams of
-          -- XXX: Should we block here?
-          Nothing     -> fail "A parameter was not ready"
-          Just params -> return params
+  let
+    fp = CS.buildPath store (td ^. tdOutput)
+    cmd = T.unpack $ td ^. tdTask . etCommand
+    procSpec params out = (proc cmd $ T.unpack <$> params) {
+        cwd = Just (fromAbsDir fp)
+      , close_fds = True
+        -- Error output should be displayed on our stderr stream
+      , std_err = Inherit
+      , std_out = out
+      }
+    convParam = ConvParam
+      { convPath = pure . CS.itemPath store
+      , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
+      , convUid = lift getEffectiveUserID
+      , convGid = lift getEffectiveGroupID
+      , convOut = pure fp
+      }
+  mbParams <- lift $ runMaybeT $
+    traverse (paramToText convParam) (td ^. tdTask . etParams)
+  params <- case mbParams of
+    Nothing     -> fail "A parameter was not ready"
+    Just params -> return params
 
-        out <- lift $
-          let fp' = fromAbsFile $ fp </> [relfile|out|] in
-          if td ^. tdTask . etWriteToStdOut
-          then UseHandle <$> openFile fp' WriteMode
-          else return Inherit
+  out <- lift $
+    let fp' = fromAbsFile $ fp </> [relfile|out|] in
+    if td ^. tdTask . etWriteToStdOut
+    then UseHandle <$> openFile fp' WriteMode
+    else return Inherit
 
-        start <- lift $ getTime Monotonic
-        let theProc = procSpec params out
-        katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
-          $(logTM) InfoS "Executing"
-          mp <- lift $ try $ createProcess theProc
-          case mp of
-            Left (ex :: IOException) -> do
-              $(logTM) WarningS . ls $ "Failed: " ++ show ex
-              lift $ CS.removeFailed store (td ^. tdOutput)
-              return $ Failure (diffTimeSpec start start) 2
-            Right (_, _, _, ph) -> do
-              exitCode <- lift $ waitForProcess ph
-              end <- lift $ getTime Monotonic
-              case exitCode of
-                ExitSuccess   -> do
-                  _ <- lift $ CS.markComplete store (td ^. tdOutput)
-                  return $ Success (diffTimeSpec start end)
-                ExitFailure i -> do
-                  lift $ CS.removeFailed store (td ^. tdOutput)
-                  return $ Failure (diffTimeSpec start end) i
+  start <- lift $ getTime Monotonic
+  let theProc = procSpec params out
+  katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
+    $(logTM) InfoS "Executing"
+    mp <- lift $ try $ createProcess theProc
+    case mp of
+      Left (ex :: IOException) -> do
+        $(logTM) WarningS . ls $ "Failed: " ++ show ex
+        lift $ CS.removeFailed store (td ^. tdOutput)
+        return $ Failure (diffTimeSpec start start) 2
+      Right (_, _, _, ph) -> do
+        exitCode <- lift $ waitForProcess ph
+        end <- lift $ getTime Monotonic
+        case exitCode of
+          ExitSuccess   -> do
+            _ <- lift $ CS.markComplete store (td ^. tdOutput)
+            return $ Success (diffTimeSpec start end)
+          ExitFailure i -> do
+            lift $ CS.removeFailed store (td ^. tdOutput)
+            return $ Failure (diffTimeSpec start end) i
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
@@ -124,14 +118,23 @@ executeLoop _ cfg store = do
       let fromCache = Completed $ ExecutionInfo executor 0
           afterTime t = Completed $ ExecutionInfo executor t
           afterFailure t i = Failed (ExecutionInfo executor t) i
+          -- Known failures that do not affect the executors ability
+          -- to execute further tasks will be logged and ignored.
+          handleFailures = handle $ \(e::CS.StoreError) ->
+            -- Certain store errors can occur if an item is forcibly removed
+            -- while the executor is constructing it or picked up a
+            -- corresponding outdated task from the queue.
+            -- XXX: The store should distinguish between recoverable
+            --   and unrecoverable errors.
+            $(logTM) WarningS . ls $ displayException e
 
-      forever $ do
+      forever $ handleFailures $ do
         $(logTM) DebugS "Awaiting task from coordinator."
         mtask <- popTask hook executor
         case mtask of
           Nothing -> lift $ threadDelay 1000000
-          Just task -> do
-            $(logTM) DebugS . ls $ "Checking task: " ++ (C8.unpack $ encodeHash $ _tdOutput task)
+          Just task -> katipAddContext (sl "task" $ task ^. tdOutput) $ do
+            $(logTM) DebugS "Checking task"
             res <- execute store task
             case res of
               Cached      -> updateTaskStatus hook (task ^. tdOutput) fromCache

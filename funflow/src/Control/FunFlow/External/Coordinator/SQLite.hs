@@ -205,7 +205,7 @@ instance Coordinator SQLite where
 
   submitTask hook td = liftIO $
     withSQLite hook $ \conn -> SQL.executeNamed conn
-      "INSERT OR IGNORE INTO\
+      "INSERT OR REPLACE INTO\
       \  tasks (output, status, task)\
       \ VALUES\
       \  (:output, :status, :task)"
@@ -295,3 +295,11 @@ instance Coordinator SQLite where
           Pending -> throwIO $ IllegalStatusUpdate output ts
           Running _ -> throwIO $ IllegalStatusUpdate output ts
         _ -> throwIO $ NonRunningTask output
+
+  dropTasks hook = liftIO $
+    withSQLite hook $ \conn ->
+      SQL.executeNamed conn
+        "DELETE FROM tasks\
+        \ WHERE\
+        \  status = :pending"
+        [ ":pending" SQL.:= SqlPending ]

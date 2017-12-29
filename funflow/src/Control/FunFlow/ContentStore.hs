@@ -67,6 +67,7 @@ module Control.FunFlow.ContentStore
   , waitUntilComplete
 
   -- * Construct Items
+  , constructOrAsync
   , constructOrWait
   , constructIfMissing
   , markPending
@@ -84,6 +85,7 @@ module Control.FunFlow.ContentStore
   , listAliases
 
   -- * Accessors
+  , buildPath
   , itemHash
   , itemPath
   , contentPath
@@ -131,6 +133,7 @@ import qualified Data.Store
 import           Data.String                         (IsString)
 import qualified Data.Text                           as T
 import           Data.Typeable                       (Typeable)
+import           Data.Void
 import qualified Database.SQLite.Simple              as SQL
 import qualified Database.SQLite.Simple.FromField    as SQL
 import qualified Database.SQLite.Simple.ToField      as SQL
@@ -181,6 +184,8 @@ data StoreError
   -- ^ An item is already complete when it shouldn't be.
   | CorruptedLink ContentHash FilePath
   -- ^ The link under the given hash points to an invalid path.
+  | FailedToConstruct ContentHash
+  -- ^ A failure occurred while waiting for the item to be constructed.
   deriving (Show, Typeable)
 instance Exception StoreError
 
@@ -251,6 +256,12 @@ newtype Alias = Alias { unAlias :: T.Text }
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir
 root = storeRoot
+
+-- | Path of the build directory of a pending item.
+--
+-- Beware, this does not check whether the item is actually pending.
+buildPath :: ContentStore -> ContentHash -> Path Abs Dir
+buildPath = mkPendingPath
 
 -- | The store path of a completed item.
 itemPath :: ContentStore -> Item -> Path Abs Dir
@@ -394,17 +405,47 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
     Failed -> return $ Nothing
 
 -- | Atomically query the state under the given key and mark pending if missing.
--- Return an 'Control.Concurrent.Async' to await updates, if already pending.
-constructOrWait
+--
+-- Returns @'Complete' item@ if the item is complete.
+-- Returns @'Pending' async@ if the item is pending, where @async@ is an
+-- 'Control.Concurrent.Async' to await updates on.
+-- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
+-- It should be constructed in the given @buildDir@,
+-- and then marked as complete using 'markComplete'.
+constructOrAsync
   :: ContentStore
   -> ContentHash
   -> IO (Status (Path Abs Dir) (Async Update) Item)
-constructOrWait store hash = withStoreLock store $
+constructOrAsync store hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $
       Missing <$> createBuildDir store hash
     Pending _ -> Pending <$> internalWatchPending store hash
+
+-- | Atomically query the state under the given key and mark pending if missing.
+-- Wait for the item to be completed, if already pending.
+-- Throws a 'FailedToConstruct' error if construction fails.
+--
+-- Returns @'Complete' item@ if the item is complete.
+-- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
+-- It should be constructed in the given @buildDir@,
+-- and then marked as complete using 'markComplete'.
+constructOrWait
+  :: ContentStore
+  -> ContentHash
+  -> IO (Status (Path Abs Dir) Void Item)
+constructOrWait store hash = constructOrAsync store hash >>= \case
+  Pending a -> wait a >>= \case
+    Completed item -> return $ Complete item
+    -- XXX: Consider extending 'Status' with a 'Failed' constructor.
+    --   If the store contains metadata as well, it could keep track of the
+    --   number of failed attempts and further details about the failure.
+    --   If an external task is responsible for the failure, the client could
+    --   choose to resubmit a certain number of times.
+    Failed -> throwIO $ FailedToConstruct hash
+  Complete item -> return $ Complete item
+  Missing dir -> return $ Missing dir
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
@@ -635,8 +676,7 @@ internalWatchPending store hash = do
   watch <- addDirWatch notifier (fromAbsDir build) giveSignal
   -- Additionally, poll on regular intervals.
   -- Inotify/Kqueue don't cover all cases, e.g. network filesystems.
-  let tenMinutes = 10 * 60 * 1000000
-  ticker <- async $ forever $ threadDelay tenMinutes >> giveSignal
+  ticker <- async $ forever $ threadDelay 3007000 >> giveSignal
   let stopWatching = do
         cancel ticker
         removeDirWatch watch

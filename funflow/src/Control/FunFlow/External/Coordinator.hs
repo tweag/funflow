@@ -51,8 +51,7 @@ class Coordinator c where
   initialise :: MonadIO m => Config c -> m (Hook c)
 
   -- | Submit a task to the task queue.
-  --   If this task is already known to the system and not completed, then
-  --   it should not be re-added to the task queue as a result of this call.
+  --   It is allowed to overwrite a known task.
   submitTask :: MonadIO m => Hook c -> TaskDescription -> m ()
 
   -- | View the size of the current task queue
@@ -78,6 +77,9 @@ class Coordinator c where
   -- | Update execution status for a running task.
   --   This should error for a task which is not running.
   updateTaskStatus :: MonadIO m => Hook c -> ContentHash -> TaskStatus -> m ()
+
+  -- | Remove all pending tasks from the queue.
+  dropTasks :: MonadIO m => Hook c -> m ()
 
 -- TH Splices
 

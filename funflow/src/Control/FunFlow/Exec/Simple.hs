@@ -17,7 +17,7 @@ module Control.FunFlow.Exec.Simple
 import           Control.Arrow (returnA)
 import           Control.Arrow.Async
 import           Control.Arrow.Free                   (eval, type (~>))
-import           Control.Concurrent.Async             (wait, withAsync)
+import           Control.Concurrent.Async             (withAsync)
 import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore         as CS
@@ -27,8 +27,9 @@ import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.External.Executor    (executeLoop)
 import           Control.Monad.Catch                  ( SomeException
                                                       , Exception, onException
-                                                      , try)
+                                                      , throwM, try)
 import qualified Data.ByteString                      as BS
+import           Data.Void
 import           Path
 
 -- | Simple evaulation of a flow
@@ -55,17 +56,8 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     withStoreCache c f = let
         chashOf i = cacherKey c confIdent i
         checkStore = AsyncA $ \chash -> do
-          instruction <- CS.constructOrWait store chash
-          case instruction of
-            CS.Pending a -> do
-              update <- wait a
-              case update of
-                CS.Completed item -> do
-                  bs <- BS.readFile $ simpleOutPath item
-                  return . Right . cacherReadValue c $ bs
-                CS.Failed ->
-                  -- XXX: Should we retry locally?
-                  fail "Remote process failed to construct item"
+          CS.constructOrWait store chash >>= \case
+            CS.Pending void -> absurd void
             CS.Complete item -> do
               bs <- BS.readFile $ simpleOutPath item
               return . Right . cacherReadValue c $ bs
@@ -94,22 +86,19 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       $ AsyncA f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
-      submitTask po $ TaskDescription chash (toTask x)
-      KnownTask _ <- awaitTask po chash
-      CS.waitUntilComplete store chash >>= \case
-        Nothing -> fail "Remote process failed to construct item"
-        Just item -> return item
+      CS.constructOrWait store chash >>= \case
+        CS.Pending void -> absurd void
+        CS.Complete item -> return item
+        CS.Missing _ -> do
+          let td = TaskDescription chash (toTask x)
+          submitTask po td
+          CS.waitUntilComplete store chash >>= \case
+            Nothing -> throwM $ ExternalTaskFailed td
+            Just item -> return item
     runFlow' _ (PutInStore f) = AsyncA $ \x -> do
       chash <- contentHash x
-      instruction <- CS.constructOrWait store chash
-      case instruction of
-        CS.Pending a -> do
-          update <- wait a
-          case update of
-            CS.Completed item -> return item
-            CS.Failed ->
-              -- XXX: Should we retry locally?
-              fail "Remote process failed to construct item"
+      CS.constructOrWait store chash >>= \case
+        CS.Pending void -> absurd void
         CS.Complete item -> return item
         CS.Missing fp ->
           do
