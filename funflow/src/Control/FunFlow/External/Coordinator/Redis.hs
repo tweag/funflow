@@ -1,13 +1,7 @@
-{-# LANGUAGE Arrows                     #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE EmptyDataDecls             #-}
 {-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
 
 module Control.FunFlow.External.Coordinator.Redis
@@ -43,10 +37,10 @@ instance Coordinator Redis where
     where
       jid = CHash.toBytes $ td ^. tdOutput
 
-  queueSize conn = liftIO $ R.runRedis conn $ do
+  queueSize conn = liftIO $ R.runRedis conn $
     fromIntegral . fromRight 0 <$> R.llen "jobs_queue"
 
-  taskInfo conn chash = liftIO $ do
+  taskInfo conn chash = liftIO $
     R.runRedis conn $ do
       eoutput <- R.get $ CHash.toBytes chash
       case eoutput of
@@ -67,7 +61,7 @@ instance Coordinator Redis where
           liftIO $ threadDelay 500000
           waitGet
 
-  updateTaskStatus conn chash status = liftIO $ do
+  updateTaskStatus conn chash status = liftIO $
     R.runRedis conn
       $ void $ R.set (CHash.toBytes chash) (encode status)
 
@@ -84,7 +78,7 @@ instance Coordinator Redis where
               let status = Running $ ExecutionInfo executor (fromNanoSecs 0)
               _ <- R.set chashbytes (encode status)
               return . Just $ TaskDescription chash task
-            Nothing    -> fail $ "Cannot decode content hash."
+            Nothing    -> fail "Cannot decode content hash."
 
   dropTasks conn = liftIO . R.runRedis conn $ do
     job <- R.del ["jobs_queue"]
