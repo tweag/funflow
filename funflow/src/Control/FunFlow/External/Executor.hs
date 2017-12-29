@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -6,17 +7,15 @@
 module Control.FunFlow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
-import           Control.Exception                    (IOException, bracket,
-                                                       try)
-import           Control.FunFlow.ContentHashable      (encodeHash)
+import           Control.Exception                    (IOException)
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad                        (forever)
+import           Control.Monad.Catch
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
-import qualified Data.ByteString.Char8                as C8
 import qualified Data.Text                            as T
 import           Katip                                as K
 import           Network.HostName
@@ -119,14 +118,23 @@ executeLoop _ cfg store = do
       let fromCache = Completed $ ExecutionInfo executor 0
           afterTime t = Completed $ ExecutionInfo executor t
           afterFailure t i = Failed (ExecutionInfo executor t) i
+          -- Known failures that do not affect the executors ability
+          -- to execute further tasks will be logged and ignored.
+          handleFailures = handle $ \(e::CS.StoreError) ->
+            -- Certain store errors can occur if an item is forcibly removed
+            -- while the executor is constructing it or picked up a
+            -- corresponding outdated task from the queue.
+            -- XXX: The store should distinguish between recoverable
+            --   and unrecoverable errors.
+            $(logTM) WarningS . ls $ displayException e
 
-      forever $ do
+      forever $ handleFailures $ do
         $(logTM) DebugS "Awaiting task from coordinator."
         mtask <- popTask hook executor
         case mtask of
           Nothing -> lift $ threadDelay 1000000
-          Just task -> do
-            $(logTM) DebugS . ls $ "Checking task: " ++ (C8.unpack $ encodeHash $ _tdOutput task)
+          Just task -> katipAddContext (sl "task" $ task ^. tdOutput) $ do
+            $(logTM) DebugS "Checking task"
             res <- execute store task
             case res of
               Cached      -> updateTaskStatus hook (task ^. tdOutput) fromCache
