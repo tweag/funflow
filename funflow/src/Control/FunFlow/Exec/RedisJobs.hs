@@ -1,28 +1,25 @@
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module Control.FunFlow.Exec.RedisJobs where
 
-import           Control.FunFlow.Exec.Redis
-import           Control.FunFlow.External.Coordinator.Redis
-import           Control.Lens                               hiding (argument)
-import           Data.Either                                (rights)
-import           Data.Maybe                                 (catMaybes)
-
-import           Control.Exception
 import           Control.Concurrent
+import           Control.Exception
 import           Control.FunFlow.Base
+import           Control.FunFlow.Exec.Redis
 import           Control.FunFlow.Utils
+import           Control.Lens               hiding (argument)
 import           Control.Monad.Except
-import           Control.Monad.State.Strict
-import qualified Data.ByteString.Char8                      as BS8
+import qualified Data.ByteString.Char8      as BS8
+import           Data.Either                (rights)
+import           Data.Maybe                 (catMaybes)
 import           Data.Store
-import qualified Data.Text                                  as T
-import qualified Database.Redis                             as R
+import qualified Data.Text                  as T
+import qualified Database.Redis             as R
 import           GHC.Generics
 
 type JobId = Integer
@@ -118,8 +115,8 @@ finishJob job y = do
   let jobIdNm = BS8.pack $ "job_" ++ show jid
   let newJob =
         case y of
-          Right res  -> job {jobStatus = JobDone, result = Just res}
-          Left err -> job {jobStatus = JobError, jobError = Just err}
+          Right res -> job {jobStatus = JobDone, result = Just res}
+          Left err  -> job {jobStatus = JobError, jobError = Just err}
   _ <- redis $ R.set jobIdNm (encode newJob)
   _ <- redis $ R.lrem "jobs_running" 1 (encode jid)
   _ <- case y of
