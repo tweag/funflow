@@ -6,6 +6,7 @@
 
 module Control.FunFlow.External.Coordinator.Redis
   ( Redis (..)
+  , RedisPreconnected (..)
   ) where
 
 import qualified Control.FunFlow.ContentHashable      as CHash
@@ -85,3 +86,23 @@ instance Coordinator Redis where
     case job of
       Left r -> fail $ "redis fail " ++ show r
       Right _ -> return ()
+
+
+data RedisPreconnected = RedisPreconnected
+
+newtype Preconnected = Preconnected R.Connection
+
+-- | Allow a preestablished redis connection to be used.
+instance Coordinator RedisPreconnected where
+  type Config RedisPreconnected = R.Connection
+  type Hook RedisPreconnected = Preconnected
+
+  initialise = return . Preconnected
+
+  submitTask (Preconnected conn) = submitTask conn
+  queueSize (Preconnected conn) = queueSize conn
+  taskInfo (Preconnected conn) = taskInfo conn
+  awaitTask (Preconnected conn) = awaitTask conn
+  updateTaskStatus (Preconnected conn) = updateTaskStatus conn
+  popTask (Preconnected conn) = popTask conn
+  dropTasks (Preconnected conn) = dropTasks conn
