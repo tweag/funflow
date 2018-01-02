@@ -67,6 +67,9 @@ withLock lock action =
 ----------------------------------------------------------------------
 -- Internals
 
+-- | Generate unique (per process) filename.
+--
+-- Combines the host name and process ID.
 getUniqueFileName :: IO (Path Rel File)
 getUniqueFileName = do
   hostName <- getHostName
@@ -76,6 +79,18 @@ getUniqueFileName = do
 lockFileName :: Path Rel File
 lockFileName = [relfile|lock|]
 
+-- | Acquire the lock.
+--
+-- Uses an algorithm that is described in the man-page of open (2) in the
+-- last paragraph to @O_EXCL@ in release 4.14 of the Linux man-pages project.
+--
+-- Creates a file under a unique (per process) filename.
+-- Attempts to hard-link that file to a common lock path.
+-- If the operation succeeds, then the lock was acquired.
+-- If not, but if the link count of the file under the unique filename
+-- increased to two, then the lock was acquired.
+-- Otherwise, another process holds the lock and this process waits
+-- and retries.
 acquireDirLock :: Path Abs Dir -> IO ()
 acquireDirLock dir = do
   file <- getUniqueFileName
@@ -92,6 +107,9 @@ acquireDirLock dir = do
         threadDelay delay
         acquireDirLock dir
 
+-- | Release the lock.
+--
+-- Unlinks the file under the unique file name and the common lock file.
 releaseDirLock :: Path Abs Dir -> IO ()
 releaseDirLock dir = do
   file <- getUniqueFileName
