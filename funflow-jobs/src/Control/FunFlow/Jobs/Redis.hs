@@ -7,7 +7,10 @@
 {-# LANGUAGE TypeFamilies          #-}
 
 module Control.FunFlow.Jobs.Redis
-  ( RFlowM
+  ( Job(..)
+  , JobId
+  , JobStatus(..)
+  , RFlowM
   , FlowST
   , resumeJob
   , sparkJob
@@ -22,7 +25,7 @@ import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Lens                hiding (argument)
-import Control.Monad (void)
+import           Control.Monad               (void)
 import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.Except
