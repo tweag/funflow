@@ -7,7 +7,9 @@
 {-# LANGUAGE TypeFamilies          #-}
 
 module Control.FunFlow.Jobs.Redis
-  ( resumeJob
+  ( RFlowM
+  , FlowST
+  , resumeJob
   , sparkJob
   , queueLoop
   , finishJob
