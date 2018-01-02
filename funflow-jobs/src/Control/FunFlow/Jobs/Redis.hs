@@ -12,7 +12,6 @@ module Control.FunFlow.Jobs.Redis
   , resumeJob
   , sparkJob
   , queueLoop
-  , finishJob
   , getJobById
   , getJobsByStatus
   , runRFlow
@@ -23,6 +22,7 @@ import           Control.Exception
 import           Control.FunFlow.Base
 import           Control.FunFlow.Utils
 import           Control.Lens                hiding (argument)
+import Control.Monad (void)
 import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.Except
@@ -32,6 +32,7 @@ import           Data.ByteString             (ByteString)
 import qualified Data.ByteString.Char8       as BS8
 import           Data.Either                 (rights)
 import           Data.Maybe                  (catMaybes)
+import           Data.Monoid                 ((<>))
 import           Data.Store
 import qualified Data.Text                   as T
 import qualified Database.Redis              as R
@@ -135,10 +136,10 @@ queueLoop allJobs runner = forever go
     go = do
       mkj <- redis $ R.brpoplpush "jobs_queue" "job_running" 1
       whenRight (mdecode mkj) $ \jid -> do
-        liftIO $ threadDelay (100000)
+        liftIO $ threadDelay 100000
         mjob <- getJobById jid
         --liftIO $ putStrLn $ "queueLoop got job id "++ show (jid,fmap jobId mjob)
-        whenJust mjob $ resumeJob allJobs runner
+        whenJust mjob $ void . resumeJob allJobs runner
 
 -- | Resume a job
 resumeJob ::
@@ -146,15 +147,17 @@ resumeJob ::
   => [(T.Text, Flow eff ex a b)]
   -> (Flow eff ex a b -> a -> IO (Either String b) )
   -> Job a b
-  -> RFlowM ()
-resumeJob allJobs runner job = do
-  --liftIO $ putStrLn $ "resumeJob got taskName "++ show (taskName job)
-  whenJust (lookup (taskName job) allJobs) $ \flow -> do
+  -> RFlowM (Either String b)
+resumeJob allJobs runner job = case lookup (taskName job) allJobs of
+  Just flow -> do
     --liftIO $ putStrLn $ "resumeJob got job id "++ show (jobId job)
     let jobIdNm = BS8.pack $ "job_" ++ show (jobId job)
     _1 .= jobIdNm
     eres <- liftIO $ runner flow (argument job)
     finishJob job eres
+    return eres
+  Nothing -> return $ Left $ "Failed to lookup job with name "
+                          <> T.unpack (taskName job)
 
 -- | When a job has finished, mark it as done and put it on the done or error queues
 finishJob :: (Store a, Store b) => Job a b -> Either String b -> RFlowM ()
