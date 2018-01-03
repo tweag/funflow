@@ -294,6 +294,65 @@ runNoEffect
   which FunFlow is unaware of but which have an impact on the results of
   computations, and so should form part of the cache.
 
+User-defined effects
+--------------------
+
+FunFlow allows you to extend the possible steps in a flow with your own
+user-defined effects. Suppose for example you are working on a flow which talks
+to a REST service offering details of your record collection. Then you might
+define the following grammar for interacting with it::
+
+  -- | Example grammar for dealing with your record collection.
+  data RecordCollectionAction a b where
+    Insert :: DatabaseAction Record ()
+    Select :: DatabaseAction Ix (Maybe Record)
+    Delete :: DatabaseAction Ix ()
+
+As with external actions, you will note that this is all possible using `stepIO`. But
+as with external actions, there are some benefits to defining your own effects:
+
+- By using effects, you can choose whether details need to be provided at
+  workflow construction or execution time. In the above example, you can define
+  a workflow without knowing where exactly the record collection is being
+  hosted. This is only needed when actually interpreting the workflow.
+- Using effects makes it very easy to test your workflow in a mock environment,
+  by changing the interpreter for your effects.
+- `IO` actions are opaque to inspection, and so hard to visualise. Providing your
+  own effects, on the other hand, lets you fully visualise what's happening in a
+  workflow.
+
+So far, all of our examples have used the type `SimpleFlow a b`. `SimpleFlow` is
+a type alias for the fully general type `Flow`::
+
+  -- | A workflow taking input of type 'a' and producing output of type 'b'.
+  --   This workflow may include user-defined effects of type 'eff' and
+  --   raise exceptions of type 'ex'.
+  type Flow eff ex a b
+  type SimpleFlow = Flow NoEffect SomeException
+
+To include the `RecordCollectionAction`, you can define a new type for your flow::
+
+  type MyFlow = Flow RecordCollectionAction SomeException
+
+To run the flow, you must also provide an interpreter for your effects. This is
+a function of type `forall a b. eff a b -> AsyncA IO a b`. Here's an example of
+an interpreter for the `RecordCollectionAction` type which just logs what's
+happening::
+
+  runRecordCollectionAction :: RecordCollectionAction a b -> AsyncA IO a b
+  runRecordCollectionAction Insert = AsyncA $ \rec -> putStrLn $ "Inserting " ++ show rec
+  runRecordCollectionAction Select = AsyncA $ \ix -> do
+    putStrLn $ "Selecting " ++ show ix
+    -- Fail to find anything  in this mock interpreter
+    return Nothing
+  runRecordCollectionAction Delete = AsyncA $ \ix -> putStrLn $ "Deleting " ++ show ix
+
+Having defined the interpreter, you can use it in place of `runNoEffect`, as in the
+example above::
+
+  CS.withStore [absdir|/tmp/funflow|] $ \store -> do
+    runFlow SQLite [absfile|/tmp/coordinator.db|] store runRecordCollectionAction 123123 flow input
+
 .. [1] Technically, it lifts it to the more general type `Flow eff ex a b`, but
        that full generality is not needed here.
 .. [2] This is heavily inspired by the nix_ package manager.
