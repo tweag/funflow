@@ -36,7 +36,7 @@ Features
   - FunFlow's caching is based around the *content store*. This stores all
     artifacts according to the hash of the inputs and computations which
     produced them. FunFlow uses this to know when exactly a computation must be
-    rerun and when previous results can be re-used.[2]_
+    rerun and when previous results can be re-used. [2]_
   - The content store also acts as a CAS_ system. This means that, if multiple
     inputs produce the same output, that output will be stored only once on disk
     (and subsequent computations will not be rerun).
