@@ -21,6 +21,7 @@ module Control.FunFlow.Steps
   , readString_
   , writeString
   , writeString_
+  , writeExecutableString
   , readYaml
   , writeYaml
   , writeYaml_
@@ -52,7 +53,8 @@ import qualified Data.Yaml                       as Yaml
 import           GHC.Conc                        (threadDelay)
 import           Path
 import           Path.IO
-import           System.Posix.Files              (createLink)
+import           System.Posix.Files              (accessModes, createLink,
+                                                  setFileMode)
 import           System.Random
 
 promptFor :: Read a => Flow eff ex String a
@@ -194,6 +196,11 @@ readString_ = arr (:</> [relfile|out|]) >>> readString
 -- | Create and write into a file under the given path in the store.
 writeString :: Flow eff ex (String, Path Rel File) (CS.Content File)
 writeString = putInStoreAt $ writeFile . fromAbsFile
+
+writeExecutableString :: Flow eff ex (String, Path Rel File) (CS.Content File)
+writeExecutableString = putInStoreAt $ \p i -> do
+  writeFile (fromAbsFile p) i
+  setFileMode (fromAbsFile p) accessModes
 
 -- | Create and write into a file named @out@ within the given item.
 writeString_ :: Flow eff ex String (CS.Content File)
