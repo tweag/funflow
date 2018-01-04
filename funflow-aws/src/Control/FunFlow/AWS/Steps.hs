@@ -20,9 +20,9 @@ module Control.FunFlow.AWS.Steps
 import qualified Aws
 import qualified Aws.S3                          as S3
 import           Control.Arrow
+import           Control.FunFlow                 (ArrowFlow, putInStore, stepIO)
 import           Control.FunFlow.AWS.Effects
 import           Control.FunFlow.AWS.S3
-import           Control.FunFlow.Base
 import           Control.FunFlow.ContentHashable
 import           Control.FunFlow.ContentStore    (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore    as CS
@@ -38,12 +38,13 @@ import           Path
 import           Path.IO
 
 -- | Put an item from an S3 bucket directly into the store.
-putInStoreAt :: forall objRef eff ex.
+putInStoreAt :: forall arr objRef eff ex.
                 ( ObjectReference objRef
                 , (Given Aws.Configuration :=> ContentHashable IO (ObjectInBucket objRef))
+                , ArrowFlow arr eff ex
                 )
              => Aws.Configuration
-             -> Flow eff ex (ObjectInBucket objRef, Path Rel File) (CS.Content File)
+             -> arr (ObjectInBucket objRef, Path Rel File) (CS.Content File)
 putInStoreAt conf = give conf $
     (proc (oib, relPath) -> do
       item <- putInStore (\d (oib, p) -> do
@@ -68,6 +69,7 @@ putInStoreAt conf = give conf $
 -- Effects turned into steps
 --------------------------------------------------------------------------------
 
-listBucketContents :: Aws.Configuration
-                   -> Flow eff ex S3.Bucket [ObjectInBucket S3.ObjectInfo]
+listBucketContents :: ArrowFlow arr eff ex
+                   => Aws.Configuration
+                   -> arr S3.Bucket [ObjectInBucket S3.ObjectInfo]
 listBucketContents conf = stepIO $ runAWSEffect conf ListBucketContents

@@ -8,8 +8,7 @@ module FunFlow.TestFlows where
 
 import           Control.Arrow
 import           Control.Exception
-import           Control.FunFlow.Base
-import           Control.FunFlow.Cache.TH
+import           Control.FunFlow
 import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.Exec.Simple

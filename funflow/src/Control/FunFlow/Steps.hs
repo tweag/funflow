@@ -27,6 +27,8 @@ module Control.FunFlow.Steps
   , writeString_
   , writeYaml
   , writeYaml_
+    -- * Docker
+  , docker
     -- * Testing and debugging
   , promptFor
   , printS
@@ -38,14 +40,16 @@ module Control.FunFlow.Steps
 where
 
 import           Control.Arrow
-import           Control.Arrow.Free              (catch, effect)
+import           Control.Arrow.Free              (catch)
 import           Control.Exception               (Exception)
-import           Control.FunFlow.Base
+import           Control.FunFlow.Base            (Flow, SimpleFlow)
+import           Control.FunFlow.Class
 import           Control.FunFlow.ContentHashable (ContentHashable,
                                                   DirectoryContent (..),
                                                   FileContent (..))
 import           Control.FunFlow.ContentStore    (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore    as CS
+import qualified Control.FunFlow.External.Docker as Docker
 import           Control.Monad.Catch             (throwM)
 import           Data.Foldable                   (for_)
 import           Data.Store
@@ -59,19 +63,19 @@ import           System.Posix.Files              (accessModes, createLink,
                                                   setFileMode)
 import           System.Random
 
-promptFor :: Read a => Flow eff ex String a
+promptFor :: (Read a, ArrowFlow arr eff ex) => arr String a
 promptFor = proc s -> do
      () <- stepIO putStr -< (s++"> ")
      s' <- stepIO (const getLine) -< ()
      returnA -< read s'
 
-printS :: Show a => Flow eff ex a ()
+printS :: (Show a, ArrowFlow arr eff ex) => arr a ()
 printS = stepIO $ \s-> print s
 
-failStep :: Flow eff ex () ()
+failStep :: ArrowFlow arr eff ex => arr () ()
 failStep = stepIO $ \_ -> fail "failStep"
 
-worstBernoulli :: Exception ex => (String -> ex) -> Flow eff ex Double Double
+worstBernoulli :: (Exception ex, ArrowFlow arr eff ex) => (String -> ex) -> arr Double Double
 worstBernoulli errorC = stepIO $ \p -> do
   r <- randomRIO (0,1)
   if r < p
@@ -80,14 +84,14 @@ worstBernoulli errorC = stepIO $ \p -> do
 
 -- | pause for a given number of seconds. Thread through a value to ensure
 --   delay does not happen inparallel with other processing
-pauseWith :: Store a => Flow eff ex (Int, a) a
+pauseWith :: (Store a, ArrowFlow arr eff ex) => arr (Int, a) a
 pauseWith = stepIO $ \(secs,a) -> do
   threadDelay (secs*1000000)
   return a
 
 -- | on first invocation die and leave a suicide note
 --   on second invocation it is resurrected and destroys suicide note, returning contents
-melancholicLazarus :: Flow eff ex String String
+melancholicLazarus :: ArrowFlow arr eff ex => arr String String
 melancholicLazarus = stepIO $ \s -> do
   let fnm = [absfile|/tmp/lazarus_note|]
   ex <- doesFileExist fnm
@@ -98,27 +102,24 @@ melancholicLazarus = stepIO $ \s -> do
     else do writeFile (fromAbsFile fnm) s
             fail "lazarus fail"
 
-internalManipulateStore :: (CS.ContentStore -> a -> IO b) -> Flow eff ex a b
-internalManipulateStore = effect . InternalManipulateStore
-
 -- | `retry n s f` reruns `f` on failure at most n times with a delay of `s`
 --   seconds between retries
-retry :: forall eff ex a b. (Exception ex, Store a)
-      => Int -> Int -> Flow eff ex a b -> Flow eff ex a b
+retry :: forall arr eff ex a b. (Exception ex, Store a, ArrowFlow arr eff ex)
+      => Int -> Int -> arr a b -> arr a b
 retry 0 _ f = f
 retry n secs f = catch f $ proc (x, _ :: ex) -> do
   x1 <- pauseWith -< (secs,x)
   x2 <- retry (n-1) secs f -< x1
   returnA -< x2
 
-lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
+lookupAliasInStore :: ArrowFlow arr eff ex => arr CS.Alias (Maybe CS.Item)
 lookupAliasInStore = internalManipulateStore CS.lookupAlias
-assignAliasInStore :: Flow eff ex (CS.Alias, CS.Item) ()
+assignAliasInStore :: ArrowFlow arr eff ex => arr (CS.Alias, CS.Item) ()
 assignAliasInStore = internalManipulateStore $ \store (alias, item) ->
   CS.assignAlias store alias item
 
-putInStoreAt :: (ContentHashable IO a, Typeable t)
-  => (Path Abs t -> a -> IO ()) -> Flow eff ex (a, Path Rel t) (CS.Content t)
+putInStoreAt :: (ContentHashable IO a, Typeable t, ArrowFlow arr eff ex)
+  => (Path Abs t -> a -> IO ()) -> arr (a, Path Rel t) (CS.Content t)
 putInStoreAt f = proc (a, p) -> do
   item <- putInStore (\d (a, p) -> do
       createDirIfMissing True (parent $ d </> p)
@@ -128,7 +129,7 @@ putInStoreAt f = proc (a, p) -> do
 
 -- | @copyFileToStore (fIn, fOut)@ copies the contents of @fIn@ into the store
 -- under the relative path @fOut@ within the subtree.
-copyFileToStore :: Flow eff ex (FileContent, Path Rel File) (CS.Content File)
+copyFileToStore :: ArrowFlow arr eff ex => arr (FileContent, Path Rel File) (CS.Content File)
 copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 
 -- | @copyDirToStore (dIn, Nothing)@ copies the contents of @dIn@ into the store
@@ -136,7 +137,7 @@ copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 --
 -- | @copyDirToStore (dIn, Just dOut)@ copies the contents of @dIn@ into the store
 -- under relative path @dOut@ within the subtree
-copyDirToStore :: Flow eff ex (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
+copyDirToStore :: ArrowFlow arr eff ex => arr (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
 copyDirToStore = proc (inDir, mbOutDir) ->
   case mbOutDir of
     Nothing -> do
@@ -150,7 +151,7 @@ copyDirToStore = proc (inDir, mbOutDir) ->
         ) -< (inDir, outDir)
 
 -- | List the contents of a directory within the store
-listDirContents :: Flow eff ex (CS.Content Dir)
+listDirContents :: ArrowFlow arr eff ex => arr (CS.Content Dir)
                                ([CS.Content Dir], [CS.Content File])
 listDirContents = internalManipulateStore
   ( \store dir -> let
@@ -167,7 +168,7 @@ listDirContents = internalManipulateStore
 
 -- | Merge a number of store directories together into a single output directory.
 --   This uses hardlinks to avoid duplicating the data on disk.
-mergeDirs :: Flow eff ex [CS.Content Dir] (CS.Content Dir)
+mergeDirs :: ArrowFlow arr eff ex => arr [CS.Content Dir] (CS.Content Dir)
 mergeDirs = proc inDirs -> do
   paths <- internalManipulateStore
     ( \store items -> return $ CS.contentPath store <$> items) -< inDirs
@@ -183,7 +184,7 @@ mergeDirs = proc inDirs -> do
     ) -< paths
 
 -- | Merge a number of files into a single output directory.
-mergeFiles :: Flow eff ex [CS.Content File] (CS.Content Dir)
+mergeFiles :: ArrowFlow arr eff ex => arr [CS.Content File] (CS.Content Dir)
 mergeFiles = proc inFiles -> do
   absFiles <- internalManipulateStore
     ( \store items -> return $ CS.contentPath store <$> items) -< inFiles
@@ -194,24 +195,24 @@ mergeFiles = proc inFiles -> do
 
 
 -- | Read the contents of the given file in the store.
-readString :: Flow eff ex (CS.Content File) String
+readString :: ArrowFlow arr eff ex => arr (CS.Content File) String
 readString = getFromStore $ readFile . fromAbsFile
 
 -- | Read the contents of a file named @out@ within the given item.
-readString_ :: Flow eff ex CS.Item String
+readString_ :: ArrowFlow arr eff ex => arr CS.Item String
 readString_ = arr (:</> [relfile|out|]) >>> readString
 
 -- | Create and write into a file under the given path in the store.
-writeString :: Flow eff ex (String, Path Rel File) (CS.Content File)
+writeString :: ArrowFlow arr eff ex => arr (String, Path Rel File) (CS.Content File)
 writeString = putInStoreAt $ writeFile . fromAbsFile
 
-writeExecutableString :: Flow eff ex (String, Path Rel File) (CS.Content File)
+writeExecutableString :: ArrowFlow arr eff ex => arr (String, Path Rel File) (CS.Content File)
 writeExecutableString = putInStoreAt $ \p i -> do
   writeFile (fromAbsFile p) i
   setFileMode (fromAbsFile p) accessModes
 
 -- | Create and write into a file named @out@ within the given item.
-writeString_ :: Flow eff ex String (CS.Content File)
+writeString_ :: ArrowFlow arr eff ex => arr String (CS.Content File)
 writeString_ = Control.FunFlow.Steps.writeString <<< arr (, [relfile|out|])
 
 -- | Read a YAML file from the given file in the store.
@@ -228,3 +229,6 @@ writeYaml = putInStoreAt $ Yaml.encodeFile . fromAbsFile
 writeYaml_ :: (ContentHashable IO a, Yaml.ToJSON a)
   => SimpleFlow a (CS.Content File)
 writeYaml_ = writeYaml <<< arr (, [relfile|out.yaml|])
+
+docker :: (ContentHashable IO a, ArrowFlow arr eff ex) => (a -> Docker.Config) -> arr a CS.Item
+docker f = external $ Docker.toExternal . f

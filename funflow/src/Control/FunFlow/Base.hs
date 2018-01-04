@@ -11,13 +11,11 @@ module Control.FunFlow.Base where
 
 import           Control.Arrow                   (Kleisli(..))
 import           Control.Arrow.Free
-import           Control.Category                ((.))
 import           Control.Exception               (SomeException)
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.Diagram
 import           Control.FunFlow.External
-import qualified Control.FunFlow.External.Docker as Docker
 import           Data.ByteString                 (ByteString)
 import           Data.Default
 import           Data.Functor.Identity
@@ -90,38 +88,6 @@ runNoEffect :: forall arr. NoEffect ~> arr
 runNoEffect = error "Impossible!"
 
 type SimpleFlow = Flow NoEffect SomeException
-
-step :: (a -> b) -> Flow eff ex a b
-step = step' def
-
-step' :: Properties a b -> (a -> b) -> Flow eff ex a b
-step' props = effect . Step props
-
-stepIO :: (a -> IO b) -> Flow eff ex a b
-stepIO = stepIO' def
-
-stepIO' :: Properties a b -> (a -> IO b) -> Flow eff ex a b
-stepIO' props = effect . StepIO props
-
-named :: T.Text -> (a -> b) -> Flow eff ex a b
-named n = step' (def { name = Just n})
-
-external :: ContentHashable IO a => (a -> ExternalTask) -> Flow eff ex a CS.Item
-external = effect . External
-
-wrap :: eff a b -> Flow eff ex a b
-wrap = effect . Wrapped def
-
-wrap' :: Properties a b -> eff a b -> Flow eff ex a b
-wrap' p eff = effect $ Wrapped p eff
-
-docker :: ContentHashable IO a => (a -> Docker.Config) -> Flow eff ex a CS.Item
-docker f = external $ Docker.toExternal . f
-
-putInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff ex a CS.Item
-putInStore = effect . PutInStore
-getFromStore :: (Path Abs t -> IO a) -> Flow eff ex (CS.Content t) a
-getFromStore = effect . GetFromStore
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow eff ex a b -> Diagram ex a b
