@@ -78,8 +78,6 @@ data Flow' eff a b where
   -- client libraries.
   InternalManipulateStore :: (CS.ContentStore -> a -> IO b)
                           -> Flow' eff a b
-  LookupAliasInStore :: Flow' eff CS.Alias (Maybe CS.Item)
-  AssignAliasInStore :: Flow' eff (CS.Alias, CS.Item) ()
   Wrapped :: Properties a b -> eff a b -> Flow' eff a b
 
 type Flow eff ex = ErrorChoice ex (Flow' eff)
@@ -124,11 +122,6 @@ putInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow eff e
 putInStore = effect . PutInStore
 getFromStore :: (Path Abs t -> IO a) -> Flow eff ex (CS.Content t) a
 getFromStore = effect . GetFromStore
-
-lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
-lookupAliasInStore = effect LookupAliasInStore
-assignAliasInStore :: Flow eff ex (CS.Alias, CS.Item) ()
-assignAliasInStore = effect AssignAliasInStore
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow eff ex a b -> Diagram ex a b

@@ -11,18 +11,20 @@ module Control.FunFlow.Steps
   ( -- * Error handling
     retry
     -- * Store manipulation
-  , putInStoreAt
-  , copyFileToStore
+  , assignAliasInStore
   , copyDirToStore
+  , copyFileToStore
   , listDirContents
+  , lookupAliasInStore
   , mergeDirs
   , mergeFiles
+  , putInStoreAt
   , readString
   , readString_
+  , readYaml
+  , writeExecutableString
   , writeString
   , writeString_
-  , writeExecutableString
-  , readYaml
   , writeYaml
   , writeYaml_
     -- * Testing and debugging
@@ -108,6 +110,12 @@ retry n secs f = catch f $ proc (x, _ :: ex) -> do
   x1 <- pauseWith -< (secs,x)
   x2 <- retry (n-1) secs f -< x1
   returnA -< x2
+
+lookupAliasInStore :: Flow eff ex CS.Alias (Maybe CS.Item)
+lookupAliasInStore = internalManipulateStore CS.lookupAlias
+assignAliasInStore :: Flow eff ex (CS.Alias, CS.Item) ()
+assignAliasInStore = internalManipulateStore $ \store (alias, item) ->
+  CS.assignAlias store alias item
 
 putInStoreAt :: (ContentHashable IO a, Typeable t)
   => (Path Abs t -> a -> IO ()) -> Flow eff ex (a, Path Rel t) (CS.Content t)
