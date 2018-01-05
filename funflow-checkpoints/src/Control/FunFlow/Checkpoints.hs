@@ -7,7 +7,14 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
-module Control.FunFlow.Checkpoints where
+module Control.FunFlow.Checkpoints
+  ( CheckpointException(..)
+  , CheckpointT
+  , checkpoint
+  , runToCompletion
+  , runToCheckpoint
+  , runToCheckpointEither
+  ) where
 
 import           Control.Arrow
 import           Control.Arrow.Free
@@ -31,7 +38,9 @@ data CheckpointException =
   | CheckpointInConditional String
     -- | A branch responsible for catching errors has a checkpoint in.
   | CheckpointInCatch String
-  deriving Show
+    -- | No matching checkpoint has been defined in the flow
+  | NoCheckpoint String
+  deriving (Eq, Show)
 
 instance Exception CheckpointException
 
@@ -49,7 +58,7 @@ data CheckpointT arr (eff :: * -> * -> *) ex a b where
   Seq :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex a c
   Par :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex c d -> CheckpointT arr eff ex (a,c) (b,d)
   Fanin :: CheckpointT arr eff ex a c -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex (Either a b) c
-  Catch   :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex (a,ex) b -> CheckpointT arr eff ex a b
+  Catch :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex (a,ex) b -> CheckpointT arr eff ex a b
 
 instance Category (arr eff ex) => Category (CheckpointT arr eff ex) where
   id = Unchecked id
@@ -65,7 +74,7 @@ instance ArrowChoice (arr eff ex) => ArrowChoice (CheckpointT arr eff ex ) where
 instance ArrowError ex (arr eff ex) => ArrowError ex (CheckpointT arr eff ex) where
   f `catch` g = Catch f g
 
-instance ArrowFlow (arr eff ex) eff ex => ArrowFlow (CheckpointT arr eff ex) eff ex where
+instance ArrowFlow eff ex (arr eff ex) => ArrowFlow eff ex (CheckpointT arr eff ex) where
   step' props = Unchecked . step' props
   stepIO' props = Unchecked . stepIO' props
   external = Unchecked . external
@@ -98,16 +107,17 @@ runToCompletion (Catch a b)    = runToCompletion a `catch` runToCompletion b
 --   but this is not guaranteed. Please don't do that.
 --
 --   It will error if a checkpoint is set down a conditional branch.
-runToCheckpointEither :: forall arr eff ex a b c.
+runToCheckpointEither :: forall c arr eff ex a b.
                         ( Arrow (arr eff ex)
                         , ArrowChoice (arr eff ex)
                         , ArrowError ex (arr eff ex)
                         , Typeable c
                         )
-                      => CheckpointRef c
+                      => String
                       -> CheckpointT arr eff ex a b
                       -> Either (arr eff ex a b) (arr eff ex a c)
-runToCheckpointEither ref = go where
+runToCheckpointEither chkName = go where
+  ref = CheckpointRef (Proxy :: Proxy c) chkName
   go :: forall i o. CheckpointT arr eff ex i o
      -> Either (arr eff ex i o) (arr eff ex i c)
   go (Checkpoint ref') = case eqT :: (Maybe (c :~: i)) of
@@ -157,5 +167,22 @@ runToCheckpointEither ref = go where
   go (Catch doThis orElseThat) = case go orElseThat of
     Right _ -> throw $ CheckpointInCatch (checkpointName ref)
     Left doneElseThat -> case go doThis of
-      Left doneThis -> Left $ doneThis `catch` doneElseThat
+      Left doneThis  -> Left $ doneThis `catch` doneElseThat
       Right doneThis -> Right doneThis
+
+-- | Run a flow to a checkpoint.
+--
+--   This will error if no matching checkpoint is found in the flow,
+--   or if that checkpoint is defined in an invalid place.
+runToCheckpoint :: forall c arr eff ex a b.
+                  ( Arrow (arr eff ex)
+                  , ArrowChoice (arr eff ex)
+                  , ArrowError ex (arr eff ex)
+                  , Typeable c
+                  )
+                => String
+                -> CheckpointT arr eff ex a b
+                -> arr eff ex a c
+runToCheckpoint cpName flow = case runToCheckpointEither cpName flow of
+  Left _  -> throw $ NoCheckpoint cpName
+  Right f -> f
