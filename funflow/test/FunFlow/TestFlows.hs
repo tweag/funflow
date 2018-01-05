@@ -11,9 +11,7 @@ import           Control.Exception
 import           Control.FunFlow
 import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS
-import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External.Coordinator.Memory
-import           Control.FunFlow.Steps
 import           Control.Monad                               (when)
 import           Data.Default                                (def)
 import           Data.List                                   (sort)
