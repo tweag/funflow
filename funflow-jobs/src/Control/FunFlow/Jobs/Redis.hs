@@ -22,7 +22,7 @@ module Control.FunFlow.Jobs.Redis
 
 import           Control.Concurrent
 import           Control.Exception
-import           Control.FunFlow.Base
+import           Control.FunFlow
 import           Control.FunFlow.Utils
 import           Control.Lens                hiding (argument)
 import           Control.Monad               (void)

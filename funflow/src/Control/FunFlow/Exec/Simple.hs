@@ -114,10 +114,6 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       CS.All item -> f $ CS.itemPath store item
       item CS.:</> path -> f $ CS.itemPath store item </> path
     runFlow' _ (InternalManipulateStore f) = AsyncA $ \i -> f store i
-    runFlow' _ LookupAliasInStore = AsyncA $ \alias ->
-      CS.lookupAlias store alias
-    runFlow' _ AssignAliasInStore = AsyncA $ \(alias, item) ->
-      CS.assignAlias store alias item
     runFlow' _ (Wrapped props w) = withStoreCache (cache props)
       $ runWrapped w
 

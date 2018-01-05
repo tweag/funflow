@@ -198,13 +198,13 @@ mapA f = arr (maybe (Left ()) Right . uncons)
 
 -- | Filter a list given an arrow filter
 filterA :: ArrowChoice a => a b Bool -> a [b] [b]
-filterA f = proc xs -> do
+filterA f = proc xs ->
   case xs of
     [] -> returnA -< []
     (y:ys) -> do
       b <- f -< y
       if b then
-        (id *** filterA f >>> arr (uncurry (:))) -< (y,ys)
+        (second (filterA f) >>> arr (uncurry (:))) -< (y,ys)
       else
         filterA f -< ys
 

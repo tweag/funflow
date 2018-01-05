@@ -9,9 +9,7 @@ import           Control.Arrow.Free
 import           Control.Exception
 import           Control.FunFlow
 import qualified Control.FunFlow.ContentStore                as CS
-import           Control.FunFlow.Exec.Simple
 import           Control.FunFlow.External.Coordinator.SQLite
-import           Control.FunFlow.Steps
 import           Control.Monad
 import           Data.String                                 (fromString)
 import           Path
