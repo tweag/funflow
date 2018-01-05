@@ -22,17 +22,6 @@ main = defaultMain tests
 newtype MyFlow eff ex a b = MyFlow { unMyFlow :: Flow eff ex a b }
   deriving (Arrow, Category, ArrowChoice, ArrowError ex, ArrowFlow eff ex)
 
--- -- Cannot derive this, because 'arr' is not the last type parameter...
--- instance ArrowFlow eff ex (MyFlow eff ex) where
---   step' = coerce $ step' @(Flow _ _  )
---   stepIO' props = MyFlow . stepIO' props
---   external = MyFlow . external
---   wrap' p eff = MyFlow $ wrap' p eff
---   putInStore = MyFlow . putInStore
---   getFromStore = MyFlow . getFromStore
---   internalManipulateStore = MyFlow . internalManipulateStore
-
-
 checkedFlow :: (CheckpointT MyFlow NoEffect SomeException) () Int
 checkedFlow = proc () -> do
   a <- checkpoint "start" -< (12345 :: Int)
@@ -46,26 +35,26 @@ checkedFlow = proc () -> do
 tests :: TestTree
 tests = testGroup "Checkpoints"
   [ testCase "Flow runs to completion" $ do
-      let unchecked = runToCompletion checkedFlow
+      let unchecked = extractToCompletion checkedFlow
       res <- runMyFlow unchecked ()
       case res of
         Right x -> assertEqual "Should return 9" 9 x
         Left ex -> assertFailure $ show ex
   , testCase "Flow aborts at checkpoint" $ do
-      let flow = runToCheckpoint "start" checkedFlow
+      let flow = extractToCheckpoint "start" checkedFlow
       res <- runMyFlow flow ()
       case res of
         Right x -> assertEqual "Should return 12345" (12345 :: Int) x
         Left ex -> assertFailure $ show ex
   , testCase "Flow aborts at checkpoint after step" $ do
-      let flow = runToCheckpoint "after_step" checkedFlow
+      let flow = extractToCheckpoint "after_step" checkedFlow
       res <- runMyFlow flow ()
       case res of
         Right x -> assertEqual "Should return 24690" (24690 :: Int) x
         Left ex -> assertFailure $ show ex
   , testCase "Flow errors at checkpoint in conditional" $
       assertException "CheckpointInConditional" (CheckpointInConditional "in_cond")
-        $ let !_flow = runToCheckpoint @Int "in_cond" checkedFlow in return ()
+        $ let !_flow = extractToCheckpoint @Int "in_cond" checkedFlow in return ()
   ]
 
 runMyFlow :: MyFlow NoEffect SomeException a b -> a -> IO (Either SomeException b)

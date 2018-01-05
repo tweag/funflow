@@ -11,9 +11,9 @@ module Control.FunFlow.Checkpoints
   ( CheckpointException(..)
   , CheckpointT
   , checkpoint
-  , runToCompletion
-  , runToCheckpoint
-  , runToCheckpointEither
+  , extractToCompletion
+  , extractToCheckpoint
+  , extractToCheckpointEither
   ) where
 
 import           Control.Arrow
@@ -57,16 +57,14 @@ data CheckpointT arr (eff :: * -> * -> *) ex a b where
   Unchecked :: arr eff ex a b -> CheckpointT arr eff ex a b
   Seq :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex a c
   Par :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex c d -> CheckpointT arr eff ex (a,c) (b,d)
-  Fanin :: CheckpointT arr eff ex a c -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex (Either a b) c
-  Catch :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex (a,ex) b -> CheckpointT arr eff ex a b
+  Fanin :: ArrowChoice (arr eff ex) => CheckpointT arr eff ex a c -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex (Either a b) c
+  Catch :: ArrowError ex (arr eff ex) => CheckpointT arr eff ex a b -> CheckpointT arr eff ex (a,ex) b -> CheckpointT arr eff ex a b
 
 instance Category (arr eff ex) => Category (CheckpointT arr eff ex) where
   id = Unchecked id
   (.) = flip Seq
 instance Arrow (arr eff ex) => Arrow (CheckpointT arr eff ex) where
   arr f = Unchecked $ arr f
-  first f = Par f id
-  second = Par id
   (***) = Par
 instance ArrowChoice (arr eff ex) => ArrowChoice (CheckpointT arr eff ex ) where
   f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
@@ -88,14 +86,14 @@ checkpoint :: Typeable a => String -> CheckpointT arr eff ex a a
 checkpoint = Checkpoint . CheckpointRef (Proxy :: Proxy a)
 
 -- | Run a checkpointed flow to completion
-runToCompletion :: (Arrow (arr eff ex), ArrowChoice (arr eff ex), ArrowError ex (arr eff ex))
-                => CheckpointT arr eff ex a b -> arr eff ex a b
-runToCompletion (Checkpoint _) = id
-runToCompletion (Unchecked x)  = x
-runToCompletion (Seq a b)      = runToCompletion b . runToCompletion a
-runToCompletion (Par a b)      = runToCompletion a *** runToCompletion b
-runToCompletion (Fanin a b)    = runToCompletion a ||| runToCompletion b
-runToCompletion (Catch a b)    = runToCompletion a `catch` runToCompletion b
+extractToCompletion :: Arrow (arr eff ex)
+                    => CheckpointT arr eff ex a b -> arr eff ex a b
+extractToCompletion (Checkpoint _) = id
+extractToCompletion (Unchecked x)  = x
+extractToCompletion (Seq a b)      = extractToCompletion b . extractToCompletion a
+extractToCompletion (Par a b)      = extractToCompletion a *** extractToCompletion b
+extractToCompletion (Fanin a b)    = extractToCompletion a ||| extractToCompletion b
+extractToCompletion (Catch a b)    = extractToCompletion a `catch` extractToCompletion b
 
 -- | Run a flow to a checkpoint.
 --
@@ -107,16 +105,14 @@ runToCompletion (Catch a b)    = runToCompletion a `catch` runToCompletion b
 --   but this is not guaranteed. Please don't do that.
 --
 --   It will error if a checkpoint is set down a conditional branch.
-runToCheckpointEither :: forall c arr eff ex a b.
+extractToCheckpointEither :: forall c arr eff ex a b.
                         ( Arrow (arr eff ex)
-                        , ArrowChoice (arr eff ex)
-                        , ArrowError ex (arr eff ex)
                         , Typeable c
                         )
                       => String
                       -> CheckpointT arr eff ex a b
                       -> Either (arr eff ex a b) (arr eff ex a c)
-runToCheckpointEither chkName = go where
+extractToCheckpointEither chkName = go where
   ref = CheckpointRef (Proxy :: Proxy c) chkName
   go :: forall i o. CheckpointT arr eff ex i o
      -> Either (arr eff ex i o) (arr eff ex i c)
@@ -174,15 +170,13 @@ runToCheckpointEither chkName = go where
 --
 --   This will error if no matching checkpoint is found in the flow,
 --   or if that checkpoint is defined in an invalid place.
-runToCheckpoint :: forall c arr eff ex a b.
+extractToCheckpoint :: forall c arr eff ex a b.
                   ( Arrow (arr eff ex)
-                  , ArrowChoice (arr eff ex)
-                  , ArrowError ex (arr eff ex)
                   , Typeable c
                   )
                 => String
                 -> CheckpointT arr eff ex a b
                 -> arr eff ex a c
-runToCheckpoint cpName flow = case runToCheckpointEither cpName flow of
+extractToCheckpoint cpName flow = case extractToCheckpointEither cpName flow of
   Left _  -> throw $ NoCheckpoint cpName
   Right f -> f
