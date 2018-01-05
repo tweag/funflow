@@ -1,6 +1,7 @@
 module Control.FunFlow
   ( Base.Flow
   , Base.SimpleFlow
+  , Base.NoEffect
   , Base.Flow'(..)
   , Base.Cacher(..)
   , Base.Properties(..)

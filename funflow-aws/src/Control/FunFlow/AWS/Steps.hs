@@ -41,7 +41,7 @@ import           Path.IO
 putInStoreAt :: forall arr objRef eff ex.
                 ( ObjectReference objRef
                 , (Given Aws.Configuration :=> ContentHashable IO (ObjectInBucket objRef))
-                , ArrowFlow arr eff ex
+                , ArrowFlow eff ex arr
                 )
              => Aws.Configuration
              -> arr (ObjectInBucket objRef, Path Rel File) (CS.Content File)
@@ -69,7 +69,7 @@ putInStoreAt conf = give conf $
 -- Effects turned into steps
 --------------------------------------------------------------------------------
 
-listBucketContents :: ArrowFlow arr eff ex
+listBucketContents :: ArrowFlow eff ex arr
                    => Aws.Configuration
                    -> arr S3.Bucket [ObjectInBucket S3.ObjectInfo]
 listBucketContents conf = stepIO $ runAWSEffect conf ListBucketContents

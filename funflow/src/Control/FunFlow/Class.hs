@@ -12,10 +12,9 @@ import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.External
 import           Data.Default                    (def)
-import qualified Data.Text                       as T
 import           Path
 
-class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow arr eff ex | arr -> eff ex where
+class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex where
   -- | Create a flow from a pure function.
   step' :: Base.Properties a b -> (a -> b) -> arr a b
   -- | Create a flow from an IO action.
@@ -31,7 +30,7 @@ class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow arr eff ex | arr -> eff 
   -- | Perform some internal manipulation of the content store.
   internalManipulateStore :: (CS.ContentStore -> a -> IO b) -> arr a b
 
-instance ArrowFlow (Base.Flow eff ex) eff ex where
+instance ArrowFlow eff ex (Base.Flow eff ex) where
   step' props = effect . Base.Step props
   stepIO' props = effect . Base.StepIO props
   external = effect . Base.External
@@ -42,13 +41,13 @@ instance ArrowFlow (Base.Flow eff ex) eff ex where
 
 -- | Create a flow from a pure function.
 --   This is a variant on 'step'' which uses the default properties.
-step :: ArrowFlow arr eff ex => (a -> b) -> arr a b
+step :: ArrowFlow eff ex arr => (a -> b) -> arr a b
 step = step' def
 
 -- | Create a flow from an IO action.
 --   This is a variant on 'stepIO'' which uses the default properties.
-stepIO :: ArrowFlow arr eff ex => (a -> IO b) -> arr a b
+stepIO :: ArrowFlow eff ex arr => (a -> IO b) -> arr a b
 stepIO = stepIO' def
 
-wrap :: ArrowFlow arr eff ex => eff a b -> arr a b
+wrap :: ArrowFlow eff ex arr => eff a b -> arr a b
 wrap = wrap' def
