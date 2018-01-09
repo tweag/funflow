@@ -91,7 +91,6 @@ module Control.FunFlow.ContentStore
   , getMetadataFile
 
   -- * Accessors
-  , buildPath
   , itemHash
   , itemPath
   , contentPath
@@ -307,12 +306,6 @@ newtype Alias = Alias { unAlias :: T.Text }
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir
 root = storeRoot
-
--- | Path of the build directory of a pending item.
---
--- Beware, this does not check whether the item is actually pending.
-buildPath :: ContentStore -> ContentHash -> Path Abs Dir
-buildPath = mkPendingPath
 
 -- | The store path of a completed item.
 itemPath :: ContentStore -> Item -> Path Abs Dir

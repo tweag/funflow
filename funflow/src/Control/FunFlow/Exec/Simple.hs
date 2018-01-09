@@ -86,12 +86,27 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       $ AsyncA f
     runFlow' po (External toTask) = AsyncA $ \x -> do
       chash <- contentHash (x, toTask x)
-      CS.constructOrWait store chash >>= \case
-        CS.Pending void -> absurd void
+      CS.lookup store chash >>= \case
+        -- The item in question is already in the store. No need to submit a task.
         CS.Complete item -> return item
-        CS.Missing _ -> do
-          let td = TaskDescription chash (toTask x)
+        -- The item is pending in the store. In this case, we should check whether
+        -- the coordinator knows about it
+        CS.Pending _ -> taskInfo po chash >>= \case
+          -- Something has gone wrong here. A task is marked as pending but the
+          -- coordinator does not know about it. Attempt to remove the pending
+          -- path and submit as normal.
+          UnknownTask -> do
+            CS.removeFailed store chash
+            submitAndWait chash (TaskDescription chash (toTask x))
+          -- Task is already known to the coordinator. Most likely something is
+          -- running this task. Just wait for it.
+          KnownTask _ -> wait chash (TaskDescription chash (toTask x))
+      where
+        submitAndWait chash td = do
           submitTask po td
+          wait chash td
+        wait chash td = do
+          KnownTask _ <- awaitTask po chash
           CS.waitUntilComplete store chash >>= \case
             Just item -> return item
             Nothing -> do
