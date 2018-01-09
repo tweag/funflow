@@ -101,6 +101,8 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           -- Task is already known to the coordinator. Most likely something is
           -- running this task. Just wait for it.
           KnownTask _ -> wait chash (TaskDescription chash (toTask x))
+        -- Nothing in the store. Submit and run.
+        CS.Missing _ -> submitAndWait chash (TaskDescription chash (toTask x))
       where
         submitAndWait chash td = do
           submitTask po td
