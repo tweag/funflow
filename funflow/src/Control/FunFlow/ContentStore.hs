@@ -522,7 +522,6 @@ markComplete store inHash = liftIO . withStoreLock store $
     Missing () -> throwIO (NotPending inHash)
     Complete _ -> throwIO (AlreadyComplete inHash)
     Pending build -> withWritableStore store $ liftIO $ do
-      unsetWritableRecursively build
       do
         let metadataDir = mkMetadataDirPath store inHash
         exists <- doesDirExist metadataDir
@@ -535,7 +534,9 @@ markComplete store inHash = liftIO . withStoreLock store $
           link' = mkCompletePath store inHash
       doesDirExist out >>= \case
         True -> removePathForcibly (fromAbsDir build)
-        False -> renameDir build out
+        False -> do
+          renameDir build out
+          unsetWritableRecursively out
       rel <- makeRelative (parent link') out
       let from' = dropTrailingPathSeparator $ fromAbsDir link'
           to' = dropTrailingPathSeparator $ fromRelDir rel
