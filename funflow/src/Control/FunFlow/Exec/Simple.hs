@@ -5,6 +5,7 @@
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeOperators       #-}
 
 module Control.FunFlow.Exec.Simple
@@ -33,6 +34,7 @@ import           Control.Monad.Catch                         (Exception,
 import           Control.Monad.IO.Class                      (liftIO)
 import           Control.Monad.Trans.Class                   (lift)
 import qualified Data.ByteString                             as BS
+import           Data.Monoid                                 ((<>))
 import           Data.Void
 import           Katip
 import           Path
@@ -122,7 +124,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
               mbStdout <- CS.getMetadataFile store chash [relfile|stdout|]
               mbStderr <- CS.getMetadataFile store chash [relfile|stderr|]
               throwM $ ExternalTaskFailed td ti mbStdout mbStderr
-    runFlow' _ (PutInStore f) = AsyncA $ \x -> do
+    runFlow' _ (PutInStore f) = AsyncA $ \x -> katipAddNamespace "putInStore" $ do
       chash <- liftIO $ contentHash x
       CS.constructOrWait store chash >>= \case
         CS.Pending void -> absurd void
@@ -132,7 +134,9 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
             liftIO $ f fp x
             CS.markComplete store chash
           `onException`
-          CS.removeFailed store chash
+            (do $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash
+                CS.removeFailed store chash
+            )
     runFlow' _ (GetFromStore f) = AsyncA $ \case
       CS.All item -> lift . f $ CS.itemPath store item
       item CS.:</> path -> lift . f $ CS.itemPath store item </> path
