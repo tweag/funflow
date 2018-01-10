@@ -27,10 +27,10 @@ instance MonadBaseControl IO m => Arrow (AsyncA m) where
   arr f = AsyncA (return . f)
   first (AsyncA f) = AsyncA (\ ~(b,d) -> f b >>= \c -> return (c,d))
   second (AsyncA f) = AsyncA (\ ~(d,b) -> f b >>= \c -> return (d,c))
-  (AsyncA f) *** (AsyncA g) = AsyncA $ \ ~(a,b) -> do
-    c <- async $ f a
-    d <- async $ g b
-    waitBoth c d
+  (AsyncA f) *** (AsyncA g) = AsyncA $ \ ~(a,b) ->
+    withAsync (f a) $ \c ->
+      withAsync (g b) $ \d ->
+        waitBoth c d
 
 instance MonadBaseControl IO m => ArrowChoice (AsyncA m) where
     left f = f +++ arr id
