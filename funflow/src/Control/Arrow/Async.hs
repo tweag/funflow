@@ -12,6 +12,7 @@ import           Control.Category
 import           Control.Concurrent.Async.Lifted
 import           Control.Monad.Catch             (Exception, MonadCatch)
 import qualified Control.Monad.Catch             as Monad.Catch
+import           Control.Monad.Trans.Class       (MonadTrans, lift)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import           Prelude                         hiding (id, (.))
 
@@ -41,3 +42,9 @@ instance (Exception ex, MonadBaseControl IO m, MonadCatch m)
   => ArrowError ex (AsyncA m) where
     AsyncA arr1 `catch` AsyncA arr2 = AsyncA $ \x ->
       arr1 x `Monad.Catch.catch` curry arr2 x
+
+-- | Lift an AsyncA through a monad transformer of the underlying monad.
+liftAsyncA :: (MonadTrans t, Monad m)
+           => AsyncA m i o
+           -> AsyncA (t m) i o
+liftAsyncA (AsyncA f) = AsyncA $ \i -> lift (f i)
