@@ -23,6 +23,7 @@ module Control.Arrow.Free
   , ArrowError(..)
     -- * Arrow functions
   , mapA
+  , mapSeqA
   , filterA
   , type (~>)
   ) where
@@ -195,6 +196,11 @@ instance FreeArrowLike (ErrorChoice ex) where
 mapA :: ArrowChoice a => a b c -> a [b] [c]
 mapA f = arr (maybe (Left ()) Right . uncons)
       >>> (arr (const []) ||| ((f *** mapA f) >>> arr (uncurry (:))))
+
+-- | Map an arrow over a list, forcing sequencing between each element.
+mapSeqA :: ArrowChoice a => a b c -> a [b] [c]
+mapSeqA f = arr (maybe (Left ()) Right . uncons)
+            >>> (arr (const []) ||| ((first f >>> second (mapA f)) >>> arr (uncurry (:))))
 
 -- | Filter a list given an arrow filter
 filterA :: ArrowChoice a => a b Bool -> a [b] [b]
