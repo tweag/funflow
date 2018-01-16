@@ -200,7 +200,7 @@ mapA f = arr (maybe (Left ()) Right . uncons)
 -- | Map an arrow over a list, forcing sequencing between each element.
 mapSeqA :: ArrowChoice a => a b c -> a [b] [c]
 mapSeqA f = arr (maybe (Left ()) Right . uncons)
-            >>> (arr (const []) ||| ((first f >>> second (mapA f)) >>> arr (uncurry (:))))
+            >>> (arr (const []) ||| ((first f >>> second (mapSeqA f)) >>> arr (uncurry (:))))
 
 -- | Filter a list given an arrow filter
 filterA :: ArrowChoice a => a b Bool -> a [b] [b]
