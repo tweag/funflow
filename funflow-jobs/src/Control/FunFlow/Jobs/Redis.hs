@@ -21,7 +21,6 @@ module Control.FunFlow.Jobs.Redis
   )  where
 
 import           Control.Concurrent
-import           Control.Exception
 import           Control.FunFlow
 import           Control.FunFlow.Utils
 import           Control.Lens                hiding (argument)

@@ -9,7 +9,7 @@ module Control.FunFlow.External.Coordinator.SQLite
   ) where
 
 import           Control.Concurrent                   (threadDelay)
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.FunFlow.ContentHashable
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator

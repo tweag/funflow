@@ -6,7 +6,7 @@ module FunFlow.SQLiteCoordinator where
 
 import           Control.Arrow
 import           Control.Arrow.Free
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.FunFlow
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.External.Coordinator.SQLite

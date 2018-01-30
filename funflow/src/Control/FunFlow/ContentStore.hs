@@ -117,14 +117,14 @@ import           Control.Arrow                       (second)
 import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception                   (Exception, bracket_,
+import           Control.Exception.Safe              (Exception, MonadMask,
+                                                      bracket, bracket_,
                                                       displayException, throwIO)
 import           Control.FunFlow.ContentStore.Notify
 import           Control.FunFlow.Orphans             ()
 import           Control.Lens
 import           Control.Monad                       (forever, unless, void,
                                                       when, (<=<), (>=>))
-import           Control.Monad.Catch                 (MonadMask, bracket)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)

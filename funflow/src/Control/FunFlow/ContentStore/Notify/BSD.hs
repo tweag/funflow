@@ -13,7 +13,7 @@ module Control.FunFlow.ContentStore.Notify.BSD
 
 import           Control.Concurrent
 import           Control.Concurrent.Async
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.Monad
 import           Data.Typeable
 import           Foreign.Ptr
