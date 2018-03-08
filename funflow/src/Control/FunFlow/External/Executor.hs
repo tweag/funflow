@@ -116,8 +116,18 @@ executeLoop :: forall c. Coordinator c
             -> Config c
             -> CS.ContentStore
             -> IO ()
-executeLoop _ cfg store = do
-  handleScribe <- mkHandleScribe ColorIfTerminal stdout InfoS V2
+executeLoop coord cfg store =
+  executeLoopWithScribe coord cfg store =<<
+    mkHandleScribe ColorIfTerminal stdout InfoS V2
+
+-- | Same as 'executeLoop', but allows specifying a custom 'Scribe' for logging
+executeLoopWithScribe :: forall c. Coordinator c
+                      => c
+                      -> Config c
+                      -> CS.ContentStore
+                      -> Scribe
+                      -> IO ()
+executeLoopWithScribe _ cfg store handleScribe = do
   let mkLogEnv = registerScribe "stdout" handleScribe defaultScribeSettings =<< initLogEnv "FFExecutorD" "production"
   bracket mkLogEnv closeScribes $ \le -> do
     let initialContext = ()
