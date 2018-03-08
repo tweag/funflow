@@ -102,18 +102,18 @@ instance SQL.FromRow SqlTask where
 
 -- | Errors that can occur when interacting with the SQLite coordinator.
 data SQLiteCoordinatorError
-  = MissingDBTaskEntry ContentHash T.Text
     -- | @MissingDBTaskEntry output field@
     --   The task database entry is missing a field.
-  | DecodingError T.Text String
+  = MissingDBTaskEntry ContentHash T.Text
     -- | @DecodingError field error@
     --   Failed to decode the field.
-  | NonRunningTask ContentHash
+  | DecodingError T.Text String
     -- | @NonRunningTask output@
     --   The task is not running.
-  | IllegalStatusUpdate ContentHash TaskStatus
+  | NonRunningTask ContentHash
     -- | @IllegalStatusUpdate output status@
     --   Cannot update the status of the task.
+  | IllegalStatusUpdate ContentHash TaskStatus
   deriving (Show, Typeable)
 instance Exception SQLiteCoordinatorError where
   displayException (MissingDBTaskEntry output field) =
