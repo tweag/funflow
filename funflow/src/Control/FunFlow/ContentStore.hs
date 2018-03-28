@@ -70,6 +70,7 @@ module Control.FunFlow.ContentStore
   , constructOrAsync
   , constructOrWait
   , constructIfMissing
+  , withConstructIfMissing
   , markPending
   , markComplete
 
@@ -119,6 +120,7 @@ import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe              (Exception, MonadMask,
                                                       bracket, bracket_,
+                                                      bracketOnError,
                                                       displayException, throwIO)
 import           Control.FunFlow.ContentStore.Notify
 import           Control.FunFlow.Orphans             ()
@@ -501,6 +503,33 @@ constructIfMissing store hash = liftIO . withStoreLock store $
     Pending _ -> return $ Pending ()
     Missing () -> withWritableStore store $
       Missing <$> internalMarkPending store hash
+
+-- | Atomically query the state under the given key and mark pending if missing.
+-- Execute the given function to construct the item, mark as complete on success
+-- and remove on failure. Forcibly removes if an uncaught exception occurs
+-- during item construction.
+withConstructIfMissing
+  :: (MonadIO m, MonadMask m)
+  => ContentStore
+  -> ContentHash
+  -> (Path Abs Dir -> m (Either e a))
+  -> m (Status e () (Maybe a, Item))
+withConstructIfMissing store hash f =
+  bracketOnError
+    (constructIfMissing store hash)
+    (\case
+      Missing _ -> removeForcibly store hash
+      _ -> return ())
+    (\case
+      Pending () -> return (Pending ())
+      Complete item -> return (Complete (Nothing, item))
+      Missing fp -> f fp >>= \case
+        Left e -> do
+          removeFailed store hash
+          return (Missing e)
+        Right x -> do
+          item <- markComplete store hash
+          return (Complete (Just x, item)))
 
 -- | Mark a non-existent item as pending.
 --
