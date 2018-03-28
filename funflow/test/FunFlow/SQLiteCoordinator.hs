@@ -7,12 +7,15 @@ module FunFlow.SQLiteCoordinator where
 
 import           Control.Arrow
 import           Control.Arrow.Free
+import           Control.Concurrent                          (threadDelay)
+import           Control.Concurrent.Async                    (wait, withAsync)
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe
 import           Control.FunFlow
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.External.Coordinator.SQLite
 import           Control.Monad
+import           Data.Semigroup                              ((<>))
 import           Data.String                                 (fromString)
 import           Path
 import           Path.IO
@@ -20,6 +23,7 @@ import qualified System.Posix.Signals                        as Signals
 import           System.Posix.Types                          (ProcessID)
 import           System.Process
 import qualified System.Process.Internals                    as Process
+import           System.Timeout                              (timeout)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -69,6 +73,17 @@ echo = external $ \msg -> ExternalTask
   , _etParams = ["-n", fromString msg]
   }
 
+sleepEcho :: SimpleFlow (Double, String) CS.Item
+sleepEcho = external $ \(time, msg) -> ExternalTask
+  { _etCommand = "sh"
+  , _etWriteToStdOut = True
+  , _etParams =
+      [ "-c"
+      , "sleep " <> fromString (show time) <> ";"
+        <> "echo -n " <> fromString msg
+      ]
+  }
+
 flow :: SimpleFlow () String
 flow = proc () -> do
   (a, (b, (c, d)))
@@ -88,4 +103,34 @@ tests = testGroup "SQLite Coordinator"
         case r of
           Left err -> assertFailure $ displayException err
           Right x  -> x @?= "abcdefgh"
+  , testCase "interrupt worker" $
+      withSystemTempDir "funflow_sqlite_" $ \wd -> do
+        r <- timeout 10000000 $
+          -- Spawn one initial executor.
+          withExecutors wd 1 $ \[executorHandle] -> do
+            mvar <- newMVar False
+            let trigger :: SimpleFlow () ()
+                trigger = stepIO (\_ -> modifyMVar_ mvar $ \_ -> pure True)
+                sleepFlow :: SimpleFlow () String
+                sleepFlow = proc () -> do
+                  r <- sleepEcho -< (1, "test")
+                  trigger -< const () r
+                  readString_ -< r
+            -- Run the flow in parallel.
+            withAsync (runTestFlow wd sleepFlow ()) $ \flowAsync -> do
+              threadDelay 500000
+              -- Interrupt the executor while the external task is running.
+              signalProcess Signals.sigINT executorHandle
+              threadDelay 2000000
+              -- Check that the executor did not complete the task.
+              progress <- readMVar mvar
+              when progress $
+                assertFailure "Executor should not have completed the task"
+              -- Spawn a new executor to finish the flow.
+              withExecutors wd 1 $ \_ ->
+                wait flowAsync
+        case r of
+          Nothing -> assertFailure "Timed out"
+          Just (Left err) -> assertFailure $ displayException err
+          Just (Right x)  -> x @?= "test"
   ]
