@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows            #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 
@@ -6,6 +7,7 @@ module FunFlow.SQLiteCoordinator where
 
 import           Control.Arrow
 import           Control.Arrow.Free
+import           Control.Concurrent.MVar
 import           Control.Exception.Safe
 import           Control.FunFlow
 import qualified Control.FunFlow.ContentStore                as CS
@@ -14,7 +16,10 @@ import           Control.Monad
 import           Data.String                                 (fromString)
 import           Path
 import           Path.IO
+import qualified System.Posix.Signals                        as Signals
+import           System.Posix.Types                          (ProcessID)
 import           System.Process
+import qualified System.Process.Internals                    as Process
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -40,6 +45,17 @@ withExecutors wd n = bracket (spawnExecutors wd n) killExecutors
 
 withExecutors_ :: Path Abs Dir -> Int -> IO a -> IO a
 withExecutors_ wd n = withExecutors wd n . const
+
+getProcessID :: ProcessHandle -> IO (Maybe ProcessID)
+getProcessID ph = Process.withProcessHandle ph $ \case
+  Process.OpenHandle h -> return (Just h)
+  Process.OpenExtHandle h _ _ -> return (Just h)
+  Process.ClosedHandle {} -> return Nothing
+
+signalProcess :: Signals.Signal -> ProcessHandle -> IO ()
+signalProcess sig = getProcessID >=> \case
+  Nothing -> return ()
+  Just pid -> Signals.signalProcess sig pid
 
 runTestFlow :: Path Abs Dir -> SimpleFlow a b -> a -> IO (Either SomeException b)
 runTestFlow wd flow' input =
