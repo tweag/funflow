@@ -35,8 +35,11 @@ spawnExecutors wd n = replicateM n (spawnExecutor wd)
 killExecutors :: [ProcessHandle] -> IO ()
 killExecutors = mapM_ terminateProcess
 
-withExecutors :: Path Abs Dir -> Int -> IO a -> IO a
-withExecutors wd n = bracket (spawnExecutors wd n) killExecutors . const
+withExecutors :: Path Abs Dir -> Int -> ([ProcessHandle] -> IO a) -> IO a
+withExecutors wd n = bracket (spawnExecutors wd n) killExecutors
+
+withExecutors_ :: Path Abs Dir -> Int -> IO a -> IO a
+withExecutors_ wd n = withExecutors wd n . const
 
 runTestFlow :: Path Abs Dir -> SimpleFlow a b -> a -> IO (Either SomeException b)
 runTestFlow wd flow' input =
@@ -64,7 +67,7 @@ tests :: TestTree
 tests = testGroup "SQLite Coordinator"
   [ testCase "echo flow" $
       withSystemTempDir "funflow_sqlite_" $ \wd ->
-      withExecutors wd 4 $ do
+      withExecutors_ wd 4 $ do
         r <- runTestFlow wd flow ()
         case r of
           Left err -> assertFailure $ displayException err
