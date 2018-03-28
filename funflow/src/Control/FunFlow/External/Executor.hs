@@ -47,7 +47,7 @@ data ExecutionResult =
 
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
-execute store td = do
+execute store td = logError $ do
   status <- CS.withConstructIfMissing store (td ^. tdOutput) $ \fp -> do
     (fpOut, hOut) <- lift $
       CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
@@ -101,6 +101,9 @@ execute store td = do
     CS.Pending () -> return AlreadyRunning
     CS.Complete (Nothing, _) -> return Cached
     CS.Complete (Just t, _) -> return (Success t)
+  where
+    logError = flip withException $ \(e::SomeException) ->
+      $(logTM) ErrorS . ls $ displayException e
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
