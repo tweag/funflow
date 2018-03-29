@@ -1,20 +1,29 @@
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeOperators      #-}
 
 import           Control.Applicative
+import           Control.Concurrent                          (myThreadId)
+import           Control.Concurrent.MVar
+import           Control.Exception.Base                      (AsyncException (UserInterrupt))
+import           Control.Exception.Safe
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.External.Coordinator.Redis
 import           Control.FunFlow.External.Coordinator.SQLite
 import           Control.FunFlow.External.Executor
+import           Control.Monad                               (void)
 import           Data.Monoid                                 ((<>))
 import qualified Database.Redis                              as R
 import qualified Options.Applicative                         as Opt
 import           Path
+import           System.Clock
+import           System.IO
+import qualified System.Posix.Signals                        as Signals
 
 
 data UseCoord
@@ -72,9 +81,52 @@ parseArgs = Opt.execParser $ Opt.info (argsParser Opt.<**> Opt.helper)
       "Await and execute funflow external tasks on the given coordinator."
   <> Opt.header "ffexecutord - Funflow task executor"
 
+data HandlerState
+  = Initial
+  | Terminating TimeSpec TimeSpec
+
+data HandlerInstruction
+  = Terminate
+  | Ignore
+  | Message
+
 main :: IO ()
 main = do
   config <- parseArgs
+
+  -- Configure custom interrupt handler.
+  -- GHC's default interrupt handler works only one time. On the second
+  -- interrupt the process will terminate immediately without any cleanup.
+  -- This could leave the funflow store and coordinator in an invalid state.
+  -- This installs a handler that works on multiple interrupts.
+  -- On the first interrupt it will send an async `UserInterrupt` exception to
+  -- the main-thread. On further interrupts it will print a message clarifying
+  -- that clean-up is ongoing.
+  mainThreadId <- myThreadId
+  mvState <- newMVar Initial
+  let handler name = Signals.Catch $ do
+        let msgTime = fromNanoSecs 1000000000
+        instr <- modifyMVar mvState $ \case
+          Initial -> do
+            t <- getTime Monotonic
+            return (Terminating t t, Terminate)
+          Terminating tsig tmsg -> do
+            t' <- getTime Monotonic
+            return $
+              if t' `diffTimeSpec` tmsg > msgTime then
+                (Terminating tsig 0, Message)
+              else
+                (Terminating tsig tmsg, Ignore)
+        case instr of
+          Terminate -> throwTo mainThreadId UserInterrupt
+          Ignore -> return ()
+          Message -> void $ tryAny $ hPutStrLn stderr $
+            "Handling " ++ name ++ " signal. Awaiting cleanup."
+      installHandler signal name = void $
+        Signals.installHandler signal (handler name) Nothing
+  installHandler Signals.sigINT "interrupt"
+  installHandler Signals.sigQUIT "quit"
+  installHandler Signals.sigTERM "terminate"
 
   -- XXX: Improve handling of invalid paths.
   storePath' <- parseAbsDir (storePath config)
