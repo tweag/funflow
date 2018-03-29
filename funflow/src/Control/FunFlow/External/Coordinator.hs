@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE StrictData                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -131,3 +132,31 @@ isInProgress h ch = do
     KnownTask Pending     -> True
     KnownTask (Running _) -> True
     _                     -> False
+
+-- | Pop a task off of the queue for execution. Passes the popped task to the
+--   given function for execution. If the function returns success ('Right'),
+--   then the task will be marked as completed in the given time. If the
+--   function returns failure ('Left'), then the task will be marked as
+--   failed. If the function raises an exception or is interrupted by an
+--   asynchronous exception, then the task will be placed back on the task
+--   queue and the exception propagated. Returns 'Nothing' if no task is
+--   available and @'Just' ()@ on task completion or regular failure.
+withPopTask :: (Coordinator c, MonadIO m, MonadMask m)
+  => Hook c -> Executor
+  -> (TaskDescription -> m (TimeSpec, Either Int ()))
+  -> m (Maybe ())
+withPopTask hook executor f =
+  bracketOnError
+    (popTask hook executor)
+    (\case
+      Nothing -> return ()
+      -- XXX: Log errors that happen here.
+      Just td -> update td Pending)
+    (\case
+      Nothing -> return Nothing
+      Just td -> f td >>= \case
+        (t, Left ec) -> Just <$> update td (Failed (execInfo t) ec)
+        (t, Right ()) -> Just <$> update td (Completed (execInfo t)))
+  where
+    update td = updateTaskStatus hook (td ^. tdOutput)
+    execInfo = ExecutionInfo executor
