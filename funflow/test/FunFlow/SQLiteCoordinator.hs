@@ -121,6 +121,12 @@ tests = testGroup "SQLite Coordinator"
               threadDelay 500000
               -- Interrupt the executor while the external task is running.
               signalProcess Signals.sigINT executorHandle
+              -- Send a second interrupt shortly after. Users can be impatient.
+              -- GHC's default interrupt handler is one-time, after the first
+              -- interrupt was called a second will terminate the process
+              -- immediately, leaving no time for clean-up.
+              threadDelay 50000
+              signalProcess Signals.sigINT executorHandle
               threadDelay 2000000
               -- Check that the executor did not complete the task.
               progress <- readMVar mvar
