@@ -86,6 +86,7 @@ module Control.FunFlow.ContentStore
   , listAliases
 
   -- * Metadata
+  , getBackReferences
   , setMetadata
   , getMetadata
   , createMetadataFile
@@ -664,6 +665,15 @@ listAliases store = liftIO . withStoreLock store $
   fmap (map (second Item)) $
     SQL.query_ (storeDb store)
       "SELECT name, dest FROM aliases"
+
+-- | Get all hashes that resulted in the given item.
+getBackReferences :: MonadIO m => ContentStore -> Item -> m [ContentHash]
+getBackReferences store (Item outHash) = liftIO . withStoreLock store $
+  map SQL.fromOnly <$> SQL.queryNamed (storeDb store)
+    "SELECT hash FROM backrefs\
+    \ WHERE\
+    \  dest = :out"
+    [ ":out" SQL.:= outHash ]
 
 -- | Set a metadata entry on a pending item.
 setMetadata :: (SQL.ToField k, SQL.ToField v, MonadIO m )
