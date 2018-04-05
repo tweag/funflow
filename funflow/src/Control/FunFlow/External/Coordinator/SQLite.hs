@@ -292,7 +292,15 @@ instance Coordinator SQLite where
             , ":exit_code" SQL.:= exitCode
             , ":output" SQL.:= output
             ]
-          Pending -> throwIO $ IllegalStatusUpdate output ts
+          Pending -> SQL.executeNamed conn
+            "UPDATE tasks\
+            \ SET\
+            \  status = :pending\
+            \ WHERE\
+            \  output = :output"
+            [ ":pending" SQL.:= SqlPending
+            , ":output" SQL.:= output
+            ]
           Running _ -> throwIO $ IllegalStatusUpdate output ts
         _ -> throwIO $ NonRunningTask output
 

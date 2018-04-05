@@ -17,6 +17,7 @@ import           Control.Monad                        (forever, when)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.ByteString                      as BS
+import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
 import           Katip                                as K
 import           Network.HostName
@@ -133,11 +134,7 @@ executeLoopWithScribe _ cfg store handleScribe = do
       hook :: Hook c <- lift $ initialise cfg
       executor <- lift $ Executor <$> getHostName
 
-      -- Types of completion/status updates
-      let fromCache = Completed $ ExecutionInfo executor 0
-          afterTime t = Completed $ ExecutionInfo executor t
-          afterFailure t i = Failed (ExecutionInfo executor t) i
-          -- Known failures that do not affect the executors ability
+      let -- Known failures that do not affect the executors ability
           -- to execute further tasks will be logged and ignored.
           handleFailures = handle $ \(e::CS.StoreError) ->
             -- Certain store errors can occur if an item is forcibly removed
@@ -149,17 +146,40 @@ executeLoopWithScribe _ cfg store handleScribe = do
 
       forever $ handleFailures $ do
         $(logTM) DebugS "Awaiting task from coordinator."
-        mtask <- popTask hook executor
-        case mtask of
-          Nothing -> lift $ threadDelay 1000000
-          Just task -> katipAddContext (sl "task" $ task ^. tdOutput) $ do
+        mb <- withPopTask hook executor $ \task ->
+          katipAddContext (sl "task" $ task ^. tdOutput) $ do
             $(logTM) DebugS "Checking task"
             res <- execute store task
             case res of
-              Cached      -> updateTaskStatus hook (task ^. tdOutput) fromCache
-              Success t   -> updateTaskStatus hook (task ^. tdOutput) $ afterTime t
-              Failure t i -> updateTaskStatus hook (task ^. tdOutput) $ afterFailure t i
-              AlreadyRunning -> return ()
+              Cached      -> do
+                $(logTM) InfoS "Task was cached"
+                return (0, Right ())
+              Success t   -> do
+                $(logTM) InfoS "Task completed successfully"
+                return (t, Right ())
+              Failure t i -> do
+                $(logTM) WarningS "Task failed"
+                return (t, Left i)
+              AlreadyRunning -> do
+                -- XXX:
+                --   This should not happen and indicates a programming error
+                --   or invalid state.
+                --   We do not want to just put the task back on the queue,
+                --   as it would cause a loop.
+                --   We do not want to just mark the task done, as a potential
+                --   later completion of the already running external task
+                --   would to mark it as done then.
+                --   We cannot mark it as ongoing, as we don't have information
+                --   on the executor where the task is already running.
+                $(logTM) ErrorS $
+                  "Received an already running task from the coordinator "
+                  <> showLS (task ^. tdOutput)
+                error $
+                  "Received an already running task from the coordinator "
+                  ++ show (task ^. tdOutput)
+        case mb of
+          Nothing -> lift $ threadDelay 1000000
+          Just () -> return ()
 
 -- | @followFile in out@ follows the file @in@
 --   and prints contents to @out@ as they appear.
