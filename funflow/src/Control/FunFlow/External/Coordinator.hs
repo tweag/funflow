@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE StrictData                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -13,9 +14,11 @@ import           Control.FunFlow.External
 import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 
+import           Data.Monoid                     ((<>))
 import           Data.Store                      (Store)
 import           Data.Store.TH                   (makeStore)
 import           Data.Typeable                   (Typeable)
+import           Katip
 import           Network.HostName
 import           Path
 import           System.Clock                    (TimeSpec)
@@ -141,7 +144,7 @@ isInProgress h ch = do
 --   asynchronous exception, then the task will be placed back on the task
 --   queue and the exception propagated. Returns 'Nothing' if no task is
 --   available and @'Just' ()@ on task completion or regular failure.
-withPopTask :: (Coordinator c, MonadIO m, MonadMask m)
+withPopTask :: (Coordinator c, MonadIO m, MonadMask m, KatipContext m)
   => Hook c -> Executor
   -> (TaskDescription -> m (TimeSpec, Either Int ()))
   -> m (Maybe ())
@@ -150,8 +153,15 @@ withPopTask hook executor f =
     (popTask hook executor)
     (\case
       Nothing -> return ()
-      -- XXX: Log errors that happen here.
-      Just td -> update td Pending)
+      Just td ->
+        update td Pending
+        `withException`
+        \e -> $(logTM) ErrorS $
+          "Failed to place task "
+          <> showLS (td ^. tdOutput)
+          <> " back on queue: "
+          <> ls (displayException (e :: SomeException))
+        )
     (\case
       Nothing -> return Nothing
       Just td -> f td >>= \case
