@@ -30,8 +30,8 @@ module Control.Arrow.Free
 
 import           Control.Arrow
 import           Control.Category
-import           Control.Monad.Catch (Exception, MonadCatch)
-import qualified Control.Monad.Catch as Monad.Catch
+import           Control.Exception.Safe (Exception, MonadCatch)
+import qualified Control.Exception.Safe
 import           Data.Bool           (Bool)
 import           Data.Constraint     (Constraint, Dict (..), mapDict, weaken1,
                                       weaken2)
@@ -148,7 +148,7 @@ class ArrowError ex a where
 instance (Arrow (Kleisli m), Exception ex, MonadCatch m)
   => ArrowError ex (Kleisli m) where
     Kleisli arr1 `catch` Kleisli arr2 = Kleisli $ \x ->
-      arr1 x `Monad.Catch.catch` curry arr2 x
+      arr1 x `Control.Exception.Safe.catch` curry arr2 x
 
 newtype ErrorChoice ex eff a b = ErrorChoice {
   runErrorChoice :: forall ac. (ArrowChoice ac, ArrowError ex ac)

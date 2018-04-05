@@ -16,7 +16,7 @@ module Control.FunFlow.Lock
   ) where
 
 import           Control.Concurrent
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.Monad           (unless)
 import           Network.HostName        (getHostName)
 import           Path

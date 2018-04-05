@@ -11,7 +11,7 @@ module Control.FunFlow.Base where
 
 import           Control.Arrow                   (Kleisli(..))
 import           Control.Arrow.Free
-import           Control.Exception               (SomeException)
+import           Control.Exception.Safe          (SomeException)
 import           Control.FunFlow.ContentHashable
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.Diagram

@@ -7,7 +7,7 @@
 module FunFlow.TestFlows where
 
 import           Control.Arrow
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.FunFlow
 import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS

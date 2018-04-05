@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilyDependencies     #-}
 module Control.FunFlow.External.Coordinator where
 
-import           Control.Exception
+import           Control.Exception.Safe
 import           Control.FunFlow.ContentHashable (ContentHash)
 import           Control.FunFlow.External
 import           Control.Lens

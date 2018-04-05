@@ -26,7 +26,7 @@ import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.FunFlow.External.Coordinator.Memory
 import           Control.FunFlow.External.Executor           (executeLoop)
-import           Control.Monad.Catch                         (Exception,
+import           Control.Exception.Safe                      (Exception,
                                                               SomeException,
                                                               bracket,
                                                               onException,

@@ -10,8 +10,8 @@ import           Control.Arrow
 import           Control.Arrow.Free              (ArrowError (..))
 import           Control.Category
 import           Control.Concurrent.Async.Lifted
-import           Control.Monad.Catch             (Exception, MonadCatch)
-import qualified Control.Monad.Catch             as Monad.Catch
+import           Control.Exception.Safe          (Exception, MonadCatch)
+import qualified Control.Exception.Safe
 import           Control.Monad.Trans.Class       (MonadTrans, lift)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
 import           Prelude                         hiding (id, (.))
@@ -41,7 +41,7 @@ instance MonadBaseControl IO m => ArrowChoice (AsyncA m) where
 instance (Exception ex, MonadBaseControl IO m, MonadCatch m)
   => ArrowError ex (AsyncA m) where
     AsyncA arr1 `catch` AsyncA arr2 = AsyncA $ \x ->
-      arr1 x `Monad.Catch.catch` curry arr2 x
+      arr1 x `Control.Exception.Safe.catch` curry arr2 x
 
 -- | Lift an AsyncA through a monad transformer of the underlying monad.
 liftAsyncA :: (MonadTrans t, Monad m)

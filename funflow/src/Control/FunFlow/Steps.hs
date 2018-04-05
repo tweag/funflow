@@ -41,7 +41,7 @@ where
 
 import           Control.Arrow
 import           Control.Arrow.Free              (catch)
-import           Control.Exception               (Exception)
+import           Control.Exception.Safe          (Exception, throwM)
 import           Control.FunFlow.Base            (SimpleFlow)
 import           Control.FunFlow.Class
 import           Control.FunFlow.ContentHashable (ContentHashable,
@@ -50,7 +50,6 @@ import           Control.FunFlow.ContentHashable (ContentHashable,
 import           Control.FunFlow.ContentStore    (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore    as CS
 import qualified Control.FunFlow.External.Docker as Docker
-import           Control.Monad.Catch             (throwM)
 import           Data.Foldable                   (for_)
 import           Data.Store
 import           Data.Traversable                (for)

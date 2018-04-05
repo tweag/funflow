@@ -11,7 +11,7 @@ module Control.FunFlow.ContentStore.Notify.Linux
   , removeDirWatch
   ) where
 
-import           Control.Exception (catch)
+import           Control.Exception.Safe (catch)
 import           System.INotify
 
 type Notifier = INotify

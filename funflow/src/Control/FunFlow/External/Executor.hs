@@ -7,14 +7,13 @@
 module Control.FunFlow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
-import           Control.Exception                    (IOException)
+import           Control.Exception.Safe
 import           Control.Concurrent.Async
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
 import           Control.Monad                        (forever, when)
-import           Control.Monad.Catch
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.ByteString                      as BS
