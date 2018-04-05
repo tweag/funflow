@@ -6,7 +6,6 @@
 module Control.FunFlow.External.Docker where
 
 import           Control.FunFlow.ContentHashable
-import qualified Control.FunFlow.ContentStore    as CS
 import           Control.FunFlow.External
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
@@ -17,13 +16,13 @@ import           System.FilePath
 
 data Bind
   -- | Single input, will get mounted to @/input@ on the image.
-  = SingleInput CS.Item
+  = SingleInput InputPath
   -- | Multiple inputs, each gets mouted into a subdirectory under
   -- @/input@ as described by the given mapping.
-  | MultiInput (Map FilePath CS.Item)
+  | MultiInput (Map FilePath InputPath)
   deriving Generic
 
-instance Monad m => ContentHashable m Bind
+instance ContentHashable IO Bind
 
 data Config = Config
   { image      :: T.Text
@@ -33,7 +32,7 @@ data Config = Config
   , args       :: [T.Text]
   } deriving Generic
 
-instance Monad m => ContentHashable m Config
+instance ContentHashable IO Config
 
 toExternal :: Config -> ExternalTask
 toExternal cfg = ExternalTask

@@ -7,7 +7,8 @@
 -- | Definition of external tasks
 module Control.FunFlow.External where
 
-import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable)
+import           Control.FunFlow.ContentHashable (ContentHash, ContentHashable, ExternallyAssuredDirectory (..),
+                                                  ExternallyAssuredFile (..))
 import qualified Control.FunFlow.ContentStore    as CS
 import           Control.Lens.TH
 import           Data.Aeson                      (FromJSON, ToJSON)
@@ -19,11 +20,28 @@ import           GHC.Generics                    (Generic)
 import           Path
 import           System.Posix.Types              (CGid, CUid)
 
+-- | Set of items which may be treated as an input path to an external task.
+data InputPath
+    -- ^ An item in the content store.
+  = IPItem CS.Item
+    -- ^ An external file whose contents are considered assured by the external
+    -- system.
+  | IPExternalFile ExternallyAssuredFile
+    -- ^ An external directory whose contents are considered assured by the
+    -- external system.
+  | IPExternalDir ExternallyAssuredDirectory
+  deriving (Generic, Show)
+
+instance ContentHashable IO InputPath
+instance FromJSON InputPath
+instance ToJSON InputPath
+instance Store InputPath
+
 -- | Component of a parameter
 data ParamField
   = ParamText !T.Text
     -- ^ Text component.
-  | ParamPath !CS.Item
+  | ParamPath !InputPath
     -- | Reference to a path to a content store item.
   | ParamEnv !T.Text
     -- ^ Reference to an environment variable.
@@ -35,7 +53,7 @@ data ParamField
     -- ^ Reference to the output path in the content store.
   deriving (Generic, Show)
 
-instance Monad m => ContentHashable m ParamField
+instance ContentHashable IO ParamField
 instance FromJSON ParamField
 instance ToJSON ParamField
 instance Store ParamField
@@ -51,7 +69,7 @@ newtype Param = Param [ParamField]
 instance IsString Param where
   fromString s = Param [ParamText (fromString s)]
 
-instance Monad m => ContentHashable m Param
+instance ContentHashable IO Param
 instance FromJSON Param
 instance ToJSON Param
 instance Store Param
@@ -73,7 +91,11 @@ data ConvParam f = ConvParam
 paramFieldToText :: Applicative f
   => ConvParam f -> ParamField -> f T.Text
 paramFieldToText _ (ParamText txt)  = pure txt
-paramFieldToText c (ParamPath item) = T.pack . fromAbsDir <$> convPath c item
+paramFieldToText c (ParamPath (IPItem item)) = T.pack . fromAbsDir <$> convPath c item
+paramFieldToText _ (ParamPath (IPExternalFile (ExternallyAssuredFile item)))
+  = pure . T.pack . fromAbsFile $ item
+paramFieldToText _ (ParamPath (IPExternalDir (ExternallyAssuredDirectory item)))
+  = pure . T.pack . fromAbsDir $ item
 paramFieldToText c (ParamEnv env)   = convEnv c env
 paramFieldToText c ParamUid         = T.pack . show <$> convUid c
 paramFieldToText c ParamGid         = T.pack . show <$> convGid c
@@ -90,15 +112,25 @@ stringParam str = Param [ParamText (T.pack str)]
 textParam :: T.Text -> Param
 textParam txt = Param [ParamText txt]
 
--- | Reference to a path to a content store item.
-pathParam :: CS.Item -> Param
+-- | Reference to a path to either:
+--   - a content store item, or
+--   - an externally assured file/directory.
+pathParam :: InputPath -> Param
 pathParam item = Param [ParamPath item]
 
 -- | Reference to a path to a file or directory within a store item.
 contentParam :: CS.Content t -> Param
-contentParam (CS.All item) = pathParam item
+contentParam (CS.All item) = pathParam $ IPItem item
 contentParam (item CS.:</> path) =
-  pathParam item <> stringParam (toFilePath path)
+  pathParam (IPItem item) <> stringParam (toFilePath path)
+
+-- | Reference an externally assured file
+externalFileParam :: ExternallyAssuredFile -> Param
+externalFileParam = pathParam . IPExternalFile
+
+-- | Reference an externally assured file
+externalDirectoryParam :: ExternallyAssuredDirectory -> Param
+externalDirectoryParam = pathParam . IPExternalDir
 
 -- | Reference to an environment variable.
 envParam :: T.Text -> Param
@@ -129,7 +161,7 @@ data ExternalTask = ExternalTask {
   , _etWriteToStdOut :: Bool
 } deriving (Generic, Show)
 
-instance Monad m => ContentHashable m ExternalTask
+instance ContentHashable IO ExternalTask
 instance FromJSON ExternalTask
 instance ToJSON ExternalTask
 instance Store ExternalTask

@@ -25,6 +25,9 @@ module Control.FunFlow.ContentHashable
   , FileContent (..)
   , DirectoryContent (..)
 
+  , ExternallyAssuredFile(..)
+  , ExternallyAssuredDirectory(..)
+
   , encodeHash
   , decodeHash
   , hashToPath
@@ -36,6 +39,7 @@ module Control.FunFlow.ContentHashable
   ) where
 
 
+import           Control.FunFlow.Orphans          ()
 import           Control.Monad                    (foldM, mzero, (>=>))
 import           Crypto.Hash                      (Context, Digest, SHA256,
                                                    digestFromByteString,
@@ -68,6 +72,8 @@ import qualified Data.Text.Array                  as TA
 import qualified Data.Text.Encoding               as TE
 import qualified Data.Text.Internal               as T
 import qualified Data.Text.Lazy                   as TL
+import           Data.Time.Clock                  (UTCTime)
+import           Data.Time.Clock.POSIX            (utcTimeToPOSIXSeconds)
 import           Data.Typeable
 import qualified Data.Vector                      as V
 import           Data.Word
@@ -91,6 +97,7 @@ import qualified Path.IO
 import           System.IO                        (IOMode (ReadMode),
                                                    withBinaryFile)
 import           System.IO.Unsafe                 (unsafePerformIO)
+import           System.Posix.Files               (fileSize, getFileStatus)
 
 
 newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
@@ -415,7 +422,6 @@ instance ContentHashable IO FileContent where
     ctx' <- if exec then contentHashUpdate ctx () else pure ctx
     contentHashUpdate_binaryFile ctx' (Path.fromAbsFile fp)
 
-
 -- | Path to a directory
 --
 -- Only the contents of the directory and their path relative to the directory
@@ -439,3 +445,63 @@ instance ContentHashable IO DirectoryContent where
         flip contentHashUpdate (Path.dirname dir)
         >=> flip contentHashUpdate (DirectoryContent dir)
         $ ctx
+
+instance Monad m => ContentHashable m UTCTime where
+  contentHashUpdate ctx utcTime = let
+      secondsSinceEpoch = fromEnum . utcTimeToPOSIXSeconds $ utcTime
+    in flip contentHashUpdate_fingerprint utcTime
+       >=> flip contentHashUpdate secondsSinceEpoch
+         $ ctx
+
+-- | Path to a file to be treated as _externally assured_.
+--
+--   An externally assured file is handled in a somewhat 'cheating' way by
+--   funflow. The 'ContentHashable' instance for such assumes that some external
+--   agent guarantees the integrity of the file being referenced. Thus, rather
+--   than hashing the file contents, we only consider its (absolute) path, size and
+--   modification time, which can be rapidly looked up from filesystem metadata.
+--
+--   For a similar approach, see the instance for 'ObjectInBucket' in
+--   Control.FunFlow.AWS.S3, where we exploit the fact that S3 is already
+--   content hashed to avoid performing any hashing.
+newtype ExternallyAssuredFile = ExternallyAssuredFile (Path.Path Path.Abs Path.File)
+  deriving (Generic, Show)
+
+instance Aeson.FromJSON ExternallyAssuredFile
+instance Aeson.ToJSON ExternallyAssuredFile
+instance Store ExternallyAssuredFile
+
+instance ContentHashable IO ExternallyAssuredFile where
+  contentHashUpdate ctx (ExternallyAssuredFile fp) = do
+    modTime <- Path.IO.getModificationTime fp
+    fSize <- fileSize <$> getFileStatus (Path.toFilePath fp)
+    flip contentHashUpdate fp
+      >=> flip contentHashUpdate modTime
+      >=> flip contentHashUpdate_storable fSize
+        $ ctx
+
+
+-- | Path to a directory to be treated as _externally assured_.
+--
+--   For an externally assured directory, we _do_ traverse its contents and verify
+--   those as we would externally assured files, rather than just relying on the
+--   directory path. Doing this traversal is pretty cheap, and it's quite likely
+--   for directory contents to be modified without modifying the contents.
+newtype ExternallyAssuredDirectory = ExternallyAssuredDirectory (Path.Path Path.Abs Path.Dir)
+  deriving (Generic, Show)
+
+instance Aeson.FromJSON ExternallyAssuredDirectory
+instance Aeson.ToJSON ExternallyAssuredDirectory
+instance Store ExternallyAssuredDirectory
+
+instance ContentHashable IO ExternallyAssuredDirectory where
+  contentHashUpdate ctx0 (ExternallyAssuredDirectory dir0) = do
+    -- Note that we don't bother looking at the relative directory paths and
+    -- including these in the hash. This is because the absolute hash gets
+    -- included every time we hash a file.
+    (dirs, files) <- Path.IO.listDir dir0
+    ctx' <- foldM hashFile ctx0 (sort files)
+    foldM hashDir ctx' (sort dirs)
+    where
+      hashFile ctx fp = contentHashUpdate ctx (ExternallyAssuredFile fp)
+      hashDir ctx dir = contentHashUpdate ctx (ExternallyAssuredDirectory dir)
