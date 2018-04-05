@@ -22,12 +22,12 @@ import           System.Posix.Types              (CGid, CUid)
 
 -- | Set of items which may be treated as an input path to an external task.
 data InputPath
-    -- ^ An item in the content store.
+    -- | An item in the content store.
   = IPItem CS.Item
-    -- ^ An external file whose contents are considered assured by the external
+    -- | An external file whose contents are considered assured by the external
     -- system.
   | IPExternalFile ExternallyAssuredFile
-    -- ^ An external directory whose contents are considered assured by the
+    -- | An external directory whose contents are considered assured by the
     -- external system.
   | IPExternalDir ExternallyAssuredDirectory
   deriving (Generic, Show)
@@ -42,7 +42,7 @@ data ParamField
   = ParamText !T.Text
     -- ^ Text component.
   | ParamPath !InputPath
-    -- | Reference to a path to a content store item.
+    -- ^ Reference to a path to a content store item.
   | ParamEnv !T.Text
     -- ^ Reference to an environment variable.
   | ParamUid
