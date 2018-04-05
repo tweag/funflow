@@ -47,67 +47,63 @@ data ExecutionResult =
 
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
-execute store td = do
-  instruction <- lift $ CS.constructIfMissing store (td ^. tdOutput)
-  case instruction of
-    CS.Pending () -> return AlreadyRunning
-    CS.Complete _ -> return Cached
-    CS.Missing fp -> do
-      (fpOut, hOut) <- lift $
-        CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
-      (fpErr, hErr) <- lift $
-        CS.createMetadataFile store (td ^. tdOutput) [relfile|stderr|]
-      let
-        withFollowOutput m
-          | td ^. tdTask . etWriteToStdOut
-          = withAsync (followFile fpErr stderr) $ \_ -> m
-          | otherwise
-          = withAsync (followFile fpErr stderr) $ \_ ->
-            withAsync (followFile fpOut stdout) $ \_ -> m
-        cmd = T.unpack $ td ^. tdTask . etCommand
-        procSpec params = (proc cmd $ T.unpack <$> params) {
-            cwd = Just (fromAbsDir fp)
-          , close_fds = True
-          , std_err = UseHandle hErr
-          , std_out = UseHandle hOut
-          }
-        convParam = ConvParam
-          { convPath = pure . CS.itemPath store
-          , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
-          , convUid = lift getEffectiveUserID
-          , convGid = lift getEffectiveGroupID
-          , convOut = pure fp
-          }
-      mbParams <- lift $ runMaybeT $
-        traverse (paramToText convParam) (td ^. tdTask . etParams)
-      params <- case mbParams of
-        Nothing     -> fail "A parameter was not ready"
-        Just params -> return params
+execute store td = logError $ do
+  status <- CS.withConstructIfMissing store (td ^. tdOutput) $ \fp -> do
+    (fpOut, hOut) <- lift $
+      CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
+    (fpErr, hErr) <- lift $
+      CS.createMetadataFile store (td ^. tdOutput) [relfile|stderr|]
+    let
+      withFollowOutput m
+        | td ^. tdTask . etWriteToStdOut
+        = withAsync (followFile fpErr stderr) $ \_ -> m
+        | otherwise
+        = withAsync (followFile fpErr stderr) $ \_ ->
+          withAsync (followFile fpOut stdout) $ \_ -> m
+      cmd = T.unpack $ td ^. tdTask . etCommand
+      procSpec params = (proc cmd $ T.unpack <$> params)
+        { cwd = Just (fromAbsDir fp)
+        , close_fds = True
+        , std_err = UseHandle hErr
+        , std_out = UseHandle hOut
+        }
+      convParam = ConvParam
+        { convPath = pure . CS.itemPath store
+        , convEnv = \e -> T.pack <$> MaybeT (getEnv $ T.unpack e)
+        , convUid = lift getEffectiveUserID
+        , convGid = lift getEffectiveGroupID
+        , convOut = pure fp
+        }
+    mbParams <- lift $ runMaybeT $
+      traverse (paramToText convParam) (td ^. tdTask . etParams)
+    params <- case mbParams of
+      Nothing     -> fail "A parameter was not ready"
+      Just params -> return params
 
-      start <- lift $ getTime Monotonic
-      let theProc = procSpec params
-      katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
-        $(logTM) InfoS "Executing"
-        mp <- lift $ try $ createProcess theProc
-        case mp of
-          Left (ex :: IOException) -> do
-            $(logTM) WarningS . ls $ "Failed: " ++ show ex
-            lift $ CS.removeFailed store (td ^. tdOutput)
-            return $ Failure (diffTimeSpec start start) 2
-          Right (_, _, _, ph) -> lift $
-            -- Error output should be displayed on our stderr stream
-            withFollowOutput $ do
-              exitCode <- waitForProcess ph
-              end <- getTime Monotonic
-              case exitCode of
-                ExitSuccess   -> do
-                  when (td ^. tdTask . etWriteToStdOut) $
-                    copyFile fpOut (fp </> [relfile|out|])
-                  _ <- CS.markComplete store (td ^. tdOutput)
-                  return $ Success (diffTimeSpec start end)
-                ExitFailure i -> do
-                  CS.removeFailed store (td ^. tdOutput)
-                  return $ Failure (diffTimeSpec start end) i
+    start <- lift $ getTime Monotonic
+    let theProc = procSpec params
+    katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
+      $(logTM) InfoS "Executing"
+      lift $ withCreateProcess theProc $ \_ _ _ ph ->
+        -- Error output should be displayed on our stderr stream
+        withFollowOutput $ do
+          exitCode <- waitForProcess ph
+          end <- getTime Monotonic
+          case exitCode of
+            ExitSuccess   -> do
+              when (td ^. tdTask . etWriteToStdOut) $
+                copyFile fpOut (fp </> [relfile|out|])
+              return $ Right (diffTimeSpec start end)
+            ExitFailure i ->
+              return $ Left (diffTimeSpec start end, i)
+  case status of
+    CS.Missing (t, ec) -> return (Failure t ec)
+    CS.Pending () -> return AlreadyRunning
+    CS.Complete (Nothing, _) -> return Cached
+    CS.Complete (Just t, _) -> return (Success t)
+  where
+    logError = flip withException $ \(e::SomeException) ->
+      $(logTM) ErrorS . ls $ displayException e
 
 -- | Execute tasks forever
 executeLoop :: forall c. Coordinator c
