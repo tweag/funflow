@@ -688,11 +688,9 @@ getMetadata :: (SQL.ToField k, SQL.FromField v, MonadIO m)
   => ContentStore -> ContentHash -> k -> m (Maybe v)
 getMetadata store hash k = liftIO . withStoreLock store $ do
   r <- SQL.queryNamed (storeDb store)
-    "SELECT FROM metadata\
+    "SELECT value FROM metadata\
     \ WHERE\
-    \  ( hash = :hash\
-    \  , key = :key\
-    \  )"
+    \  (hash = :hash AND key = :key)"
     [ ":hash" SQL.:= hash
     , ":key" SQL.:= k
     ]
