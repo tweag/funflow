@@ -960,6 +960,9 @@ initDb storeDir db = do
     \  , PRIMARY KEY(hash, key)\
     \  )"
 
+-- | Adds a link between input hash and the output hash.
+--
+-- Assumes that the store is locked and writable.
 addBackReference :: ContentStore -> ContentHash -> Item -> IO ()
 addBackReference store inHash (Item outHash) =
   SQL.executeNamed (storeDb store)
