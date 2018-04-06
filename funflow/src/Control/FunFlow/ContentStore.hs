@@ -668,7 +668,9 @@ listAliases store = liftIO . withStoreLock store $
 -- | Set a metadata entry on a pending item.
 setMetadata :: (SQL.ToField k, SQL.ToField v, MonadIO m )
             => ContentStore -> ContentHash -> k -> v -> m ()
-setMetadata store hash k v = liftIO . withStoreLock store $
+setMetadata store hash k v = liftIO $
+  withStoreLock store $
+  withWritableStore store $
   internalQuery store hash >>= \case
     Pending _ -> SQL.executeNamed (storeDb store)
       "INSERT OR REPLACE INTO\
