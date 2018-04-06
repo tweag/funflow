@@ -16,6 +16,7 @@ import           Control.Lens
 import           Control.Monad                        (forever, mzero, when)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
+import qualified Data.Aeson                           as Json
 import qualified Data.ByteString                      as BS
 import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
@@ -91,6 +92,9 @@ execute store td = logError $ do
           IPExternalFile _ -> mzero
           IPExternalDir _ -> mzero
     CS.setInputs store (td ^. tdOutput) inputItems
+    CS.setMetadata store (td ^. tdOutput)
+      ("external-task"::T.Text)
+      (Json.encode (td ^. tdTask))
 
     start <- lift $ getTime Monotonic
     let theProc = procSpec params
