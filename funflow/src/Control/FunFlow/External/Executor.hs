@@ -45,6 +45,9 @@ data ExecutionResult =
     -- | Execution failed with the following exit code.
     --   TODO where should logs go?
   | Failure TimeSpec Int
+    -- | The executor itself failed to execute the external task.
+    --   E.g. because the executable was not found.
+  | ExecutorFailure IOException
 
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
@@ -85,7 +88,7 @@ execute store td = logError $ do
     let theProc = procSpec params
     katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
       $(logTM) InfoS "Executing"
-      lift $ withCreateProcess theProc $ \_ _ _ ph ->
+      res <- lift $ tryIO $ withCreateProcess theProc $ \_ _ _ ph ->
         -- Error output should be displayed on our stderr stream
         withFollowOutput $ do
           exitCode <- waitForProcess ph
@@ -97,8 +100,16 @@ execute store td = logError $ do
               return $ Right (diffTimeSpec start end)
             ExitFailure i ->
               return $ Left (diffTimeSpec start end, i)
+      case res of
+        -- execution was successful
+        Right (Right r) -> return $ Right r
+        -- execution failed
+        Right (Left e) -> return $ Left (Right e)
+        -- executor itself failed
+        Left e -> return $ Left (Left e)
   case status of
-    CS.Missing (t, ec) -> return (Failure t ec)
+    CS.Missing (Left e) -> return (ExecutorFailure e)
+    CS.Missing (Right (t, ec)) -> return (Failure t ec)
     CS.Pending () -> return AlreadyRunning
     CS.Complete (Nothing, _) -> return Cached
     CS.Complete (Just t, _) -> return (Success t)
@@ -160,6 +171,9 @@ executeLoopWithScribe _ cfg store handleScribe = do
               Failure t i -> do
                 $(logTM) WarningS "Task failed"
                 return (t, Left i)
+              ExecutorFailure e -> do
+                $(logTM) ErrorS $ "Executor failed: " <> ls (displayException e)
+                return (0, Left 2)
               AlreadyRunning -> do
                 -- XXX:
                 --   This should not happen and indicates a programming error
