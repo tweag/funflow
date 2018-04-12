@@ -7,11 +7,13 @@
 module FunFlow.TestFlows where
 
 import           Control.Arrow
+import           Control.Concurrent.Async                    (withAsync)
 import           Control.Exception.Safe
 import           Control.FunFlow
 import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.External.Coordinator.Memory
+import           Control.FunFlow.External.Executor           (executeLoop)
 import           Control.Monad                               (when)
 import           Data.Default                                (def)
 import           Data.List                                   (sort)
@@ -102,7 +104,8 @@ testFlowAssertion (FlowAssertion nm x flw expect before) =
     CS.withStore storeDir $ \store -> do
       hook <- createMemoryCoordinator
       before
-      res <- runSimpleFlow MemoryCoordinator hook store flw x
+      res <- withAsync (executeLoop MemoryCoordinator hook store) $ \_ ->
+        runSimpleFlow MemoryCoordinator hook store flw x
       assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion
