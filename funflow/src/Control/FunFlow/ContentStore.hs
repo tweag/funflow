@@ -86,6 +86,9 @@ module Control.FunFlow.ContentStore
   , listAliases
 
   -- * Metadata
+  , getBackReferences
+  , setInputs
+  , getInputs
   , setMetadata
   , getMetadata
   , createMetadataFile
@@ -125,8 +128,8 @@ import           Control.Exception.Safe              (Exception, MonadMask,
 import           Control.FunFlow.ContentStore.Notify
 import           Control.FunFlow.Orphans             ()
 import           Control.Lens
-import           Control.Monad                       (forever, unless, void,
-                                                      when, (<=<), (>=>))
+import           Control.Monad                       (forever, forM_, unless,
+                                                      void, when, (<=<), (>=>))
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)
@@ -665,10 +668,47 @@ listAliases store = liftIO . withStoreLock store $
     SQL.query_ (storeDb store)
       "SELECT name, dest FROM aliases"
 
+-- | Get all hashes that resulted in the given item.
+getBackReferences :: MonadIO m => ContentStore -> Item -> m [ContentHash]
+getBackReferences store (Item outHash) = liftIO . withStoreLock store $
+  map SQL.fromOnly <$> SQL.queryNamed (storeDb store)
+    "SELECT hash FROM backrefs\
+    \ WHERE\
+    \  dest = :out"
+    [ ":out" SQL.:= outHash ]
+
+-- | Define the input items to a subtree.
+setInputs :: MonadIO m => ContentStore -> ContentHash -> [Item] -> m ()
+setInputs store hash items = liftIO $
+  withStoreLock store $
+  withWritableStore store $
+  internalQuery store hash >>= \case
+    Pending _ -> forM_ items $ \(Item input) ->
+      SQL.executeNamed (storeDb store)
+        "INSERT OR REPLACE INTO\
+        \  inputs (hash, input)\
+        \ VALUES\
+        \  (:hash, :input)"
+        [ ":hash" SQL.:= hash
+        , ":input" SQL.:= input
+        ]
+    _ -> throwIO $ NotPending hash
+
+-- | Get the input items to a subtree if any were defined.
+getInputs :: MonadIO m => ContentStore -> ContentHash -> m [Item]
+getInputs store hash = liftIO . withStoreLock store $
+  map (Item . SQL.fromOnly) <$> SQL.queryNamed (storeDb store)
+    "SELECT input FROM inputs\
+    \ WHERE\
+    \  hash = :hash"
+    [ ":hash" SQL.:= hash ]
+
 -- | Set a metadata entry on a pending item.
 setMetadata :: (SQL.ToField k, SQL.ToField v, MonadIO m )
             => ContentStore -> ContentHash -> k -> v -> m ()
-setMetadata store hash k v = liftIO . withStoreLock store $
+setMetadata store hash k v = liftIO $
+  withStoreLock store $
+  withWritableStore store $
   internalQuery store hash >>= \case
     Pending _ -> SQL.executeNamed (storeDb store)
       "INSERT OR REPLACE INTO\
@@ -686,11 +726,9 @@ getMetadata :: (SQL.ToField k, SQL.FromField v, MonadIO m)
   => ContentStore -> ContentHash -> k -> m (Maybe v)
 getMetadata store hash k = liftIO . withStoreLock store $ do
   r <- SQL.queryNamed (storeDb store)
-    "SELECT FROM metadata\
+    "SELECT value FROM metadata\
     \ WHERE\
-    \  ( hash = :hash\
-    \  , key = :key\
-    \  )"
+    \  (hash = :hash AND key = :key)"
     [ ":hash" SQL.:= hash
     , ":key" SQL.:= k
     ]
@@ -943,13 +981,13 @@ initDb storeDir db = do
     \  , dest TEXT NOT NULL\
     \  )"
   -- Inputs @input@ to hashes @hash@.
-  -- SQL.execute_ db
-  --   "CREATE TABLE IF NOT EXISTS\
-  --   \  inputs\
-  --   \  ( hash TEXT NOT NULL\
-  --   \  , input TEXT NOT NULL\
-  --   \  , UNIQUE (hash, input)\
-  --   \  )"
+  SQL.execute_ db
+    "CREATE TABLE IF NOT EXISTS\
+    \  inputs\
+    \  ( hash TEXT NOT NULL\
+    \  , input TEXT NOT NULL\
+    \  , UNIQUE (hash, input)\
+    \  )"
   -- Arbitrary metadata on hashes.
   SQL.execute_ db
     "CREATE TABLE IF NOT EXISTS\
@@ -960,6 +998,9 @@ initDb storeDir db = do
     \  , PRIMARY KEY(hash, key)\
     \  )"
 
+-- | Adds a link between input hash and the output hash.
+--
+-- Assumes that the store is locked and writable.
 addBackReference :: ContentStore -> ContentHash -> Item -> IO ()
 addBackReference store inHash (Item outHash) =
   SQL.executeNamed (storeDb store)

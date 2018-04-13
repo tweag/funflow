@@ -13,9 +13,10 @@ import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
-import           Control.Monad                        (forever, when)
+import           Control.Monad                        (forever, mzero, when)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
+import qualified Data.Aeson                           as Json
 import qualified Data.ByteString                      as BS
 import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
@@ -83,6 +84,21 @@ execute store td = logError $ do
     params <- case mbParams of
       Nothing     -> fail "A parameter was not ready"
       Just params -> return params
+
+    let
+      inputItems :: [CS.Item]
+      inputItems = do
+        Param fields <- td ^. tdTask . etParams
+        ParamPath inputPath <- fields
+        case inputPath of
+          IPItem item -> pure item
+          -- XXX: Store these references as well.
+          IPExternalFile _ -> mzero
+          IPExternalDir _ -> mzero
+    CS.setInputs store (td ^. tdOutput) inputItems
+    CS.setMetadata store (td ^. tdOutput)
+      ("external-task"::T.Text)
+      (Json.encode (td ^. tdTask))
 
     start <- lift $ getTime Monotonic
     let theProc = procSpec params
