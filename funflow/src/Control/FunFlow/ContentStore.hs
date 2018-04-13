@@ -694,7 +694,7 @@ setInputs store hash items = liftIO $
         ]
     _ -> throwIO $ NotPending hash
 
--- | Get the input items to a subtree if any where defined.
+-- | Get the input items to a subtree if any were defined.
 getInputs :: MonadIO m => ContentStore -> ContentHash -> m [Item]
 getInputs store hash = liftIO . withStoreLock store $
   map (Item . SQL.fromOnly) <$> SQL.queryNamed (storeDb store)
