@@ -3,15 +3,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module FunFlow.TestFlows where
 
 import           Control.Arrow
-import           Control.Exception.Safe
+import           Control.Arrow.Free
+import           Control.Concurrent.Async                    (withAsync)
+import           Control.Exception.Safe                      hiding (catch)
 import           Control.FunFlow
 import           Control.FunFlow.ContentStore                (Content ((:</>)))
 import qualified Control.FunFlow.ContentStore                as CS
 import           Control.FunFlow.External.Coordinator.Memory
+import           Control.FunFlow.External.Executor           (executeLoop)
 import           Control.Monad                               (when)
 import           Data.Default                                (def)
 import           Data.List                                   (sort)
@@ -78,6 +82,20 @@ flowMerge = proc () -> do
   files <- arr (fmap CS.contentFilename) <<< arr snd <<< listDirContents -< comb
   returnA -< (sort files == sort [[relfile|a|], [relfile|b|]])
 
+-- | Test that a missing executable in an external causes a catchable error.
+flowMissingExecutable :: SimpleFlow () (Either () ())
+flowMissingExecutable = proc () -> do
+  r <- (arr Right <<< external (\() -> ExternalTask
+    { _etCommand = "non-existent-executable-39fd1e85a0a05113938e0"
+    , _etParams = []
+    , _etWriteToStdOut = True
+    }))
+    `catch` arr (Left @SomeException . snd)
+    -< ()
+  returnA -< case r of
+    Left _ -> Left ()
+    Right _ -> Right ()
+
 
 flowAssertions :: [FlowAssertion]
 flowAssertions =
@@ -89,6 +107,7 @@ flowAssertions =
   , FlowAssertion "aliasFlow" () aliasFlow (Just (Nothing, Just "test")) (return ())
   , FlowAssertion "cachingFlow" () flowCached (Just True) (return ())
   , FlowAssertion "mergingStoreItems" () flowMerge (Just True) (return ())
+  , FlowAssertion "missingExecutable" () flowMissingExecutable (Just (Left ())) (return ())
   ]
 
 setup :: IO ()
@@ -102,7 +121,8 @@ testFlowAssertion (FlowAssertion nm x flw expect before) =
     CS.withStore storeDir $ \store -> do
       hook <- createMemoryCoordinator
       before
-      res <- runSimpleFlow MemoryCoordinator hook store flw x
+      res <- withAsync (executeLoop MemoryCoordinator hook store) $ \_ ->
+        runSimpleFlow MemoryCoordinator hook store flw x
       assertFlowResult expect res
 
 assertFlowResult :: (Eq a, Show ex, Show a) => Maybe a -> Either ex a -> Assertion
