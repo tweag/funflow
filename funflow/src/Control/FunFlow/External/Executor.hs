@@ -89,6 +89,7 @@ execute store td = logError $ do
         ParamPath inputPath <- fields
         case inputPath of
           IPItem item -> pure item
+          -- XXX: Store these references as well.
           IPExternalFile _ -> mzero
           IPExternalDir _ -> mzero
     CS.setInputs store (td ^. tdOutput) inputItems
