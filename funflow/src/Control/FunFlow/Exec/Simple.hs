@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows              #-}
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE OverloadedStrings   #-}
@@ -39,6 +40,7 @@ import           Data.Void
 import           Katip
 import           Path
 import           System.IO                                   (stderr)
+import Data.Foldable (traverse_)
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
@@ -86,13 +88,28 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           Left fp -> do
             res <- f -< i
             writeStore -< (chash, fp, res)
+    writeMd :: forall i o. ContentHash
+            -> i
+            -> o
+            -> MDWriter i o
+            -> KatipContextT IO ()
+    writeMd _ _ _ Nothing = return ()
+    writeMd chash i o (Just writer) =
+      let kvs = writer i o
+      in traverse_ (uncurry $ CS.setMetadata store chash) kvs
+
 
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA (KatipContextT IO) a1 b1
     runFlow' _ (Step props f) = withStoreCache (cache props)
-      . AsyncA $ \x -> return $ f x
+      . AsyncA $ \x -> do
+          let out = f x
+          case cache props of
+            NoCache -> return ()
+            Cache key _ _ -> writeMd (key confIdent x) x out $ mdpolicy props
+          return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
       . liftAsyncA $ AsyncA f
-    runFlow' po (External toTask) = AsyncA $ \x -> do
+    runFlow' po (External props toTask) = AsyncA $ \x -> do
       chash <- liftIO $ contentHash (x, toTask x)
       CS.lookup store chash >>= \case
         -- The item in question is already in the store. No need to submit a task.
@@ -105,12 +122,15 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           -- path and submit as normal.
           UnknownTask -> do
             CS.removeFailed store chash
+            writeMd chash (toTask x) () $ ep_mdpolicy props
             submitAndWait chash (TaskDescription chash (toTask x))
           -- Task is already known to the coordinator. Most likely something is
           -- running this task. Just wait for it.
           KnownTask _ -> wait chash (TaskDescription chash (toTask x))
         -- Nothing in the store. Submit and run.
-        CS.Missing _ -> submitAndWait chash (TaskDescription chash (toTask x))
+        CS.Missing _ -> do
+          writeMd chash (toTask x) () $ ep_mdpolicy props
+          submitAndWait chash (TaskDescription chash (toTask x))
       where
         submitAndWait chash td = do
           submitTask po td

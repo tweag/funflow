@@ -21,6 +21,9 @@ class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff 
   stepIO' :: Base.Properties a b -> (a -> IO b) -> arr a b
   -- | Create an external task in the flow.
   external :: ContentHashable IO a => (a -> ExternalTask) -> arr a CS.Item
+  -- | Create an external task with additional properties
+  external' :: ContentHashable IO a
+            => Base.ExternalProperties -> (a -> ExternalTask) -> arr a CS.Item
   -- | Create a flow from a user-defined effect.
   wrap' :: Base.Properties a b -> eff a b -> arr a b
   -- | Create a flow which will write its incoming data to the store.
@@ -33,7 +36,8 @@ class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff 
 instance ArrowFlow eff ex (Base.Flow eff ex) where
   step' props = effect . Base.Step props
   stepIO' props = effect . Base.StepIO props
-  external = effect . Base.External
+  external = effect . Base.External def
+  external' p td = effect $ Base.External p td
   wrap' p eff = effect $ Base.Wrapped p eff
   putInStore = effect . Base.PutInStore
   getFromStore = effect . Base.GetFromStore
