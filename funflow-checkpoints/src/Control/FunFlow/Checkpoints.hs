@@ -76,6 +76,7 @@ instance ArrowFlow eff ex (arr eff ex) => ArrowFlow eff ex (CheckpointT arr eff 
   step' props = Unchecked . step' props
   stepIO' props = Unchecked . stepIO' props
   external = Unchecked . external
+  external' p eff = Unchecked $ external' p eff
   wrap' p eff = Unchecked $ wrap' p eff
   putInStore = Unchecked . putInStore
   getFromStore = Unchecked . getFromStore
