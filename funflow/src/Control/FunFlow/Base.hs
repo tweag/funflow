@@ -1,7 +1,7 @@
 {-# LANGUAGE EmptyDataDecls            #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE FlexibleInstances         #-}
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE TypeOperators             #-}
@@ -9,7 +9,7 @@
 
 module Control.FunFlow.Base where
 
-import           Control.Arrow                   (Kleisli(..))
+import           Control.Arrow                   (Kleisli (..))
 import           Control.Arrow.Free
 import           Control.Exception.Safe          (SomeException)
 import           Control.FunFlow.ContentHashable
@@ -20,10 +20,13 @@ import           Data.ByteString                 (ByteString)
 import           Data.Default
 import           Data.Functor.Identity
 import           Data.Proxy                      (Proxy (..))
-import qualified Data.Store as Store
+import qualified Data.Store                      as Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
+
+-- | Metadata writer
+type MDWriter i o = Maybe (i -> o -> [(T.Text, T.Text)])
 
 -- | A cacher is responsible for controlling how steps are cached.
 data Cacher i o =
@@ -34,10 +37,10 @@ data Cacher i o =
       --   This function additionally takes an
       --   'identities' which gets incorporated into
       --   the cacher.
-      cacherKey         :: Int -> i -> ContentHash
-    , cacherStoreValue  :: o -> ByteString
+      cacherKey        :: Int -> i -> ContentHash
+    , cacherStoreValue :: o -> ByteString
       -- | Attempt to read the cache value back. May throw exceptions.
-    , cacherReadValue   :: ByteString -> o
+    , cacherReadValue  :: ByteString -> o
     }
 
 defaultCacherWithIdent :: (Store.Store o, ContentHashable Identity i)
@@ -52,22 +55,39 @@ defaultCacherWithIdent ident = Cache
 data Properties i o = Properties
   { -- | Name of this step. Used when describing the step in diagrams
     --   or other reporting.
-    name  :: Maybe T.Text
+    name     :: Maybe T.Text
     -- | Specify whether this step can be cached or not and, if so,
     --   how to do so.
-  , cache :: Cacher i o
+  , cache    :: Cacher i o
+    -- | Write additional metadata to the content store.
+  , mdpolicy :: MDWriter i o
   }
 
 instance Default (Properties i o) where
   def = Properties
     { name = Nothing
     , cache = NoCache
+    , mdpolicy = Nothing
+    }
+
+-- | Additional properties associated with external tasks.
+newtype ExternalProperties = ExternalProperties
+  { -- | Write additional metadata to the content store.
+    ep_mdpolicy :: MDWriter ExternalTask ()
+  }
+
+instance Default ExternalProperties where
+  def = ExternalProperties
+    { ep_mdpolicy = Nothing
     }
 
 data Flow' eff a b where
   Step :: Properties a b -> (a -> b) -> Flow' eff a b
   StepIO :: Properties a b -> (a -> IO b) -> Flow' eff a b
-  External :: ContentHashable IO a => (a -> ExternalTask) -> Flow' eff a CS.Item
+  External :: ContentHashable IO a
+           => ExternalProperties
+           -> (a -> ExternalTask)
+           -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
   PutInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.
