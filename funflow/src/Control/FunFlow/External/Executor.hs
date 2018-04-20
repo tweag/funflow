@@ -7,17 +7,20 @@
 module Control.FunFlow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
+import           Control.Concurrent.MVar
 import           Control.Exception.Safe
 import           Control.Concurrent.Async
 import qualified Control.FunFlow.ContentStore         as CS
 import           Control.FunFlow.External
 import           Control.FunFlow.External.Coordinator
 import           Control.Lens
-import           Control.Monad                        (forever, mzero, when)
+import           Control.Monad                        (forever, mzero, unless,
+                                                       when)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.Aeson                           as Json
 import qualified Data.ByteString                      as BS
+import           Data.Maybe                           (isJust)
 import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
 import           Katip                                as K
@@ -59,12 +62,12 @@ execute store td = logError $ do
     (fpErr, hErr) <- lift $
       CS.createMetadataFile store (td ^. tdOutput) [relfile|stderr|]
     let
-      withFollowOutput m
+      withFollowOutput
         | td ^. tdTask . etWriteToStdOut
-        = withAsync (followFile fpErr stderr) $ \_ -> m
+        = withFollowFile fpErr stderr
         | otherwise
-        = withAsync (followFile fpErr stderr) $ \_ ->
-          withAsync (followFile fpOut stdout) $ \_ -> m
+        = withFollowFile fpErr stderr
+        . withFollowFile fpOut stdout
       cmd = T.unpack $ td ^. tdTask . etCommand
       procSpec params = (proc cmd $ T.unpack <$> params)
         { cwd = Just (fromAbsDir fp)
@@ -211,15 +214,21 @@ executeLoopWithScribe _ cfg store handleScribe = do
           Nothing -> lift $ threadDelay 1000000
           Just () -> return ()
 
--- | @followFile in out@ follows the file @in@
+-- | @withFollowFile in out@ follows the file @in@
 --   and prints contents to @out@ as they appear.
 --   The file must exist. Doesn't handle file truncation.
-followFile :: Path Abs File -> Handle -> IO ()
-followFile infile outhandle = do
+withFollowFile :: Path Abs File -> Handle -> IO a -> IO a
+withFollowFile infile outhandle action = do
+  mv <- newEmptyMVar
   inhandle <- openFile (fromAbsFile infile) ReadMode
-  forever $ do
-    some <- BS.hGetSome inhandle 4096
-    if BS.null some then
-      threadDelay 100000
-    else
-      BS.hPut outhandle some
+  let loop = do
+        some <- BS.hGetSome inhandle 4096
+        if BS.null some then do
+          done <- isJust <$> tryTakeMVar mv
+          unless done $ do
+            threadDelay 10000
+            loop
+        else do
+          BS.hPut outhandle some
+          loop
+  snd <$> concurrently (tryIO loop) (action <* putMVar mv ())
