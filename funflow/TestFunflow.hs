@@ -5,10 +5,10 @@
 import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.Exception.Safe
-import           Control.FunFlow
-import qualified Control.FunFlow.ContentStore                as CS
-import           Control.FunFlow.External.Coordinator.Memory
-import           Control.FunFlow.Pretty
+import           Control.Funflow
+import qualified Control.Funflow.ContentStore                as CS
+import           Control.Funflow.External.Coordinator.Memory
+import           Control.Funflow.Pretty
 import           Data.Monoid                                 ((<>))
 import           Path.IO
 

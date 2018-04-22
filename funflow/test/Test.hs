@@ -1,7 +1,7 @@
 import qualified Control.Arrow.Async.Tests
-import qualified FunFlow.ContentStore
-import qualified FunFlow.SQLiteCoordinator
-import qualified FunFlow.TestFlows
+import qualified Funflow.ContentStore
+import qualified Funflow.SQLiteCoordinator
+import qualified Funflow.TestFlows
 import           Test.Tasty
 
 main :: IO ()
@@ -9,8 +9,8 @@ main = defaultMain tests
 
 tests :: TestTree
 tests = testGroup "Unit Tests"
-  [ FunFlow.ContentStore.tests
+  [ Funflow.ContentStore.tests
   , Control.Arrow.Async.Tests.tests
-  , FunFlow.TestFlows.tests
-  , FunFlow.SQLiteCoordinator.tests
+  , Funflow.TestFlows.tests
+  , Funflow.SQLiteCoordinator.tests
   ]

@@ -8,8 +8,8 @@ import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.Category
 import           Control.Exception.Safe
-import           Control.FunFlow
-import           Control.FunFlow.Checkpoints
+import           Control.Funflow
+import           Control.Funflow.Checkpoints
 import           Control.Monad               (guard)
 import           Path.IO
 import           Prelude                     hiding ((.))

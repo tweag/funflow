@@ -1,4 +1,4 @@
-FunFlow
+Funflow
 =======
 
 .. highlight:: haskell
@@ -7,35 +7,35 @@ FunFlow
 .. image:: https://circleci.com/gh/tweag/funflow.svg?style=svg
     :target: https://circleci.com/gh/tweag/funflow
 
-FunFlow is a library and tools to compose and run computational workflows. 
+Funflow is a library and tools to compose and run computational workflows.
 A workflow is a computation built up of multiple steps. These steps are then
 wired together into a larger computation. Outputs from previous steps can form
-inputs to subsequent steps. 
+inputs to subsequent steps.
 
 Features
 --------
 
-- FunFlow allows for **seamless composition** of multiple types of computation:
+- Funflow allows for **seamless composition** of multiple types of computation:
 
   - *Pure functions* (of type `a -> b`)
   - *IO actions* (of type `a -> IO b`)
   - *External* computations. External computations are executed outside of
-    FunFlow. They allow FunFlow to invoke computations from any
+    Funflow. They allow Funflow to invoke computations from any
     language.
-  - *User-defined effects*. FunFlow is extensible with user-defined effects. By
+  - *User-defined effects*. Funflow is extensible with user-defined effects. By
     specifying different interpreters for such effects, you can easily test
-    FunFlow in a mock environment.
+    Funflow in a mock environment.
 
-- FunFlow is designed to be **integrated** into your application. Flows can be
+- Funflow is designed to be **integrated** into your application. Flows can be
   executed inside your Haskell program, even where they involve external
-  computations which are run by other processes. FunFlow's support for
+  computations which are run by other processes. Funflow's support for
   user-defined effects lets you extend the grammar of a workflow with your own
   domain specific applications.
-- FunFlow provides very powerful **caching** for steps.
+- Funflow provides very powerful **caching** for steps.
 
-  - FunFlow's caching is based around the *content store*. This stores all
+  - Funflow's caching is based around the *content store*. This stores all
     artifacts according to the hash of the inputs and computations which
-    produced them. FunFlow uses this to know when exactly a computation must be
+    produced them. Funflow uses this to know when exactly a computation must be
     rerun and when previous results can be re-used. [2]_
   - The content store also acts as a CAS_ system. This means that, if multiple
     inputs produce the same output, that output will be stored only once on disk
@@ -48,21 +48,21 @@ Features
     enabled for internal computations by providing suitable
     serialisation/deserialisation functions.
 
-- **Failure handling**. In a long-running workflow, failures are inevitable. FunFlow
+- **Failure handling**. In a long-running workflow, failures are inevitable. Funflow
   has support for handling failures inside workflows, and for resuming workflows
   from the last successful point once some external error has been corrected.
-- Sequential and **parallel execution**. FunFlow executes sections of workflows
+- Sequential and **parallel execution**. Funflow executes sections of workflows
   in parallel where this is possible, and handles sequential execution where
   tasks have dependencies.
-- **Task distribution**. External steps can be serialised and run remotely. FunFlow
+- **Task distribution**. External steps can be serialised and run remotely. Funflow
   includes a number of central coordinators which handle distributing steps
   among multiple machines:
 
-  - An `in-memory <./funflow/src/Control/FunFlow/External/Coordinator/Memory.hs>`_
+  - An `in-memory <./funflow/src/Control/Funflow/External/Coordinator/Memory.hs>`_
     coordinator, useful for single-process computation.
-  - A `Redis based <./funflow/src/Control/FunFlow/External/Coordinator/Redis.hs>`_
+  - A `Redis based <./funflow/src/Control/Funflow/External/Coordinator/Redis.hs>`_
     coordinator.
-  - A `SQLite <./funflow/src/Control/FunFlow/External/Coordinator/SQLite.hs>`_
+  - A `SQLite <./funflow/src/Control/Funflow/External/Coordinator/SQLite.hs>`_
     coordinator, which uses a SQLite database as a shared location for task
     distribution.
 
@@ -71,7 +71,7 @@ Features
   distributing full workflows using Redis. This has some extra constraints
   compared to distributing external tasks, since Haskell functions are in
   general not serialisable.
-- Safe and powerful workflow composition. FunFlow takes advantage of Haskell's
+- Safe and powerful workflow composition. Funflow takes advantage of Haskell's
   type system to ensure flows are composed in a safe manner. And since the
   composition of flows results in a flow, it's easy to include one complex
   workflow as part of another.
@@ -106,7 +106,7 @@ You can also use Haskell's arrow notation to compose more complex flows::
                     (\_ -> putStrLn "What's your favourite number?" >> const getLine) -< name
     returnA -< (name, fnum)
 
-In this flow, you can also see the use of FunFlow's caching.
+In this flow, you can also see the use of Funflow's caching.
 
 `stepIO`
   `stepIO` lifts an `IO` action into a flow.
@@ -117,7 +117,7 @@ In this flow, you can also see the use of FunFlow's caching.
 Running a workflow
 ------------------
 
-To run a workflow, use one of the options from Control.FunFlow.Exec.Simple_ .
+To run a workflow, use one of the options from Control.Funflow.Exec.Simple_ .
 The easiest place to start is with `withSimpleLocalRunner`. This takes the
 absolute path to a directory used to host the content store. It returns a
 function which can be used to run your workflow.
@@ -127,8 +127,8 @@ Here's an example of a complete pipeline, along with a runner::
   {-# LANGUAGE Arrows #-}
   {-# LANGUAGE QuasiQuotes #-}
   import Control.Arrow
-  import Control.FunFlow
-  import Control.FunFlow.Exec.Simple (withSimpleLocalRunner)
+  import Control.Funflow
+  import Control.Funflow.Exec.Simple (withSimpleLocalRunner)
   import Data.Default
   import Path
 
@@ -177,9 +177,9 @@ big advantages:
   visualised in the workflow graph, and their stdout/stderr streams are captured
   automatically.
 
-FunFlow's current approach to external tasks is heavily based on Docker_. Using
+Funflow's current approach to external tasks is heavily based on Docker_. Using
 Docker allows tasks to be self-contained, and adds minimal requirements to the
-system being used to host FunFlow instances (they just need to have docker
+system being used to host Funflow instances (they just need to have docker
 running).
 
 To use a docker container as an external step, define a function of type `a ->
@@ -276,7 +276,7 @@ store directory, and `/tmp/coordinator.db` as our coordinating database::
   ffexecutord sqlite /tmp/funflow /tmp/coordinator.db
 
 You then need to run the flow, pointing at this coordinator. To do so, you'll need a
-slightly more complex function from Control.FunFlow.Exec.Simple_: `runSimpleFlow`. You
+slightly more complex function from Control.Funflow.Exec.Simple_: `runSimpleFlow`. You
 need to give this the correct parameters for the `SQLite` coordinator::
 
   CS.withStore [absdir|/tmp/funflow|] $ \store -> do
@@ -291,13 +291,13 @@ runNoEffect
 123123
   This is a random integer used in helping to determine the hashes for caching
   internal steps. It's needed because there might be parts of the environment
-  which FunFlow is unaware of but which have an impact on the results of
+  which Funflow is unaware of but which have an impact on the results of
   computations, and so should form part of the cache.
 
 User-defined effects
 --------------------
 
-FunFlow allows you to extend the possible steps in a flow with your own
+Funflow allows you to extend the possible steps in a flow with your own
 user-defined effects. Suppose for example you are working on a flow which talks
 to a REST service offering details of your record collection. Then you might
 define the following grammar for interacting with it::
@@ -360,4 +360,4 @@ example above::
 .. _CAS: https://en.wikipedia.org/wiki/Content-addressable_storage
 .. _arrows: https://www.haskell.org/arrows/
 .. _Docker: https://www.docker.com
-.. _Control.FunFlow.Exec.Simple: ./funflow/src/Control/FunFlow/Exec/Simple.hs
+.. _Control.Funflow.Exec.Simple: ./funflow/src/Control/Funflow/Exec/Simple.hs
