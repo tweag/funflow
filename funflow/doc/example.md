@@ -1,4 +1,4 @@
-## Biofinder example
+## Machine learning example
 
 ### Some signatures for basic functions
 
@@ -36,8 +36,8 @@ dockerFlow :: ToDockerConfig a => Flow a ContentHash
 
 ### Model training
 
-This is an example of a biofinder workflow which might run. It performs the
-following actions:
+This is an example of a machine learning workflow which might run. It performs
+the following actions:
 
 1. Loads data from a Postgres instance
 2. Puts these data into the contenthashable store
@@ -66,7 +66,7 @@ fetchFromPosgres = proc config -> do
 fitPCAModel :: Flow ContentHash ContentHash
 fitPCAModel = proc input -> do
   dockerFlow -< DockerConfig
-                  "pfizer/transformPCA"
+                  "tweag/transformPCA"
                   (SingleInput input)
                   "/usr/bin/python"
                   ["..."]
@@ -99,7 +99,7 @@ Projection performs the following:
 projectOnto :: Flow ContentHash ContentHash
 projectOnto = proc input -> do
   dockerFlow -< DockerConfig
-                  "pfizer/trainPCA"
+                  "tweag/trainPCA"
                   (SingleInput input)
                   "/usr/bin/python"
                   ["..."]
