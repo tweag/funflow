@@ -5,8 +5,13 @@ jobs:
       - image: fpco/stack-build
     steps:
       - checkout
+      - run:
+          name: Compute cache key
+          command: |
+            find . -name "*.cabal" -o -name "stack.yaml" -type f | sort | xargs cat > /tmp/stack-deps
       - restore_cache:
-          key: stack-deps-{{ checksum "stack.yaml" }}
+          keys:
+            - funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
       - run:
           name: Setup build toolchain
           command: stack setup
@@ -16,7 +21,7 @@ jobs:
       - save_cache:
           paths:
             - "~/.stack"
-          key: stack-deps-{{ checksum "stack.yaml" }}
+          key: funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
       - run:
           name: Building
           command: stack build --pedantic
