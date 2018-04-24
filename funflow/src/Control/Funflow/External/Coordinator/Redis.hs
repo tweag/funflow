@@ -4,6 +4,11 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 
+-- | Redis-based co-ordinator for Funflow.
+--
+--   There are two co-ordinators defined in this module. They differ in whether
+--   they open a new connection to Redis or re-use an existing one. Other than
+--   that they behave identically.
 module Control.Funflow.External.Coordinator.Redis
   ( Redis (..)
   , RedisPreconnected (..)

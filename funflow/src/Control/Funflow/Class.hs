@@ -3,6 +3,16 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
+
+-- | Defines a class for types which can be used as workflows.
+--
+--   In general, you should not need this functionality unless you are defining
+--   your own flow types (perhaps to use a state transformer or similar), in
+--   which case this allows you to work using the standard combinators in
+--   Funflow and then define the mapping to 'Base.Flow'
+--
+--   For an example of use, see the module @Control.Funflow.Checkpoints@, which
+--   defines a checkpointed flow.
 module Control.Funflow.Class where
 
 import           Control.Arrow

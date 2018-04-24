@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TupleSections         #-}
 
+-- | Miscallaneous steps to form part of Funflow computations.
 module Control.Funflow.Steps
   ( -- * Error handling
     retry

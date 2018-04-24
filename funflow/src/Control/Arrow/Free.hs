@@ -13,6 +13,17 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
+-- | Various varieties of free arrow constructions.
+--
+--   For all of these constructions, there are only two important functions:
+--   - 'eval' evaluates the free arrow in the context of another arrow.
+--   - 'effect' lifts the underlying effect into the arrow.
+--
+--   The class 'FreeArrowLike', which is not exported from this module, exists
+--   to allow these to be defined generally.
+--
+--   This module also defines some arrow combinators which are not exposed by
+--   the standard arrow library.
 module Control.Arrow.Free
   ( Free
   , Choice
@@ -41,6 +52,7 @@ import           Data.List           (uncons)
 import           Data.Maybe          (maybe)
 import           Data.Tuple          (curry, uncurry)
 
+-- | A natural transformation on type constructors of two arguments.
 type x ~> y = forall a b. x a b -> y a b
 
 --------------------------------------------------------------------------------
@@ -68,6 +80,7 @@ instance (a x, b x) => Join a b x where
 -- Arrow
 --------------------------------------------------------------------------------
 
+-- | Freely generated arrows over an effect.
 data Free eff a b where
   Pure :: (a -> b) -> Free eff a b
   Effect :: eff a b -> Free eff a b
@@ -108,6 +121,7 @@ instance FreeArrowLike Free where
 -- ArrowChoice
 --------------------------------------------------------------------------------
 
+-- | Freely generated `ArrowChoice` over an effect.
 newtype Choice eff a b = Choice {
   runChoice :: forall ac. ArrowChoice ac => (eff ~> ac) -> ac a b
 }
@@ -142,6 +156,8 @@ instance FreeArrowLike Choice where
 -- ErrorChoice
 --------------------------------------------------------------------------------
 
+-- | ArrowError represents those arrows which can catch exceptions within the
+--   processing of the flow.
 class ArrowError ex a where
   catch :: a e c -> a (e, ex) c -> a e c
 
@@ -150,6 +166,7 @@ instance (Arrow (Kleisli m), Exception ex, MonadCatch m)
     Kleisli arr1 `catch` Kleisli arr2 = Kleisli $ \x ->
       arr1 x `Control.Exception.Safe.catch` curry arr2 x
 
+-- | Freely generated arrows with both choice and error handling.
 newtype ErrorChoice ex eff a b = ErrorChoice {
   runErrorChoice :: forall ac. (ArrowChoice ac, ArrowError ex ac)
                  => (eff ~> ac) -> ac a b

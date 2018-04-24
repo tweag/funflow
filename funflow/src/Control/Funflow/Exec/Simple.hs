@@ -9,6 +9,11 @@
 {-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeOperators       #-}
 
+-- | This module contains the means to execute a pipeline.
+--
+--   You should probably start with 'withSimpleLocalRunner' and 'runSimpleFlow'.
+--   The other functions in this module provide more flexible versions of
+--   'runSimpleFlow'.
 module Control.Funflow.Exec.Simple
   ( runFlow
   , runFlowEx

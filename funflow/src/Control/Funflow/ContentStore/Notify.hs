@@ -1,5 +1,14 @@
 {-# LANGUAGE CPP #-}
 
+-- | Generic file change notifier library for unix-based systems.
+--
+--   This library abstracts over specific implementations for BSD and linux
+--   systems.
+--
+--   It provides facilities to watch specific directories for the following changes:
+--   - File moves
+--   - File deletion
+--   - Attribute changes.
 module Control.Funflow.ContentStore.Notify
   ( Notifier
   , initNotifier

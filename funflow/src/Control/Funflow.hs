@@ -1,3 +1,6 @@
+-- | Central Funflow module.
+--
+--   This module just re-exports various other modules for convenience.
 module Control.Funflow
   ( Base.Flow
   , Base.SimpleFlow

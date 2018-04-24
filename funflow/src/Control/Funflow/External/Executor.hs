@@ -4,6 +4,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 -- | Executor for external tasks.
+--
+--   An executor will poll for tasks on the co-ordinator, mark them as in
+--   progress and then execute them.
+--
+--   You probably want to start with 'executeLoop'.
 module Control.Funflow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)

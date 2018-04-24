@@ -6,6 +6,9 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 
+-- | Distributable Funflow jobs. This allows full jobs (e.g. workflows) to be
+--   distributed using Redis. This is at the cost of requiring the same code to
+--   be running everywhere, and having a map from strings to codepoints.
 module Control.Funflow.Jobs.Redis
   ( Job(..)
   , JobId
