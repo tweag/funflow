@@ -7,6 +7,15 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeOperators         #-}
+-- | Checkpointable flows.
+--
+--   A checkpointable flow acts as a normal flow but for the option to define
+--   'checkpoint' steps. These have no effect on dataflow, but may be used to
+--   truncate a flow.
+--
+--   For example, this could be used to implement a build system with multiple
+--   targets; for 'build', 'test', 'run' etc. For an example of using this, see
+--   the tests.
 module Control.Funflow.Checkpoints
   ( CheckpointException(..)
   , CheckpointT

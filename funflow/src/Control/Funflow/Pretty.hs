@@ -1,8 +1,8 @@
-{-# LANGUAGE Arrows              #-}
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Pretty-printer for Funflow diagrams.
 module Control.Funflow.Pretty where
 
 import           Control.Funflow.Base

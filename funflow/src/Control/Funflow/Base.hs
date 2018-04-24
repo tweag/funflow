@@ -7,6 +7,10 @@
 {-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE ViewPatterns              #-}
 
+-- | Core Funflow types and functions.
+--
+--   In particular, you will probably care about the 'Flow' type, which is the
+--   type of all Funflow workflows.
 module Control.Funflow.Base where
 
 import           Control.Arrow                   (Kleisli (..))

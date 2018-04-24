@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Implementation of filesystem watch for BSD-based systems using KQueue.
 module Control.Funflow.ContentStore.Notify.BSD
   ( Notifier
   , initNotifier

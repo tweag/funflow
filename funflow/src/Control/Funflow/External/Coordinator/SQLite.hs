@@ -4,6 +4,11 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE QuasiQuotes       #-}
 
+-- | SQLLite co-ordinator for Funflow.
+--
+--   This co-ordinator effectively uses the shared filesystem as a tool for task
+--   distribution and sequencing. This means that it can control a distributed
+--   funflow task without needing any additional processes running.
 module Control.Funflow.External.Coordinator.SQLite
   ( SQLite (..)
   ) where

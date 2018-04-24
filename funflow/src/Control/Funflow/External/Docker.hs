@@ -3,6 +3,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
+-- | Module supporting the use of docker containers as external tasks.
+--
+--   In general, an external task can be any command. This module just makes it
+--   easier to specify certain tasks which will run inside docker containers. It
+--   handles constructing the call to docker, mounting input and output
+--   directories, and specifying the docker image and version to use.
 module Control.Funflow.External.Docker where
 
 import           Control.Funflow.ContentHashable

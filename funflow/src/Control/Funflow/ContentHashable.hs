@@ -11,6 +11,16 @@
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE UnboxedTuples         #-}
 
+-- | 'ContentHashable' provides a hashing function suitable for use in the
+--   Funflow content store.
+--
+--   This behaves as does a normal hashing function on Haskell types. However,
+--   on path types, this instead calculates a hash based on the contents of the
+--   file or directory referenced.
+--
+--   We also export the 'ExternallyAssuredFile' and 'ExternallyAssuredDirectory'
+--   types. These instead use the path, file size and modification time to control
+--   the hash.
 module Control.Funflow.ContentHashable
   ( ContentHash
   , toBytes

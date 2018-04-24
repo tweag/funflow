@@ -6,6 +6,12 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeFamilyDependencies     #-}
+
+-- | A Funflow coordinator is used to distribute tasks amongst multiple
+--   executors. It provides a functionality to submit tasks, to fetch them for
+--   execution, and to check on their status.
+--
+--   There are multiple possible instantiations of the 'Coordinator' class.
 module Control.Funflow.External.Coordinator where
 
 import           Control.Exception.Safe

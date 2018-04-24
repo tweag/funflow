@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Implementation of filesystem watching functionality for linux based on
+--   inotify.
 module Control.Funflow.ContentStore.Notify.Linux
   ( Notifier
   , initNotifier
