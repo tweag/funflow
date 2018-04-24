@@ -22,7 +22,6 @@ module Control.Funflow.Jobs.Redis
 
 import           Control.Concurrent
 import           Control.Funflow
-import           Control.Funflow.Utils
 import           Control.Lens                hiding (argument)
 import           Control.Monad               (void)
 import           Control.Monad.Base
@@ -177,3 +176,15 @@ finishJob job y = do
     Right _ -> redis $ R.rpush "jobs_done" [encode jid]
     Left _  -> redis $ R.rpush "jobs_error" [encode jid]
   return ()
+
+mdecode :: Store a => Maybe ByteString -> Either String a
+mdecode (Nothing) = Left "no value"
+mdecode (Just bs) = over _Left show $ decode bs
+
+whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
+whenJust Nothing _ = return ()
+whenJust (Just x) f = f x
+
+whenRight :: Monad m => Either b a -> (a -> m ()) -> m ()
+whenRight (Left _) _ = return ()
+whenRight (Right x) f = f x

@@ -12,7 +12,6 @@ module Control.Funflow.External.Coordinator.Redis
 import qualified Control.Funflow.ContentHashable      as CHash
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
-import           Control.Funflow.Utils
 import           Control.Lens
 import           Control.Monad.Except
 import           Control.Monad.Fix                    (fix)
@@ -39,7 +38,7 @@ instance Coordinator Redis where
       jid = CHash.toBytes $ td ^. tdOutput
 
   queueSize conn = liftIO $ R.runRedis conn $
-    fromIntegral . fromRight 0 <$> R.llen "jobs_queue"
+    fromIntegral . either (const 0) id <$> R.llen "jobs_queue"
 
   taskInfo conn chash = liftIO $
     R.runRedis conn $ do
