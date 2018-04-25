@@ -7,6 +7,8 @@ module Control.Funflow
   , Base.NoEffect
   , Base.Flow'(..)
   , Base.Cacher(..)
+  , Base.ExternalProperties(..)
+  , Base.MDWriter
   , Base.Properties(..)
   , Base.defaultCacherWithIdent
   , Cache.defaultCacher
