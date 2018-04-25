@@ -30,7 +30,7 @@ import           Path
 import           Prelude                         hiding (id, (.))
 
 -- | Metadata writer
-type MDWriter i o = Maybe (i -> o -> [(T.Text, T.Text)])
+type MDWriter i o = Maybe (i -> o -> [(T.Text, ByteString)])
 
 -- | A cacher is responsible for controlling how steps are cached.
 data Cacher i o =
