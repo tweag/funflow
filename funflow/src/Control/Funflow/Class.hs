@@ -32,7 +32,7 @@ class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff 
   -- | Create an external task in the flow.
   external :: (a -> ExternalTask) -> arr a CS.Item
   -- | Create an external task with additional properties
-  external' :: Base.ExternalProperties -> (a -> ExternalTask) -> arr a CS.Item
+  external' :: Base.ExternalProperties a -> (a -> ExternalTask) -> arr a CS.Item
   -- | Create a flow from a user-defined effect.
   wrap' :: Base.Properties a b -> eff a b -> arr a b
   -- | Create a flow which will write its incoming data to the store.

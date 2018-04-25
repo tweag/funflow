@@ -75,12 +75,12 @@ instance Default (Properties i o) where
     }
 
 -- | Additional properties associated with external tasks.
-newtype ExternalProperties = ExternalProperties
+newtype ExternalProperties a = ExternalProperties
   { -- | Write additional metadata to the content store.
-    ep_mdpolicy :: MDWriter ExternalTask ()
+    ep_mdpolicy :: MDWriter a ()
   }
 
-instance Default ExternalProperties where
+instance Default (ExternalProperties a) where
   def = ExternalProperties
     { ep_mdpolicy = Nothing
     }
@@ -88,7 +88,7 @@ instance Default ExternalProperties where
 data Flow' eff a b where
   Step :: Properties a b -> (a -> b) -> Flow' eff a b
   StepIO :: Properties a b -> (a -> IO b) -> Flow' eff a b
-  External :: ExternalProperties
+  External :: ExternalProperties a
            -> (a -> ExternalTask)
            -> Flow' eff a CS.Item
   -- XXX: Constrain allowed user actions.

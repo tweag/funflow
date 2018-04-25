@@ -127,14 +127,14 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           -- path and submit as normal.
           UnknownTask -> do
             CS.removeFailed store chash
-            writeMd chash (toTask x) () $ ep_mdpolicy props
+            writeMd chash x () $ ep_mdpolicy props
             submitAndWait chash (TaskDescription chash (toTask x))
           -- Task is already known to the coordinator. Most likely something is
           -- running this task. Just wait for it.
           KnownTask _ -> wait chash (TaskDescription chash (toTask x))
         -- Nothing in the store. Submit and run.
         CS.Missing _ -> do
-          writeMd chash (toTask x) () $ ep_mdpolicy props
+          writeMd chash x () $ ep_mdpolicy props
           submitAndWait chash (TaskDescription chash (toTask x))
       where
         submitAndWait chash td = do
