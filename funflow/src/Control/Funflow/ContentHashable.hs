@@ -68,6 +68,7 @@ import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
 import           Data.Functor.Contravariant
+import qualified Data.Hashable
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Int
@@ -121,6 +122,9 @@ instance Aeson.FromJSON ContentHash where
     = Aeson.typeMismatch "ContentHash" invalid
 instance Aeson.ToJSON ContentHash where
   toJSON = Aeson.String . TE.decodeUtf8 . encodeHash
+
+instance Data.Hashable.Hashable ContentHash where
+  hashWithSalt s = Data.Hashable.hashWithSalt s . encodeHash
 
 instance Show ContentHash where
   showsPrec d h = showParen (d > app_prec)
