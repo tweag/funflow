@@ -115,7 +115,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
       . liftAsyncA $ AsyncA f
     runFlow' po (External props toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ contentHash (x, toTask x)
+      chash <- liftIO $ contentHash (toTask x)
       CS.lookup store chash >>= \case
         -- The item in question is already in the store. No need to submit a task.
         CS.Complete item -> return item
