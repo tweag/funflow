@@ -136,6 +136,7 @@ import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
 import qualified Data.ByteString.Char8               as C8
 import           Data.Foldable                       (asum)
+import qualified Data.Hashable
 import           Data.List                           (foldl', stripPrefix)
 import           Data.Maybe                          (fromMaybe, listToMaybe)
 import           Data.Monoid                         ((<>))
@@ -272,6 +273,7 @@ instance Monad m => ContentHashable m Item where
 
 instance FromJSON Item
 instance ToJSON Item
+instance Data.Hashable.Hashable Item
 instance Data.Store.Store Item
 
 -- | File or directory within a content store 'Item'.
