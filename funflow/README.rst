@@ -12,6 +12,8 @@ A workflow is a computation built up of multiple steps. These steps are then
 wired together into a larger computation. Outputs from previous steps can form
 inputs to subsequent steps.
 
+For more in-depth context, see the Funflow announcement_.
+
 Features
 --------
 
@@ -361,3 +363,4 @@ example above::
 .. _arrows: https://www.haskell.org/arrows/
 .. _Docker: https://www.docker.com
 .. _Control.Funflow.Exec.Simple: ./funflow/src/Control/Funflow/Exec/Simple.hs
+.. _announcement: https://www.tweag.io/posts/2018-04-25-funflow.html
