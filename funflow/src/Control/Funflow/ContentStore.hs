@@ -705,23 +705,21 @@ getInputs store hash = liftIO . withStoreLock store $
     \  hash = :hash"
     [ ":hash" SQL.:= hash ]
 
--- | Set a metadata entry on a pending item.
+-- | Set a metadata entry on an item.
 setMetadata :: (SQL.ToField k, SQL.ToField v, MonadIO m )
             => ContentStore -> ContentHash -> k -> v -> m ()
 setMetadata store hash k v = liftIO $
   withStoreLock store $
   withWritableStore store $
-  internalQuery store hash >>= \case
-    Pending _ -> SQL.executeNamed (storeDb store)
-      "INSERT OR REPLACE INTO\
-      \  metadata (hash, key, value)\
-      \ VALUES\
-      \  (:hash, :key, :value)"
-      [ ":hash" SQL.:= hash
-      , ":key" SQL.:= k
-      , ":value" SQL.:= v
-      ]
-    _ -> throwIO $ NotPending hash
+  SQL.executeNamed (storeDb store)
+    "INSERT OR REPLACE INTO\
+    \  metadata (hash, key, value)\
+    \ VALUES\
+    \  (:hash, :key, :value)"
+    [ ":hash" SQL.:= hash
+    , ":key" SQL.:= k
+    , ":value" SQL.:= v
+    ]
 
 -- | Retrieve a metadata entry on an item, or 'Nothing' if missing.
 getMetadata :: (SQL.ToField k, SQL.FromField v, MonadIO m)
