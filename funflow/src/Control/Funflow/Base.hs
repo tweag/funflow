@@ -75,14 +75,18 @@ instance Default (Properties i o) where
     }
 
 -- | Additional properties associated with external tasks.
-newtype ExternalProperties a = ExternalProperties
+data ExternalProperties a = ExternalProperties
   { -- | Write additional metadata to the content store.
     ep_mdpolicy :: MDWriter a ()
+    -- | Specify that this external step is impure, and as such should not be
+    -- cached.
+  , ep_impure :: Bool
   }
 
 instance Default (ExternalProperties a) where
   def = ExternalProperties
     { ep_mdpolicy = Nothing
+    , ep_impure = False
     }
 
 data Flow' eff a b where

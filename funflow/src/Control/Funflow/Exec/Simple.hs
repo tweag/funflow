@@ -23,8 +23,13 @@ module Control.Funflow.Exec.Simple
 
 import           Control.Arrow                               (returnA)
 import           Control.Arrow.Async
-import           Control.Arrow.Free                          (eval, type (~>))
+import           Control.Arrow.Free                          (type (~>), eval)
 import           Control.Concurrent.Async                    (withAsync)
+import           Control.Exception.Safe                      (Exception,
+                                                              SomeException,
+                                                              bracket,
+                                                              onException,
+                                                              throwM, try)
 import           Control.Funflow.Base
 import           Control.Funflow.ContentHashable
 import qualified Control.Funflow.ContentStore                as CS
@@ -32,20 +37,17 @@ import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
-import           Control.Exception.Safe                      (Exception,
-                                                              SomeException,
-                                                              bracket,
-                                                              onException,
-                                                              throwM, try)
 import           Control.Monad.IO.Class                      (liftIO)
 import           Control.Monad.Trans.Class                   (lift)
 import qualified Data.ByteString                             as BS
+import           Data.Foldable                               (traverse_)
+import           Data.Int                                    (Int64)
 import           Data.Monoid                                 ((<>))
 import           Data.Void
 import           Katip
 import           Path
 import           System.IO                                   (stderr)
-import Data.Foldable (traverse_)
+import           System.Random                               (randomIO)
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
@@ -109,13 +111,17 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       . AsyncA $ \x -> do
           let out = f x
           case cache props of
-            NoCache -> return ()
+            NoCache       -> return ()
             Cache key _ _ -> writeMd (key confIdent x) x out $ mdpolicy props
           return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
       . liftAsyncA $ AsyncA f
     runFlow' po (External props toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ contentHash (toTask x)
+      chash <- liftIO $ if (ep_impure props)
+               then do
+                 salt <- randomIO :: IO Int64
+                 contentHash (toTask x, salt)
+               else contentHash (toTask x)
       CS.lookup store chash >>= \case
         -- The item in question is already in the store. No need to submit a task.
         CS.Complete item -> return item
