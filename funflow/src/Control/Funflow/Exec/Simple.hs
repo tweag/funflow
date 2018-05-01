@@ -44,7 +44,7 @@ import           Control.Monad.Fix                           (fix)
 import           Control.Monad.IO.Class                      (liftIO)
 import           Control.Monad.Trans.Class                   (lift)
 import qualified Data.ByteString                             as BS
-import           Data.Foldable                               (traverse_, for_)
+import           Data.Foldable                               (for_)
 import           Data.Int                                    (Int64)
 import           Data.Monoid                                 ((<>))
 import           Data.Void
