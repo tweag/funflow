@@ -67,12 +67,14 @@ import qualified Data.ByteString                  as BS
 import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
+import           Data.Foldable                    (foldlM)
 import           Data.Functor.Contravariant
 import qualified Data.Hashable
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Int
 import           Data.List                        (sort)
+import           Data.List.NonEmpty               (NonEmpty)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Ratio
@@ -359,6 +361,9 @@ instance (Typeable v, ContentHashable m v)
 
 instance ContentHashable m a => ContentHashable m [a] where
   contentHashUpdate = foldM contentHashUpdate
+
+instance ContentHashable m a => ContentHashable m (NonEmpty a) where
+  contentHashUpdate = foldlM contentHashUpdate
 
 instance ContentHashable m a => ContentHashable m (V.Vector a) where
   contentHashUpdate = V.foldM' contentHashUpdate
