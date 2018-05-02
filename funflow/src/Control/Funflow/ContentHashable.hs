@@ -67,12 +67,14 @@ import qualified Data.ByteString                  as BS
 import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
+import           Data.Foldable                    (foldlM)
 import           Data.Functor.Contravariant
 import qualified Data.Hashable
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.HashSet                     as HashSet
 import           Data.Int
 import           Data.List                        (sort)
+import           Data.List.NonEmpty               (NonEmpty)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Ratio
@@ -357,11 +359,23 @@ instance (Typeable v, ContentHashable m v)
     -- XXX: The order of the list is unspecified.
     >=> flip contentHashUpdate (HashSet.toList s) $ ctx
 
-instance ContentHashable m a => ContentHashable m [a] where
-  contentHashUpdate = foldM contentHashUpdate
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m [a] where
+  contentHashUpdate ctx l =
+    flip contentHashUpdate_fingerprint l
+    >=> flip (foldM contentHashUpdate) l $ ctx
 
-instance ContentHashable m a => ContentHashable m (V.Vector a) where
-  contentHashUpdate = V.foldM' contentHashUpdate
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m (NonEmpty a) where
+  contentHashUpdate ctx l =
+    flip contentHashUpdate_fingerprint l
+    >=> flip (foldlM contentHashUpdate) l $ ctx
+
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m (V.Vector a) where
+  contentHashUpdate ctx v =
+    flip contentHashUpdate_fingerprint v
+    >=> flip (V.foldM' contentHashUpdate) v $ ctx
 
 instance Monad m => ContentHashable m ()
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (a, b)
