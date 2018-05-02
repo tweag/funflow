@@ -359,14 +359,23 @@ instance (Typeable v, ContentHashable m v)
     -- XXX: The order of the list is unspecified.
     >=> flip contentHashUpdate (HashSet.toList s) $ ctx
 
-instance ContentHashable m a => ContentHashable m [a] where
-  contentHashUpdate = foldM contentHashUpdate
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m [a] where
+  contentHashUpdate ctx l =
+    flip contentHashUpdate_fingerprint l
+    >=> flip (foldM contentHashUpdate) l $ ctx
 
-instance ContentHashable m a => ContentHashable m (NonEmpty a) where
-  contentHashUpdate = foldlM contentHashUpdate
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m (NonEmpty a) where
+  contentHashUpdate ctx l =
+    flip contentHashUpdate_fingerprint l
+    >=> flip (foldlM contentHashUpdate) l $ ctx
 
-instance ContentHashable m a => ContentHashable m (V.Vector a) where
-  contentHashUpdate = V.foldM' contentHashUpdate
+instance (Typeable a, ContentHashable m a)
+  => ContentHashable m (V.Vector a) where
+  contentHashUpdate ctx v =
+    flip contentHashUpdate_fingerprint v
+    >=> flip (V.foldM' contentHashUpdate) v $ ctx
 
 instance Monad m => ContentHashable m ()
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (a, b)
