@@ -49,6 +49,7 @@ module Control.Funflow.ContentHashable
   ) where
 
 
+import           Control.Exception.Safe           (catchJust)
 import           Control.Funflow.Orphans          ()
 import           Control.Monad                    (foldM, mzero, (>=>))
 import           Crypto.Hash                      (Context, Digest, SHA256,
@@ -109,6 +110,7 @@ import qualified Path.Internal
 import qualified Path.IO
 import           System.IO                        (IOMode (ReadMode),
                                                    withBinaryFile)
+import           System.IO.Error                  (isPermissionError)
 import           System.IO.Unsafe                 (unsafePerformIO)
 import           System.Posix.Files               (fileSize, getFileStatus)
 
@@ -515,6 +517,13 @@ instance ContentHashable IO ExternallyAssuredFile where
 --   those as we would externally assured files, rather than just relying on the
 --   directory path. Doing this traversal is pretty cheap, and it's quite likely
 --   for directory contents to be modified without modifying the contents.
+--
+--   If an item in the directory cannot be read due to lacking permissions,
+--   then it will be ignored and not included in the hash. If the flow does not
+--   have permissions to access the contents of a subdirectory, then these
+--   contents cannot influence the outcome of a task and it is okay to exclude
+--   them from the hash. In that case we only hash the name, as that could
+--   influence the outcome of a task.
 newtype ExternallyAssuredDirectory = ExternallyAssuredDirectory (Path.Path Path.Abs Path.Dir)
   deriving (Generic, Show)
 
@@ -532,4 +541,8 @@ instance ContentHashable IO ExternallyAssuredDirectory where
     foldM hashDir ctx' (sort dirs)
     where
       hashFile ctx fp = contentHashUpdate ctx (ExternallyAssuredFile fp)
+        `catchPermissionError` \_ -> contentHashUpdate ctx fp
       hashDir ctx dir = contentHashUpdate ctx (ExternallyAssuredDirectory dir)
+        `catchPermissionError` \_ -> contentHashUpdate ctx dir
+      catchPermissionError = catchJust $ \e ->
+        if isPermissionError e then Just e else Nothing
