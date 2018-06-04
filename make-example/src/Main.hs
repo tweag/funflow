@@ -1,8 +1,9 @@
-{-# LANGUAGE Arrows            #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE  QuasiQuotes      #-}
+{-# LANGUAGE Arrows               #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE OverloadedStrings    #-}
+{-# LANGUAGE  QuasiQuotes         #-}
 {-# LANGUAGE  ScopedTypeVariables #-}
+{-# LANGUAGE  TypeOperators       #-}
 
 module Main where
 
@@ -54,7 +55,9 @@ type Set = Set.Set
 # TODO Later
 1) Clean import list.
 2) Check validity of make file.
-
+3) Use
+   > type (==>) = SimpleFlow
+   everywhere.
 
 -}
 
@@ -223,31 +226,47 @@ testMakeFileParse = do
 -- assuming the makefile is valid at this point!
 
 buildTarget :: MakeFile -> MakeRule -> SimpleFlow () (Content File)
-buildTarget mkfile target@(MakeRule targetNm deps cmd) = proc _ -> do
-  let srcfiles = sourceFiles mkfile
-  let allRules = allrules mkfile
-  () <- guardFlow -< (target `Set.member` allRules) -- | Does this work?
-  let neededTargets = Set.toList $ deps `Set.difference` srcfiles
-  let neededSources  = Set.toList $ deps `Set.intersection` srcfiles
-  let neededTargetRules = findRules mkfile neededTargets
-  case neededTargetRules of
-    Nothing -> do
-      () <- failNow -< ()
-      returnA -< (error "dependency rules missing")
-    Just (depRules :: [MakeRule]) -> do
-      -- really cool application: no repeated work here!
-      -- a powerful dynamic programming tool
-      let depTargetFlows = map (buildTarget mkfile) depRules
-      let countDepFlows = length depTargetFlows
-      joinedFlow <- flowJoin -< depTargetFlows
-      depFiles <- joinedFlow -< (replicate countDepFlows ())
-      compiledFile <- compileFile -< (targetNm, neededSources, depFiles)
-      returnA -< compiledFile
+buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
+   srcfiles = sourceFiles mkfile
+   allRules = allrules mkfile
+   neededTargets = Set.toList $ deps `Set.difference` srcfiles
+   neededSources  = Set.toList $ deps `Set.intersection` srcfiles
+   neededTargetRules = findRules mkfile neededTargets
+   -- () <- guardFlow -< (target `Set.member` allRules) -- | Does this work?
+ in case neededTargetRules of
+   Nothing -> proc _ -> do
+     () <- failNow -< ()
+     returnA -< (error "dependency rules missing")
+   Just (depRules :: [MakeRule]) -> let
+       depTargetFlows = map (buildTarget mkfile) depRules
+       countDepFlows = length depTargetFlows
+     in proc _ -> do
+       -- really cool application: no repeated work here!
+       -- a powerful dynamic programming tool
+       depFiles <- flowJoin depTargetFlows -< (replicate countDepFlows ())
+       compiledFile <- compileFile -< (targetNm, neededSources, depFiles,cmd)
+       returnA -< compiledFile
 
 
+findRules :: MakeFile -> [TargetFile] -> Maybe [MakeRule]
+findRules MakeFile {allrules = rules} ts = do
+  guard ((tfileSet Set.\\ ruleTarNmSet) == Set.empty)
+  let targetRules = Set.filter ((`Set.member` tfileSet) . getRuleTargetNm) rules
+  return $ Set.toList targetRules
+  where
+    ruleTarNmSet = Set.map getRuleTargetNm rules
+    tfileSet = Set.fromList ts
+    getRuleTargetNm (MakeRule tf _ _) = tf
+
+
+type (==>) = SimpleFlow
+
+-- | Compiles a C file in a docker container.
+compileFile :: (TargetFile, [SourceFile], [Content File], Command) ==> (Content File)
 compileFile = undefined
 
-findRules = undefined
+
+
 
 -- Do we want this? How does it work with error handling?
 data ExitStatus where
@@ -262,9 +281,7 @@ data ExitStatus where
 
 -- | Reference
 ---------------------------------------------------------------------------------
-getMkRuleTargetNm :: MakeRule -> TargetFile
-getMkRuleTargetNm (MakeRule tf _ _) = tf
-
+{-
 -- uggh, need lenght indexed vectors to do this nicely
 flowJoin :: SimpleFlow [SimpleFlow a b] (SimpleFlow [a] [b])
 flowJoin = proc flows -> do
@@ -277,15 +294,17 @@ flowJoin = proc flows -> do
                      bs <- joinedFlow -< as
                      returnA -< (b:bs)
                     )
+-}
 
-{-
+
+flowJoin :: [SimpleFlow a b] -> SimpleFlow [a] [b]
 flowJoin [] = step (\_ -> [])                           -- Eh.
 flowJoin ff@(f:fs) = proc aa@(a:as) -> do
   () <- guardFlow -< (length ff == length aa)
   b <- f -< a
   bs <- (flowJoin fs) -< as
   returnA -< (b:bs)
--}
+
 
 -- | Not sure if this works:
 guardFlow :: SimpleFlow Bool ()
