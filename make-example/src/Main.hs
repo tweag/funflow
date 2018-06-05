@@ -1,9 +1,10 @@
-{-# LANGUAGE Arrows               #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE  QuasiQuotes         #-}
-{-# LANGUAGE  ScopedTypeVariables #-}
-{-# LANGUAGE  TypeOperators       #-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Main where
 
@@ -48,6 +49,7 @@ import Data.Char (isLetter, isDigit)
 import System.Posix.Files ( setFileMode, accessModes )
 
 type Set = Set.Set
+type Map = Map.Map
 
 
 {-
@@ -228,11 +230,9 @@ testMakeFileParse = do
 buildTarget :: MakeFile -> MakeRule -> SimpleFlow () (Content File)
 buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
    srcfiles = sourceFiles mkfile
-   allRules = allrules mkfile
    neededTargets = Set.toList $ deps `Set.difference` srcfiles
    neededSources  = Set.toList $ deps `Set.intersection` srcfiles
    neededTargetRules = findRules mkfile neededTargets
-   -- () <- guardFlow -< (target `Set.member` allRules) -- | Does this work?
  in case neededTargetRules of
    Nothing -> proc _ -> do
      () <- failNow -< ()
@@ -240,12 +240,26 @@ buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
    Just (depRules :: [MakeRule]) -> let
        depTargetFlows = map (buildTarget mkfile) depRules
        countDepFlows = length depTargetFlows
+       grabSources srcs = monadJoin $ map (readFile . ("./" ++)) srcs
+       grabSrcsFlow = stepIO grabSources
      in proc _ -> do
        -- really cool application: no repeated work here!
        -- a powerful dynamic programming tool
+       () <- guardFlow -< (target `Set.member` (allrules mkfile)) -- | Does this work?
+       contentSrcFiles <- grabSrcsFlow -< neededSources
+       let fullSrcFiles = Map.fromList $ zip neededSources contentSrcFiles
        depFiles <- flowJoin depTargetFlows -< (replicate countDepFlows ())
-       compiledFile <- compileFile -< (targetNm, neededSources, depFiles,cmd)
+       compiledFile <- compileFile -< (targetNm, fullSrcFiles, depFiles,cmd)
        returnA -< compiledFile
+
+-- Does grabSrcsFlow fail if one can't be found?
+
+monadJoin :: Monad m => [m a] -> m [a]
+monadJoin [] = return []
+monadJoin (m:ms) = do
+  a <- m
+  as <- monadJoin ms
+  return (a:as)
 
 
 findRules :: MakeFile -> [TargetFile] -> Maybe [MakeRule]
@@ -262,8 +276,100 @@ findRules MakeFile {allrules = rules} ts = do
 type (==>) = SimpleFlow
 
 -- | Compiles a C file in a docker container.
-compileFile :: (TargetFile, [SourceFile], [Content File], Command) ==> (Content File)
-compileFile = undefined
+compileFile ::
+  (TargetFile, Map SourceFile String, [Content File], Command) ==> (Content File)
+compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
+  srcsInStore <- writeToStore -< srcDeps
+  let inputFilesInStore = srcsInStore ++ tarDeps
+  let scriptSrc = "#!/usr/bin/env bash\n\
+                  \cd /input/deps\n" ++ cmd ++
+                  "\ncp " ++ tf ++ " /output/"
+  compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
+  compiledFile <- dockerFlow -< (inputFilesInStore,compileScript)
+  relpathCompiledFile <- flowStringToRelFile -< tf
+  returnA -< (compiledFile :</> relpathCompiledFile)
+    where
+      dockerFlow = docker dockerConfFn
+      dockerConfFn (deps, compileScript) = Docker.Config
+        { Docker.image = "gcc"
+        , Docker.optImageID = Nothing
+        , Docker.input = Docker.MultiInput inputs
+        , Docker.command = "./input/script/script.sh"
+        , Docker.args = []
+        }
+        where
+          inputs = Map.fromList inputAsocList
+          cfToItem = IPItem . CS.contentItem
+          depItems = map cfToItem deps
+          depAsocList = zip (cycle ["deps"]) depItems
+          inputAsocList =
+            ("script", cfToItem compileScript) : depAsocList
+
+
+
+type FileName = String
+type FileContent = String
+
+writeToStore :: (Map FileName FileContent) ==> [Content File]
+writeToStore = proc files -> do
+  let listfiles = Map.toList files
+  filesWithPaths <- mapA flowfix -< listfiles
+  contents <- mapA writeString -< filesWithPaths
+  returnA -< contents
+
+
+-- These three functions can be cleaned up.
+fix :: (String, String) -> IO (String, Path Rel File)
+fix (x,y) = do
+  path <- parseRelFile x
+  return (y,path)
+
+flowfix :: (String, String) ==> (String, Path Rel File)
+flowfix = stepIO fix
+
+flowStringToRelFile :: String ==> Path Rel File
+flowStringToRelFile = stepIO parseRelFile
+
+{-
+# Process
+1) Get source files and make a Map SourceFile String for name -> content.
+2) Write each of these in the store with their name as the relpath.
+3) Create a docker config:
+
+a) gcc
+b) Nothing
+c) Input: use the contentItem below to get all the Content Files you have and store those.
+
+-- contentItem :: Content t -> Item
+
+Also, a bash script (made executable with writeExecutableString) called
+"bashscript.sh"
+
+This should simply
+   * go to /input
+   * run the input command from the makefile
+   * copy the expected file to /output/
+
+You'll need to put each of these in their own folder (or some shared folders).
+All the dep files can go in /input/deps/.
+The script can go in /input/script.
+
+d) The command to run the bash script: "./input/script/bashscript.sh"
+
+
+
+# Docker Containers
+As I understand it, all we do is run a bash script
+in a docker container. We've preloaded files from the cache into
+/input/ and when we're done, we look for a (already specified) file in
+/output/, put that in the cache and return a CS.Item for that file in the cache.
+
+-}
+
+
+
+
+
 
 
 

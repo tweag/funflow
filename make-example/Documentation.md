@@ -35,6 +35,9 @@ We attempt to compile it in a way such that
  * if we fail, we indicate the target that can't be built.
 
 
+Restrictions:
 
+ * All the files should be in one place
+ * No folders or complex stuff
 
 
