@@ -80,18 +80,16 @@ main = do
         cwd <- getCurrentDir
         r <- withSimpleLocalRunner (cwd </> [reldir|makefiletest/store|]) $ \run ->
           run ((buildTarget mfile defGoalRule) >>> readByteString) ()
-          -- readByteString :: SimpleFlow (Content File) ByteString
         case r of
           Left error ->
             putStrLn $ "\n\nFailed, target failed: \n\n" ++ displayException error
           Right (execContent :: BS.ByteString) -> do
             let outpath = (fromAbsDir cwd) ++ "/" ++ tfName
             BS.writeFile outpath execContent
-            setFileMode outpath accessModes
+            setFileMode outpath accessModes -- chmod +x
             putStrLn "\n\nSuccess, target executable made."
 
 
--- I need a way to write a (Content File)
 readByteString :: Content File ==> BS.ByteString
 readByteString = getFromStore $ BS.readFile . fromAbsFile
 
@@ -317,19 +315,19 @@ type FileContent = String
 writeToStore :: (Map FileName FileContent) ==> [Content File]
 writeToStore = proc files -> do
   let listfiles = Map.toList files
-  filesWithPaths <- mapA flowfix -< listfiles
+  filesWithPaths <- mapA flowfixSrcFileData -< listfiles
   contents <- mapA writeString -< filesWithPaths
   returnA -< contents
 
 
 -- These three functions can be cleaned up.
-fix :: (String, String) -> IO (String, Path Rel File)
-fix (x,y) = do
-  path <- parseRelFile x
+ioFixSrcFileData :: (FileName, FileContent) -> IO (FileContent, Path Rel File)
+ioFixSrcFileData (x,y) = do
+  path <- parseRelFile x -- parseRelFile :: FileName -> IO Path Rel File
   return (y,path)
 
-flowfix :: (String, String) ==> (String, Path Rel File)
-flowfix = stepIO fix
+flowfixSrcFileData :: (String, String) ==> (String, Path Rel File)
+flowfixSrcFileData = stepIO fix
 
 flowStringToRelFile :: String ==> Path Rel File
 flowStringToRelFile = stepIO parseRelFile

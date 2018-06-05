@@ -35,9 +35,14 @@ We attempt to compile it in a way such that
  * if we fail, we indicate the target that can't be built.
 
 
-Restrictions:
+## Restrictions
 
  * All the files should be in one place
  * No folders or complex stuff
 
+
+## Issues
+
+ * For some reason, it requires sudo to write files 
+   _inside_ dockers.
 
