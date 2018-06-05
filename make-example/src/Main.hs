@@ -65,8 +65,7 @@ type Map = Map.Map
 
 
 
--------------------------------------------------------------------------------------
--- Main
+-- | Main
 -------------------------------------------------------------------------------------
 
 main :: IO ()
@@ -284,6 +283,8 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   let scriptSrc = "#!/usr/bin/env bash\n\
                   \cd /input/deps\n" ++ cmd ++
                   "\ncp " ++ tf ++ " /output/"
+  () <- printFlow -< "The generated script: "
+  () <- printFlow -< scriptSrc
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
   compiledFile <- dockerFlow -< (inputFilesInStore,compileScript)
   relpathCompiledFile <- flowStringToRelFile -< tf
@@ -332,6 +333,7 @@ flowStringToRelFile = stepIO parseRelFile
 
 {-
 # Process
+
 1) Get source files and make a Map SourceFile String for name -> content.
 2) Write each of these in the store with their name as the relpath.
 3) Create a docker config:
@@ -357,21 +359,14 @@ The script can go in /input/script.
 d) The command to run the bash script: "./input/script/bashscript.sh"
 
 
-
 # Docker Containers
+
 As I understand it, all we do is run a bash script
 in a docker container. We've preloaded files from the cache into
 /input/ and when we're done, we look for a (already specified) file in
 /output/, put that in the cache and return a CS.Item for that file in the cache.
 
 -}
-
-
-
-
-
-
-
 
 
 -- Do we want this? How does it work with error handling?
@@ -385,23 +380,8 @@ data ExitStatus where
 
 
 
--- | Reference
+-- | Reference/ Library
 ---------------------------------------------------------------------------------
-{-
--- uggh, need lenght indexed vectors to do this nicely
-flowJoin :: SimpleFlow [SimpleFlow a b] (SimpleFlow [a] [b])
-flowJoin = proc flows -> do
-  case flows of
-    [] -> returnA -< (step $ \_ -> [])
-    (f:fs) -> do
-      joinedFlow <- flowJoin -< fs
-      returnA -< (proc (a:as) -> do
-                     b <- f -< a
-                     bs <- joinedFlow -< as
-                     returnA -< (b:bs)
-                    )
--}
-
 
 flowJoin :: [SimpleFlow a b] -> SimpleFlow [a] [b]
 flowJoin [] = step (\_ -> [])                           -- Eh.
@@ -421,15 +401,18 @@ guardFlow = proc test -> do
       () <- failNow -< ()
       returnA -< ()
 
-
 failNow :: SimpleFlow () ()
 failNow = proc _ -> do
       (stepIO err) -< ()
 
-
 err :: () -> IO ()
 err () = do
   error "error"
+
+printFlow :: String ==> ()
+printFlow = proc s -> do
+  () <- stepIO putStrLn -< s
+  returnA -< ()
 
 ---------------------------------------------------------------------------------
 
