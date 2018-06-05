@@ -38,8 +38,8 @@ import Text.Read (readMaybe)
 
 import Text.Parsec (ParseError, parse)
 import Text.Parsec.String (Parser)
-import Text.Parsec.Char (noneOf, oneOf, char, digit, satisfy, newline, string,
-                        letter)
+import Text.Parsec.Char (noneOf, oneOf, char, digit,
+                         satisfy, newline, string, letter)
 import Text.Parsec.Combinator (many1, choice, chainl1)
 
 import Control.Monad (void, guard)
@@ -47,6 +47,7 @@ import Control.Applicative ((<$>), (<*>), (<*), (*>), many, (<|>))
 import Data.Char (isLetter, isDigit)
 
 import System.Posix.Files ( setFileMode, accessModes )
+import qualified Data.ByteString as BS
 
 type Set = Set.Set
 type Map = Map.Map
@@ -75,20 +76,24 @@ main = do
       Right (MFError err) -> putStrLn $ "Invalid make file: \n" ++ err
       Left mfile -> do
         let defGoalRule = defaultGoal mfile
+        let tfName = getRuleTargetNm defGoalRule
         cwd <- getCurrentDir
         r <- withSimpleLocalRunner (cwd </> [reldir|makefiletest/store|]) $ \run ->
-          run ((buildTarget mfile defGoalRule) >>> readString) ()
-          -- readString :: SimpleFlow (Content File) String
+          run ((buildTarget mfile defGoalRule) >>> readByteString) ()
+          -- readByteString :: SimpleFlow (Content File) ByteString
         case r of
           Left error ->
             putStrLn $ "\n\nFailed, target failed: \n\n" ++ displayException error
-          Right (execContent :: String) -> do
-            let outpath = ((fromAbsDir cwd) ++ "/a.out")
-            writeFile outpath execContent
+          Right (execContent :: BS.ByteString) -> do
+            let outpath = (fromAbsDir cwd) ++ "/" ++ tfName
+            BS.writeFile outpath execContent
             setFileMode outpath accessModes
-            putStrLn $ "\n\nSuccess, target executable made."
+            putStrLn "\n\nSuccess, target executable made."
 
 
+-- I need a way to write a (Content File)
+readByteString :: Content File ==> BS.ByteString
+readByteString = getFromStore $ BS.readFile . fromAbsFile
 
 -- | Data Defs
 -------------------------------------------------------------------------------------
@@ -260,7 +265,6 @@ monadJoin (m:ms) = do
   as <- monadJoin ms
   return (a:as)
 
-
 findRules :: MakeFile -> [TargetFile] -> Maybe [MakeRule]
 findRules MakeFile {allrules = rules} ts = do
   guard ((tfileSet Set.\\ ruleTarNmSet) == Set.empty)
@@ -269,7 +273,9 @@ findRules MakeFile {allrules = rules} ts = do
   where
     ruleTarNmSet = Set.map getRuleTargetNm rules
     tfileSet = Set.fromList ts
-    getRuleTargetNm (MakeRule tf _ _) = tf
+
+getRuleTargetNm :: MakeRule -> String
+getRuleTargetNm (MakeRule tf _ _) = tf
 
 
 type (==>) = SimpleFlow
@@ -280,18 +286,17 @@ compileFile ::
 compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   srcsInStore <- writeToStore -< srcDeps
   let inputFilesInStore = srcsInStore ++ tarDeps
+  inputDir <- mergeFiles -< inputFilesInStore
   let scriptSrc = "#!/usr/bin/env bash\n\
                   \cd /input/deps\n" ++ cmd ++
                   "\ncp " ++ tf ++ " /output/"
-  () <- printFlow -< "The generated script: "
-  () <- printFlow -< scriptSrc
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
-  compiledFile <- dockerFlow -< (inputFilesInStore,compileScript)
+  compiledFile <- dockerFlow -< (inputDir,compileScript)
   relpathCompiledFile <- flowStringToRelFile -< tf
   returnA -< (compiledFile :</> relpathCompiledFile)
     where
       dockerFlow = docker dockerConfFn
-      dockerConfFn (deps, compileScript) = Docker.Config
+      dockerConfFn (depDir, compileScript) = Docker.Config
         { Docker.image = "gcc"
         , Docker.optImageID = Nothing
         , Docker.input = Docker.MultiInput inputs
@@ -299,12 +304,10 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
         , Docker.args = []
         }
         where
-          inputs = Map.fromList inputAsocList
-          cfToItem = IPItem . CS.contentItem
-          depItems = map cfToItem deps
-          depAsocList = zip (cycle ["deps"]) depItems
-          inputAsocList =
-            ("script", cfToItem compileScript) : depAsocList
+          inputs = Map.fromList [scriptInput, depInput]
+          mkInputPath = IPItem . CS.contentItem
+          scriptInput = ("script", mkInputPath compileScript)
+          depInput = ("deps", mkInputPath depDir)
 
 
 

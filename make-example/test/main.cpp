@@ -1,5 +1,9 @@
-#include <iostream.h>
+#include <iostream>
 #include "functions.h"
+
+using std::cout;
+using std::endl;
+
 
 int main(){
     print_hello();
