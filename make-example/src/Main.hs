@@ -327,7 +327,7 @@ ioFixSrcFileData (x,y) = do
   return (y,path)
 
 flowfixSrcFileData :: (String, String) ==> (String, Path Rel File)
-flowfixSrcFileData = stepIO fix
+flowfixSrcFileData = stepIO ioFixSrcFileData
 
 flowStringToRelFile :: String ==> Path Rel File
 flowStringToRelFile = stepIO parseRelFile
