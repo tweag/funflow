@@ -61,7 +61,7 @@ and simply run it":
 
 ```bash
 $ ls
-makefile makefile-tool sourcefile1.c sourcefile2.c ...
+makefile-tool Makefile sourcefile1.c sourcefile2.c ...
 $ sudo ./makefile-tool
 ```
 
