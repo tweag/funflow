@@ -14,7 +14,7 @@ and
 
 1. creates a workflow for that particular build, and,
 2. runs that workflow to either produce the desired executable or 
-   fail gently in doing so.
+   fails gently in doing so.
 
 
 ## Specification
@@ -82,47 +82,5 @@ $ pwd
 funflow/funflow-exmaples/makefile-tool/test
 $ sudo ./makefile-tool
 ```
-
-## Known Issues
-
- * For some reason, it requires sudo to write files 
-   inside dockers. This may be particular to some docker setups.
-
-
-## Notes for writing the blog post
-
-
-### How `buildTarget` works
-
- 1) Get source files and make a Map SourceFile String for name -> content.
- 2) Get the dependent make rules.
- 3) Join the flows that build these dependent targets
- 4) Recursively build these targets (caching ensures no repeated work)
- 5) Use a compilation flow with the built dependencies and given
- source files to compile the input target.
-
-### How `compileFile` works
-
- 1) Write the given source files to the content store
- 2) Merge all the dependent targets and sources to a folder in
- the content store.
- 3) Make a bash executable that goes to an "input directory", runs 
- an input command and copies a hopefully produced output file to 
- an "output directory".
- 4) Make a docker flow that takes an input directory, an input bash file 
- and runs that script with the input directory stored in the path "/input/deps"
- in the docker container.
-
-
-### Docker Containers In General
-
- As I understand it, all we do is run a bash script
- in a docker container. We've preloaded files from the cache into
- /input/ and when we're done, we look for a (already specified) file in
- /output/, put that in the cache and return a CS.Item for that
- file in the cache.
-
-
-
 
   

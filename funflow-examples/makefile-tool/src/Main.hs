@@ -12,7 +12,7 @@ import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.Exception.Safe ( try )
 import           Control.Funflow
-import qualified Control.Funflow.ContentStore                as CS
+import qualified Control.Funflow.ContentStore as CS
 import Control.Funflow.ContentStore ( Content (..) )
 import Control.Exception ( Exception (..), SomeException (..) )
 import qualified Control.Funflow.External.Docker as Docker
@@ -28,13 +28,13 @@ import Path ( Path(..), Rel, Abs, File
 import System.IO ( IO, getLine )
 import System.Directory ( getCurrentDirectory )
 import Text.Read ( readMaybe )
-
 import System.Posix.Files ( setFileMode, accessModes )
+import Data.Traversable ( sequence )
 import qualified Data.ByteString as BS
 
 -- Internal Imports
-import Parse (  regularParse, parseMakeFile,
-               parsecMakeFile )
+import Parse ( regularParse, parseMakeFile
+             , parsecMakeFile )
 import Types
 
 -- Data Structures
@@ -96,7 +96,7 @@ getValidMakeFile = do
 readMakeFileMaybe :: IO (Maybe String)
 readMakeFileMaybe = do
   cwd <- getCurrentDirectory
-  let makeFileLoc = cwd ++ "/makefile"
+  let makeFileLoc = cwd ++ "/Makefile"
   tryRead <- try $ readFile makeFileLoc
   case tryRead of
     Left (_ :: SomeException) -> return Nothing
@@ -131,7 +131,7 @@ buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
    Just (depRules :: [MakeRule]) -> let
        depTargetFlows = map (buildTarget mkfile) depRules
        countDepFlows = length depTargetFlows
-       grabSources srcs = monadJoin $ map (readFile . ("./" ++)) srcs
+       grabSources srcs = sequence $ map (readFile . ("./" ++)) srcs
        grabSrcsFlow = stepIO grabSources
      in proc _ -> do
        -- really cool application: no repeated work here!
@@ -142,14 +142,6 @@ buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
        depFiles <- flowJoin depTargetFlows -< (replicate countDepFlows ())
        compiledFile <- compileFile -< (targetNm, fullSrcFiles, depFiles,cmd)
        returnA -< compiledFile
-
-
-monadJoin :: Monad m => [m a] -> m [a]
-monadJoin [] = return []
-monadJoin (m:ms) = do
-  a <- m
-  as <- monadJoin ms
-  return (a:as)
 
 
 findRules :: MakeFile -> [TargetFile] -> Maybe [MakeRule]
@@ -169,7 +161,7 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   srcsInStore <- writeToStore -< srcDeps
   let inputFilesInStore = srcsInStore ++ tarDeps
   inputDir <- mergeFiles -< inputFilesInStore
-  let scriptSrc = "#!/usr/bin/env bash\n\
+  let scriptSrc = "#!/bin/bash\n\
                   \cd /input/deps\n" ++ cmd ++
                   "\ncp " ++ tf ++ " /output/"
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
@@ -181,7 +173,7 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
       dockerFlow = docker dockerConfFn
       dockerConfFn (depDir, compileScript) = Docker.Config
         { Docker.image = "gcc"
-        , Docker.optImageID = Nothing
+        , Docker.optImageID = Nothing --Just "7.3.0"
         , Docker.input = Docker.MultiInput inputs
         , Docker.command = "./input/script/script.sh"
         , Docker.args = []
@@ -217,7 +209,7 @@ flowfixSrcFileData = stepIO ioFixSrcFileData
 
 ioFixSrcFileData :: (FileName, FileContent) -> IO (FileContent, Path Rel File)
 ioFixSrcFileData (x,y) = do
-  path <- parseRelFile x 
+  path <- parseRelFile x
   -- Note: parseRelFile :: FileName -> IO Path Rel File.
   return (y,path)
 
