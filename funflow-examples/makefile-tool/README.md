@@ -57,7 +57,7 @@ file1.0: file-dependency
 ```
 Put all the source files and the makefile in the 
 same directory as the `makefile-tool` executable 
-and simply run it":
+and simply run it:
 
 ```bash
 $ ls
