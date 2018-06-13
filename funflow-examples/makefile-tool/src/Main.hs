@@ -162,8 +162,8 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   let inputFilesInStore = srcsInStore ++ tarDeps
   inputDir <- mergeFiles -< inputFilesInStore
   let scriptSrc = "#!/usr/bin/env bash\n\
-                  \cd /input/deps\n" ++ cmd  ++ " -o /output/" ++ tf   -- this is bad !!!
-                  -- "\ncp " ++ tf ++ " /output/"
+                  \cd /input/deps\n" ++ 
+                  cmd  ++ " -o /output/" ++ tf
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
   compiledFile <- dockerFlow -< (inputDir,compileScript)
   relpathCompiledFile <- flowStringToRelFile -< tf
