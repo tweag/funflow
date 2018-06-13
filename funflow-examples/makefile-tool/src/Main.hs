@@ -18,16 +18,15 @@ import Control.Exception ( Exception (..), SomeException (..) )
 import qualified Control.Funflow.External.Docker as Docker
 
 -- Library Imports
-import Control.Monad (void, guard)
+import Control.Monad ( guard )
 import Path.IO ( getCurrentDir )
-import Path ( Path(..), Rel, Abs, File
-            , reldir, absdir, Dir, relfile 
+import Path ( Path, Rel, File
+            , reldir, Dir, relfile 
             , parseRelFile, fromAbsDir
             , fromAbsFile, (</>)
             )
-import System.IO ( IO, getLine )
+import System.IO ( IO )
 import System.Directory ( getCurrentDirectory )
-import Text.Read ( readMaybe )
 import System.Posix.Files ( setFileMode, accessModes )
 import Data.Traversable ( sequence )
 import qualified Data.ByteString as BS
@@ -51,8 +50,8 @@ main :: IO ()
 main = do
     perhapsMakeFile <- getValidMakeFile
     case perhapsMakeFile of
-      Right (MFError err) -> 
-        putStrLn $ "Invalid make file: \n" ++ err
+      Right (MFError errMsg) -> 
+        putStrLn $ "Invalid make file: \n" ++ errMsg
       Left mfile -> do
         let defGoalRule = defaultGoal mfile
         let tfName = mkRuleTarNm defGoalRule
@@ -61,9 +60,9 @@ main = do
         r <- withSimpleLocalRunner contentStore $ \run ->
           run ((buildTarget mfile defGoalRule) >>> readByteString) ()
         case r of
-          Left error ->
+          Left errorMsg ->
             putStrLn $ 
-              "\n\nFailed, target failed: \n\n" ++ displayException error
+              "\n\nFailed, target failed: \n\n" ++ displayException errorMsg
           Right (execContent :: BS.ByteString) -> do
             let outpath = (fromAbsDir cwd) ++ "/" ++ tfName
             BS.writeFile outpath execContent
@@ -84,10 +83,10 @@ getValidMakeFile = do
   case tryRead of
     Nothing ->
       return $ Right $ MFError $ "`cwd`/makefile does not exist"
-    Just readFile ->
-      case parseMakeFile readFile of
-        Left error ->
-          return $ Right $ MFError $ show error
+    Just fileRead ->
+      case parseMakeFile fileRead of
+        Left errorMsg ->
+          return $ Right $ MFError $ show errorMsg
         Right mkFile ->
           -- for now, ignoring checking it's valid
           return $ Left mkFile
@@ -248,5 +247,3 @@ printFlow :: String ==> ()
 printFlow = proc s -> do
   () <- stepIO putStrLn -< s
   returnA -< ()
-
-
