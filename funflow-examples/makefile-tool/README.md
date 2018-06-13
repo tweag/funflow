@@ -51,12 +51,12 @@ More precisely, the `Makefile` should follow these rules:
  * After a newline, there's a newline sepearted list of rules
    * The first rule is the *default goal* to be made, i.e., the 
      executable we want at the end.
-   * Each rule
-     - States the name of the file produced, a colon, and then a list
-      of dependencies. The depenencies are either source files or 
-      other files that need to be produced.
+   * Rule format:
+     - The first line states the name of the file produced, a colon, 
+       and then a list of dependencies. The depenencies are either 
+       source files or other files that need to be produced.
      - The following line lists a `gcc` command with the restriction that 
-       *the output file is not named, i.e., there is no `-o` argument*
+       **the output file is not named, i.e., there is no `-o` argument**.
 
 To build the C project, put all the source files 
 and the `Makefile` in the  same directory and 
