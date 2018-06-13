@@ -12,8 +12,8 @@ import Control.Applicative ( many, (<|>) )
 import Data.List.Unique ( allUnique )
 import Text.Parsec (ParseError, parse)
 import Text.Parsec.String ( Parser )
-import Text.Parsec.Char ( noneOf, oneOf, char, digit
-                        , satisfy, newline, string, letter
+import Text.Parsec.Char ( noneOf, oneOf, char
+                        , newline, string, letter
                         )
 import Text.Parsec.Combinator ( many1 )
 
