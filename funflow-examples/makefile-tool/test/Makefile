@@ -1,13 +1,13 @@
 source-files: main.cpp factorial.cpp hello.cpp functions.h
 
 hello: main.o factorial.o hello.o functions.h
-    gcc main.o factorial.o hello.o -o hello
+g++ main.o factorial.o hello.o
 
 main.o: main.cpp functions.h
-    gcc -c main.cpp
+g++ -c main.cpp
 
 factorial.o: factorial.cpp functions.h
-    gcc -c factorial.cpp
+g++ -c factorial.cpp
 
 hello.o: hello.cpp functions.h
-    gcc -c hello.cpp
+g++ -c hello.cpp

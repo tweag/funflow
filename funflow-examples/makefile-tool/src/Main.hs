@@ -161,9 +161,9 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   srcsInStore <- writeToStore -< srcDeps
   let inputFilesInStore = srcsInStore ++ tarDeps
   inputDir <- mergeFiles -< inputFilesInStore
-  let scriptSrc = "#!/bin/bash\n\
-                  \cd /input/deps\n" ++ cmd ++
-                  "\ncp " ++ tf ++ " /output/"
+  let scriptSrc = "#!/usr/bin/env bash\n\
+                  \cd /input/deps\n" ++ cmd  ++ " -o /output/" ++ tf   -- this is bad !!!
+                  -- "\ncp " ++ tf ++ " /output/"
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
   compiledFile <- dockerFlow -< (inputDir,compileScript)
   relpathCompiledFile <- flowStringToRelFile -< tf
@@ -173,9 +173,9 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
       dockerFlow = docker dockerConfFn
       dockerConfFn (depDir, compileScript) = Docker.Config
         { Docker.image = "gcc"
-        , Docker.optImageID = Nothing --Just "7.3.0"
+        , Docker.optImageID = Just "7.3.0"
         , Docker.input = Docker.MultiInput inputs
-        , Docker.command = "./input/script/script.sh"
+        , Docker.command = "/input/script/script.sh"
         , Docker.args = []
         }
         where
