@@ -245,13 +245,13 @@ runSimpFlow = do
 simpleFlow :: (String, String) ==> (Content File)
 simpleFlow = proc (str, name) -> do
   item <- external mkExternal -< (str, name)
-  relfilePath <- flowStringToRelFile -< name
-  returnA -< (item :</> relfilePath)
+  returnA -< (item :</> [relfile|out|])
+
 
 mkExternal :: (String, String) -> ExternalTask
 mkExternal (str, name) = ExternalTask
-  { _etCommand = T.pack ("/usr/bin/printf " ++ (show str))
-  , _etParams = []
+  { _etCommand = T.pack "printf"
+  , _etParams = [stringParam (show str)]
   , _etWriteToStdOut = True
   }
 
