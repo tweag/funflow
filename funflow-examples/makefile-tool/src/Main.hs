@@ -12,6 +12,7 @@ import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.Exception.Safe ( try )
 import           Control.Funflow
+import           Control.Funflow.External
 import qualified Control.Funflow.ContentStore as CS
 import Control.Funflow.ContentStore ( Content (..) )
 import Control.Exception ( Exception (..), SomeException (..) )
@@ -21,7 +22,7 @@ import qualified Control.Funflow.External.Docker as Docker
 import Control.Monad ( guard )
 import Path.IO ( getCurrentDir )
 import Path ( Path, Rel, File
-            , reldir, Dir, relfile 
+            , reldir, Dir, relfile
             , parseRelFile, fromAbsDir
             , fromAbsFile, (</>)
             )
@@ -35,6 +36,15 @@ import qualified Data.ByteString as BS
 import Parse ( regularParse, parseMakeFile
              , parsecMakeFile )
 import Types
+
+
+
+
+
+
+import qualified Data.Text as T
+
+
 
 -- Data Structures
 import qualified Data.Map.Strict as Map
@@ -211,6 +221,55 @@ ioFixSrcFileData (x,y) = do
   path <- parseRelFile x
   -- Note: parseRelFile :: FileName -> IO Path Rel File.
   return (y,path)
+
+
+
+
+
+
+
+
+
+-- Figuring out the conversion
+
+runSimpFlow :: IO ()
+runSimpFlow = do
+  cwd <- getCurrentDir
+  let contentStore = cwd </> [reldir|makefiletest/store|]
+  r <- withSimpleLocalRunner contentStore $ \run ->
+    run (simpleFlow >>> readString) ("test string", "fileTest")
+  case r of
+    Left errMsg -> putStrLn $ "\n Failed: " ++ displayException errMsg
+    Right fileContent -> putStrLn $ "\n File content : \n" ++ fileContent
+
+
+simpleFlow :: (String, String) ==> (Content File)
+simpleFlow = proc (str, name) -> do
+  item <- external mkExternal -< (str, name)
+  relfilePath <- flowStringToRelFile -< name
+  returnA -< (item :</> relfilePath)
+
+mkExternal :: (String, String) -> ExternalTask
+mkExternal (str, name) = ExternalTask
+  { _etCommand = T.pack ("printf " ++ (show str) " > ")
+  , _etParams = [outParam]
+  , _etWriteToStdOut = True
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 -- | Library Functions
