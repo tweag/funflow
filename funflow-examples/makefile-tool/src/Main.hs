@@ -242,7 +242,6 @@ runSimpFlow = do
     Left errMsg -> putStrLn $ "\n Failed: " ++ displayException errMsg
     Right fileContent -> putStrLn $ "\n File content : \n" ++ fileContent
 
-
 simpleFlow :: (String, String) ==> (Content File)
 simpleFlow = proc (str, name) -> do
   item <- external mkExternal -< (str, name)
@@ -251,8 +250,8 @@ simpleFlow = proc (str, name) -> do
 
 mkExternal :: (String, String) -> ExternalTask
 mkExternal (str, name) = ExternalTask
-  { _etCommand = T.pack ("printf " ++ (show str) " > ")
-  , _etParams = [outParam]
+  { _etCommand = T.pack ("/usr/bin/printf " ++ (show str))
+  , _etParams = []
   , _etWriteToStdOut = True
   }
 
