@@ -214,42 +214,6 @@ ioFixSrcFileData (x,y) = do
   return (y,path)
 
 
-<<<<<<< HEAD
-=======
-
-
-
-
-
-
-
--- Figuring out the conversion
-
-runSimpFlow :: IO ()
-runSimpFlow = do
-  cwd <- getCurrentDir
-  let contentStore = cwd </> [reldir|makefiletest/store|]
-  r <- withSimpleLocalRunner contentStore $ \run ->
-    run (simpleFlow >>> readString) ("test string", "fileTest")
-  case r of
-    Left errMsg -> putStrLn $ "\n Failed: " ++ displayException errMsg
-    Right fileContent -> putStrLn $ "\n File content : \n" ++ fileContent
-
-simpleFlow :: (String, String) ==> (Content File)
-simpleFlow = proc (str, name) -> do
-  item <- external mkExternal -< (str, name)
-  returnA -< (item :</> [relfile|out|])
-
-
-mkExternal :: (String, String) -> ExternalTask
-mkExternal (str, name) = ExternalTask
-  { _etCommand = T.pack "printf"
-  , _etParams = [stringParam (show str)]
-  , _etWriteToStdOut = True
-  }
-
-
-
 -- | Library Functions
 --------------------------------------------------------------------------------
 
