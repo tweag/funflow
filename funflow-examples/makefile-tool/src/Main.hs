@@ -21,7 +21,7 @@ import qualified Control.Funflow.External.Docker as Docker
 import Control.Monad ( guard )
 import Path.IO ( getCurrentDir )
 import Path ( Path, Rel, File
-            , reldir, Dir, relfile 
+            , reldir, Dir, relfile
             , parseRelFile, fromAbsDir
             , fromAbsFile, (</>)
             )
@@ -50,7 +50,7 @@ main :: IO ()
 main = do
     perhapsMakeFile <- getValidMakeFile
     case perhapsMakeFile of
-      Right (MFError errMsg) -> 
+      Right (MFError errMsg) ->
         putStrLn $ "Invalid make file: \n" ++ errMsg
       Left mfile -> do
         let defGoalRule = defaultGoal mfile
@@ -220,7 +220,8 @@ flowJoin :: [a ==> b] -> ([a] ==> [b])
 flowJoin [] = step (\_ -> [])
 flowJoin ff@(f:fs) = proc aa@(a:as) -> do
   () <- guardFlow -< (length ff == length aa)
-  (b,bs) <- f  *** (flowJoin fs) -< (a, as)
+  b <- f -< a
+  bs <- flowJoin fs -< as
   returnA -< (b:bs)
 
 
