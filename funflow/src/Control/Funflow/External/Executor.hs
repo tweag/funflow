@@ -19,8 +19,7 @@ import qualified Control.Funflow.ContentStore         as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Lens
-import           Control.Monad                        (forever, mzero, unless,
-                                                       when)
+import           Control.Monad                        (forever, mzero, unless)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.Aeson                           as Json
