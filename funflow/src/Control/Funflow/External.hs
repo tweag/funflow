@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TemplateHaskell            #-}
 -- | Definition of external tasks
 module Control.Funflow.External where
@@ -148,17 +149,35 @@ gidParam = Param [ParamGid]
 outParam :: Param
 outParam = Param [ParamOut]
 
+-- | Control how and where stdout from the process is captured. Some external
+-- steps will write their output to stdout rather than to a file.
+data OutputCapture
+    -- | Specify that the step will write its output files directly, and that
+    --   stdout will not be captured in the step output.
+  = NoOutputCapture
+    -- | Capture output to a file named 'out' in the output directory.
+  | StdOutCapture
+    -- | Capture output to a custom named file in the output directory.
+  | CustomOutCapture (Path Rel File)
+  deriving (Generic, Show)
+
+-- | Get the file to write output to, if this is desired.
+outputCaptureToRelFile :: OutputCapture -> Maybe (Path Rel File)
+outputCaptureToRelFile NoOutputCapture         = Nothing
+outputCaptureToRelFile StdOutCapture           = Just [relfile|out|]
+outputCaptureToRelFile (CustomOutCapture file) = Just file
+
+instance ContentHashable IO OutputCapture
+instance FromJSON OutputCapture
+instance ToJSON OutputCapture
+instance Store OutputCapture
+
 -- | A monomorphic description of an external task. This is basically just
 --   a command which can be run.
 data ExternalTask = ExternalTask {
     _etCommand       :: T.Text
   , _etParams        :: [Param]
-    -- | If this is set, then the process outputs on its stdout stream
-    --   rather than writing to a file. In this case, output will be
-    --   redirected into a file called 'out' in the output directory.
-    --   Otherwise, the task is assumed to write itself to files in its
-    --   working directory.
-  , _etWriteToStdOut :: Bool
+  , _etWriteToStdOut :: OutputCapture
 } deriving (Generic, Show)
 
 instance ContentHashable IO ExternalTask
