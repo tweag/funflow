@@ -51,7 +51,7 @@ toExternal cfg = ExternalTask
       [ imageArg
       , stringParam (command cfg)
       ] ++ map textParam (args cfg)
-  , _etWriteToStdOut = False
+  , _etWriteToStdOut = NoOutputCapture
   }
   where
     mounts = outputMount : inputMounts

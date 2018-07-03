@@ -88,7 +88,7 @@ flowMissingExecutable = proc () -> do
   r <- (arr Right <<< external (\() -> ExternalTask
     { _etCommand = "non-existent-executable-39fd1e85a0a05113938e0"
     , _etParams = []
-    , _etWriteToStdOut = True
+    , _etWriteToStdOut = StdOutCapture
     }))
     `catch` arr (Left @SomeException . snd)
     -< ()

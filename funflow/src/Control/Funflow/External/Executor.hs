@@ -12,20 +12,20 @@
 module Control.Funflow.External.Executor where
 
 import           Control.Concurrent                   (threadDelay)
+import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe
-import           Control.Concurrent.Async
 import qualified Control.Funflow.ContentStore         as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Lens
-import           Control.Monad                        (forever, mzero, unless,
-                                                       when)
+import           Control.Monad                        (forever, mzero, unless)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.Aeson                           as Json
 import qualified Data.ByteString                      as BS
-import           Data.Maybe                           (isJust)
+import           Data.Foldable                        (for_)
+import           Data.Maybe                           (isJust, isNothing)
 import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
 import           Katip                                as K
@@ -68,7 +68,8 @@ execute store td = logError $ do
       CS.createMetadataFile store (td ^. tdOutput) [relfile|stderr|]
     let
       withFollowOutput
-        | td ^. tdTask . etWriteToStdOut
+        | td ^. tdTask . etWriteToStdOut . to outputCaptureToRelFile
+              . to isNothing
         = withFollowFile fpErr stderr
         | otherwise
         = withFollowFile fpErr stderr
@@ -99,10 +100,10 @@ execute store td = logError $ do
         Param fields <- td ^. tdTask . etParams
         ParamPath inputPath <- fields
         case inputPath of
-          IPItem item -> pure item
+          IPItem item      -> pure item
           -- XXX: Store these references as well.
           IPExternalFile _ -> mzero
-          IPExternalDir _ -> mzero
+          IPExternalDir _  -> mzero
     CS.setInputs store (td ^. tdOutput) inputItems
     CS.setMetadata store (td ^. tdOutput)
       ("external-task"::T.Text)
@@ -119,8 +120,8 @@ execute store td = logError $ do
           end <- getTime Monotonic
           case exitCode of
             ExitSuccess   -> do
-              when (td ^. tdTask . etWriteToStdOut) $
-                copyFile fpOut (fp </> [relfile|out|])
+              for_ (td ^. tdTask . etWriteToStdOut . to outputCaptureToRelFile)
+                $ \file -> copyFile fpOut (fp </> file)
               return $ Right (diffTimeSpec start end)
             ExitFailure i ->
               return $ Left (diffTimeSpec start end, i)
@@ -128,15 +129,15 @@ execute store td = logError $ do
         -- execution was successful
         Right (Right r) -> return $ Right r
         -- execution failed
-        Right (Left e) -> return $ Left (Right e)
+        Right (Left e)  -> return $ Left (Right e)
         -- executor itself failed
-        Left e -> return $ Left (Left e)
+        Left e          -> return $ Left (Left e)
   case status of
-    CS.Missing (Left e) -> return (ExecutorFailure e)
+    CS.Missing (Left e)        -> return (ExecutorFailure e)
     CS.Missing (Right (t, ec)) -> return (Failure t ec)
-    CS.Pending () -> return AlreadyRunning
-    CS.Complete (Nothing, _) -> return Cached
-    CS.Complete (Just t, _) -> return (Success t)
+    CS.Pending ()              -> return AlreadyRunning
+    CS.Complete (Nothing, _)   -> return Cached
+    CS.Complete (Just t, _)    -> return (Success t)
   where
     logError = flip withException $ \(e::SomeException) ->
       $(logTM) ErrorS . ls $ displayException e

@@ -69,14 +69,14 @@ runTestFlow wd flow' input =
 echo :: SimpleFlow String CS.Item
 echo = external $ \msg -> ExternalTask
   { _etCommand = "echo"
-  , _etWriteToStdOut = True
+  , _etWriteToStdOut = StdOutCapture
   , _etParams = ["-n", fromString msg]
   }
 
 sleepEcho :: SimpleFlow (Double, String) CS.Item
 sleepEcho = external $ \(time, msg) -> ExternalTask
   { _etCommand = "sh"
-  , _etWriteToStdOut = True
+  , _etWriteToStdOut = StdOutCapture
   , _etParams =
       [ "-c"
       , "sleep " <> fromString (show time) <> ";"
