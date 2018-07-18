@@ -89,6 +89,7 @@ flowMissingExecutable = proc () -> do
     { _etCommand = "non-existent-executable-39fd1e85a0a05113938e0"
     , _etParams = []
     , _etWriteToStdOut = StdOutCapture
+    , _etEnv = []
     }))
     `catch` arr (Left @SomeException . snd)
     -< ()
@@ -96,6 +97,18 @@ flowMissingExecutable = proc () -> do
     Left _ -> Left ()
     Right _ -> Right ()
 
+-- | Test that we can provide an environment variable to an external step.
+externalEnvVar :: SimpleFlow () (Either String ())
+externalEnvVar = proc () -> do
+  r <- readString_ <<< external (\() -> ExternalTask
+    { _etCommand = "bash"
+    , _etParams = [textParam "-c", textParam "echo -n $FOO"]
+    , _etWriteToStdOut = StdOutCapture
+    , _etEnv = [("FOO", textParam "testing")]
+    }) -< ()
+  returnA -< case r of
+    "testing" -> Right ()
+    x -> Left x
 
 flowAssertions :: [FlowAssertion]
 flowAssertions =
@@ -108,6 +121,7 @@ flowAssertions =
   , FlowAssertion "cachingFlow" () flowCached (Just True) (return ())
   , FlowAssertion "mergingStoreItems" () flowMerge (Just True) (return ())
   , FlowAssertion "missingExecutable" () flowMissingExecutable (Just (Left ())) (return ())
+  , FlowAssertion "externalEnvVar" () externalEnvVar (Just (Right ())) (return ())
   ]
 
 setup :: IO ()

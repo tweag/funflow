@@ -71,6 +71,7 @@ echo = external $ \msg -> ExternalTask
   { _etCommand = "echo"
   , _etWriteToStdOut = StdOutCapture
   , _etParams = ["-n", fromString msg]
+  , _etEnv = []
   }
 
 sleepEcho :: SimpleFlow (Double, String) CS.Item
@@ -82,6 +83,7 @@ sleepEcho = external $ \(time, msg) -> ExternalTask
       , "sleep " <> fromString (show time) <> ";"
         <> "echo -n " <> fromString msg
       ]
+  , _etEnv = []
   }
 
 flow :: SimpleFlow () String
