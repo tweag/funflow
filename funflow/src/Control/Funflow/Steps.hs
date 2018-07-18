@@ -16,6 +16,8 @@ module Control.Funflow.Steps
   , copyDirToStore
   , copyFileToStore
   , listDirContents
+  , globDir
+  , globDirPattern
   , lookupAliasInStore
   , mergeDirs
   , mergeFiles
@@ -59,6 +61,7 @@ import qualified Data.Yaml                       as Yaml
 import           GHC.Conc                        (threadDelay)
 import           Path
 import           Path.IO
+import qualified System.FilePath.Glob            as Glob
 import           System.Posix.Files              (accessModes, createLink,
                                                   setFileMode)
 import           System.Random
@@ -166,6 +169,25 @@ listDirContents = internalManipulateStore
                )
   )
 
+-- | Search for files in the directory matching the given text string, as a glob
+-- pattern.
+globDir :: ArrowFlow eff ex arr
+        => arr (CS.Content Dir, String) [CS.Content File]
+globDir = globDirPattern <<< second (arr $ Glob.simplify . Glob.compile)
+
+-- | Search for files in the directory matching the given pattern.
+globDirPattern :: ArrowFlow eff ex arr
+               => arr (CS.Content Dir, Glob.Pattern) [CS.Content File]
+globDirPattern = internalManipulateStore
+  ( \store (dir, patt) -> let
+      item = CS.contentItem dir
+      itemRoot = CS.itemPath store item
+    in do
+      files <- mapM parseAbsFile =<< Glob.globDir1 patt (toFilePath itemRoot)
+      relFiles <- for files (stripProperPrefix itemRoot)
+      return ( (item :</>) <$> relFiles )
+  )
+
 -- | Merge a number of store directories together into a single output directory.
 --   This uses hardlinks to avoid duplicating the data on disk.
 mergeDirs :: ArrowFlow eff ex arr => arr [CS.Content Dir] (CS.Content Dir)
@@ -192,7 +214,6 @@ mergeFiles = proc inFiles -> do
     (\d inFiles -> for_ inFiles $ \inFile ->
       createLink (toFilePath inFile) (toFilePath $ d </> filename inFile)
     ) -< absFiles
-
 
 -- | Read the contents of the given file in the store.
 readString :: ArrowFlow eff ex arr => arr (CS.Content File) String
