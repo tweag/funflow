@@ -177,6 +177,8 @@ instance Store OutputCapture
 data ExternalTask = ExternalTask {
     _etCommand       :: T.Text
   , _etParams        :: [Param]
+    -- ^ Environment variables to set for the scope of the execution.
+  , _etEnv           :: [(T.Text, Param)]
   , _etWriteToStdOut :: OutputCapture
 } deriving (Generic, Show)
 

@@ -11,6 +11,7 @@
 --   You probably want to start with 'executeLoop'.
 module Control.Funflow.External.Executor where
 
+import           Control.Arrow                        (second)
 import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
@@ -75,11 +76,12 @@ execute store td = logError $ do
         = withFollowFile fpErr stderr
         . withFollowFile fpOut stdout
       cmd = T.unpack $ td ^. tdTask . etCommand
-      procSpec params = (proc cmd $ T.unpack <$> params)
+      procSpec params textEnv = (proc cmd $ T.unpack <$> params)
         { cwd = Just (fromAbsDir fp)
         , close_fds = True
         , std_err = UseHandle hErr
         , std_out = UseHandle hOut
+        , env = map (bimap T.unpack T.unpack) <$> textEnv
         }
       convParam = ConvParam
         { convPath = pure . CS.itemPath store
@@ -90,6 +92,8 @@ execute store td = logError $ do
         }
     mbParams <- lift $ runMaybeT $
       traverse (paramToText convParam) (td ^. tdTask . etParams)
+    mbEnv <- lift $ runMaybeT $
+      traverse (sequence . second (paramToText convParam))  (td ^. tdTask . etEnv)
     params <- case mbParams of
       Nothing     -> fail "A parameter was not ready"
       Just params -> return params
@@ -110,7 +114,7 @@ execute store td = logError $ do
       (Json.encode (td ^. tdTask))
 
     start <- lift $ getTime Monotonic
-    let theProc = procSpec params
+    let theProc = procSpec params mbEnv
     katipAddNamespace "process" . katipAddContext (sl "processId" $ show theProc) $ do
       $(logTM) InfoS "Executing"
       res <- lift $ tryIO $ withCreateProcess theProc $ \_ _ _ ph ->

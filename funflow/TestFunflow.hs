@@ -56,6 +56,7 @@ externalTest = let
       { _etCommand = "/run/current-system/sw/bin/echo"
       , _etParams = [textParam t]
       , _etWriteToStdOut = StdOutCapture
+      , _etEnv = []
       }
     flow = exFlow >>> readString_
   in withSystemTempDir "test_output_external_" $ \storeDir -> do
@@ -73,6 +74,7 @@ storeTest = let
       { _etCommand = "/run/current-system/sw/bin/cat"
       , _etParams = [contentParam a, contentParam b]
       , _etWriteToStdOut = StdOutCapture
+      , _etEnv = []
       }
     flow = proc (s1, s2) -> do
       f1 <- writeString_ -< s1
