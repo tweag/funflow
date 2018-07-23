@@ -35,8 +35,9 @@ data Config = Config
   , optImageID :: Maybe T.Text
   , input      :: Bind
   , command    :: FilePath
-  , args       :: [T.Text]
+  , args       :: [Param]
   , env        :: [(T.Text, T.Text)]
+  , stdout     :: OutputCapture
   } deriving Generic
 
 instance ContentHashable IO Config
@@ -51,9 +52,9 @@ toExternal cfg = ExternalTask
       ] ++ mounts ++
       [ imageArg
       , stringParam (command cfg)
-      ] ++ map textParam (args cfg)
+      ] ++ (args cfg)
   , _etEnv = map (fmap textParam) (env cfg)
-  , _etWriteToStdOut = NoOutputCapture
+  , _etWriteToStdOut = stdout cfg
   }
   where
     mounts = outputMount : inputMounts

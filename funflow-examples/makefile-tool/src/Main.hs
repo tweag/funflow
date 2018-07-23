@@ -177,6 +177,7 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
         , Docker.command = "/input/script/script.sh"
         , Docker.args = []
         , Docker.env = []
+        , Docker.stdout = NoOutputCapture
         }
         where
           inputs = Map.fromList [scriptInput, depInput]
