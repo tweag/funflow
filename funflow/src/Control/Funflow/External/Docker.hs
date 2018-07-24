@@ -35,7 +35,7 @@ data Config = Config
   , optImageID :: Maybe T.Text
   , input      :: Bind
   , command    :: FilePath
-  , args       :: [Param]
+  , args       :: [T.Text]
   , env        :: [(T.Text, T.Text)]
   , stdout     :: OutputCapture
   } deriving Generic
@@ -52,7 +52,7 @@ toExternal cfg = ExternalTask
       ] ++ mounts ++
       [ imageArg
       , stringParam (command cfg)
-      ] ++ (args cfg)
+      ] ++ map textParam (args cfg)
   , _etEnv = map (fmap textParam) (env cfg)
   , _etWriteToStdOut = stdout cfg
   }
