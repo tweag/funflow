@@ -1,0 +1,137 @@
+name: funflow
+version: '1.2.0'
+synopsis: Workflows with arrows
+description: An arrow with resumable computations and logging
+category: Control
+author: Tom Nielsen, Nicholas Clarke, Andreas Herrmann
+maintainer: nicholas.clarke@tweag.io
+license: MIT
+homepage: https://github.com/tweag/funflow
+bug-reports: https://github.com/tweag/funflow
+tested-with: GHC==7.8.4 GHC==7.10.2 GHC==7.10.3 GHC==8.0.1
+extra-source-files:
+- changelog.md
+dependencies:
+- base >=4.6 && <5
+- hedis
+- safe-exceptions
+- text
+- unix
+library:
+  source-dirs: src
+  ghc-options:
+  - -Wall
+  - -fno-warn-type-defaults
+  exposed-modules:
+  - Control.Arrow.Async
+  - Control.Arrow.Free
+  - Control.Funflow
+  - Control.Funflow.Cache.TH
+  - Control.Funflow.ContentHashable
+  - Control.Funflow.ContentStore
+  - Control.Funflow.Diagram
+  - Control.Funflow.External
+  - Control.Funflow.External.Docker
+  - Control.Funflow.External.Executor
+  - Control.Funflow.External.Coordinator
+  - Control.Funflow.External.Coordinator.Memory
+  - Control.Funflow.External.Coordinator.Redis
+  - Control.Funflow.External.Coordinator.SQLite
+  - Control.Funflow.Lock
+  - Control.Funflow.Orphans
+  - Control.Funflow.Steps
+  - Control.Funflow.Pretty
+  - Control.Funflow.Exec.Simple
+  dependencies:
+  - Glob
+  - aeson >=1.2.3.0
+  - async
+  - bytestring
+  - clock
+  - constraints
+  - containers
+  - contravariant
+  - cryptonite
+  - data-default
+  - directory
+  - exceptions
+  - filepath
+  - ghc-prim
+  - hashable
+  - hostname
+  - integer-gmp
+  - katip >=0.5.0.1
+  - lens
+  - lifted-async
+  - memory
+  - monad-control
+  - mtl
+  - path >0.6.0
+  - path-io
+  - pretty
+  - process
+  - random
+  - scientific
+  - sqlite-simple
+  - stm
+  - store
+  - template-haskell >=2.11
+  - time
+  - transformers
+  - unordered-containers
+  - vector
+  - yaml
+  when:
+  - condition: os(linux)
+    then:
+      cpp-options: -DOS_Linux
+      dependencies:
+      - hinotify ==0.3.9
+    else:
+      when:
+      - condition: (os(osx)) || (os(freebsd))
+        cpp-options: -DOS_BSD
+        dependencies:
+        - kqueue
+executables:
+  ffexecutord:
+    main: FFExecutorD.hs
+    source-dirs: app
+    dependencies:
+    - bytestring
+    - clock
+    - funflow
+    - path
+    - optparse-applicative
+tests:
+  unit-tests:
+    main: Test.hs
+    source-dirs: test
+    ghc-options:
+    - -Wall
+    - -threaded
+    dependencies:
+    - base
+    - async
+    - containers
+    - data-default >=0.7
+    - directory
+    - filepath
+    - funflow
+    - path
+    - path-io
+    - process
+    - random
+    - tasty
+    - tasty-hunit
+    - temporary
+  test-funflow:
+    main: TestFunflow.hs
+    ghc-options:
+    - -Wall
+    - -threaded
+    dependencies:
+    - funflow
+    - filepath
+    - path
+    - path-io
