@@ -115,6 +115,7 @@ runNoEffect :: forall arr. NoEffect ~> arr
 runNoEffect = error "Impossible!"
 
 type SimpleFlow = Flow NoEffect SomeException
+type (==>) = SimpleFlow
 
 -- | Convert a flow to a diagram, for inspection/pretty printing
 toDiagram :: Flow eff ex a b -> Diagram ex a b
