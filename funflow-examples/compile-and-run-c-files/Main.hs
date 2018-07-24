@@ -71,6 +71,7 @@ compileModule = proc csrc -> do
       , Docker.command = "/input/script/compile.sh"
       , Docker.args = ["/input/data/out.c", "/output/out.o"]
       , Docker.env = []
+      , Docker.stdout = NoOutputCapture
       }
 
 -- | This flow takes a list of files which are assumed to be 'C' modules.
@@ -100,6 +101,7 @@ compileExec = proc mods -> do
                       | (n, _) <- zip [1::Int ..] cModules
                       ]
       , Docker.env = []
+      , Docker.stdout = NoOutputCapture
       }
 
 -- | This flow takes a file which is assumed to be an executable,
@@ -124,4 +126,5 @@ runExec = proc (exec, args) -> do
       , Docker.command = "/input/script/run.sh"
       , Docker.args = map T.pack args
       , Docker.env = []
+      , Docker.stdout = NoOutputCapture
       }

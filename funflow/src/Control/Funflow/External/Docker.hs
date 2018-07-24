@@ -37,6 +37,7 @@ data Config = Config
   , command    :: FilePath
   , args       :: [T.Text]
   , env        :: [(T.Text, T.Text)]
+  , stdout     :: OutputCapture
   } deriving Generic
 
 instance ContentHashable IO Config
@@ -53,7 +54,7 @@ toExternal cfg = ExternalTask
       , stringParam (command cfg)
       ] ++ map textParam (args cfg)
   , _etEnv = map (fmap textParam) (env cfg)
-  , _etWriteToStdOut = NoOutputCapture
+  , _etWriteToStdOut = stdout cfg
   }
   where
     mounts = outputMount : inputMounts
