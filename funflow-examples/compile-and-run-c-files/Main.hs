@@ -69,9 +69,8 @@ compileModule = proc csrc -> do
                        , ("data", IPItem $ CS.contentItem cInput)
                        ]
       , Docker.command = "/input/script/compile.sh"
-      , Docker.args = map stringParam ["/input/data/out.c", "/output/out.o"]
+      , Docker.args = ["/input/data/out.c", "/output/out.o"]
       , Docker.env = []
-      , Docker.stdout = NoOutputCapture
       }
 
 -- | This flow takes a list of files which are assumed to be 'C' modules.
@@ -96,12 +95,11 @@ compileExec = proc mods -> do
                        | (n, cMod) <- zip [1::Int ..] cModules
                        ]
       , Docker.command = "/input/script/compile.sh"
-      , Docker.args = map textParam $ "/output/out" :
+      , Docker.args = "/output/out" :
                       [ T.pack $ "/input/module"++show n++"/out.o"
                       | (n, _) <- zip [1::Int ..] cModules
                       ]
       , Docker.env = []
-      , Docker.stdout = NoOutputCapture
       }
 
 -- | This flow takes a file which is assumed to be an executable,
@@ -124,7 +122,6 @@ runExec = proc (exec, args) -> do
                        , ("exec", IPItem $ CS.contentItem exec)
                        ]
       , Docker.command = "/input/script/run.sh"
-      , Docker.args = map stringParam args
+      , Docker.args = map T.pack args
       , Docker.env = []
-      , Docker.stdout = NoOutputCapture
       }

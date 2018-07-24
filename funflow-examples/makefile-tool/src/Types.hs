@@ -3,6 +3,7 @@
 
 module Types where
 
+import Control.Funflow
 import qualified Data.Set as Set
 
 type Set = Set.Set
@@ -29,6 +30,9 @@ type Command = String
 
 -- Makefile error type
 newtype MFError = MFError String
+
+-- Elegant flow syntax
+type (==>) = SimpleFlow
 
 
 
