@@ -10,15 +10,13 @@ import Control.Funflow
 import Control.Funflow.ContentStore (Content (..))
 import qualified Control.Funflow.ContentStore as CS
 import qualified Control.Funflow.External.Docker as Docker
-import qualified Data.Map.Strict as Map
-import qualified Data.Text as T
 import Path
 import Path.IO
 
 main :: IO ()
 main = do
     cwd <- getCurrentDir
-    r <- withSimpleLocalRunner (cwd </> [reldir|funflow-example/store|]) $ \run -> do
+    r <- withSimpleLocalRunner (cwd </> [reldir|funflow-example/store|]) $ \run ->
       run mainFlow 3
     case r of
       Left err ->
@@ -64,12 +62,8 @@ compileModule = proc csrc -> do
     compileDocker = docker $ \(cInput, scriptInput) -> Docker.Config
       { Docker.image = "gcc"
       , Docker.optImageID = Just "7.3.0"
-      , Docker.input = Docker.MultiInput
-        $ Map.fromList [ ("script", IPItem $ CS.contentItem scriptInput)
-                       , ("data", IPItem $ CS.contentItem cInput)
-                       ]
-      , Docker.command = "/input/script/compile.sh"
-      , Docker.args = ["/input/data/out.c", "/output/out.o"]
+      , Docker.command = contentParam scriptInput
+      , Docker.args = [contentParam cInput, textParam "/output/out.o"]
       , Docker.env = []
       , Docker.stdout = NoOutputCapture
       }
@@ -90,16 +84,8 @@ compileExec = proc mods -> do
     compileDocker = docker $ \(cModules, scriptInput) -> Docker.Config
       { Docker.image = "gcc"
       , Docker.optImageID = Just "7.3.0"
-      , Docker.input = Docker.MultiInput
-        $ Map.fromList $ ("script", IPItem $ CS.contentItem scriptInput) :
-                       [ ("module"++show n, IPItem $ CS.contentItem cMod)
-                       | (n, cMod) <- zip [1::Int ..] cModules
-                       ]
-      , Docker.command = "/input/script/compile.sh"
-      , Docker.args = "/output/out" :
-                      [ T.pack $ "/input/module"++show n++"/out.o"
-                      | (n, _) <- zip [1::Int ..] cModules
-                      ]
+      , Docker.command = contentParam scriptInput
+      , Docker.args = textParam "/output/out" : map contentParam cModules
       , Docker.env = []
       , Docker.stdout = NoOutputCapture
       }
@@ -115,16 +101,14 @@ runExec = proc (exec, args) -> do
   where
     runScript =
       "#!/bin/sh\n\
-      \/input/exec/out $@ > /output/out\n"
+      \toExec=\"$1\"\n\
+      \shift\n\
+      \\"$toExec\" $@ > /output/out\n"
     runDocker = docker $ \(script, exec, args) -> Docker.Config
       { Docker.image = "gcc"
       , Docker.optImageID = Just "7.3.0"
-      , Docker.input = Docker.MultiInput
-        $ Map.fromList [ ("script", IPItem $ CS.contentItem script)
-                       , ("exec", IPItem $ CS.contentItem exec)
-                       ]
-      , Docker.command = "/input/script/run.sh"
-      , Docker.args = map T.pack args
+      , Docker.command = contentParam script
+      , Docker.args = contentParam exec : map stringParam args
       , Docker.env = []
       , Docker.stdout = NoOutputCapture
       }
