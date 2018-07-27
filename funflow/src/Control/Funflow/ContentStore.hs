@@ -97,6 +97,7 @@ module Control.Funflow.ContentStore
   -- * Accessors
   , itemHash
   , itemPath
+  , itemRelPath
   , contentPath
   , contentItem
   , contentFilename
@@ -314,6 +315,10 @@ newtype Alias = Alias { unAlias :: T.Text }
 -- | The root directory of the store.
 root :: ContentStore -> Path Abs Dir
 root = storeRoot
+
+-- | The scoped path to a content item within the store.
+itemRelPath :: Item -> Path Rel Dir
+itemRelPath (Item x) = prefixHashPath itemPrefix x
 
 -- | The store path of a completed item.
 itemPath :: ContentStore -> Item -> Path Abs Dir

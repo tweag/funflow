@@ -1,44 +1,42 @@
 {-# LANGUAGE Arrows              #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Main where
 
 -- Funflow Imports
 import           Control.Arrow
 import           Control.Arrow.Free
-import           Control.Exception.Safe ( try )
+import           Control.Exception               (Exception (..),
+                                                  SomeException (..))
+import           Control.Exception.Safe          (try)
 import           Control.Funflow
-import qualified Control.Funflow.ContentStore as CS
-import Control.Funflow.ContentStore ( Content (..) )
-import Control.Exception ( Exception (..), SomeException (..) )
+import           Control.Funflow.ContentStore    (Content (..))
+import qualified Control.Funflow.ContentStore    as CS
 import qualified Control.Funflow.External.Docker as Docker
 
 -- Library Imports
-import Control.Monad ( guard )
-import Path.IO ( getCurrentDir )
-import Path ( Path, Rel, File
-            , reldir, Dir, relfile
-            , parseRelFile, fromAbsDir
-            , fromAbsFile, (</>)
-            )
-import System.IO ( IO )
-import System.Directory ( getCurrentDirectory )
-import System.Posix.Files ( setFileMode, accessModes )
-import Data.Traversable ( sequence )
-import qualified Data.ByteString as BS
+import           Control.Monad                   (guard)
+import qualified Data.ByteString                 as BS
+import           Path                            (Dir, File, Path, Rel,
+                                                  fromAbsDir, fromAbsFile,
+                                                  parseRelFile, reldir, relfile,
+                                                  (</>))
+import           Path.IO                         (getCurrentDir)
+import           System.Directory                (getCurrentDirectory)
+import           System.IO                       (IO)
+import           System.Posix.Files              (accessModes, setFileMode)
 
 -- Internal Imports
-import Parse ( regularParse, parseMakeFile
-             , parsecMakeFile )
-import Types
+import           Parse                           (parseMakeFile, parsecMakeFile,
+                                                  regularParse)
+import           Types
 
 -- Data Structures
-import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
+import qualified Data.Map.Strict                 as Map
+import qualified Data.Set                        as Set
 type Set = Set.Set
 type Map = Map.Map
 
@@ -61,7 +59,7 @@ main = do
           run ((buildTarget mfile defGoalRule) >>> readByteString) ()
         case r of
           Left errorMsg ->
-            putStrLn $ 
+            putStrLn $
               "\n\nFailed, target failed: \n\n" ++ displayException errorMsg
           Right (execContent :: BS.ByteString) -> do
             let outpath = (fromAbsDir cwd) ++ "/" ++ tfName
@@ -99,7 +97,7 @@ readMakeFileMaybe = do
   tryRead <- try $ readFile makeFileLoc
   case tryRead of
     Left (_ :: SomeException) -> return Nothing
-    Right file -> return (Just file)
+    Right file                -> return (Just file)
 
 
 testMakeFileParse :: IO ()
@@ -109,7 +107,7 @@ testMakeFileParse = do
   putStrLn "Readfile:"
   putStrLn mkfilestr
   putStrLn "Parsing:"
-  putStrLn $ show $ regularParse parsecMakeFile mkfilestr
+  print $ regularParse parsecMakeFile mkfilestr
 
 
 -- | Building A Target
@@ -130,12 +128,12 @@ buildTarget mkfile target@(MakeRule targetNm deps cmd) = let
    Just (depRules :: [MakeRule]) -> let
        depTargetFlows = map (buildTarget mkfile) depRules
        countDepFlows = length depTargetFlows
-       grabSources srcs = sequence $ map (readFile . ("./" ++)) srcs
+       grabSources = mapM (readFile . ("./" ++))
        grabSrcsFlow = stepIO grabSources
      in proc _ -> do
        -- really cool application: no repeated work here!
        -- a powerful dynamic programming tool
-       () <- guardFlow -< (target `Set.member` (allrules mkfile)) 
+       () <- guardFlow -< (target `Set.member` (allrules mkfile))
        contentSrcFiles <- grabSrcsFlow -< neededSources
        let fullSrcFiles = Map.fromList $ zip neededSources contentSrcFiles
        depFiles <- flowJoin depTargetFlows -< (replicate countDepFlows ())
@@ -155,14 +153,14 @@ findRules MakeFile {allrules = rules} ts = do
 
 -- | Compiles a C file in a docker container.
 compileFile ::
-  (TargetFile, Map SourceFile String, [Content File], Command) ==> (Content File)
+  (TargetFile, Map SourceFile String, [Content File], Command) ==> Content File
 compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
   srcsInStore <- writeToStore -< srcDeps
   let inputFilesInStore = srcsInStore ++ tarDeps
   inputDir <- mergeFiles -< inputFilesInStore
   let scriptSrc = "#!/usr/bin/env bash\n\
-                  \cd /input/deps\n" ++ 
-                  cmd  ++ " -o /output/" ++ tf
+                  \cd $1 \n"
+                  ++ cmd ++ " -o /output/" ++ tf
   compileScript <- writeExecutableString -< (scriptSrc, [relfile|script.sh|])
   compiledFile <- dockerFlow -< (inputDir,compileScript)
   relpathCompiledFile <- flowStringToRelFile -< tf
@@ -173,17 +171,11 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
       dockerConfFn (depDir, compileScript) = Docker.Config
         { Docker.image = "gcc"
         , Docker.optImageID = Just "7.3.0"
-        , Docker.input = Docker.MultiInput inputs
-        , Docker.command = "/input/script/script.sh"
-        , Docker.args = []
+        , Docker.command = contentParam compileScript
+        , Docker.args = [contentParam depDir]
         , Docker.env = []
         , Docker.stdout = NoOutputCapture
         }
-        where
-          inputs = Map.fromList [scriptInput, depInput]
-          mkInputPath = IPItem . CS.contentItem
-          scriptInput = ("script", mkInputPath compileScript)
-          depInput = ("deps", mkInputPath depDir)
 
 
 -- Note: type SourceFile = String.
