@@ -115,6 +115,7 @@ toExternal (toDocker -> cfg) = ExternalTask
   , _etParams =
       [ "run"
       , "--user=" <> uidParam
+      , "--workdir=/output"
       ] ++ mounts ++
       [ imageArg
       , dCommand cfg
