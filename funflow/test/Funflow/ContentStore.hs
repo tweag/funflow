@@ -1,7 +1,8 @@
-{-# LANGUAGE LambdaCase       #-}
+{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes      #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Funflow.ContentStore
   ( tests
