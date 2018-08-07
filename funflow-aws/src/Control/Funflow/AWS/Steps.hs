@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows                #-}
+{-# LANGUAGE CPP                   #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -29,6 +30,9 @@ import qualified Control.Funflow.ContentStore    as CS
 import           Control.Lens
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Conduit                    (($$+-))
+#if MIN_VERSION_conduit(1,3,0)
+import           Data.Conduit                    (sealConduitT)
+#endif
 import           Data.Conduit.Binary             (sinkFile)
 import           Data.Constraint
 import           Data.Reflection
@@ -62,8 +66,11 @@ putInStoreAt conf = give conf $
         S3.GetObjectResponse { S3.gorResponse = rsp } <-
           Aws.pureAws conf s3cfg mgr $
             S3.getObject (oib ^. oibBucket) (objectReference $ oib ^. oibObject)
-
-        responseBody rsp $$+- sinkFile (toFilePath fp)
+#if MIN_VERSION_conduit(1,3,0)
+        sealConduitT (responseBody rsp) $$+- sinkFile (toFilePath fp)
+#else
+        reponseBody rsp $$+- sinkFile (toFilePath fp)
+#endif
 
 --------------------------------------------------------------------------------
 -- Effects turned into steps

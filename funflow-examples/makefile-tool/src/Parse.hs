@@ -3,24 +3,22 @@
 module Parse ( regularParse
              , parsecMakeFile
              , parseMakeFile
-             ) 
+             )
 where
 
-import Control.Monad ( void, guard )
-import Control.Applicative ( many, (<|>) )
-
-import Data.List.Unique ( allUnique )
-import Text.Parsec (ParseError, parse)
-import Text.Parsec.String ( Parser )
-import Text.Parsec.Char ( noneOf, oneOf, char
-                        , newline, string, letter
-                        )
-import Text.Parsec.Combinator ( many1 )
+import           Control.Applicative    (many, (<|>))
+import           Control.Monad          (guard, void)
+import           Data.List              (nub)
+import           Text.Parsec            (ParseError, parse)
+import           Text.Parsec.Char       (char, letter, newline, noneOf, oneOf,
+                                         string)
+import           Text.Parsec.Combinator (many1)
+import           Text.Parsec.String     (Parser)
 
 -- Internal Imports
-import Types
+import           Types
 
-import qualified Data.Set as Set
+import qualified Data.Set               as Set
 
 
 -- | Top level code
@@ -54,7 +52,7 @@ parsecSrcFiles = do
   rest <- many1 (noneOf ['\n'])
   let srcFiles = words rest
   void $ newline -- at the end
-  guard $ allUnique srcFiles
+  guard $ length srcFiles == length (nub srcFiles)
   let sources = Set.fromList srcFiles
   return sources
 
@@ -64,7 +62,7 @@ parsecRule = do
   void $ char ':'
   depStr <- many1 (noneOf ['\n'])
   let deps = words depStr
-  guard $ allUnique deps
+  guard $ length deps == length (nub deps)
   let buildSet = Set.fromList deps
   void newline
   command <- many1 (noneOf ['\n'])
