@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE OverloadedStrings          #-}
@@ -29,7 +30,9 @@ import           Network.HostName
 import           Path
 import           System.Clock                    (TimeSpec)
 
+#if !MIN_VERSION_store(0,5,0)
 instance Store TimeSpec
+#endif
 
 -- | Information about an executor capable of running tasks. Currently this
 --   is just a newtype wrapper around hostname.

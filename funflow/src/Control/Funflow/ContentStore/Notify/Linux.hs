@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                 #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -14,6 +15,9 @@ module Control.Funflow.ContentStore.Notify.Linux
   ) where
 
 import           Control.Exception.Safe (catch)
+#if MIN_VERSION_hinotify(0,3,10)
+import qualified Data.ByteString.Char8 as BS
+#endif
 import           System.INotify
 
 type Notifier = INotify
@@ -27,13 +31,18 @@ killNotifier = killINotify
 type Watch = WatchDescriptor
 
 addDirWatch :: Notifier -> FilePath -> IO () -> IO Watch
-addDirWatch inotify dir f = addWatch inotify mask dir $ \case
+addDirWatch inotify dir f = addWatch inotify mask dir' $ \case
   Attributes True Nothing -> f
   MovedSelf True -> f
   DeletedSelf -> f
   _ -> return ()
   where
     mask = [Attrib, MoveSelf, DeleteSelf, OnlyDir]
+#if MIN_VERSION_hinotify(0,3,10)
+    dir' = BS.pack dir
+#else
+    dir' = dir
+#endif
 
 removeDirWatch :: Watch -> IO ()
 removeDirWatch w =
