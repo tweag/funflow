@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
@@ -13,7 +14,9 @@ import           Control.Funflow.ContentHashable (ContentHash, ContentHashable, 
 import qualified Control.Funflow.ContentStore    as CS
 import           Control.Lens.TH
 import           Data.Aeson                      (FromJSON, ToJSON)
+#if __GLASGOW_HASKELL__ < 804
 import           Data.Semigroup
+#endif
 import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T
