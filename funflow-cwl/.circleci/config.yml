@@ -1,0 +1,33 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: fpco/stack-build
+    steps:
+      - checkout
+      - run:
+          name: Compute cache key
+          command: |
+            find . -name "*.cabal" -o -name "stack.yaml" -type f | sort | xargs cat > /tmp/stack-deps
+      - restore_cache:
+          keys:
+            - funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
+      - run:
+          name: Setup build toolchain
+          command: stack setup
+      - run:
+          name: Building dependencies
+          command: stack test --only-snapshot --prefetch
+      - save_cache:
+          paths:
+            - "~/.stack"
+          key: funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
+      - run:
+          name: Building
+          command: stack build --pedantic
+      - run:
+          name: Building tests
+          command: stack test --pedantic --no-run-tests
+      - run:
+          name: Running tests
+          command: stack test
