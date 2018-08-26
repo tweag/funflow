@@ -9,7 +9,6 @@ The executable we provide is called ``ffcwlrunner``.
 Executing ``ffcwlrunner cwlfile.cwl job.yml`` runs the CWL workflow or
 tool ``cwlfile.cwl`` with the input job file ``job.yml``.
 
-
 ## Installation
 
 ### System Requirements
@@ -19,7 +18,6 @@ To install and use ``ffcwlrunner``, your system needs these:
 * [stack](https://docs.haskellstack.org/en/stable/README/)
 * [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 * [docker](https://www.docker.com/)
-
 
 ### Install Process
 
@@ -36,11 +34,9 @@ $ stack install
    to nicely distribute computation and internally has typed verification of
    the  composition that happens in CWL workflows.
 
-
-2.  CWL has several nice visualization tools and UIs that effectively allow
-    data scientists to write powerful workflows easily, and then execute and
-    edit them with all the power of Funflow.
-
+2. CWL has several nice visualization tools and UIs that effectively
+   allow data scientists to write powerful workflows easily, and then
+   execute and edit them with all the power of Funflow.
 
 ## Restrictions: Our Subset of CWL
 
@@ -48,7 +44,7 @@ We only support a subset of the CWL specification. We lay out exactly what is
 supported here. To understand CWL, take a look at the official specification or
 the user guide available [here](https://www.commonwl.org/v1.0/).
 
-The CWL specification uses the YAML format for its tool or workflow files. So,
+The CWL specification uses the YAML format for its tool or workflow files. So
 we describe our restrictions by specifying which fields we support and what
 types those fields must hold. Again, note that this is a subset of the CWL
 specification; we are specifying which valid CWL files will work with
@@ -57,8 +53,9 @@ specification; we are specifying which valid CWL files will work with
 Usually, our specification just makes more basic fields required and supports
 fewer obscure optional fields.
 
-**It's critical to note that excessive fields are ignored. For example, we do not support the InitialWorkDir requirement so a CWL file that has this requirement will not behave as expected.**
-
+**It's critical to note that excessive fields are ignored. For
+example, we do not support the InitialWorkDir requirement so a CWL
+file that has this requirement will not behave as expected.**
 
 ### Command Line Tool Files
 
@@ -92,7 +89,6 @@ These are the only optional fields we support.
   command.
 - **requirements** is optional.
 
-
 #### Significant Changes:
 
 - There are no runtime environment references
@@ -100,8 +96,6 @@ These are the only optional fields we support.
 - We don't support any All outputs must be obtained through globing.
 - All positions must be unique. This makes the ordering of command line
   arguments explicit and organized. If this is not the case, **the executable will refuse to accept the cwl tool**.
-
-
 
 ### Workflow Files
 
@@ -133,8 +127,6 @@ Workflows must have the following form:
   - **scatterMethod** is one of two strings `"dotproduct"` or
     `"nested_crossproduct"`. The string `"flat_crossproduct"` **causes an
     error**.
-
-
 
 ### Job Files
 
@@ -180,15 +172,11 @@ That is, `EnvVarRequirement` and `DockerRequirement`.
 
 The only supported field for docker requirements is the `dockerPull` field.
 
-
 ### Types
 
 We support all input types **except for records**.
 
 The only types that can be listed in outputs are `File`s and arrays of `File`s.
-
-
-
 
 ## Usage
 
@@ -235,7 +223,6 @@ Available coordinators:
   memory                   Use internal memory coordinator
 ```
 
-
 ### A Simple Example
 
 
@@ -247,7 +234,6 @@ $ cd storeDirName/item8*
 $ cat out.txt
 -f  -i 42.0 --example-string hello --file= /home/divesh/tweag/work/funflow-work/funflow-interface/funflow-cwl/test/guide/storeDirName/item-f174a7c27a12c55ae8c8fcd2fbbb20cf4be4a795a9fdf3cd637e81e28878bd35/whale.txt
 ```
-
 
 ### Using A CWL UI
 
@@ -272,7 +258,6 @@ The Rabix GUI is friendly and intuitive:
 
 ![Rabix GUI Screenshot](readme/RabixComposer.png)
 
-
 ### Checking Valid CWL
 
 If you use Rabix, the produced CWL will be correct.
@@ -289,7 +274,3 @@ some-cwl-file.cwl
 
 Document `some-cwl-file` is valid
 ```
-
-
-
-
