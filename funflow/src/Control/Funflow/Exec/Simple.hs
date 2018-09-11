@@ -41,13 +41,11 @@ import           Control.Monad.IO.Class                      (liftIO)
 import           Control.Monad.Trans.Class                   (lift)
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (traverse_)
-import           Data.Int                                    (Int64)
 import           Data.Monoid                                 ((<>))
 import           Data.Void
 import           Katip
 import           Path
 import           System.IO                                   (stderr)
-import           System.Random                               (randomIO)
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
@@ -117,11 +115,11 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
       . liftAsyncA $ AsyncA f
     runFlow' po (External props toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ if (ep_impure props)
-               then do
-                 salt <- randomIO :: IO Int64
-                 contentHash (toTask x, salt)
-               else contentHash (toTask x)
+      chash <- liftIO $ case (ep_impure props) of
+                          EpPure -> contentHash (toTask x)
+                          EpImpure fn -> do
+                            salt <- fn
+                            contentHash (toTask x, salt)
       CS.lookup store chash >>= \case
         -- The item in question is already in the store. No need to submit a task.
         CS.Complete item -> return item

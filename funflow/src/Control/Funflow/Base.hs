@@ -23,11 +23,13 @@ import           Control.Funflow.External
 import           Data.ByteString                 (ByteString)
 import           Data.Default
 import           Data.Functor.Identity
+import           Data.Int                        (Int64)
 import           Data.Proxy                      (Proxy (..))
 import qualified Data.Store                      as Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
+import           System.Random                   (randomIO)
 
 -- | Metadata writer
 type MDWriter i o = Maybe (i -> o -> [(T.Text, ByteString)])
@@ -74,19 +76,27 @@ instance Default (Properties i o) where
     , mdpolicy = Nothing
     }
 
+data EpPurity = EpPure | EpImpure (IO Int64)
+
+instance Default EpPurity where
+  def = EpPure
+
+alwaysRecompile :: EpPurity
+alwaysRecompile = EpImpure randomIO
+
 -- | Additional properties associated with external tasks.
 data ExternalProperties a = ExternalProperties
   { -- | Write additional metadata to the content store.
     ep_mdpolicy :: MDWriter a ()
     -- | Specify that this external step is impure, and as such should not be
     -- cached.
-  , ep_impure :: Bool
+  , ep_impure :: EpPurity
   }
 
 instance Default (ExternalProperties a) where
   def = ExternalProperties
     { ep_mdpolicy = Nothing
-    , ep_impure = False
+    , ep_impure = def
     }
 
 data Flow' eff a b where
