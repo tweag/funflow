@@ -124,7 +124,9 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
                else contentHash (toTask x)
       CS.lookup store chash >>= \case
         -- The item in question is already in the store. No need to submit a task.
-        CS.Complete item -> return item
+        CS.Complete item -> do
+          $(logTM) InfoS . ls $ encodeHash chash <> " found in store. Retrieving."
+          return item
         -- The item is pending in the store. In this case, we should check whether
         -- the coordinator knows about it
         CS.Pending _ -> taskInfo po chash >>= \case
@@ -132,14 +134,18 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           -- coordinator does not know about it. Attempt to remove the pending
           -- path and submit as normal.
           UnknownTask -> do
+            $(logTM) WarningS . ls $ encodeHash chash <> " marked as pending but unknown to coordinator."
             CS.removeFailed store chash
             writeMd chash x () $ ep_mdpolicy props
             submitAndWait chash (TaskDescription chash (toTask x))
           -- Task is already known to the coordinator. Most likely something is
           -- running this task. Just wait for it.
-          KnownTask _ -> wait chash (TaskDescription chash (toTask x))
+          KnownTask _ -> do
+            $(logTM) InfoS . ls $ encodeHash chash <> " pending in store."
+            wait chash (TaskDescription chash (toTask x))
         -- Nothing in the store. Submit and run.
         CS.Missing _ -> do
+          $(logTM) InfoS . ls $ "Submitting task " <> encodeHash chash <> " to coordinator."
           writeMd chash x () $ ep_mdpolicy props
           submitAndWait chash (TaskDescription chash (toTask x))
       where
