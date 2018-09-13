@@ -154,7 +154,7 @@ executeLoop :: forall c. Coordinator c
             -> IO ()
 executeLoop coord cfg store =
   executeLoopWithScribe coord cfg store =<<
-    mkHandleScribe ColorIfTerminal stdout InfoS V2
+    mkHandleScribe ColorIfTerminal stdout WarningS V2
 
 -- | Same as 'executeLoop', but allows specifying a custom 'Scribe' for logging
 executeLoopWithScribe :: forall c. Coordinator c
