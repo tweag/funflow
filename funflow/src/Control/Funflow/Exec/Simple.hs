@@ -33,6 +33,7 @@ import           Control.Exception.Safe                      (Exception,
 import           Control.Funflow.Base
 import           Control.Funflow.ContentHashable
 import qualified Control.Funflow.ContentStore                as CS
+import           Control.Funflow.Exec.Summary
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
@@ -60,7 +61,7 @@ runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
                  --   multiple configurations.
           -> Flow eff ex a b
           -> a
-          -> KatipContextT IO b
+          -> KatipContextT IO (FlowSummary, b)
 runFlowEx _ cfg store runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
