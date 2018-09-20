@@ -40,6 +40,7 @@ import           System.IO                            (Handle, IOMode (..),
 import           System.Posix.Env                     (getEnv)
 import           System.Posix.User
 import           System.Process
+import           GHC.IO.Handle                        (hClose)
 
 data ExecutionResult =
     -- | The result already exists in the store and there is no need
@@ -121,6 +122,8 @@ execute store td = logError $ do
         -- Error output should be displayed on our stderr stream
         withFollowOutput $ do
           exitCode <- waitForProcess ph
+          hClose hErr
+          hClose hOut
           end <- getTime Monotonic
           case exitCode of
             ExitSuccess   -> do
@@ -241,4 +244,6 @@ withFollowFile infile outhandle action = do
         else do
           BS.hPut outhandle some
           loop
-  snd <$> concurrently (tryIO loop) (action <* putMVar mv ())
+  res <- snd <$> concurrently (tryIO loop) (action <* putMVar mv ())
+  hClose inhandle
+  return res
