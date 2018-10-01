@@ -55,6 +55,9 @@ data ParamField
     -- ^ Reference to the effective group ID of the executor.
   | ParamOut
     -- ^ Reference to the output path in the content store.
+  | ParamCmd Param
+    -- ^ A quoted command that we can pass to another program as an
+    -- argument.
   deriving (Generic, Show)
 
 instance ContentHashable IO ParamField
@@ -104,6 +107,7 @@ paramFieldToText c (ParamEnv env)   = convEnv c env
 paramFieldToText c ParamUid         = T.pack . show <$> convUid c
 paramFieldToText c ParamGid         = T.pack . show <$> convGid c
 paramFieldToText c ParamOut         = T.pack . fromAbsDir <$> convOut c
+paramFieldToText c (ParamCmd cmd)   = paramToText c cmd
 
 -- | Transform a parameter to text using the given converter.
 paramToText :: Applicative f
