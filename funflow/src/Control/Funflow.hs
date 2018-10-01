@@ -13,6 +13,8 @@ module Control.Funflow
   , Base.ExternalProperties(..)
   , Base.MDWriter
   , Base.Properties(..)
+  , Base.EpPurity(..)
+  , Base.alwaysRecompile
   , Base.defaultCacherWithIdent
   , Cache.defaultCacher
   , Cache.defaultCacherLoc
