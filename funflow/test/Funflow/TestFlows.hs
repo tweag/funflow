@@ -89,7 +89,7 @@ flowMissingExecutable = proc () -> do
     { _etCommand = "non-existent-executable-39fd1e85a0a05113938e0"
     , _etParams = []
     , _etWriteToStdOut = StdOutCapture
-    , _etEnv = []
+    , _etEnv = EnvExplicit []
     }))
     `catch` arr (Left @SomeException . snd)
     -< ()
@@ -104,7 +104,7 @@ externalEnvVar = proc () -> do
     { _etCommand = "bash"
     , _etParams = [textParam "-c", textParam "echo -n $FOO"]
     , _etWriteToStdOut = StdOutCapture
-    , _etEnv = [("FOO", textParam "testing")]
+    , _etEnv = EnvExplicit [("FOO", textParam "testing")]
     }) -< ()
   returnA -< case r of
     "testing" -> Right ()

@@ -93,8 +93,13 @@ execute store td = logError $ do
         }
     mbParams <- lift $ runMaybeT $
       traverse (paramToText convParam) (td ^. tdTask . etParams)
-    mbEnv <- lift $ runMaybeT $
-      traverse (sequence . second (paramToText convParam))  (td ^. tdTask . etEnv)
+    mbEnv <- case td ^. tdTask . etEnv of
+      EnvInherit -> pure Nothing
+      EnvExplicit x ->
+        (lift . runMaybeT $ traverse (sequence . second (paramToText convParam)) x)
+        >>= \case
+          Nothing -> fail "A parameter was not ready"
+          jp -> return jp
     params <- case mbParams of
       Nothing     -> fail "A parameter was not ready"
       Just params -> return params

@@ -64,7 +64,7 @@ compileModule = proc csrc -> do
       , Docker.optImageID = Just "7.3.0"
       , Docker.command = contentParam scriptInput
       , Docker.args = [contentParam cInput, textParam "/output/out.o"]
-      , Docker.env = []
+      , Docker.env = EnvExplicit []
       , Docker.stdout = NoOutputCapture
       }
 
@@ -86,7 +86,7 @@ compileExec = proc mods -> do
       , Docker.optImageID = Just "7.3.0"
       , Docker.command = contentParam scriptInput
       , Docker.args = textParam "/output/out" : map contentParam cModules
-      , Docker.env = []
+      , Docker.env = EnvExplicit []
       , Docker.stdout = NoOutputCapture
       }
 
@@ -109,6 +109,6 @@ runExec = proc (exec, args) -> do
       , Docker.optImageID = Just "7.3.0"
       , Docker.command = contentParam script
       , Docker.args = contentParam exec : map stringParam args
-      , Docker.env = []
+      , Docker.env = EnvExplicit []
       , Docker.stdout = NoOutputCapture
       }
