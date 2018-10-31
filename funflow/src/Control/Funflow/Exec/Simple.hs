@@ -178,49 +178,56 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
       $ runWrapped w
 
 -- | Run a flow in a logging context.
-runFlowLog :: forall c eff ex a b. (Coordinator c, Exception ex)
+runFlowLog :: forall m c eff ex a b.
+              (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+              ,MonadCatch m, MonadMask m, KatipContext m)
            => c
            -> Config c
            -> CS.ContentStore
-           -> (eff ~> AsyncA (KatipContextT IO)) -- ^ Natural transformation from wrapped effects
+           -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
            -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
                  --   multiple configurations.
            -> Flow eff ex a b
            -> a
-           -> KatipContextT IO (Either ex b)
+           -> m (Either ex b)
 runFlowLog c cfg store runWrapped confIdent flow input =
   try $ runFlowEx c cfg store runWrapped confIdent flow input
 
 -- | Run a flow, discarding all logging.
-runFlow :: forall c eff ex a b. (Coordinator c, Exception ex)
+runFlow :: forall m c eff ex a b.
+           (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+           ,MonadCatch m, MonadMask m)
         => c
         -> Config c
         -> CS.ContentStore
-        -> (eff ~> AsyncA IO) -- ^ Natural transformation from wrapped effects
+        -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
         -> Int -- ^ Flow configuration identity. This forms part of the caching
                --   system and is used to disambiguate the same flow run in
                --   multiple configurations.
         -> Flow eff ex a b
         -> a
-        -> IO (Either ex b)
+        -> m (Either ex b)
 runFlow c cfg store runWrapped confIdent flow input = do
-  le <- initLogEnv "funflow" "production"
+  le <- liftIO $ initLogEnv "funflow" "production"
   runKatipContextT le () "runFlow"
     $ runFlowLog c cfg store (liftAsyncA . runWrapped) confIdent flow input
 
 -- | Run a simple flow. Logging will be sent to stderr
-runSimpleFlow :: forall c a b. (Coordinator c)
+runSimpleFlow :: forall m c a b.
+                 (Coordinator c, MonadIO m, MonadBaseControl IO m
+                 ,MonadCatch m, MonadMask m)
         => c
         -> Config c
         -> CS.ContentStore
         -> SimpleFlow a b
         -> a
-        -> IO (Either SomeException b)
+        -> m (Either SomeException b)
 runSimpleFlow c ccfg store flow input = do
-  handleScribe <- mkHandleScribe ColorIfTerminal stderr InfoS V2
-  let mkLogEnv = registerScribe "stderr" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "production"
-  bracket mkLogEnv closeScribes $ \le -> do
+  handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stderr InfoS V2
+  let mkLogEnv = liftIO $
+        registerScribe "stderr" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "production"
+  bracket mkLogEnv (liftIO . closeScribes) $ \le -> do
     let initialContext = ()
         initialNamespace = "executeLoop"
 
