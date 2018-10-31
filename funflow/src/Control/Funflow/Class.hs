@@ -24,7 +24,7 @@ import           Control.Funflow.External
 import           Data.Default                    (def)
 import           Path
 
-class (ArrowChoice arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex where
+class (Arrow arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex where
   -- | Create a flow from a pure function.
   step' :: Base.Properties a b -> (a -> b) -> arr a b
   -- | Create a flow from an IO action.

@@ -140,7 +140,8 @@ copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 --
 -- | @copyDirToStore (dIn, Just dOut)@ copies the contents of @dIn@ into the store
 -- under relative path @dOut@ within the subtree
-copyDirToStore :: ArrowFlow eff ex arr => arr (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
+copyDirToStore :: (ArrowChoice arr, ArrowFlow eff ex arr)
+               => arr (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
 copyDirToStore = proc (inDir, mbOutDir) ->
   case mbOutDir of
     Nothing -> do
