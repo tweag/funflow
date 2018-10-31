@@ -37,8 +37,10 @@ import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
-import           Control.Monad.IO.Class                      (liftIO)
-import           Control.Monad.Trans.Class                   (lift)
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Control                 (MonadBaseControl)
+import           Control.Monad.Catch                         (MonadCatch
+                                                             ,MonadMask)
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (traverse_)
 import           Data.Monoid                                 ((<>))
@@ -48,17 +50,19 @@ import           Path
 import           System.IO                                   (stderr)
 
 -- | Simple evaulation of a flow
-runFlowEx :: forall c eff ex a b. (Coordinator c, Exception ex)
+runFlowEx :: forall m c eff ex a b.
+             (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+             ,MonadCatch m, MonadMask m, KatipContext m)
           => c
           -> Config c
           -> CS.ContentStore
-          -> (eff ~> AsyncA (KatipContextT IO)) -- ^ Natural transformation from wrapped effects
+          -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
           -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
                  --   multiple configurations.
           -> Flow eff ex a b
           -> a
-          -> KatipContextT IO b
+          -> m b
 runFlowEx _ cfg store runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
@@ -66,7 +70,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     simpleOutPath item = toFilePath
       $ CS.itemPath store item </> [relfile|out|]
     withStoreCache :: forall i o. Cacher i o
-                   -> AsyncA (KatipContextT IO) i o -> AsyncA (KatipContextT IO) i o
+                   -> AsyncA m i o -> AsyncA m i o
     withStoreCache NoCache f = f
     withStoreCache c f = let
         chashOf i = cacherKey c confIdent i
@@ -97,14 +101,14 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
             -> i
             -> o
             -> MDWriter i o
-            -> KatipContextT IO ()
+            -> m ()
     writeMd _ _ _ Nothing = return ()
     writeMd chash i o (Just writer) =
       let kvs = writer i o
       in traverse_ (uncurry $ CS.setMetadata store chash) kvs
 
 
-    runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA (KatipContextT IO) a1 b1
+    runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA m a1 b1
     runFlow' _ (Step props f) = withStoreCache (cache props)
       . AsyncA $ \x -> do
           let out = f x
@@ -113,7 +117,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
             Cache key _ _ -> writeMd (key confIdent x) x out $ mdpolicy props
           return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
-      . liftAsyncA $ AsyncA f
+      . AsyncA $ liftIO . f
     runFlow' po (External props toTask) = AsyncA $ \x -> do
       chash <- liftIO $ case (ep_impure props) of
                           EpPure -> contentHash (toTask x)
@@ -167,9 +171,9 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
                 CS.removeFailed store chash
             )
     runFlow' _ (GetFromStore f) = AsyncA $ \case
-      CS.All item -> lift . f $ CS.itemPath store item
-      item CS.:</> path -> lift . f $ CS.itemPath store item </> path
-    runFlow' _ (InternalManipulateStore f) = AsyncA $ \i ->lift $ f store i
+      CS.All item -> liftIO . f $ CS.itemPath store item
+      item CS.:</> path -> liftIO . f $ CS.itemPath store item </> path
+    runFlow' _ (InternalManipulateStore f) = AsyncA $ \i -> liftIO $ f store i
     runFlow' _ (Wrapped props w) = withStoreCache (cache props)
       $ runWrapped w
 
