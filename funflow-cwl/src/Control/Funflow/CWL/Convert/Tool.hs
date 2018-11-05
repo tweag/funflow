@@ -90,7 +90,7 @@ externalFn cmd' mkParams stdCapture env inHList =
     ExternalTask
       { _etCommand = T.pack cmd'
       , _etParams = mkParams inHList
-      , _etEnv = map (fmap textParam) (env inHList)
+      , _etEnv = EnvExplicit $ map (fmap textParam) (env inHList)
       , _etWriteToStdOut = outCapture
       }
 
@@ -108,7 +108,7 @@ dockerFn cmd' img mkParams stdCapture env inHList = D.toExternal $
     , D.optImageID = Nothing
     , D.command = stringParam cmd'
     , D.args = mkParams inHList
-    , D.env = map (onSnd textParam) $ env inHList
+    , D.env = EnvExplicit $ map (onSnd textParam) $ env inHList
     , D.stdout = determineStdOut stdCapture
     }
 

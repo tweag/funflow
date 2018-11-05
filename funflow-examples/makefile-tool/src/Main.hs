@@ -173,7 +173,7 @@ compileFile = proc (tf, srcDeps, tarDeps, cmd) -> do
         , Docker.optImageID = Just "7.3.0"
         , Docker.command = contentParam compileScript
         , Docker.args = [contentParam depDir]
-        , Docker.env = []
+        , Docker.env = EnvExplicit []
         , Docker.stdout = NoOutputCapture
         }
 
