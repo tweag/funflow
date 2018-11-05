@@ -179,13 +179,29 @@ instance FromJSON OutputCapture
 instance ToJSON OutputCapture
 instance Store OutputCapture
 
+-- | Control the environment set for the external process. This can either
+--   inherit from the surrounding environment, or explicitly set things.
+data Env
+    -- | Inherit all environment variables from the surrounding shell. Note that
+    -- the values of these variables will not be taken into account in the
+    -- content hash, and so changes to them will not trigger a rerun of the
+    -- step.
+  = EnvInherit
+  | EnvExplicit [(T.Text, Param)]
+  deriving (Generic, Show)
+
+instance ContentHashable IO Env
+instance FromJSON Env
+instance ToJSON Env
+instance Store Env
+
 -- | A monomorphic description of an external task. This is basically just
 --   a command which can be run.
 data ExternalTask = ExternalTask {
     _etCommand       :: T.Text
   , _etParams        :: [Param]
     -- ^ Environment variables to set for the scope of the execution.
-  , _etEnv           :: [(T.Text, Param)]
+  , _etEnv           :: Env
   , _etWriteToStdOut :: OutputCapture
 } deriving (Generic, Show)
 
