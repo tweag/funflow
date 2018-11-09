@@ -8,7 +8,7 @@ module Main where
 
 -- Funflow Imports
 import           Control.Arrow
-import           Control.Arrow.Free
+import           Control.Arrow.Free              hiding (try)
 import           Control.Exception               (Exception (..),
                                                   SomeException (..))
 import           Control.Exception.Safe          (try)

@@ -18,7 +18,7 @@ ppFlow = ppDiagram . toDiagram where
   ppDiagram (Seq f g) = parens $ ppDiagram f <+> text ">>>" <+> ppDiagram g
   ppDiagram (Par f g) = parens $ ppDiagram f <+>  text "***" <+> ppDiagram g
   ppDiagram (Fanin f g) = parens $ ppDiagram f <+>  text "|||" <+> ppDiagram g
-  ppDiagram (Catch f g) = parens $ ppDiagram f <+>  text "catch" <+> ppDiagram g
+  ppDiagram (Try f) = parens $ text "try" <+> ppDiagram f
 
 showFlow :: Flow eff ex a b -> String
 showFlow = render . ppFlow

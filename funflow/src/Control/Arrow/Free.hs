@@ -32,6 +32,7 @@ module Control.Arrow.Free
   , eval
     -- * ArrowError
   , ArrowError(..)
+  , catch
     -- * Arrow functions
   , mapA
   , mapSeqA
@@ -50,7 +51,7 @@ import           Data.Either         (Either (..))
 import           Data.Function       (const, flip, ($))
 import           Data.List           (uncons)
 import           Data.Maybe          (maybe)
-import           Data.Tuple          (curry, uncurry)
+import           Data.Tuple          (uncurry)
 
 -- | A natural transformation on type constructors of two arguments.
 type x ~> y = forall a b. x a b -> y a b
@@ -159,12 +160,20 @@ instance FreeArrowLike Choice where
 -- | ArrowError represents those arrows which can catch exceptions within the
 --   processing of the flow.
 class ArrowError ex a where
-  catch :: a e c -> a (e, ex) c -> a e c
+  try :: a e c -> a e (Either ex c)
+
+catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
+catch a onExc = proc e -> do
+  res <- try a -< e
+  case res of
+    Left ex ->
+      onExc -< (e, ex)
+    Right r ->
+      returnA -< r
 
 instance (Arrow (Kleisli m), Exception ex, MonadCatch m)
   => ArrowError ex (Kleisli m) where
-    Kleisli arr1 `catch` Kleisli arr2 = Kleisli $ \x ->
-      arr1 x `Control.Exception.Safe.catch` curry arr2 x
+    try (Kleisli a) = Kleisli $ Control.Exception.Safe.try . a
 
 -- | Freely generated arrows with both choice and error handling.
 newtype ErrorChoice ex eff a b = ErrorChoice {
@@ -188,7 +197,7 @@ instance ArrowChoice (ErrorChoice ex eff) where
   (ErrorChoice a) ||| (ErrorChoice b) = ErrorChoice $ \f -> a f ||| b f
 
 instance ArrowError ex (ErrorChoice ex eff) where
-  (ErrorChoice a) `catch` (ErrorChoice h) = ErrorChoice $ \f -> a f `catch` h f
+  try (ErrorChoice a) = ErrorChoice $ \f -> try $ a f
 
 instance FreeArrowLike (ErrorChoice ex) where
   type Ctx (ErrorChoice ex) = Join ArrowChoice (ArrowError ex)
