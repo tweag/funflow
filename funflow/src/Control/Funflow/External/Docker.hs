@@ -55,7 +55,7 @@ data Config = Config
   , optImageID :: Maybe T.Text
   , command    :: Param
   , args       :: [Param]
-  , env        :: [(T.Text, Param)]
+  , env        :: Env
   , stdout     :: OutputCapture
   } deriving Generic
 
@@ -65,7 +65,7 @@ data Docker = Docker
   , dInput      :: Bind
   , dCommand    :: Param
   , dArgs       :: [Param]
-  , dEnv        :: [(T.Text, Param)]
+  , dEnv        :: Env
   , dStdout     :: OutputCapture
   } deriving Generic
 
@@ -93,7 +93,9 @@ toDocker cfg = Docker
     ((command', args', env'), ConvertState input' _) = flip runState initState $ do
       command'' <- transformParam (command cfg)
       args'' <- mapM transformParam (args cfg)
-      env'' <- mapM (runKleisli $ second $ Kleisli transformParam) (env cfg)
+      env'' <- case env cfg of
+        EnvInherit -> pure EnvInherit
+        EnvExplicit x -> EnvExplicit <$> mapM (runKleisli $ second $ Kleisli transformParam) x
       return (command'', args'', env'')
     transformParam :: Param -> State ConvertState Param
     transformParam (Param pfs) = Param <$> mapM transformParamField pfs
