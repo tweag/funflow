@@ -40,8 +40,7 @@ instance MonadBaseControl IO m => ArrowChoice (AsyncA m) where
 
 instance (Exception ex, MonadBaseControl IO m, MonadCatch m)
   => ArrowError ex (AsyncA m) where
-    AsyncA arr1 `catch` AsyncA arr2 = AsyncA $ \x ->
-      arr1 x `Control.Exception.Safe.catch` curry arr2 x
+  try (AsyncA a) = AsyncA $ Control.Exception.Safe.try . a
 
 -- | Lift an AsyncA through a monad transformer of the underlying monad.
 liftAsyncA :: (MonadTrans t, Monad m)

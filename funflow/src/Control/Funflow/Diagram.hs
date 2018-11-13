@@ -33,7 +33,7 @@ data Diagram ex a b where
   Seq :: Diagram ex a b -> Diagram ex b c -> Diagram ex a c
   Par :: Diagram ex a b -> Diagram ex c d -> Diagram ex (a,c) (b,d)
   Fanin :: Diagram ex a c -> Diagram ex b c -> Diagram ex (Either a b) c
-  Catch   :: Diagram ex a b -> Diagram ex (a,ex) b -> Diagram ex a b
+  Try :: Diagram ex a b -> Diagram ex a (Either ex b)
 
 instance Category (Diagram ex) where
   id = Node emptyNodeProperties Proxy Proxy
@@ -51,7 +51,7 @@ instance ArrowChoice (Diagram ex) where
   f ||| g = Fanin f g
 
 instance ArrowError ex (Diagram ex) where
-  f `catch` g = Catch f g
+  try = Try
 
 -- | Construct a labelled node
 node :: forall arr a b ex. Arrow arr => arr a b -> [T.Text] -> (Diagram ex) a b

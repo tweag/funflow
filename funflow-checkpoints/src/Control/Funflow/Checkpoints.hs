@@ -67,7 +67,7 @@ data CheckpointT arr (eff :: * -> * -> *) ex a b where
   Seq :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex a c
   Par :: CheckpointT arr eff ex a b -> CheckpointT arr eff ex c d -> CheckpointT arr eff ex (a,c) (b,d)
   Fanin :: ArrowChoice (arr eff ex) => CheckpointT arr eff ex a c -> CheckpointT arr eff ex b c -> CheckpointT arr eff ex (Either a b) c
-  Catch :: ArrowError ex (arr eff ex) => CheckpointT arr eff ex a b -> CheckpointT arr eff ex (a,ex) b -> CheckpointT arr eff ex a b
+  Try :: ArrowError ex (arr eff ex) => CheckpointT arr eff ex a b -> CheckpointT arr eff ex a (Either ex b)
 
 instance Category (arr eff ex) => Category (CheckpointT arr eff ex) where
   id = Unchecked id
@@ -79,7 +79,7 @@ instance ArrowChoice (arr eff ex) => ArrowChoice (CheckpointT arr eff ex ) where
   f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
   f ||| g = Fanin f g
 instance ArrowError ex (arr eff ex) => ArrowError ex (CheckpointT arr eff ex) where
-  f `catch` g = Catch f g
+  try = Try
 
 instance ArrowFlow eff ex (arr eff ex) => ArrowFlow eff ex (CheckpointT arr eff ex) where
   step' props = Unchecked . step' props
@@ -103,7 +103,7 @@ extractToCompletion (Unchecked x)  = x
 extractToCompletion (Seq a b)      = extractToCompletion b . extractToCompletion a
 extractToCompletion (Par a b)      = extractToCompletion a *** extractToCompletion b
 extractToCompletion (Fanin a b)    = extractToCompletion a ||| extractToCompletion b
-extractToCompletion (Catch a b)    = extractToCompletion a `catch` extractToCompletion b
+extractToCompletion (Try a)        = try $ extractToCompletion a
 
 -- | Run a flow to a checkpoint.
 --
@@ -167,14 +167,11 @@ extractToCheckpointEither chkName = go where
     (Left doneLeft, Left doneRight) -> Left $ doneLeft ||| doneRight
     -- Checkpoint in a conditional. Throw an error.
     _ -> throw $ CheckpointInConditional (checkpointName ref)
-  -- Catch branch. Firstly, we check whether there are any checkpoints in the error handling case.
-  -- If there are, we throw an error, because what does that even mean? If there aren't, then
-  -- we can carry out the `doThis` branch, but we lose error handling if it has a checkpoint.
-  go (Catch doThis orElseThat) = case go orElseThat of
-    Right _ -> throw $ CheckpointInCatch (checkpointName ref)
-    Left doneElseThat -> case go doThis of
-      Left doneThis  -> Left $ doneThis `catch` doneElseThat
-      Right doneThis -> Right doneThis
+  -- Try branch. We can carry out the `doThis` branch, but we lose error
+  -- handling if it has a checkpoint, because of return type.
+  go (Try doThis) = case go doThis of
+    Left doneThis  -> Left $ try doneThis
+    Right doneThis -> Right doneThis
 
 -- | Run a flow to a checkpoint.
 --

@@ -107,7 +107,7 @@ melancholicLazarus = stepIO $ \s -> do
 
 -- | `retry n s f` reruns `f` on failure at most n times with a delay of `s`
 --   seconds between retries
-retry :: forall arr eff ex a b. (Exception ex, Store a, ArrowFlow eff ex arr)
+retry :: forall arr eff ex a b. (Exception ex, Store a, ArrowFlow eff ex arr, ArrowChoice arr)
       => Int -> Int -> arr a b -> arr a b
 retry 0 _ f = f
 retry n secs f = catch f $ proc (x, _ :: ex) -> do
