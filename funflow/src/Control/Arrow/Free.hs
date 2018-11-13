@@ -41,9 +41,13 @@ module Control.Arrow.Free
   ) where
 
 import           Control.Arrow
+import           Control.Arrow.AppArrow
 import           Control.Category
 import           Control.Exception.Safe (Exception, MonadCatch)
 import qualified Control.Exception.Safe
+import           Control.Monad.Trans.Reader
+import           Control.Monad.Trans.Writer
+import qualified Control.Monad.Trans.Writer.Strict as SW
 import           Data.Bool           (Bool)
 import           Data.Constraint     (Constraint, Dict (..), mapDict, weaken1,
                                       weaken2)
@@ -51,6 +55,7 @@ import           Data.Either         (Either (..))
 import           Data.Function       (const, flip, ($))
 import           Data.List           (uncons)
 import           Data.Maybe          (maybe)
+import           Data.Monoid         (Monoid)
 import           Data.Tuple          (uncurry)
 
 -- | A natural transformation on type constructors of two arguments.
@@ -161,6 +166,18 @@ instance FreeArrowLike Choice where
 --   processing of the flow.
 class ArrowError ex a where
   try :: a e c -> a e (Either ex c)
+
+instance (ArrowError ex arr) => ArrowError ex (AppArrow (Reader r) arr) where
+  try (AppArrow act) = AppArrow $ reader $ \r ->
+    try $ runReader act r
+
+instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (Writer w) arr) where
+  try (AppArrow act) = AppArrow $ writer (try arr, w)
+    where (arr, w) = runWriter act
+
+instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (SW.Writer w) arr) where
+  try (AppArrow act) = AppArrow $ SW.writer (try arr, w)
+    where (arr, w) = SW.runWriter act
 
 catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
 catch a onExc = proc e -> do
