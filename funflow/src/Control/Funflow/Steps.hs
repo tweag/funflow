@@ -107,7 +107,7 @@ melancholicLazarus = stepIO $ \s -> do
 
 -- | `retry n s f` reruns `f` on failure at most n times with a delay of `s`
 --   seconds between retries
-retry :: forall arr eff ex a b. (Exception ex, Store a, ArrowFlow eff ex arr)
+retry :: forall arr eff ex a b. (Exception ex, Store a, ArrowFlow eff ex arr, ArrowChoice arr)
       => Int -> Int -> arr a b -> arr a b
 retry 0 _ f = f
 retry n secs f = catch f $ proc (x, _ :: ex) -> do
@@ -140,7 +140,8 @@ copyFileToStore = putInStoreAt $ \p (FileContent inFP) -> copyFile inFP p
 --
 -- | @copyDirToStore (dIn, Just dOut)@ copies the contents of @dIn@ into the store
 -- under relative path @dOut@ within the subtree
-copyDirToStore :: ArrowFlow eff ex arr => arr (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
+copyDirToStore :: (ArrowChoice arr, ArrowFlow eff ex arr)
+               => arr (DirectoryContent, Maybe (Path Rel Dir)) (CS.Content Dir)
 copyDirToStore = proc (inDir, mbOutDir) ->
   case mbOutDir of
     Nothing -> do
