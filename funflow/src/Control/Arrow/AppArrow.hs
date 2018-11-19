@@ -27,6 +27,13 @@ instance (Applicative app, ArrowChoice arr) => ArrowChoice (AppArrow app arr) wh
   right (AppArrow a) = AppArrow $ right <$> a
   AppArrow a1 +++ AppArrow a2 = AppArrow $ (+++) <$> a1 <*> a2
   AppArrow a1 ||| AppArrow a2 = AppArrow $ (|||) <$> a1 <*> a2
-  
+
+instance (Applicative f, Arrow arr) => Functor (AppArrow f arr t) where
+  fmap f = (>>> arr f)
+
+instance (Applicative app, Arrow arr) => Applicative (AppArrow app arr t) where
+  pure = arr . const
+  a <*> b = a &&& b >>> arr (uncurry ($))
+
 appArrow :: (Applicative app) => arr a b -> AppArrow app arr a b
 appArrow = AppArrow . pure
