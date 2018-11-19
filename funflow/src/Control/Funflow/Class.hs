@@ -22,9 +22,6 @@ import qualified Control.Funflow.Base            as Base
 import           Control.Funflow.ContentHashable
 import qualified Control.Funflow.ContentStore    as CS
 import           Control.Funflow.External
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Writer
-import qualified Control.Monad.Trans.Writer.Strict as SW
 import           Data.Default                    (def)
 import           Path
 

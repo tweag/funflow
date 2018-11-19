@@ -172,12 +172,12 @@ instance (ArrowError ex arr) => ArrowError ex (AppArrow (Reader r) arr) where
     try $ runReader act r
 
 instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (Writer w) arr) where
-  try (AppArrow act) = AppArrow $ writer (try arr, w)
-    where (arr, w) = runWriter act
+  try (AppArrow act) = AppArrow $ writer (try a, w)
+    where (a, w) = runWriter act
 
 instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (SW.Writer w) arr) where
-  try (AppArrow act) = AppArrow $ SW.writer (try arr, w)
-    where (arr, w) = SW.runWriter act
+  try (AppArrow act) = AppArrow $ SW.writer (try a, w)
+    where (a, w) = SW.runWriter act
 
 catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
 catch a onExc = proc e -> do
