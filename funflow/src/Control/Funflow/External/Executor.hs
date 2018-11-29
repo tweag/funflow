@@ -29,6 +29,7 @@ import           Data.Foldable                        (for_)
 import           Data.Maybe                           (isJust, isNothing)
 import           Data.Monoid                          ((<>))
 import qualified Data.Text                            as T
+import           GHC.IO.Handle                        (hClose)
 import           Katip                                as K
 import           Network.HostName
 import           Path
@@ -40,7 +41,6 @@ import           System.IO                            (Handle, IOMode (..),
 import           System.Posix.Env                     (getEnv)
 import           System.Posix.User
 import           System.Process
-import           GHC.IO.Handle                        (hClose)
 
 data ExecutionResult =
     -- | The result already exists in the store and there is no need

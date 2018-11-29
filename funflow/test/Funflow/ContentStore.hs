@@ -13,6 +13,7 @@ import           Control.Exception.Safe          (tryAny)
 import           Control.Funflow.ContentHashable (contentHash)
 import           Control.Funflow.ContentStore    (ContentStore)
 import qualified Control.Funflow.ContentStore    as ContentStore
+import qualified Control.Funflow.RemoteCache     as Remote
 import           Control.Monad                   (void)
 import           Data.Maybe                      (catMaybes)
 import qualified Data.Set                        as Set
@@ -94,7 +95,7 @@ tests = testGroup "Content Store"
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
 
-      ContentStore.constructOrAsync store hash >>= \case
+      ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Pending _ ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -102,7 +103,7 @@ tests = testGroup "Content Store"
         ContentStore.Missing _ ->
           return ()
 
-      a <- ContentStore.constructOrAsync store hash >>= \case
+      a <- ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "under construction still missing"
           undefined
@@ -130,7 +131,7 @@ tests = testGroup "Content Store"
       item'' <- wait b
       item'' @?= ContentStore.Completed item
 
-      ContentStore.constructOrAsync store hash >>= \case
+      ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "complete still missing"
         ContentStore.Pending _ -> do
@@ -142,7 +143,7 @@ tests = testGroup "Content Store"
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
 
-      ContentStore.constructOrAsync store hash >>= \case
+      ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Pending _ ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -150,7 +151,7 @@ tests = testGroup "Content Store"
         ContentStore.Missing _ ->
           return ()
 
-      a <- ContentStore.constructOrAsync store hash >>= \case
+      a <- ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "under construction still missing"
           undefined
@@ -178,7 +179,7 @@ tests = testGroup "Content Store"
       item'' <- wait b
       item'' @?= ContentStore.Failed
 
-      ContentStore.constructOrAsync store hash >>= \case
+      ContentStore.constructOrAsync store Remote.noCache hash >>= \case
         ContentStore.Pending _ -> do
           assertFailure "failed still under construction"
         ContentStore.Complete _ -> do

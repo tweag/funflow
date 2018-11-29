@@ -37,10 +37,11 @@ import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
+import qualified Control.Funflow.RemoteCache                 as Remote
+import           Control.Monad.Catch                         (MonadCatch,
+                                                              MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
-import           Control.Monad.Catch                         (MonadCatch
-                                                             ,MonadMask)
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (traverse_)
 import           Data.Monoid                                 ((<>))
@@ -56,6 +57,7 @@ runFlowEx :: forall m c eff ex a b.
           => c
           -> Config c
           -> CS.ContentStore
+          -> Remote.Cacher m
           -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
           -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
@@ -63,7 +65,7 @@ runFlowEx :: forall m c eff ex a b.
           -> Flow eff ex a b
           -> a
           -> m b
-runFlowEx _ cfg store runWrapped confIdent flow input = do
+runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
@@ -75,7 +77,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     withStoreCache c f = let
         chashOf i = cacherKey c confIdent i
         checkStore = AsyncA $ \chash ->
-          CS.constructOrWait store chash >>= \case
+          CS.constructOrWait store cacher chash >>= \case
             CS.Pending void -> absurd void
             CS.Complete item -> do
               bs <- liftIO . BS.readFile $ simpleOutPath item
@@ -85,7 +87,8 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           do
              liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
                          . cacherStoreValue c $ res
-             _ <- CS.markComplete store chash
+             finalItem <- CS.markComplete store chash
+             _ <- Remote.push cacher chash (CS.itemPath store finalItem)
              return res
            `onException`
              CS.removeFailed store chash
@@ -159,13 +162,15 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
               throwM $ ExternalTaskFailed td ti mbStdout mbStderr
     runFlow' _ (PutInStore f) = AsyncA $ \x -> katipAddNamespace "putInStore" $ do
       chash <- liftIO $ contentHash x
-      CS.constructOrWait store chash >>= \case
+      CS.constructOrWait store cacher chash >>= \case
         CS.Pending void -> absurd void
         CS.Complete item -> return item
         CS.Missing fp ->
           do
             liftIO $ f fp x
-            CS.markComplete store chash
+            finalItem <- CS.markComplete store chash
+            _ <- Remote.push cacher chash (CS.itemPath store finalItem)
+            pure finalItem
           `onException`
             (do $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash
                 CS.removeFailed store chash
@@ -184,6 +189,7 @@ runFlowLog :: forall m c eff ex a b.
            => c
            -> Config c
            -> CS.ContentStore
+           -> Remote.Cacher m
            -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
            -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
@@ -191,8 +197,8 @@ runFlowLog :: forall m c eff ex a b.
            -> Flow eff ex a b
            -> a
            -> m (Either ex b)
-runFlowLog c cfg store runWrapped confIdent flow input =
-  try $ runFlowEx c cfg store runWrapped confIdent flow input
+runFlowLog c cfg store cacher runWrapped confIdent flow input =
+  try $ runFlowEx c cfg store cacher runWrapped confIdent flow input
 
 -- | Run a flow, discarding all logging.
 runFlow :: forall m c eff ex a b.
@@ -201,6 +207,7 @@ runFlow :: forall m c eff ex a b.
         => c
         -> Config c
         -> CS.ContentStore
+        -> Remote.Cacher (KatipContextT m)
         -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
         -> Int -- ^ Flow configuration identity. This forms part of the caching
                --   system and is used to disambiguate the same flow run in
@@ -208,10 +215,10 @@ runFlow :: forall m c eff ex a b.
         -> Flow eff ex a b
         -> a
         -> m (Either ex b)
-runFlow c cfg store runWrapped confIdent flow input = do
+runFlow c cfg store cacher runWrapped confIdent flow input = do
   le <- liftIO $ initLogEnv "funflow" "production"
   runKatipContextT le () "runFlow"
-    $ runFlowLog c cfg store (liftAsyncA . runWrapped) confIdent flow input
+    $ runFlowLog c cfg store cacher (liftAsyncA . runWrapped) confIdent flow input
 
 -- | Run a simple flow. Logging will be sent to stderr
 runSimpleFlow :: forall m c a b.
@@ -232,7 +239,7 @@ runSimpleFlow c ccfg store flow input = do
         initialNamespace = "executeLoop"
 
     runKatipContextT le initialContext initialNamespace
-      $ runFlowLog c ccfg store runNoEffect 12345 flow input
+      $ runFlowLog c ccfg store Remote.noCache runNoEffect 12345 flow input
 
 -- | Create a full pipeline runner locally. This includes an executor for
 --   executing external tasks.
