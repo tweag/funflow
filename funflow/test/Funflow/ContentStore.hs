@@ -92,10 +92,11 @@ tests = testGroup "Content Store"
         content @?= expectedContent
 
   , testCase "await construction" $
+    Remote.memoryCache >>= \myCache ->
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
 
-      ContentStore.constructOrAsync store Remote.noCache hash >>= \case
+      ContentStore.constructOrAsync store myCache hash >>= \case
         ContentStore.Pending _ ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -384,6 +385,32 @@ tests = testGroup "Content Store"
       do
         r <- ContentStore.lookupAlias store aliasB
         r @?= Nothing
+
+    , testCase "Remote caching" $ do
+      cacher <- Remote.memoryCache
+      hash <- contentHash ("test" :: String)
+      let file = [relfile|file|]
+          expectedContent = "Hello World"
+
+      -- Populate the remote cache
+      withEmptyStore $ \store -> do
+        ContentStore.constructOrAsync store cacher hash >>= \case
+          ContentStore.Pending _ ->
+            assertFailure "missing already under construction"
+          ContentStore.Complete _ ->
+            assertFailure "missing already complete"
+          ContentStore.Missing subtree -> do
+            isWritable subtree @? "under construction not writable"
+            writeFile (fromAbsFile $ subtree </> file) expectedContent
+            Remote.push cacher hash subtree
+
+      -- Expects having the item in cache
+      withEmptyStore $ \store -> do
+        ContentStore.constructOrAsync store cacher hash >>= \case
+          ContentStore.Pending _ ->
+            assertFailure "missing already under construction"
+          ContentStore.Complete _ -> pure ()
+          ContentStore.Missing _ -> assertFailure "Not found in the cache"
 
   ]
 

@@ -478,9 +478,9 @@ constructOrAsync store cacher hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $ do
-      let destDir :: Path Abs Dir = undefined
+      let destDir :: Path Abs Dir = mkItemPath store hash
       Remote.pull cacher hash destDir >>= \case
-        Remote.PullOK -> return $ Complete (Item hash)
+        Remote.PullOK () -> return $ Complete (Item hash)
         Remote.NotInCache ->
           Missing <$> liftIO (internalMarkPending store hash)
         Remote.PullError _ ->
