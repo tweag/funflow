@@ -468,10 +468,10 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
 -- It should be constructed in the given @buildDir@,
 -- and then marked as complete using 'markComplete'.
 constructOrAsync
-  :: forall m.
-     (MonadIO m, MonadBaseControl IO m, MonadMask m)
+  :: forall m remoteCache.
+     (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
-  -> Remote.Cacher m
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) (Async Update) Item)
 constructOrAsync store cacher hash = withStoreLock store $
@@ -496,9 +496,9 @@ constructOrAsync store cacher hash = withStoreLock store $
 -- It should be constructed in the given @buildDir@,
 -- and then marked as complete using 'markComplete'.
 constructOrWait
-  :: (MonadIO m, MonadMask m, MonadBaseControl IO m)
+  :: (MonadIO m, MonadMask m, MonadBaseControl IO m, Remote.Cacher m remoteCache)
   => ContentStore
-  -> Remote.Cacher m
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) Void Item)
 constructOrWait store cacher hash = constructOrAsync store cacher hash >>= \case

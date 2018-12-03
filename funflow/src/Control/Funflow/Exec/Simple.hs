@@ -51,13 +51,13 @@ import           Path
 import           System.IO                                   (stderr)
 
 -- | Simple evaulation of a flow
-runFlowEx :: forall m c eff ex a b.
+runFlowEx :: forall m c eff ex a b remoteCache.
              (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
-             ,MonadCatch m, MonadMask m, KatipContext m)
+             ,MonadCatch m, MonadMask m, KatipContext m, Remote.Cacher m remoteCache)
           => c
           -> Config c
           -> CS.ContentStore
-          -> Remote.Cacher m
+          -> remoteCache
           -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
           -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
@@ -183,13 +183,13 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
       $ runWrapped w
 
 -- | Run a flow in a logging context.
-runFlowLog :: forall m c eff ex a b.
+runFlowLog :: forall m c eff ex a b remoteCache.
               (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
-              ,MonadCatch m, MonadMask m, KatipContext m)
+              ,MonadCatch m, MonadMask m, KatipContext m, Remote.Cacher m remoteCache)
            => c
            -> Config c
            -> CS.ContentStore
-           -> Remote.Cacher m
+           -> remoteCache
            -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
            -> Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
@@ -201,13 +201,13 @@ runFlowLog c cfg store cacher runWrapped confIdent flow input =
   try $ runFlowEx c cfg store cacher runWrapped confIdent flow input
 
 -- | Run a flow, discarding all logging.
-runFlow :: forall m c eff ex a b.
+runFlow :: forall m c eff ex a b remoteCache.
            (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
-           ,MonadCatch m, MonadMask m)
+           ,MonadCatch m, MonadMask m, Remote.Cacher (KatipContextT m) remoteCache)
         => c
         -> Config c
         -> CS.ContentStore
-        -> Remote.Cacher (KatipContextT m)
+        -> remoteCache
         -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
         -> Int -- ^ Flow configuration identity. This forms part of the caching
                --   system and is used to disambiguate the same flow run in
@@ -239,7 +239,7 @@ runSimpleFlow c ccfg store flow input = do
         initialNamespace = "executeLoop"
 
     runKatipContextT le initialContext initialNamespace
-      $ runFlowLog c ccfg store Remote.noCache runNoEffect 12345 flow input
+      $ runFlowLog c ccfg store Remote.NoCache runNoEffect 12345 flow input
 
 -- | Create a full pipeline runner locally. This includes an executor for
 --   executing external tasks.
