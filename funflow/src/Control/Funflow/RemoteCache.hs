@@ -122,3 +122,13 @@ instance MonadIO m => Cacher m MemoryCache where
 
 memoryCache :: MonadIO m => m MemoryCache
 memoryCache = liftIO $ MemoryCache <$> newMVar mempty
+
+-- |
+-- If 'a' is a 'Cacher' then 'Maybe a' is a cacher such that 'Just x' behavies
+-- like 'x' and 'Nothing' doesn't cache anything
+instance Cacher m a => Cacher m (Maybe a) where
+  pull (Just x) = pull x
+  pull Nothing  = pull NoCache
+
+  push (Just x) = push x
+  push Nothing  = push NoCache
