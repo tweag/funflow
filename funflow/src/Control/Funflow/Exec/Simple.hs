@@ -88,7 +88,7 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
              liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
                          . cacherStoreValue c $ res
              finalItem <- CS.markComplete store chash
-             _ <- Remote.push cacher chash (CS.itemPath store finalItem)
+             _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
              return res
            `onException`
              CS.removeFailed store chash
@@ -169,7 +169,7 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
           do
             liftIO $ f fp x
             finalItem <- CS.markComplete store chash
-            _ <- Remote.push cacher chash (CS.itemPath store finalItem)
+            _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
             pure finalItem
           `onException`
             (do $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash

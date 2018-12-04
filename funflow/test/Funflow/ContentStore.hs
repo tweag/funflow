@@ -402,7 +402,7 @@ tests = testGroup "Content Store"
           ContentStore.Missing subtree -> do
             isWritable subtree @? "under construction not writable"
             writeFile (fromAbsFile $ subtree </> file) expectedContent
-            Remote.push cacher hash subtree
+            Remote.push cacher hash Nothing subtree
 
       -- Expects having the item in cache
       withEmptyStore $ \store -> do

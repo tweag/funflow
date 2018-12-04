@@ -7,7 +7,7 @@
 -- keep several funflow stores (possibly on different machines) in sync.
 module Control.Funflow.RemoteCache
   ( Cacher(..)
-  , PullResult(..), PushResult(..)
+  , PullResult(..), PushResult(..), AliasResult(..)
   , NoCache(..), memoryCache
   , pullAsArchive, pushAsArchive
   ) where
@@ -37,6 +37,11 @@ data PushResult
   | PushError String
   deriving (Eq, Ord, Show)
 
+data AliasResult
+ = AliasOK
+ | TargetNotInCache
+ | AliasError String
+
 -- |
 -- A simple mechanism for remote-caching.
 --
@@ -45,20 +50,35 @@ data PushResult
 -- No assumption is made on the availability of a store path. In particular,
 -- pushing a path to the cache doesn't mean that we can pull it back.
 class Monad m => Cacher m a where
-  push :: a -> ContentHash -> Path Abs Dir -> m PushResult
+  push ::
+       a
+    -> ContentHash -- ^ "Primary" key: hash of the content
+    -> Maybe ContentHash -- ^ "Secondary" key: hash of the dependencies
+    -> Path Abs Dir -- ^ Path to the content
+    -> m PushResult
   pull :: a -> ContentHash -> Path Abs Dir -> m (PullResult ())
 
 -- |
 -- Push the path as an archive to the remote cache
 pushAsArchive ::
      MonadIO m
-  => (ContentHash -> ByteString -> m PushResult)
-  -> ContentHash
+  => (ContentHash -> ContentHash -> m (Either String ())) -- ^ How to create the aliases
+  -> (ContentHash -> ByteString -> m PushResult) -- ^ How to push the content
+  -> ContentHash -- ^ Primary key
+  -> Maybe ContentHash -- ^ Secondary key
   -> Path Abs Dir
   -> m PushResult
-pushAsArchive pushArchive hash path = do
+pushAsArchive alias pushArchive primaryKey mSecondaryKey path = do
   archive <- liftIO $ Tar.write <$> Tar.pack (toFilePath path) ["."]
-  pushArchive hash archive
+  pushArchive primaryKey archive >>= \case
+    PushError e -> pure $ PushError e
+    res ->
+      case mSecondaryKey of
+        Just secondaryKey ->
+          alias primaryKey secondaryKey >>= \case
+          Left err -> pure $ PushError err
+          Right () -> pure res
+        Nothing -> pure res
 
 pullAsArchive ::
      MonadIO m
@@ -80,7 +100,7 @@ data NoCache = NoCache
 
 instance Monad m => Cacher m NoCache where
   pull _ _ _ = pure NotInCache
-  push _ _ _ = pure PushOK
+  push _ _ _ _ = pure PushOK
 
 -- |
 -- An in-memory cache, for testing purposes
@@ -91,11 +111,14 @@ instance MonadIO m => Cacher m MemoryCache where
     case Map.lookup hash cacheMap of
       Nothing -> pure NotInCache
       Just x  -> pure (PullOK x)
-  push (MemoryCache cacheVar) = pushAsArchive $ \hash content -> do
+  push (MemoryCache cacheVar) = pushAsArchive alias $ \hash content -> do
     liftIO $ modifyMVar_
       cacheVar
       (\cacheMap -> pure $ Map.insert hash content cacheMap)
     pure PushOK
+    where
+      alias from to = liftIO $ Right <$> modifyMVar_ cacheVar
+        (\cacheMap -> pure $ Map.insert to (cacheMap Map.! from) cacheMap)
 
 memoryCache :: MonadIO m => m MemoryCache
 memoryCache = liftIO $ MemoryCache <$> newMVar mempty
