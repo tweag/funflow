@@ -24,7 +24,6 @@ import           Control.Funflow
 import           Control.Funflow.Cache.TH                    (defaultCacher)
 import           Control.Funflow.ContentHashable             (ContentHashable)
 import           Control.Funflow.External.Coordinator.Memory
-import           Control.Funflow.External.Executor           (executeLoop)
 import           Control.Lens                                hiding (Unwrapped,
                                                               Wrapped)
 import           Control.Monad                               (join)
@@ -74,12 +73,12 @@ lookup l = wrap' props $ Lookup l
 newtype ImdbQueryRunner = ImdbQueryRunner (forall i o. IMDBQuery i o -> AsyncA IO i o)
 
 imdbQueryRunner :: T.Text -> IO ImdbQueryRunner
-imdbQueryRunner apikey = do
+imdbQueryRunner apikey' = do
   session <- Sess.newSession
   let
     iqr :: IMDBQuery ~> AsyncA IO
     iqr (Search ls) = AsyncA $ \searchterm -> do
-      let opts = defaults & params .~ [ ("apikey", apikey)
+      let opts = defaults & params .~ [ ("apikey", apikey')
                                       , ("s", searchterm)
                                       ]
       r <- Sess.getWith opts session "http://www.omdbapi.com/" >>= asValue
@@ -88,7 +87,7 @@ imdbQueryRunner apikey = do
       let lkup = case ident of
             IdentByTitle title -> ("t", title)
             IdentById iid      -> ("i", iid)
-          opts = defaults & params .~ [ ( "apikey", apikey), lkup]
+          opts = defaults & params .~ [ ( "apikey", apikey'), lkup]
       r <- Sess.getWith opts session "http://www.omdbapi.com/" >>= asValue
       return $ r ^.. responseBody . ls
   return $ ImdbQueryRunner iqr
