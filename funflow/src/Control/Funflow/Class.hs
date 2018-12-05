@@ -16,6 +16,7 @@
 module Control.Funflow.Class where
 
 import           Control.Arrow
+import           Control.Arrow.AppArrow
 import           Control.Arrow.Free
 import qualified Control.Funflow.Base            as Base
 import           Control.Funflow.ContentHashable
@@ -64,3 +65,16 @@ stepIO = stepIO' def
 
 wrap :: ArrowFlow eff ex arr => eff a b -> arr a b
 wrap = wrap' def
+
+instance ( Applicative app
+         , ArrowError ex (AppArrow app (arr eff ex))
+         , ArrowFlow eff ex (arr eff ex) )
+      => ArrowFlow eff ex (AppArrow app (arr eff ex)) where
+  step' props f = appArrow $ step' props f
+  stepIO' props f = appArrow $ stepIO' props f
+  external f = appArrow $ external f
+  external' props f = appArrow $ external' props f
+  wrap' props eff = appArrow $ wrap' props eff
+  putInStore f = appArrow $ putInStore f
+  getFromStore f = appArrow $ getFromStore f
+  internalManipulateStore f = appArrow $ internalManipulateStore f
