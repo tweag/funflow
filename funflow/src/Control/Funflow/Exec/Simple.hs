@@ -149,7 +149,7 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           submitTask po td
           wait chash td
         wait chash td = do
-          KnownTask _ <- awaitTask po chash
+          _ <- awaitTask po chash
           CS.waitUntilComplete store chash >>= \case
             Just item -> return item
             Nothing -> do
