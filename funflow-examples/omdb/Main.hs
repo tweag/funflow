@@ -24,6 +24,7 @@ import           Control.Funflow
 import           Control.Funflow.Cache.TH                    (defaultCacher)
 import           Control.Funflow.ContentHashable             (ContentHashable)
 import           Control.Funflow.External.Coordinator.Memory
+import qualified Control.Funflow.RemoteCache                 as Remote (NoCache(..))
 import           Control.Lens                                hiding (Unwrapped,
                                                               Wrapped)
 import           Control.Monad                               (join)
@@ -105,7 +106,7 @@ main =  do
   memHook <- createMemoryCoordinator
   storeDir <- getXdgDir XdgCache $ Just [reldir|funflow/store|]
   r <- withStore storeDir $ \store ->
-    runFlow MemoryCoordinator memHook store imdbRunner 1234 mainFlow (searchTerm opts)
+    runFlow MemoryCoordinator memHook store Remote.NoCache imdbRunner 1234 mainFlow (searchTerm opts)
   case r of
     Left err ->
       putStrLn $ "FAILED: " <> displayException err
