@@ -149,7 +149,9 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
           submitTask po td
           wait chash td
         wait chash td = do
-          _ <- awaitTask po chash
+          awaitTask po chash >>= \case
+            KnownTask _ -> pure ()
+            _ -> error "[Control.Funflow.Exec.Simple.runFlowEx] Expected KnownTask."
           CS.waitUntilComplete store chash >>= \case
             Just item -> return item
             Nothing -> do
