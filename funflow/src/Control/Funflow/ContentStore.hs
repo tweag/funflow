@@ -474,17 +474,10 @@ constructOrAsync
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) (Async Update) Item)
-constructOrAsync store cacher hash = withStoreLock store $
-  internalQuery store hash >>= \case
+constructOrAsync store cacher hash =
+  constructIfMissing store cacher hash >>= \case
     Complete item -> return $ Complete item
-    Missing () -> withWritableStore store $ do
-      let destDir :: Path Abs Dir = mkItemPath store hash
-      Remote.pull cacher hash destDir >>= \case
-        Remote.PullOK () -> return $ Complete (Item hash)
-        Remote.NotInCache ->
-          Missing <$> liftIO (internalMarkPending store hash)
-        Remote.PullError _ ->
-          Missing <$> liftIO (internalMarkPending store hash)
+    Missing path -> return $ Missing path
     Pending _ -> Pending <$> liftIO (internalWatchPending store hash)
 
 -- | Atomically query the state under the given key and mark pending if missing.
@@ -515,30 +508,38 @@ constructOrWait store cacher hash = constructOrAsync store cacher hash >>= \case
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
-  :: MonadIO m
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) () Item)
-constructIfMissing store hash = liftIO . withStoreLock store $
+constructIfMissing store cacher hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
+    Missing () -> withWritableStore store $ do
+      let destDir :: Path Abs Dir = mkItemPath store hash
+      Remote.pull cacher hash destDir >>= \case
+        Remote.PullOK () -> return $ Complete (Item hash)
+        Remote.NotInCache ->
+          Missing <$> liftIO (internalMarkPending store hash)
+        Remote.PullError _ ->
+          Missing <$> liftIO (internalMarkPending store hash)
     Pending _ -> return $ Pending ()
-    Missing () -> withWritableStore store $
-      Missing <$> internalMarkPending store hash
 
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Execute the given function to construct the item, mark as complete on success
 -- and remove on failure. Forcibly removes if an uncaught exception occurs
 -- during item construction.
 withConstructIfMissing
-  :: (MonadIO m, MonadMask m)
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
-withConstructIfMissing store hash f =
+withConstructIfMissing store cacher hash f =
   bracketOnError
-    (constructIfMissing store hash)
+    (constructIfMissing store cacher hash)
     (\case
       Missing _ -> removeForcibly store hash
       _ -> return ())

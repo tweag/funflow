@@ -19,6 +19,7 @@ import           Control.Exception.Safe
 import qualified Control.Funflow.ContentStore         as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
+import qualified Control.Funflow.RemoteCache          as Remote
 import           Control.Lens
 import           Control.Monad                        (forever, mzero, unless)
 import           Control.Monad.Trans                  (lift)
@@ -63,7 +64,8 @@ data ExecutionResult =
 -- | Execute an individual task.
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = logError $ do
-  status <- CS.withConstructIfMissing store (td ^. tdOutput) $ \fp -> do
+     -- We should pass a Remote cacher down to it:
+  status <- CS.withConstructIfMissing store Remote.NoCache (td ^. tdOutput) $ \fp -> do
     (fpOut, hOut) <- lift $
       CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
     (fpErr, hErr) <- lift $
