@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows                     #-}
+{-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}

@@ -36,6 +36,7 @@ module Control.Funflow.Steps
   , promptFor
   , printS
   , failStep
+  , cachedFailStep
   , worstBernoulli
   , pauseWith
   , melancholicLazarus
@@ -45,7 +46,8 @@ where
 import           Control.Arrow
 import           Control.Arrow.Free              (catch)
 import           Control.Exception.Safe          (Exception, throwM)
-import           Control.Funflow.Base            (SimpleFlow)
+import           Control.Funflow.Base            (SimpleFlow, cache,
+                                                  defaultCacherWithIdent)
 import           Control.Funflow.Class
 import           Control.Funflow.ContentHashable (ContentHashable,
                                                   DirectoryContent (..),
@@ -53,6 +55,7 @@ import           Control.Funflow.ContentHashable (ContentHashable,
 import           Control.Funflow.ContentStore    (Content ((:</>)))
 import qualified Control.Funflow.ContentStore    as CS
 import qualified Control.Funflow.External.Docker as Docker
+import           Data.Default                    (def)
 import           Data.Foldable                   (for_)
 import           Data.Store
 import           Data.Traversable                (for)
@@ -77,6 +80,11 @@ printS = stepIO $ \s-> print s
 
 failStep :: ArrowFlow eff ex arr => arr () ()
 failStep = stepIO $ \_ -> fail "failStep"
+
+cachedFailStep :: ArrowFlow eff ex arr => arr () ()
+cachedFailStep = stepIO'
+  (def { cache = defaultCacherWithIdent 1235314531893843918})
+  (\_ -> fail "cachedFailStep")
 
 worstBernoulli :: (Exception ex, ArrowFlow eff ex arr) => (String -> ex) -> arr Double Double
 worstBernoulli errorC = stepIO $ \p -> do

@@ -74,32 +74,27 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
     withStoreCache :: forall i o. Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
     withStoreCache NoCache f = f
-    withStoreCache c f = let
-        chashOf i = cacherKey c confIdent i
-        checkStore = AsyncA $ \chash ->
-          CS.constructOrWait store cacher chash >>= \case
-            CS.Pending void -> absurd void
-            CS.Complete item -> do
-              bs <- liftIO . BS.readFile $ simpleOutPath item
-              return . Right . cacherReadValue c $ bs
-            CS.Missing fp -> return $ Left fp
-        writeStore = AsyncA $ \(chash, fp, res) ->
-          do
-             liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                         . cacherStoreValue c $ res
-             finalItem <- CS.markComplete store chash
-             _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
-             return res
-           `onException`
-             CS.removeFailed store chash
-      in proc i -> do
-        let chash = chashOf i
-        mcontents <- checkStore -< chash
-        case mcontents of
-          Right contents -> returnA -< contents
-          Left fp -> do
-            res <- f -< i
-            writeStore -< (chash, fp, res)
+    withStoreCache c (AsyncA f) = AsyncA $ \i -> do
+      let chash = cacherKey c confIdent i
+          computeAndStore fp = do
+            res <- f i  -- Do the actual computation
+            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                   . cacherStoreValue c $ res
+            finalItem <- CS.markComplete store chash
+            _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
+            return $ Right res
+          readItem item = do
+            bs <- liftIO . BS.readFile $ simpleOutPath item
+            return . cacherReadValue c $ bs
+      CS.withConstructIfMissing store cacher chash computeAndStore >>= \case
+        CS.Missing e -> absurd e
+        CS.Pending _ ->
+          liftIO (CS.waitUntilComplete store chash) >>= \case
+            Just item -> readItem item
+            Nothing -> throwM $ CS.FailedToConstruct chash
+        CS.Complete (Just a, _) -> return a
+        CS.Complete (_, item) -> readItem item
+        
     writeMd :: forall i o. ContentHash
             -> i
             -> o
@@ -152,7 +147,9 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
           submitTask po td
           wait chash td
         wait chash td = do
-          KnownTask _ <- awaitTask po chash
+          awaitTask po chash >>= \case
+            KnownTask _ -> pure ()
+            _ -> error "[Control.Funflow.Exec.Simple.runFlowEx] Expected KnownTask."
           CS.waitUntilComplete store chash >>= \case
             Just item -> return item
             Nothing -> do
