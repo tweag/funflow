@@ -194,7 +194,7 @@ tests = testGroup "Content Store"
       let file = [relfile|file|]
           expectedContent = "Hello World"
 
-      ContentStore.constructIfMissing store hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Pending () ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -204,7 +204,7 @@ tests = testGroup "Content Store"
             @? "under construction not writable"
           writeFile (fromAbsFile $ subtree </> file) expectedContent
 
-      ContentStore.constructIfMissing store hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Missing _ ->
           assertFailure "under construction still missing"
         ContentStore.Complete _ ->
@@ -212,7 +212,7 @@ tests = testGroup "Content Store"
         ContentStore.Pending () ->
           void $ ContentStore.markComplete store hash
 
-      ContentStore.constructIfMissing store hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Missing _ ->
           assertFailure "complete still missing"
         ContentStore.Pending () ->
