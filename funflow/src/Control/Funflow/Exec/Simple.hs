@@ -80,8 +80,6 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
             res <- f i  -- Do the actual computation
             liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
                    . cacherStoreValue c $ res
-            finalItem <- CS.markComplete store chash
-            _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
             return $ Right res
           readItem item = do
             bs <- liftIO . BS.readFile $ simpleOutPath item

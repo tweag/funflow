@@ -552,6 +552,7 @@ withConstructIfMissing store cacher hash f =
           return (Missing e)
         Right x -> do
           item <- markComplete store hash
+          _ <- Remote.push cacher (itemHash item) (Just hash) fp
           return (Complete (Just x, item)))
 
 -- | Mark a non-existent item as pending.
