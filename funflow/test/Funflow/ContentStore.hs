@@ -421,26 +421,26 @@ tests = testGroup "Content Store"
             isWritable subtree @? "under construction not writable"
             writeFile (fromAbsFile $ subtree </> file) expectedContent
             return $ Right ()
-
-      -- Populate the remote cache
+      
+      -- Populates the remote cache
       withEmptyStore $ \store -> do
         ContentStore.withConstructIfMissing store cacher hash doWrite >>= \case
+          ContentStore.Missing _ -> assertFailure "not found in the cache"
           ContentStore.Pending _ ->
             assertFailure "missing already under construction"
             -- ContentStore.waitUntilComplete store hash >>= \case
             --   Just item -> return ()
             --   Nothing -> assertFailure "item construction failed"
           ContentStore.Complete _ -> pure ()
-          ContentStore.Missing _ -> assertFailure "not found in the cache"
-
-      -- Expects having the item in cache
+    
+      -- Expects having the item in the remote cache
       withEmptyStore $ \store -> do
         ContentStore.withConstructIfMissing store cacher hash
-          (const $ assertFailure "should not run") >>= \case
+          (const $ assertFailure "should not try to write the file a second time") >>= \case
+            ContentStore.Missing _ -> assertFailure "Not found in the cache"
             ContentStore.Pending _ ->
               assertFailure "missing already under construction"
             ContentStore.Complete _ -> pure ()
-            ContentStore.Missing _ -> assertFailure "Not found in the cache"
 
   ]
 
