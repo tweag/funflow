@@ -44,6 +44,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (traverse_)
+import           Data.Maybe
 import           Data.Monoid                                 ((<>))
 import           Data.Void
 import           Katip
@@ -59,9 +60,12 @@ runFlowEx :: forall m c eff ex a b remoteCache.
           -> CS.ContentStore
           -> remoteCache
           -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
-          -> Int -- ^ Flow configuration identity. This forms part of the caching
-                 --   system and is used to disambiguate the same flow run in
-                 --   multiple configurations.
+          -> Maybe Int -- ^ Flow configuration identity. This forms part of the
+                       --   caching system and is used to disambiguate the same
+                       --   flow run in multiple configurations. If Nothing,
+                       --   then it means this flow has no identity, this
+                       --   implies that steps will be executed without cache,
+                       --   and external tasks will all be considered impure.
           -> Flow eff ex a b
           -> a
           -> m b
@@ -73,9 +77,9 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
       $ CS.itemPath store item </> [relfile|out|]
     withStoreCache :: forall i o. Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
-    withStoreCache NoCache f = f
-    withStoreCache c (AsyncA f) = AsyncA $ \i -> do
-      let chash = cacherKey c confIdent i
+    withStoreCache c@Cache{} (AsyncA f)
+      | Just confIdent' <- confIdent = AsyncA $ \i -> do
+      let chash = cacherKey c confIdent' i
           computeAndStore fp = do
             res <- f i  -- Do the actual computation
             liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
@@ -92,6 +96,7 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
             Nothing -> throwM $ CS.FailedToConstruct chash
         CS.Complete (Just a, _) -> return a
         CS.Complete (_, item) -> readItem item
+    withStoreCache _ f = f
         
     writeMd :: forall i o. ContentHash
             -> i
@@ -109,13 +114,16 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
       . AsyncA $ \x -> do
           let out = f x
           case cache props of
-            NoCache       -> return ()
-            Cache key _ _ -> writeMd (key confIdent x) x out $ mdpolicy props
+            Cache key _ _ | Just confIdent' <- confIdent ->
+              writeMd (key confIdent' x) x out $ mdpolicy props
+            _ -> return ()
           return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
       . AsyncA $ liftIO . f
     runFlow' po (External props toTask) = AsyncA $ \x -> do
-      chash <- liftIO $ case (ep_impure props) of
+      let purity | Just _ <- confIdent = ep_impure props
+                 | otherwise = alwaysRecompile
+      chash <- liftIO $ case purity of
                           EpPure -> contentHash (toTask x)
                           EpImpure fn -> do
                             salt <- fn
@@ -186,7 +194,7 @@ runFlowLog :: forall m c eff ex a b remoteCache.
            -> CS.ContentStore
            -> remoteCache
            -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
-           -> Int -- ^ Flow configuration identity. This forms part of the caching
+           -> Maybe Int -- ^ Flow configuration identity. This forms part of the caching
                  --   system and is used to disambiguate the same flow run in
                  --   multiple configurations.
            -> Flow eff ex a b
@@ -204,7 +212,7 @@ runFlow :: forall m c eff ex a b remoteCache.
         -> CS.ContentStore
         -> remoteCache
         -> (eff ~> AsyncA m) -- ^ Natural transformation from wrapped effects
-        -> Int -- ^ Flow configuration identity. This forms part of the caching
+        -> Maybe Int -- ^ Flow configuration identity. This forms part of the caching
                --   system and is used to disambiguate the same flow run in
                --   multiple configurations.
         -> Flow eff ex a b
@@ -234,7 +242,7 @@ runSimpleFlow c ccfg store flow input = do
         initialNamespace = "executeLoop"
 
     runKatipContextT le initialContext initialNamespace
-      $ runFlowLog c ccfg store Remote.NoCache runNoEffect 12345 flow input
+      $ runFlowLog c ccfg store Remote.NoCache runNoEffect (Just 12345) flow input
 
 -- | Create a full pipeline runner locally. This includes an executor for
 --   executing external tasks.

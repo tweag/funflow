@@ -106,7 +106,7 @@ main =  do
   memHook <- createMemoryCoordinator
   storeDir <- getXdgDir XdgCache $ Just [reldir|funflow/store|]
   r <- withStore storeDir $ \store ->
-    runFlow MemoryCoordinator memHook store Remote.NoCache imdbRunner 1234 mainFlow (searchTerm opts)
+    runFlow MemoryCoordinator memHook store Remote.NoCache imdbRunner (Just 1234) mainFlow (searchTerm opts)
   case r of
     Left err ->
       putStrLn $ "FAILED: " <> displayException err
