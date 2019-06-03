@@ -10,7 +10,7 @@ import Data.Monoid ((<>))
 import qualified Options.Applicative as Opt
 import qualified Database.Redis as R
 import qualified Data.ByteString as B
-import Network.Socket.Internal ( PortNumber )
+import Network.Socket (HostName, PortNumber )
 
 
 import           Data.HList
@@ -107,7 +107,7 @@ argsParser = Args
         <> Opt.help "Password for the Redis instance, if needed." ))
 
     useRedis ::
-      R.HostName -> PortNumber -> Maybe B.ByteString -> UseCoord
+      HostName -> PortNumber -> Maybe B.ByteString -> UseCoord
     useRedis host port pw = UseRedis $ R.defaultConnectInfo
       { R.connectHost = host
       , R.connectPort = R.PortNumber port
@@ -119,5 +119,3 @@ argsParser = Args
       <$> Opt.strArgument
         (  Opt.metavar "SQLFILE"
         <> Opt.help "Path to SQLite database file." )
-
-
