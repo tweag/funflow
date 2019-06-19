@@ -6,7 +6,12 @@ let
   pkgSet = haskell.mkStackPkgSet {
     stack-pkgs = import ./pkgs.nix;
     pkg-def-extras = [];
-    modules = [];
+    modules = [
+      {
+        # The SQLite tests break due to not finding 'echo'. We disable them for now.
+        packages.funflow.components.tests.unit-tests.testFlags = ["-p '! /SQLite/'"];
+      }
+    ];
   };
 
 in
