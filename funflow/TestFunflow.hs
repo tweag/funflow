@@ -1,6 +1,7 @@
-{-# LANGUAGE Arrows            #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Arrows              #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Arrow
 import           Control.Arrow.Free
@@ -9,7 +10,9 @@ import           Control.Funflow
 import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.Pretty
+import           Data.Default
 import           Data.Monoid                                 ((<>))
+import           Path
 import           Path.IO
 
 mkError :: String -> SomeException
@@ -32,22 +35,33 @@ flow2caught = retry 100 0 flow2
 flow3 :: SimpleFlow [Int] [Int]
 flow3 = mapA (arr (+1))
 
-main :: IO ()
-main =
+runFailingFlow :: Path Abs Dir -> IO ()
+runFailingFlow storeDir = withSimpleLocalRunner storeDir $ \runner -> do
+   r <- runner cachedFailStep ()
+   print r
+
+testFailingFlow :: IO ()
+testFailingFlow =
   withSystemTempDir "test_output" $ \storeDir ->
-  CS.withStore storeDir $ \store -> do
-    memHook <- createMemoryCoordinator
-    res <- runSimpleFlow MemoryCoordinator memHook store flow2 ()
-    print res
-    res' <- runSimpleFlow MemoryCoordinator memHook store flow2caught ()
-    print res'
-    putStrLn $ showFlow myFlow
-    putStrLn $ showFlow flow2
-    res1 <- runSimpleFlow MemoryCoordinator memHook store flow3 [1..10]
-    print res1
---  main = redisTest
-    externalTest
-    storeTest
+    runFailingFlow storeDir >> runFailingFlow storeDir
+
+main :: IO ()
+main = do
+  testFailingFlow
+  withSystemTempDir "test_output" $ \storeDir ->
+    CS.withStore storeDir $ \store -> do
+      memHook <- createMemoryCoordinator
+      res <- runSimpleFlow MemoryCoordinator memHook store flow2 ()
+      print res
+      res' <- runSimpleFlow MemoryCoordinator memHook store flow2caught ()
+      print res'
+      putStrLn $ showFlow myFlow
+      putStrLn $ showFlow flow2
+      res1 <- runSimpleFlow MemoryCoordinator memHook store flow3 [1..10]
+      print res1
+  --  main = redisTest
+      externalTest
+      storeTest
 
 externalTest :: IO ()
 externalTest = let

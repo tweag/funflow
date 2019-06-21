@@ -85,6 +85,7 @@
         "test-funflow" = {
           depends = [
             (hsPkgs.base)
+            (hsPkgs.data-default)
             (hsPkgs.funflow)
             (hsPkgs.filepath)
             (hsPkgs.hedis)

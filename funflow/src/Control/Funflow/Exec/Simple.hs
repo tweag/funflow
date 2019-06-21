@@ -72,31 +72,25 @@ runFlowEx _ cfg store runWrapped confIdent flow input = do
     withStoreCache :: forall i o. Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
     withStoreCache NoCache f = f
-    withStoreCache c f = let
-        chashOf i = cacherKey c confIdent i
-        checkStore = AsyncA $ \chash ->
-          CS.constructOrWait store chash >>= \case
-            CS.Pending void -> absurd void
-            CS.Complete item -> do
-              bs <- liftIO . BS.readFile $ simpleOutPath item
-              return . Right . cacherReadValue c $ bs
-            CS.Missing fp -> return $ Left fp
-        writeStore = AsyncA $ \(chash, fp, res) ->
-          do
-             liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                         . cacherStoreValue c $ res
-             _ <- CS.markComplete store chash
-             return res
-           `onException`
-             CS.removeFailed store chash
-      in proc i -> do
-        let chash = chashOf i
-        mcontents <- checkStore -< chash
-        case mcontents of
-          Right contents -> returnA -< contents
-          Left fp -> do
-            res <- f -< i
-            writeStore -< (chash, fp, res)
+    withStoreCache c (AsyncA f) = AsyncA $ \i -> do
+      let chash = cacherKey c confIdent i
+          computeAndStore fp = do
+            res <- f i  -- Do the actual computation
+            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                   . cacherStoreValue c $ res
+            return $ Right res
+          readItem item = do
+            bs <- liftIO . BS.readFile $ simpleOutPath item
+            return . cacherReadValue c $ bs
+      CS.withConstructIfMissing store chash computeAndStore >>= \case
+        CS.Missing e -> absurd e
+        CS.Pending _ ->
+          liftIO (CS.waitUntilComplete store chash) >>= \case
+            Just item -> readItem item
+            Nothing -> throwM $ CS.FailedToConstruct chash
+        CS.Complete (Just a, _) -> return a
+        CS.Complete (_, item) -> readItem item
+        
     writeMd :: forall i o. ContentHash
             -> i
             -> o
