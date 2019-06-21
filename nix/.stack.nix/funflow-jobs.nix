@@ -31,4 +31,4 @@
           ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow-jobs; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow-jobs; }

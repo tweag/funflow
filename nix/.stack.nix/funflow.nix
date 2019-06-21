@@ -117,4 +117,4 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow; }

@@ -77,4 +77,4 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow-cwl; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow-cwl; }

@@ -4,7 +4,7 @@ let
   haskell = import (./haskell.nix-src.nix) { inherit pkgs; };
 
   pkgSet = haskell.mkStackPkgSet {
-    stack-pkgs = import ./pkgs.nix;
+    stack-pkgs = import ./.stack.nix/pkgs.nix;
     pkg-def-extras = [];
     modules = [
       {

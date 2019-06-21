@@ -34,4 +34,4 @@
           ];
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow-aws; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow-aws; }

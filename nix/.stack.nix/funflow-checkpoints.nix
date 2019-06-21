@@ -30,4 +30,4 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow-checkpoints; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow-checkpoints; }

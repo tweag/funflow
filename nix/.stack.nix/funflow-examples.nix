@@ -63,4 +63,4 @@
           };
         };
       };
-    } // rec { src = (pkgs.lib).mkDefault .././funflow-examples; }
+    } // rec { src = (pkgs.lib).mkDefault ../.././funflow-examples; }
