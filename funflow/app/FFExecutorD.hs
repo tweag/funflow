@@ -19,6 +19,7 @@ import           Control.Funflow.External.Executor
 import           Control.Monad                               (void)
 import           Data.Monoid                                 ((<>))
 import qualified Database.Redis                              as R
+import           Network.Socket                              (PortNumber)
 import qualified Options.Applicative                         as Opt
 import           Path
 import           System.Clock
@@ -64,7 +65,7 @@ argsParser = Opt.subparser
         <> Opt.help "Password for the Redis instance, if needed." ))
     useRedis store host port pw = Args store $ UseRedis R.defaultConnectInfo
       { R.connectHost = host
-      , R.connectPort = R.PortNumber port
+      , R.connectPort = R.PortNumber (port :: PortNumber)
       , R.connectAuth = pw
       }
     sqliteParser = useSQLite
