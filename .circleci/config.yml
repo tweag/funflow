@@ -2,32 +2,27 @@ version: 2
 jobs:
   build:
     docker:
-      - image: fpco/stack-build
+      - image: nixos/nix:2.0
     steps:
       - checkout
       - run:
-          name: Compute cache key
+          name: Setup Cachix
           command: |
-            find . -name "*.cabal" -o -name "stack.yaml" -type f | sort | xargs cat > /tmp/stack-deps
-      - restore_cache:
-          keys:
-            - funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
-      - run:
-          name: Setup build toolchain
-          command: stack setup
-      - run:
-          name: Building dependencies
-          command: stack -j1 test --only-snapshot --prefetch
-      - save_cache:
-          paths:
-            - "~/.stack"
-          key: funflow-stack-deps-{{arch}}-{{checksum "/tmp/stack-deps"}}
+            apk --no-progress update
+            apk --no-progress add ca-certificates
+            nix-channel --update
+            # Install cachix and activate project cache
+            nix-env -iA cachix -f https://github.com/NixOS/nixpkgs/tarball/1d4de0d552ae9aa66a5b8dee5fb0650a4372d148
+            USER=dummy cachix use tweag
       - run:
           name: Building
-          command: stack build --pedantic
-      - run:
-          name: Building tests
-          command: stack test --pedantic --no-run-tests
+          command: nix-build nix/ci.nix -A required-packages | cachix push tweag
       - run:
           name: Running tests
-          command: stack test funflow:unit-tests
+          command: nix-build nix/ci.nix -A required-tests | cachix push tweag
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build:
+          context: org-global
