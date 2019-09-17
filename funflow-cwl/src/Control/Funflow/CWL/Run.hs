@@ -116,7 +116,6 @@ tryRun (Args cwlpath jobpath store useCoord) = do
 -- * The steps to execute a cwl workflow or tool.
 --------------------------------------------------------------------------------
 
-
 -- | Try to parse two JSON values into a 'CWLFile' and 'Job'
 -- respectively.
 tryParse :: Value -> Value -> IOErrM (CWLFile, Job)
@@ -124,11 +123,11 @@ tryParse cwlfileVal jobVal = do
   cwlfile :: CWLFile <- parseValue cwlfileVal
   job :: Job <- parseValue jobVal
   return (cwlfile, job)
-
   where
     parseValue :: FromJSON a => Value -> IOErrM a
-    parseValue = parseMonad parseJSON
-
+    parseValue v = case parseEither parseJSON v of
+                    Left errmsg -> throwM $ ErrMsg $ errmsg
+                    Right a -> return a
 
 
 -- | An existential type for a Flow that takes
