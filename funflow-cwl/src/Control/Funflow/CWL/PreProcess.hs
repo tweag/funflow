@@ -75,8 +75,11 @@ getMaybeTy _ = Nothing
 
 -- | Given the object for a cwlwf or tool,
 -- determine the input schema.
-getInSchema :: Object -> ErrM (M.HashMap String CWLType)
-getInSchema = parseMonad parseInSchema
+getInSchema :: Object -> IOErrM (M.HashMap String CWLType)
+getInSchema o =
+  case parseEither parseInSchema o of
+    Left errmsg -> throwM $ ErrMsg $ errmsg
+    Right map -> return map
 
 parseInSchema :: Object -> Parser (M.HashMap String CWLType)
 parseInSchema obj = do

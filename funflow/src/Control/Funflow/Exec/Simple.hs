@@ -21,7 +21,6 @@ module Control.Funflow.Exec.Simple
   , withSimpleLocalRunner
   ) where
 
-import           Control.Arrow                               (returnA)
 import           Control.Arrow.Async
 import           Control.Arrow.Free                          (type (~>), eval)
 import           Control.Concurrent.Async                    (withAsync)
@@ -234,7 +233,7 @@ runSimpleFlow :: forall m c a b.
         -> a
         -> m (Either SomeException b)
 runSimpleFlow c ccfg store flow input = do
-  handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stderr InfoS V2
+  handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stderr (permitItem InfoS) V2
   let mkLogEnv = liftIO $
         registerScribe "stderr" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "production"
   bracket mkLogEnv (liftIO . closeScribes) $ \le -> do
