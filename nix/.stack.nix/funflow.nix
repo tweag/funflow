@@ -52,6 +52,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       synopsis = "Workflows with arrows";
       description = "An arrow with resumable computations and logging";
       buildType = "Simple";
+      isLocal = true;
       };
     components = {
       "library" = {
@@ -91,6 +92,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."sqlite-simple" or (buildDepError "sqlite-simple"))
           (hsPkgs."stm" or (buildDepError "stm"))
           (hsPkgs."store" or (buildDepError "store"))
+          (hsPkgs."tar" or (buildDepError "tar"))
           (hsPkgs."template-haskell" or (buildDepError "template-haskell"))
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."time" or (buildDepError "time"))
@@ -102,6 +104,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           ] ++ (if system.isLinux
           then [ (hsPkgs."hinotify" or (buildDepError "hinotify")) ]
           else (pkgs.lib).optional (system.isOsx || system.isFreebsd) (hsPkgs."kqueue" or (buildDepError "kqueue")));
+        buildable = true;
         };
       exes = {
         "ffexecutord" = {
@@ -118,6 +121,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."safe-exceptions" or (buildDepError "safe-exceptions"))
             (hsPkgs."optparse-applicative" or (buildDepError "optparse-applicative"))
             ];
+          buildable = true;
           };
         };
       tests = {
@@ -134,6 +138,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."safe-exceptions" or (buildDepError "safe-exceptions"))
             (hsPkgs."unix" or (buildDepError "unix"))
             ];
+          buildable = true;
           };
         "unit-tests" = {
           depends = [
@@ -154,6 +159,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."temporary" or (buildDepError "temporary"))
             (hsPkgs."unix" or (buildDepError "unix"))
             ];
+          buildable = true;
           };
         };
       };

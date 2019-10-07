@@ -52,6 +52,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       synopsis = "Tools for flows which interact with AWS";
       description = "";
       buildType = "Simple";
+      isLocal = true;
       };
     components = {
       "library" = {
@@ -71,6 +72,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."resourcet" or (buildDepError "resourcet"))
           (hsPkgs."text" or (buildDepError "text"))
           ];
+        buildable = true;
         };
       };
     } // rec { src = (pkgs.lib).mkDefault ../.././funflow-aws; }
