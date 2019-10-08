@@ -52,6 +52,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       synopsis = "Checkpoint functionality for funflow workflows.";
       description = "";
       buildType = "Simple";
+      isLocal = true;
       };
     components = {
       "library" = {
@@ -59,6 +60,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."base" or (buildDepError "base"))
           (hsPkgs."funflow" or (buildDepError "funflow"))
           ];
+        buildable = true;
         };
       tests = {
         "unit-tests" = {
@@ -71,6 +73,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
             (hsPkgs."tasty" or (buildDepError "tasty"))
             (hsPkgs."tasty-hunit" or (buildDepError "tasty-hunit"))
             ];
+          buildable = true;
           };
         };
       };

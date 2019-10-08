@@ -52,6 +52,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
       synopsis = "Support for distribution of flows in funflow.";
       description = "";
       buildType = "Simple";
+      isLocal = true;
       };
     components = {
       "library" = {
@@ -68,6 +69,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
           (hsPkgs."text" or (buildDepError "text"))
           (hsPkgs."transformers-base" or (buildDepError "transformers-base"))
           ];
+        buildable = true;
         };
       };
     } // rec { src = (pkgs.lib).mkDefault ../.././funflow-jobs; }

@@ -52,6 +52,7 @@ module Control.Funflow.ContentHashable
 import           Control.Exception.Safe           (catchJust)
 import           Control.Funflow.Orphans          ()
 import           Control.Monad                    (foldM, mzero, (>=>))
+import           Control.Monad.IO.Class           (MonadIO, liftIO)
 import           Crypto.Hash                      (Context, Digest, SHA256,
                                                    digestFromByteString,
                                                    hashFinalize, hashInit,
@@ -459,9 +460,9 @@ instance ContentHashable IO FileContent where
 -- The path to the directory is ignored.
 newtype DirectoryContent = DirectoryContent (Path.Path Path.Abs Path.Dir)
 
-instance ContentHashable IO DirectoryContent where
+instance MonadIO m => ContentHashable m DirectoryContent where
 
-  contentHashUpdate ctx0 (DirectoryContent dir0) = do
+  contentHashUpdate ctx0 (DirectoryContent dir0) = liftIO $ do
     (dirs, files) <- Path.IO.listDir dir0
     ctx' <- foldM hashFile ctx0 (sort files)
     foldM hashDir ctx' (sort dirs)

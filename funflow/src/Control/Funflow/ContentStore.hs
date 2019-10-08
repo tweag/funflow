@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -123,15 +124,16 @@ import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe              (Exception, MonadMask,
-                                                      bracket, bracket_,
-                                                      bracketOnError,
+                                                      bracket, bracketOnError,
+                                                      bracket_,
                                                       displayException, throwIO)
 import           Control.Funflow.ContentStore.Notify
 import           Control.Funflow.Orphans             ()
 import           Control.Lens
-import           Control.Monad                       (forever, forM_, unless,
+import           Control.Monad                       (forM_, forever, unless,
                                                       void, when, (<=<), (>=>))
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
+import           Control.Monad.Trans.Control         (MonadBaseControl)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
@@ -166,6 +168,7 @@ import           Control.Funflow.ContentHashable     (ContentHash,
                                                       encodeHash, pathToHash,
                                                       toBytes)
 import           Control.Funflow.Lock
+import qualified Control.Funflow.RemoteCache         as Remote
 
 
 -- | Status of an item in the store.
@@ -465,16 +468,17 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
 -- It should be constructed in the given @buildDir@,
 -- and then marked as complete using 'markComplete'.
 constructOrAsync
-  :: MonadIO m
+  :: forall m remoteCache.
+     (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) (Async Update) Item)
-constructOrAsync store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
+constructOrAsync store cacher hash =
+  constructIfMissing store cacher hash >>= \case
     Complete item -> return $ Complete item
-    Missing () -> withWritableStore store $
-      Missing <$> internalMarkPending store hash
-    Pending _ -> Pending <$> internalWatchPending store hash
+    Missing path -> return $ Missing path
+    Pending _ -> Pending <$> liftIO (internalWatchPending store hash)
 
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Wait for the item to be completed, if already pending.
@@ -485,11 +489,12 @@ constructOrAsync store hash = liftIO . withStoreLock store $
 -- It should be constructed in the given @buildDir@,
 -- and then marked as complete using 'markComplete'.
 constructOrWait
-  :: MonadIO m
+  :: (MonadIO m, MonadMask m, MonadBaseControl IO m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) Void Item)
-constructOrWait store hash = constructOrAsync store hash >>= \case
+constructOrWait store cacher hash = constructOrAsync store cacher hash >>= \case
   Pending a -> liftIO (wait a) >>= \case
     Completed item -> return $ Complete item
     -- XXX: Consider extending 'Status' with a 'Failed' constructor.
@@ -503,30 +508,38 @@ constructOrWait store hash = constructOrAsync store hash >>= \case
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
-  :: MonadIO m
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) () Item)
-constructIfMissing store hash = liftIO . withStoreLock store $
+constructIfMissing store cacher hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
+    Missing () -> withWritableStore store $ do
+      let destDir :: Path Abs Dir = mkItemPath store hash
+      Remote.pull cacher hash destDir >>= \case
+        Remote.PullOK () -> return $ Complete (Item hash)
+        Remote.NotInCache ->
+          Missing <$> liftIO (internalMarkPending store hash)
+        Remote.PullError _ ->
+          Missing <$> liftIO (internalMarkPending store hash)
     Pending _ -> return $ Pending ()
-    Missing () -> withWritableStore store $
-      Missing <$> internalMarkPending store hash
 
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Execute the given function to construct the item, mark as complete on success
 -- and remove on failure. Forcibly removes if an uncaught exception occurs
 -- during item construction.
 withConstructIfMissing
-  :: (MonadIO m, MonadMask m)
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
+  -> remoteCache
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
-withConstructIfMissing store hash f =
+withConstructIfMissing store cacher hash f =
   bracketOnError
-    (constructIfMissing store hash)
+    (constructIfMissing store cacher hash)
     (\case
       Missing _ -> removeForcibly store hash
       _ -> return ())
@@ -539,6 +552,7 @@ withConstructIfMissing store hash f =
           return (Missing e)
         Right x -> do
           item <- markComplete store hash
+          _ <- Remote.push cacher (itemHash item) (Just hash) (itemPath store item)
           return (Complete (Just x, item)))
 
 -- | Mark a non-existent item as pending.
@@ -781,7 +795,7 @@ metadataPath = (</> [reldir|metadata|])
 
 -- | Holds a lock on the global 'MVar' and on the global lock file
 -- for the duration of the given action.
-withStoreLock :: ContentStore -> IO a -> IO a
+withStoreLock :: MonadBaseControl IO m => ContentStore -> m a -> m a
 withStoreLock store = withLock (storeLock store)
 
 prefixHashPath :: C8.ByteString -> ContentHash -> Path Rel Dir
@@ -895,25 +909,25 @@ internalWatchPending store hash = do
   -- Stop watching when it arrives.
   async $ takeMVar update <* stopWatching
 
-setRootDirWritable :: Path Abs Dir -> IO ()
-setRootDirWritable storeRoot =
+setRootDirWritable :: MonadIO m => Path Abs Dir -> m ()
+setRootDirWritable storeRoot = liftIO $
   setFileMode (fromAbsDir storeRoot) writableRootDirMode
 
 writableRootDirMode :: FileMode
 writableRootDirMode = writableDirMode
 
-setRootDirReadOnly :: Path Abs Dir -> IO ()
-setRootDirReadOnly storeRoot =
+setRootDirReadOnly :: MonadIO m => Path Abs Dir -> m ()
+setRootDirReadOnly storeRoot = liftIO $
   setFileMode (fromAbsDir storeRoot) readOnlyRootDirMode
 
 readOnlyRootDirMode :: FileMode
 readOnlyRootDirMode = writableDirMode `intersectFileModes` allButWritableMode
 
-withWritableStoreRoot :: Path Abs Dir -> IO a -> IO a
+withWritableStoreRoot :: (MonadMask m, MonadIO m) => Path Abs Dir -> m a -> m a
 withWritableStoreRoot storeRoot =
   bracket_ (setRootDirWritable storeRoot) (setRootDirReadOnly storeRoot)
 
-withWritableStore :: ContentStore -> IO a -> IO a
+withWritableStore :: (MonadMask m, MonadIO m) => ContentStore -> m a -> m a
 withWritableStore ContentStore {storeRoot} =
   withWritableStoreRoot storeRoot
 

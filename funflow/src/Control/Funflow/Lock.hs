@@ -1,4 +1,5 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Thread and process write lock.
@@ -17,8 +18,9 @@ module Control.Funflow.Lock
 
 import           Control.Concurrent
 import           Control.Exception.Safe
-import           Control.Monad           (unless)
-import           Network.HostName        (getHostName)
+import           Control.Monad               (unless)
+import           Control.Monad.Trans.Control (MonadBaseControl, liftBaseOp_)
+import           Network.HostName            (getHostName)
 import           Path
 import           Path.IO
 import           System.Posix.Files
@@ -58,8 +60,8 @@ closeLock lock = do
   takeMVar (lockMVar lock)
 
 -- | Acquire the lock for the duration of the given action and release after.
-withLock :: Lock -> IO a -> IO a
-withLock lock action =
+withLock :: MonadBaseControl IO m => Lock -> m a -> m a
+withLock lock = liftBaseOp_ $ \action ->
   withMVar (lockMVar lock) $ \() ->
     bracket_ (acquireDirLock $ lockDir lock) (releaseDirLock $ lockDir lock) $
       action
