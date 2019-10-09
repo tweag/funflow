@@ -42,7 +42,7 @@ in { system, compiler, flags, pkgs, hsPkgs, pkgconfPkgs, ... }:
     flags = {};
     package = {
       specVersion = "1.10";
-      identifier = { name = "funflow"; version = "1.4.1"; };
+      identifier = { name = "funflow"; version = "1.5.0"; };
       license = "MIT";
       copyright = "";
       maintainer = "nicholas.clarke@tweag.io";
