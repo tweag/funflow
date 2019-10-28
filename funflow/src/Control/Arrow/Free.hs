@@ -38,6 +38,7 @@ module Control.Arrow.Free
   , mapSeqA
   , filterA
   , hoistErrorChoiceEff
+  , expandErrorChoiceEff
   , type (~>)
   ) where
 
@@ -205,6 +206,13 @@ hoistErrorChoiceEff
   -> ErrorChoice ex eff' a b
 hoistErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
   ec (interp . f)
+
+expandErrorChoiceEff
+  :: (forall x y. eff x y -> ErrorChoice ex eff' x y)
+  -> ErrorChoice ex eff a b
+  -> ErrorChoice ex eff' a b
+expandErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
+  ec (\eff -> runErrorChoice (f eff) interp)
 
 instance Category (ErrorChoice ex eff) where
   id = ErrorChoice $ const id

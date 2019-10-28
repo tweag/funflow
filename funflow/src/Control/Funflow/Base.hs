@@ -117,17 +117,6 @@ data Flow' eff a b where
 
 type Flow eff ex = ErrorChoice ex (Flow' eff)
 
--- | Change the effect type present inside the Flow
-hoistFlowEff :: (eff ~> eff') -> Flow eff ex -> Flow eff' ex
-hoistFlowEff f = hoistErrorChoiceEff $ \e -> case e of
-  Step p s -> Step p s
-  StepIO p s -> StepIO p s
-  External p s -> External p s
-  PutInStore s -> PutInStore s
-  GetFromStore s -> GetFromStore s
-  InternalManipulateStore s -> InternalManipulateStore s
-  Wrapped p s -> Wrapped p (f s)
-
 data NoEffect a b
 
 -- | Since there are no constructors for 'NoEffect', this code can never be
