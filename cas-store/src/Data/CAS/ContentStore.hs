@@ -16,11 +16,11 @@
 
 -- | Hash addressed store in file system.
 --
--- Associates a key ('Control.Funflow.ContentHashable.ContentHash')
+-- Associates a key ('Data.CAS.ContentHashable.ContentHash')
 -- with an item in the store. An item can either be
--- 'Control.Funflow.ContentStore.Missing',
--- 'Control.Funflow.ContentStore.Pending', or
--- 'Control.Funflow.ContentStore.Complete'.
+-- 'Data.CAS.ContentStore.Missing',
+-- 'Data.CAS.ContentStore.Pending', or
+-- 'Data.CAS.ContentStore.Complete'.
 -- The state is persisted in the file system.
 --
 -- Items are stored under a path derived from their hash. Therefore,
@@ -370,7 +370,7 @@ close store = do
 -- | Open the store under the given root and perform the given action.
 -- Closes the store once the action is complete
 --
--- See also: 'Control.Funflow.ContentStore.open'
+-- See also: 'Data.CAS.ContentStore.open'
 withStore :: (MonadIO m, MonadMask m)
   => Path Abs Dir -> (ContentStore -> m a) -> m a
 withStore root' = bracket (liftIO $ open root') (liftIO . close)
@@ -560,7 +560,7 @@ withConstructIfMissing store cacher hash f =
 --
 -- Creates the build directory and returns its path.
 --
--- See also: 'Control.Funflow.ContentStore.constructIfMissing'.
+-- See also: 'Data.CAS.ContentStore.constructIfMissing'.
 markPending :: MonadIO m => ContentStore -> ContentHash -> m (Path Abs Dir)
 markPending store hash = liftIO . withStoreLock store $
   internalQuery store hash >>= \case
@@ -815,7 +815,7 @@ prefixHashPath pref hash
   | Just dir <- Path.parseRelDir $ C8.unpack $ pref <> encodeHash hash
   = dir
   | otherwise = error
-      "[Control.Funflow.ContentStore.prefixHashPath] \
+      "[Data.CAS.ContentStore.prefixHashPath] \
       \Failed to construct hash path."
 
 pendingPrefix, completePrefix, hashPrefix, itemPrefix :: IsString s => s
