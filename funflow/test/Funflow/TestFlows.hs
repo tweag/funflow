@@ -12,11 +12,11 @@ import           Control.Arrow.Free
 import           Control.Concurrent.Async                    (withAsync)
 import           Control.Exception.Safe                      hiding (catch)
 import           Control.Funflow
-import           Control.Funflow.ContentStore                (Content ((:</>)))
-import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
 import           Control.Monad                               (when)
+import           Data.CAS.ContentStore                       (Content ((:</>)))
+import qualified Data.CAS.ContentStore                       as CS
 import           Data.Default                                (def)
 import           Data.List                                   (sort)
 import           Path

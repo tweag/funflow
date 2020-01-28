@@ -10,10 +10,10 @@ module Funflow.ContentStore
 
 import           Control.Concurrent.Async
 import           Control.Exception.Safe          (tryAny)
-import           Control.Funflow.ContentHashable (contentHash)
-import           Control.Funflow.ContentStore    (ContentStore)
-import qualified Control.Funflow.ContentStore    as ContentStore
-import qualified Control.Funflow.RemoteCache     as Remote
+import           Data.CAS.ContentHashable        (contentHash)
+import           Data.CAS.ContentStore           (ContentStore)
+import qualified Data.CAS.ContentStore           as ContentStore
+import qualified Data.CAS.RemoteCache            as Remote
 import           Control.Monad                   (void)
 import           Data.Maybe                      (catMaybes)
 import qualified Data.Set                        as Set
