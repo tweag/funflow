@@ -30,18 +30,18 @@ import           Control.Exception.Safe                      (Exception,
                                                               onException,
                                                               throwM, try)
 import           Control.Funflow.Base
-import           Control.Funflow.ContentHashable
-import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
-import qualified Control.Funflow.RemoteCache                 as Remote
 import           Control.Monad.Catch                         (MonadCatch,
                                                               MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import qualified Data.ByteString                             as BS
+import           Data.CAS.ContentHashable
+import qualified Data.CAS.ContentStore                       as CS
+import qualified Data.CAS.RemoteCache                        as Remote
 import           Data.Foldable                               (traverse_)
 import           Data.Monoid                                 ((<>))
 import           Data.Void

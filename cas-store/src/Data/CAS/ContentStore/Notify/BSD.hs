@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Implementation of filesystem watch for BSD-based systems using KQueue.
-module Control.Funflow.ContentStore.Notify.BSD
+module Data.CAS.ContentStore.Notify.BSD
   ( Notifier
   , initNotifier
   , killNotifier

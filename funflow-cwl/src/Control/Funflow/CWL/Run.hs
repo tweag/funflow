@@ -37,7 +37,7 @@ import Control.Funflow.External.Coordinator
 import Control.Funflow.External.Coordinator.Memory
 import Control.Funflow.External.Coordinator.SQLite
 import Control.Funflow.External.Coordinator.Redis
-import qualified Control.Funflow.ContentStore as CS
+import qualified Data.CAS.ContentStore as CS
 
 
 import  Control.Funflow.CWL.Convert

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -45,7 +46,7 @@
 -- * Pending items are stored writable under the path @pending-\<key>@.
 -- * Complete items are stored read-only under the path @item-\<hash>@,
 --   with a link under @complete-\<key>@ pointing to that directory.
-module Control.Funflow.ContentStore
+module Data.CAS.ContentStore
   (
   -- * Open/Close
     withStore
@@ -127,10 +128,11 @@ import           Control.Exception.Safe              (Exception, MonadMask,
                                                       bracket, bracketOnError,
                                                       bracket_,
                                                       displayException, throwIO)
-import           Control.Funflow.ContentStore.Notify
+import           Data.CAS.ContentStore.Notify
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
-                                                      void, when, (<=<), (>=>))
+                                                      void, when, (<=<), (>=>),
+                                                      mzero)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Control.Monad.Trans.Control         (MonadBaseControl)
 import           Crypto.Hash                         (hashUpdate)
@@ -160,14 +162,14 @@ import           System.IO                           (Handle, IOMode (..),
 import           System.Posix.Files
 import           System.Posix.Types
 
-import           Control.Funflow.ContentHashable     (ContentHash,
+import           Data.CAS.ContentHashable            (ContentHash,
                                                       ContentHashable (..),
                                                       DirectoryContent (..),
                                                       contentHashUpdate_fingerprint,
-                                                      encodeHash, pathToHash,
+                                                      decodeHash, encodeHash, pathToHash,
                                                       toBytes)
-import           Control.Funflow.Lock
-import qualified Control.Funflow.RemoteCache         as Remote
+import           Data.CAS.Lock
+import qualified Data.CAS.RemoteCache                as Remote
 
 
 -- | Status of an item in the store.
@@ -640,6 +642,17 @@ removeItemForcibly store item = liftIO . withStoreLock store $ withWritableStore
   removePathForcibly (fromAbsDir $ itemPath store item)
   -- XXX: Remove dangling links.
   --   Add back-references in some form.
+
+-- We need this orphan instance here so cas-hash doesn't depend on sqlite
+instance SQL.FromField ContentHash where
+  fromField f = do
+    bs <- SQL.fromField f
+    case decodeHash bs of
+      Just h  -> pure h
+      Nothing -> mzero
+
+instance SQL.ToField ContentHash where
+  toField = SQL.toField . encodeHash
 
 -- | Link the given alias to the given item.
 -- If the alias existed before it is overwritten.

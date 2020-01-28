@@ -5,7 +5,7 @@
 -- |
 -- This module defines the remote caching mechanism of funflow which is used to
 -- keep several funflow stores (possibly on different machines) in sync.
-module Control.Funflow.RemoteCache
+module Data.CAS.RemoteCache
   ( Cacher(..)
   , PullResult(..), PushResult(..), AliasResult(..)
   , NoCache(..), memoryCache
@@ -14,9 +14,9 @@ module Control.Funflow.RemoteCache
 
 import qualified Codec.Archive.Tar               as Tar
 import           Control.Concurrent.MVar
-import           Control.Funflow.ContentHashable
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
 import           Data.ByteString.Lazy            (ByteString)
+import           Data.CAS.ContentHashable
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Path

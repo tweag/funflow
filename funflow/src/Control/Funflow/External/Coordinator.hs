@@ -16,11 +16,10 @@
 module Control.Funflow.External.Coordinator where
 
 import           Control.Exception.Safe
-import           Control.Funflow.ContentHashable (ContentHash)
 import           Control.Funflow.External
 import           Control.Lens
 import           Control.Monad.IO.Class          (MonadIO, liftIO)
-
+import           Data.CAS.ContentHashable        (ContentHash)
 import           Data.Monoid                     ((<>))
 import           Data.Store                      (Store)
 import           Data.Store.TH                   (makeStore)

@@ -39,8 +39,8 @@ module Control.Funflow.CWL.Convert.FlowCmdWrapper
 -- Funflow
 import Control.Arrow
 import Control.Funflow
-import qualified Control.Funflow.ContentStore as CS
-import Control.Funflow.ContentStore ( Content (..) )
+import Data.CAS.ContentStore ( Content (..) )
+import qualified Data.CAS.ContentStore as CS
 
 -- Not funflow
 import qualified Data.Text as T

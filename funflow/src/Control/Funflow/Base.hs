@@ -16,11 +16,11 @@ module Control.Funflow.Base where
 import           Control.Arrow                   (Kleisli (..))
 import           Control.Arrow.Free
 import           Control.Exception.Safe          (SomeException)
-import           Control.Funflow.ContentHashable
-import qualified Control.Funflow.ContentStore    as CS
 import           Control.Funflow.Diagram
 import           Control.Funflow.External
 import           Data.ByteString                 (ByteString)
+import           Data.CAS.ContentHashable
+import qualified Data.CAS.ContentStore           as CS
 import           Data.Default
 import           Data.Functor.Identity
 import           Data.Int                        (Int64)

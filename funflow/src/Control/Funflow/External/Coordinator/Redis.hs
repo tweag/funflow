@@ -14,12 +14,12 @@ module Control.Funflow.External.Coordinator.Redis
   , RedisPreconnected (..)
   ) where
 
-import qualified Control.Funflow.ContentHashable      as CHash
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Lens
 import           Control.Monad.Except
 import           Control.Monad.Fix                    (fix)
+import qualified Data.CAS.ContentHashable             as CHash
 import           Data.Store
 import qualified Database.Redis                       as R
 import           GHC.Conc

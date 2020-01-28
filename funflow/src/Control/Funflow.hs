@@ -33,7 +33,7 @@ module Control.Funflow
 import qualified Control.Funflow.Base         as Base
 import qualified Control.Funflow.Cache.TH     as Cache
 import qualified Control.Funflow.Class        as Class
-import qualified Control.Funflow.ContentStore as CS
 import           Control.Funflow.Exec.Simple
 import           Control.Funflow.External
 import           Control.Funflow.Steps
+import qualified Data.CAS.ContentStore        as CS

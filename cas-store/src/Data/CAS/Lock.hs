@@ -9,7 +9,7 @@
 -- and fcntl write locks for synchronisation between processes.
 --
 -- Only ever have one 'Lock' object per lock file per process!
-module Control.Funflow.Lock
+module Data.CAS.Lock
   ( Lock
   , openLock
   , closeLock

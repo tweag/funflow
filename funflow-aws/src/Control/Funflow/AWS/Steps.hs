@@ -24,11 +24,11 @@ import           Control.Arrow
 import           Control.Funflow                 (ArrowFlow, putInStore, stepIO)
 import           Control.Funflow.AWS.Effects
 import           Control.Funflow.AWS.S3
-import           Control.Funflow.ContentHashable
-import           Control.Funflow.ContentStore    (Content ((:</>)))
-import qualified Control.Funflow.ContentStore    as CS
 import           Control.Lens
 import           Control.Monad.Trans.Resource    (runResourceT)
+import           Data.CAS.ContentHashable
+import           Data.CAS.ContentStore           (Content ((:</>)))
+import qualified Data.CAS.ContentStore           as CS
 import           Data.Conduit                    (($$+-))
 #if MIN_VERSION_conduit(1,3,0)
 import           Data.Conduit                    (sealConduitT)

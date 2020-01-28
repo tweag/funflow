@@ -9,14 +9,15 @@
 -- | Definition of external tasks
 module Control.Funflow.External where
 
-import           Control.Funflow.ContentHashable (ContentHash, ContentHashable, ExternallyAssuredDirectory (..),
-                                                  ExternallyAssuredFile (..))
-import qualified Control.Funflow.ContentStore    as CS
 import           Control.Lens.TH
 import           Data.Aeson                      (FromJSON, ToJSON)
 #if __GLASGOW_HASKELL__ < 804
 import           Data.Semigroup
 #endif
+import           Data.CAS.ContentHashable        (ContentHash, ContentHashable, ExternallyAssuredDirectory (..),
+                                                  ExternallyAssuredFile (..))
+import qualified Data.CAS.ContentStore           as CS
+
 import           Data.Store                      (Store)
 import           Data.String                     (IsString (..))
 import qualified Data.Text                       as T

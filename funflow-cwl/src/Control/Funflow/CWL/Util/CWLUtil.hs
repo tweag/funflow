@@ -13,7 +13,7 @@ internal CWL types that arise often.
 
 module Control.Funflow.CWL.Util.CWLUtil where
 
-import           Control.Funflow.ContentStore
+import           Data.CAS.ContentStore
     (Content (..))
 import           Data.Proxy
 import           Path

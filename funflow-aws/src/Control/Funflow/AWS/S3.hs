@@ -12,11 +12,11 @@ module Control.Funflow.AWS.S3 where
 
 import qualified Aws
 import qualified Aws.S3                          as S3
-import           Control.Funflow.ContentHashable
 import           Control.Lens
 import           Control.Monad                   ((>=>))
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
+import           Data.CAS.ContentHashable
 import           Data.Constraint
 import           Data.Reflection
 import           GHC.Generics                    (Generic)

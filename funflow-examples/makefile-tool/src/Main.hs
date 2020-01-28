@@ -13,9 +13,9 @@ import           Control.Exception               (Exception (..),
                                                   SomeException (..))
 import           Control.Exception.Safe          (try)
 import           Control.Funflow
-import           Control.Funflow.ContentStore    (Content (..))
-import qualified Control.Funflow.ContentStore    as CS
 import qualified Control.Funflow.External.Docker as Docker
+import           Data.CAS.ContentStore           (Content (..))
+import qualified Data.CAS.ContentStore           as CS
 
 -- Library Imports
 import           Control.Monad                   (guard)

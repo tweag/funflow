@@ -49,12 +49,12 @@ import           Control.Exception.Safe          (Exception, throwM)
 import           Control.Funflow.Base            (SimpleFlow, cache,
                                                   defaultCacherWithIdent)
 import           Control.Funflow.Class
-import           Control.Funflow.ContentHashable (ContentHashable,
+import qualified Control.Funflow.External.Docker as Docker
+import           Data.CAS.ContentHashable        (ContentHashable,
                                                   DirectoryContent (..),
                                                   FileContent (..))
-import           Control.Funflow.ContentStore    (Content ((:</>)))
-import qualified Control.Funflow.ContentStore    as CS
-import qualified Control.Funflow.External.Docker as Docker
+import           Data.CAS.ContentStore           (Content ((:</>)))
+import qualified Data.CAS.ContentStore           as CS
 import           Data.Default                    (def)
 import           Data.Foldable                   (for_)
 import           Data.Store
