@@ -128,7 +128,6 @@ import           Control.Exception.Safe              (Exception, MonadMask,
                                                       bracket_,
                                                       displayException, throwIO)
 import           Control.Funflow.ContentStore.Notify
-import           Control.Funflow.Orphans             ()
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
                                                       void, when, (<=<), (>=>))
