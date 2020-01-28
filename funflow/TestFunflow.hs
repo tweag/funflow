@@ -10,7 +10,6 @@ import           Control.Funflow
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.Pretty
 import qualified Data.CAS.ContentStore                       as CS
-import           Data.Default
 import           Data.Monoid                                 ((<>))
 import           Path
 import           Path.IO

@@ -4,7 +4,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TypeApplications  #-}
 
-module Funflow.ContentStore
+module CAS.ContentStore
   ( tests
   ) where
 
