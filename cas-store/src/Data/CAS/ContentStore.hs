@@ -53,6 +53,10 @@ module Data.CAS.ContentStore
   , open
   , close
 
+  -- * Cache Kleisli in MonadIO actions
+  , Cacher (..)
+  , cacheKleisliIO
+  
   -- * List Contents
   , listAll
   , listPending
@@ -127,7 +131,8 @@ import           Control.Concurrent.MVar
 import           Control.Exception.Safe              (Exception, MonadMask,
                                                       bracket, bracketOnError,
                                                       bracket_,
-                                                      displayException, throwIO)
+                                                      displayException, throwIO,
+                                                      throwM)
 import           Data.CAS.ContentStore.Notify
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
@@ -138,6 +143,8 @@ import           Control.Monad.Trans.Control         (MonadBaseControl)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
+import           Data.ByteString                     (ByteString)
+import qualified Data.ByteString                     as BS
 import qualified Data.ByteString.Char8               as C8
 import           Data.Foldable                       (asum)
 import qualified Data.Hashable
@@ -1042,3 +1049,53 @@ addBackReference store inHash (Item outHash) =
     [ ":in" SQL.:= inHash
     , ":out" SQL.:= outHash
     ]
+
+-- | A cacher is responsible for controlling how steps are cached.
+data Cacher i o =
+    NoCache -- ^ This step cannot be cached (default).
+  | Cache
+    { -- | Function to encode the input into a content
+      --   hash.
+      --   This function additionally takes an
+      --   'identities' which gets incorporated into
+      --   the cacher.
+      cacherKey        :: Int -> i -> ContentHash
+    , cacherStoreValue :: o -> ByteString
+      -- | Attempt to read the cache value back. May throw exceptions.
+    , cacherReadValue  :: ByteString -> o
+    }
+
+-- | Caches a Kleisli of some MonadIO action in the store given the required
+-- properties
+cacheKleisliIO
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  => Maybe Int
+  -> Cacher i o
+  -> remoteCache
+  -> ContentStore
+  -> (i -> m o)
+  -> i
+  -> m o
+cacheKleisliIO confIdent c@Cache{} cacher store f
+      | Just confIdent' <- confIdent = \i -> do
+      let chash = cacherKey c confIdent' i
+          computeAndStore fp = do
+            res <- f i  -- Do the actual computation
+            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                   . cacherStoreValue c $ res
+            return $ Right res
+          readItem item = do
+            bs <- liftIO . BS.readFile $ simpleOutPath item
+            return . cacherReadValue c $ bs
+      withConstructIfMissing store cacher chash computeAndStore >>= \case
+        Missing e -> absurd e
+        Pending _ ->
+          liftIO (waitUntilComplete store chash) >>= \case
+            Just item -> readItem item
+            Nothing -> throwM $ FailedToConstruct chash
+        Complete (Just a, _) -> return a
+        Complete (_, item) -> readItem item
+  where
+    simpleOutPath item =
+      toFilePath $ itemPath store item </> [relfile|out|]
+cacheKleisliIO _ _ _ _ f = f

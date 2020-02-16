@@ -38,7 +38,6 @@ import           Control.Monad.Catch                         (MonadCatch,
                                                               MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
-import qualified Data.ByteString                             as BS
 import           Data.CAS.ContentHashable
 import qualified Data.CAS.ContentStore                       as CS
 import qualified Data.CAS.RemoteCache                        as Remote
@@ -71,31 +70,11 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
-    simpleOutPath item = toFilePath
-      $ CS.itemPath store item </> [relfile|out|]
-    withStoreCache :: forall i o. Cacher i o
+    withStoreCache :: forall i o. CS.Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
-    withStoreCache c@Cache{} (AsyncA f)
-      | Just confIdent' <- confIdent = AsyncA $ \i -> do
-      let chash = cacherKey c confIdent' i
-          computeAndStore fp = do
-            res <- f i  -- Do the actual computation
-            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                   . cacherStoreValue c $ res
-            return $ Right res
-          readItem item = do
-            bs <- liftIO . BS.readFile $ simpleOutPath item
-            return . cacherReadValue c $ bs
-      CS.withConstructIfMissing store cacher chash computeAndStore >>= \case
-        CS.Missing e -> absurd e
-        CS.Pending _ ->
-          liftIO (CS.waitUntilComplete store chash) >>= \case
-            Just item -> readItem item
-            Nothing -> throwM $ CS.FailedToConstruct chash
-        CS.Complete (Just a, _) -> return a
-        CS.Complete (_, item) -> readItem item
-    withStoreCache _ f = f
-        
+    withStoreCache c (AsyncA f) = AsyncA $
+      CS.cacheKleisliIO confIdent c cacher store f
+      
     writeMd :: forall i o. ContentHash
             -> i
             -> o
@@ -112,7 +91,7 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
       . AsyncA $ \x -> do
           let out = f x
           case cache props of
-            Cache key _ _ | Just confIdent' <- confIdent ->
+            CS.Cache key _ _ | Just confIdent' <- confIdent ->
               writeMd (key confIdent' x) x out $ mdpolicy props
             _ -> return ()
           return out

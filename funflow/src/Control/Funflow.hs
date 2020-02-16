@@ -9,7 +9,7 @@ module Control.Funflow
   , type (Base.==>)
   , Base.NoEffect
   , Base.Flow'(..)
-  , Base.Cacher(..)
+  , CS.Cacher(..)
   , Base.ExternalProperties(..)
   , Base.MDWriter
   , Base.Properties(..)
