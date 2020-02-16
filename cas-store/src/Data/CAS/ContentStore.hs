@@ -53,8 +53,9 @@ module Data.CAS.ContentStore
   , open
   , close
 
-  -- * Cache Kleisli in MonadIO actions
+  -- * High-level API
   , Cacher (..)
+  , defaultCacherWithIdent
   , cacheKleisliIO
   
   -- * List Contents
@@ -1065,11 +1066,25 @@ data Cacher i o =
     , cacherReadValue  :: ByteString -> o
     }
 
+-- | Constructs a 'Cacher' that will use hashability of input and
+-- serializability of output to make a step cacheable
+defaultCacherWithIdent :: (Data.Store.Store o, ContentHashable Identity i)
+                       => Int -- ^ Seed for the cacher
+                       -> Cacher i o
+defaultCacherWithIdent ident = Cache
+  { cacherKey = \i ident' -> runIdentity $ contentHash (ident', ident, i)
+  , cacherStoreValue = Data.Store.encode
+  , cacherReadValue = Data.Store.decodeEx
+  }
+
 -- | Caches a Kleisli of some MonadIO action in the store given the required
 -- properties
 cacheKleisliIO
   :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
-  => Maybe Int
+  => Maybe Int  -- ^ This can be used to disambiguate the same program run in
+                -- multiple configurations. If Nothing, then it means this
+                -- program has no identity, this implies that steps will be
+                -- executed without cache, even if 'Cache' has been given.
   -> Cacher i o
   -> remoteCache
   -> ContentStore

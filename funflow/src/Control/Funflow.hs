@@ -9,13 +9,13 @@ module Control.Funflow
   , type (Base.==>)
   , Base.NoEffect
   , Base.Flow'(..)
-  , CS.Cacher(..)
   , Base.ExternalProperties(..)
   , Base.MDWriter
   , Base.Properties(..)
   , Base.EpPurity(..)
   , Base.alwaysRecompile
-  , Base.defaultCacherWithIdent
+  , CS.Cacher(..)
+  , CS.defaultCacherWithIdent
   , Cache.defaultCacher
   , Cache.defaultCacherLoc
     -- * Defines our primitive flow functions

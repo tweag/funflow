@@ -22,10 +22,8 @@ import           Data.ByteString                 (ByteString)
 import           Data.CAS.ContentHashable
 import           Data.CAS.ContentStore           as CS
 import           Data.Default
-import           Data.Functor.Identity
 import           Data.Int                        (Int64)
 import           Data.Proxy                      (Proxy (..))
-import qualified Data.Store                      as Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
@@ -33,15 +31,6 @@ import           System.Random                   (randomIO)
 
 -- | Metadata writer
 type MDWriter i o = Maybe (i -> o -> [(T.Text, ByteString)])
-
-defaultCacherWithIdent :: (Store.Store o, ContentHashable Identity i)
-                       => Int -- ^ Seed for the cacher
-                       -> Cacher i o
-defaultCacherWithIdent ident = Cache
-  { cacherKey = \i ident' -> runIdentity $ contentHash (ident', ident, i)
-  , cacherStoreValue = Store.encode
-  , cacherReadValue = Store.decodeEx
-  }
 
 data Properties i o = Properties
   { -- | Name of this step. Used when describing the step in diagrams

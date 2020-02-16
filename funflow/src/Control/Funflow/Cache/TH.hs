@@ -8,7 +8,7 @@
 -- | Template Haskell splices for the funflow cache.
 module Control.Funflow.Cache.TH where
 
-import           Control.Funflow.Base
+import           Data.CAS.ContentStore
 import           Data.Hashable
 import           Language.Haskell.TH.Syntax
 import           System.Random

@@ -46,14 +46,14 @@ where
 import           Control.Arrow
 import           Control.Arrow.Free              (catch)
 import           Control.Exception.Safe          (Exception, throwM)
-import           Control.Funflow.Base            (SimpleFlow, cache,
-                                                  defaultCacherWithIdent)
+import           Control.Funflow.Base            (SimpleFlow, cache)
 import           Control.Funflow.Class
 import qualified Control.Funflow.External.Docker as Docker
 import           Data.CAS.ContentHashable        (ContentHashable,
                                                   DirectoryContent (..),
                                                   FileContent (..))
-import           Data.CAS.ContentStore           (Content ((:</>)))
+import           Data.CAS.ContentStore           (Content ((:</>)),
+                                                  defaultCacherWithIdent)
 import qualified Data.CAS.ContentStore           as CS
 import           Data.Default                    (def)
 import           Data.Foldable                   (for_)
