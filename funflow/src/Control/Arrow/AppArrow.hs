@@ -1,6 +1,8 @@
 -- | This modules defines the composition of an applicative functor and an
 -- arrow, which is always an arrow.
 
+-- THIS MODULE IS DEPRECATED, RATHER USE THE Cayley NEWTYPE FROM profunctors
+
 module Control.Arrow.AppArrow
   ( AppArrow(..)
   , appArrow
@@ -10,6 +12,8 @@ import Control.Category
 import Control.Arrow
 import Prelude          hiding (id, (.))
 
+-- | Equivalent of Cayley from profunctors or Tannen from bifunctors. You should
+-- use Cayley instead of AppArrow.
 newtype AppArrow app arr a b = AppArrow { unAppArrow :: app (arr a b) }
 
 instance (Applicative app, Category cat) => Category (AppArrow app cat) where

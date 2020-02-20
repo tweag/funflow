@@ -43,7 +43,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
 import qualified Data.ByteString                             as BS
 import           Data.Foldable                               (traverse_)
-import           Data.Maybe
 import           Data.Monoid                                 ((<>))
 import           Data.Void
 import           Katip
