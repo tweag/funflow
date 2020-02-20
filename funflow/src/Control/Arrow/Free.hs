@@ -42,7 +42,6 @@ module Control.Arrow.Free
   ) where
 
 import           Control.Arrow
-import           Control.Arrow.AppArrow
 import           Control.Category
 import           Control.Exception.Safe (Exception, MonadCatch)
 import qualified Control.Exception.Safe
@@ -57,6 +56,7 @@ import           Data.List           (uncons)
 import           Data.Maybe          (maybe)
 import           Data.Monoid         (Monoid)
 import qualified Data.Profunctor     as P
+import qualified Data.Profunctor.Cayley as P
 import qualified Data.Profunctor.Traversing as P
 import           Data.Tuple          (uncurry)
 
@@ -169,16 +169,16 @@ instance FreeArrowLike Choice where
 class ArrowError ex a where
   try :: a e c -> a e (Either ex c)
 
-instance (ArrowError ex arr) => ArrowError ex (AppArrow (Reader r) arr) where
-  try (AppArrow act) = AppArrow $ reader $ \r ->
+instance (ArrowError ex arr) => ArrowError ex (P.Cayley (Reader r) arr) where
+  try (P.Cayley act) = P.Cayley $ reader $ \r ->
     try $ runReader act r
 
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (Writer w) arr) where
-  try (AppArrow act) = AppArrow $ writer (try a, w)
+instance (ArrowError ex arr, Monoid w) => ArrowError ex (P.Cayley (Writer w) arr) where
+  try (P.Cayley act) = P.Cayley $ writer (try a, w)
     where (a, w) = runWriter act
 
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (SW.Writer w) arr) where
-  try (AppArrow act) = AppArrow $ SW.writer (try a, w)
+instance (ArrowError ex arr, Monoid w) => ArrowError ex (P.Cayley (SW.Writer w) arr) where
+  try (P.Cayley act) = P.Cayley $ SW.writer (try a, w)
     where (a, w) = SW.runWriter act
 
 catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
