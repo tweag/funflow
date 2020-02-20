@@ -67,7 +67,7 @@ wrap :: ArrowFlow eff ex arr => eff a b -> arr a b
 wrap = wrap' def
 
 instance ( Applicative app
-         , ArrowError ex (P.Cayley app (arr eff ex))
+         , ArrowError ex (arr eff ex)
          , ArrowFlow eff ex (arr eff ex) )
       => ArrowFlow eff ex (P.Cayley app (arr eff ex)) where
   step' props f = P.Cayley . pure $ step' props f

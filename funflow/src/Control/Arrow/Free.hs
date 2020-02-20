@@ -41,24 +41,22 @@ module Control.Arrow.Free
   , type (~>)
   ) where
 
+import           Prelude                (Functor (..))
+
 import           Control.Arrow
 import           Control.Category
 import           Control.Exception.Safe (Exception, MonadCatch)
 import qualified Control.Exception.Safe
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Writer
-import qualified Control.Monad.Trans.Writer.Strict as SW
-import           Data.Bool           (Bool)
-import           Data.Constraint     (Constraint, Dict (..))
-import           Data.Either         (Either (..))
-import           Data.Function       (const, flip, ($))
-import           Data.List           (uncons)
-import           Data.Maybe          (maybe)
-import           Data.Monoid         (Monoid)
-import qualified Data.Profunctor     as P
+import           Data.Bool              (Bool)
+import           Data.Constraint        (Constraint, Dict (..))
+import           Data.Either            (Either (..))
+import           Data.Function          (const, flip, ($))
+import           Data.List              (uncons)
+import           Data.Maybe             (maybe)
+import qualified Data.Profunctor        as P
 import qualified Data.Profunctor.Cayley as P
 import qualified Data.Profunctor.Traversing as P
-import           Data.Tuple          (uncurry)
+import           Data.Tuple             (uncurry)
 
 -- | A natural transformation on type constructors of two arguments.
 type x ~> y = forall a b. x a b -> y a b
@@ -169,17 +167,8 @@ instance FreeArrowLike Choice where
 class ArrowError ex a where
   try :: a e c -> a e (Either ex c)
 
-instance (ArrowError ex arr) => ArrowError ex (P.Cayley (Reader r) arr) where
-  try (P.Cayley act) = P.Cayley $ reader $ \r ->
-    try $ runReader act r
-
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (P.Cayley (Writer w) arr) where
-  try (P.Cayley act) = P.Cayley $ writer (try a, w)
-    where (a, w) = runWriter act
-
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (P.Cayley (SW.Writer w) arr) where
-  try (P.Cayley act) = P.Cayley $ SW.writer (try a, w)
-    where (a, w) = SW.runWriter act
+instance (ArrowError ex arr, Functor f) => ArrowError ex (P.Cayley f arr) where
+  try (P.Cayley f) = P.Cayley $ fmap try f
 
 catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
 catch a onExc = proc e -> do
