@@ -14,7 +14,8 @@ module Control.Funflow
   , Base.Properties(..)
   , Base.EpPurity(..)
   , Base.alwaysRecompile
-  , CS.Cacher(..)
+  , CS.CacherM(..)
+  , CS.Cacher
   , CS.defaultCacherWithIdent
   , Cache.defaultCacher
   , Cache.defaultCacherLoc

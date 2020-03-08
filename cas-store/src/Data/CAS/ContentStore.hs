@@ -54,8 +54,10 @@ module Data.CAS.ContentStore
   , close
 
   -- * High-level API
-  , Cacher (..)
+  , CacherM (..)
+  , Cacher
   , defaultCacherWithIdent
+  , defaultIOCacherWithIdent
   , cacheKleisliIO
   , putInStore
   , contentPath
@@ -131,7 +133,6 @@ import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe
-import           Data.CAS.ContentStore.Notify
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
                                                       void, when, (<=<), (>=>),
@@ -144,6 +145,7 @@ import           Data.Bits                           (complement)
 import           Data.ByteString                     (ByteString)
 import qualified Data.ByteString                     as BS
 import qualified Data.ByteString.Char8               as C8
+import           Data.CAS.ContentStore.Notify
 import           Data.Foldable                       (asum)
 import qualified Data.Hashable
 import           Data.List                           (foldl', stripPrefix)
@@ -1049,7 +1051,7 @@ addBackReference store inHash (Item outHash) =
     ]
 
 -- | A cacher is responsible for controlling how steps are cached.
-data Cacher i o =
+data CacherM m i o =
     NoCache -- ^ This step cannot be cached (default).
   | Cache
     { -- | Function to encode the input into a content
@@ -1057,22 +1059,34 @@ data Cacher i o =
       --   This function additionally takes an
       --   'identities' which gets incorporated into
       --   the cacher.
-      cacherKey        :: Int -> i -> ContentHash
+      cacherKey        :: Int -> i -> m ContentHash
     , cacherStoreValue :: o -> ByteString
       -- | Attempt to read the cache value back. May throw exceptions.
     , cacherReadValue  :: ByteString -> o
     }
 
+-- | A pure 'CacherM'
+type Cacher = CacherM Identity
+
 -- | Constructs a 'Cacher' that will use hashability of input and
 -- serializability of output to make a step cacheable
-defaultCacherWithIdent :: (Data.Store.Store o, ContentHashable Identity i)
+defaultCacherWithIdent :: forall m i o.
+                          (ContentHashable m i, Data.Store.Store o)
                        => Int -- ^ Seed for the cacher
-                       -> Cacher i o
+                       -> CacherM m i o
 defaultCacherWithIdent ident = Cache
-  { cacherKey = \i ident' -> runIdentity $ contentHash (ident', ident, i)
+  { cacherKey = \i ident' -> contentHash (ident', ident, i)
   , cacherStoreValue = Data.Store.encode
   , cacherReadValue = Data.Store.decodeEx
   }
+
+-- | Looks for a @CacherM IO@, then lifts it
+defaultIOCacherWithIdent :: (MonadIO m, ContentHashable IO i, Data.Store.Store o)
+                         => Int -- ^ Seed for the cacher
+                         -> CacherM m i o
+defaultIOCacherWithIdent ident = c{cacherKey = \x i -> liftIO $ cacherKey c x i}
+  where c = defaultCacherWithIdent ident
+
 
 -- | Caches a Kleisli of some MonadIO action in the store given the required
 -- properties
@@ -1082,7 +1096,7 @@ cacheKleisliIO
                 -- multiple configurations. If Nothing, then it means this
                 -- program has no identity, this implies that steps will be
                 -- executed without cache, even if 'Cache' has been given.
-  -> Cacher i o
+  -> CacherM m i o
   -> ContentStore
   -> remoteCache
   -> (i -> m o)
@@ -1090,8 +1104,8 @@ cacheKleisliIO
   -> m o
 cacheKleisliIO confIdent c@Cache{} store remoteCacher f i
   | Just confIdent' <- confIdent = do
-      let chash = cacherKey c confIdent' i
-          computeAndStore fp = do
+      chash <- cacherKey c confIdent' i
+      let computeAndStore fp = do
             res <- f i  -- Do the actual computation
             liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
                    . cacherStoreValue c $ res

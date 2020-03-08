@@ -33,6 +33,7 @@ import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
+import           Control.Lens                                (Identity (..))
 import           Control.Monad.Catch                         (MonadCatch,
                                                               MonadMask)
 import           Control.Monad.IO.Class
@@ -71,7 +72,9 @@ runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
     withStoreCache :: forall i o. CS.Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
     withStoreCache c (AsyncA f) = AsyncA $
-      CS.cacheKleisliIO confIdent c store remoteCacher f
+      let c' = c{CS.cacherKey = \ident i -> return $ runIdentity $
+                  CS.cacherKey c ident i}
+      in CS.cacheKleisliIO confIdent c' store remoteCacher f
       
     writeMd :: forall i o. ContentHash
             -> i
@@ -89,7 +92,7 @@ runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
           let out = f x
           case cache props of
             CS.Cache key _ _ | Just confIdent' <- confIdent ->
-              writeMd (key confIdent' x) x out $ mdpolicy props
+              writeMd (runIdentity $ key confIdent' x) x out $ mdpolicy props
             _ -> return ()
           return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
