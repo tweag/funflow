@@ -27,7 +27,6 @@ import           Control.Concurrent.Async                    (withAsync)
 import           Control.Exception.Safe                      (Exception,
                                                               SomeException,
                                                               bracket,
-                                                              onException,
                                                               throwM, try)
 import           Control.Funflow.Base
 import           Control.Funflow.External
@@ -43,7 +42,6 @@ import qualified Data.CAS.ContentStore                       as CS
 import qualified Data.CAS.RemoteCache                        as Remote
 import           Data.Foldable                               (traverse_)
 import           Data.Monoid                                 ((<>))
-import           Data.Void
 import           Katip
 import           Path
 import           System.IO                                   (stderr)
@@ -84,7 +82,6 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
     writeMd chash i o (Just writer) =
       let kvs = writer i o
       in traverse_ (uncurry $ CS.setMetadata store chash) kvs
-
 
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA m a1 b1
     runFlow' _ (Step props f) = withStoreCache (cache props)
@@ -140,24 +137,13 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
               mbStdout <- CS.getMetadataFile store chash [relfile|stdout|]
               mbStderr <- CS.getMetadataFile store chash [relfile|stderr|]
               throwM $ ExternalTaskFailed td ti mbStdout mbStderr
-    runFlow' _ (PutInStore f) = AsyncA $ \x -> katipAddNamespace "putInStore" $ do
-      chash <- liftIO $ contentHash x
-      CS.constructOrWait store cacher chash >>= \case
-        CS.Pending void -> absurd void
-        CS.Complete item -> return item
-        CS.Missing fp ->
-          do
-            liftIO $ f fp x
-            finalItem <- CS.markComplete store chash
-            _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
-            pure finalItem
-          `onException`
-            (do $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash
-                CS.removeFailed store chash
-            )
-    runFlow' _ (GetFromStore f) = AsyncA $ \case
-      CS.All item -> liftIO . f $ CS.itemPath store item
-      item CS.:</> path -> liftIO . f $ CS.itemPath store item </> path
+    runFlow' _ (PutInStore f) = AsyncA $
+      katipAddNamespace "putInStore"
+      . CS.putInStore cacher store
+          (\chash -> $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash)
+          (\p -> liftIO . f p)
+    runFlow' _ (GetFromStore f) = AsyncA $
+      liftIO . f . CS.contentPath store
     runFlow' _ (InternalManipulateStore f) = AsyncA $ \i -> liftIO $ f store i
     runFlow' _ (Wrapped props w) = withStoreCache (cache props)
       $ runWrapped w

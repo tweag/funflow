@@ -57,6 +57,8 @@ module Data.CAS.ContentStore
   , Cacher (..)
   , defaultCacherWithIdent
   , cacheKleisliIO
+  , putInStore
+  , contentPath
   
   -- * List Contents
   , listAll
@@ -105,7 +107,6 @@ module Data.CAS.ContentStore
   , itemHash
   , itemPath
   , itemRelPath
-  , contentPath
   , contentItem
   , contentFilename
   , root
@@ -129,11 +130,7 @@ import           Control.Arrow                       (second)
 import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception.Safe              (Exception, MonadMask,
-                                                      bracket, bracketOnError,
-                                                      bracket_,
-                                                      displayException, throwIO,
-                                                      throwM)
+import           Control.Exception.Safe
 import           Data.CAS.ContentStore.Notify
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
@@ -320,7 +317,7 @@ instance Monad m => ContentHashable m (Content File) where
 All item ^</> path = item :</> path
 (item :</> dir) ^</> path = item :</> dir </> path
 infixl 4 ^</>
-
+  
 newtype Alias = Alias { unAlias :: T.Text }
   deriving (ContentHashable IO, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
 
@@ -1091,8 +1088,8 @@ cacheKleisliIO
   -> (i -> m o)
   -> i
   -> m o
-cacheKleisliIO confIdent c@Cache{} cacher store f
-      | Just confIdent' <- confIdent = \i -> do
+cacheKleisliIO confIdent c@Cache{} cacher store f i
+  | Just confIdent' <- confIdent = do
       let chash = cacherKey c confIdent' i
           computeAndStore fp = do
             res <- f i  -- Do the actual computation
@@ -1113,4 +1110,32 @@ cacheKleisliIO confIdent c@Cache{} cacher store f
   where
     simpleOutPath item =
       toFilePath $ itemPath store item </> [relfile|out|]
-cacheKleisliIO _ _ _ _ f = f
+cacheKleisliIO _ _ _ _ f i = f i
+
+-- | Caches an action that writes content-addressed data to the store. Returns
+-- the Item of the written content.
+putInStore
+  :: (MonadIO m, MonadMask m, MonadBaseControl IO m
+     ,Remote.Cacher m remoteCacher
+     ,ContentHashable IO t)
+  => remoteCacher
+  -> ContentStore
+  -> (ContentHash -> m ()) -- ^ In case an exception occurs
+  -> (Path Abs Dir -> t -> m ()) -- ^ The action that writes to the new store
+                                 -- directory
+  -> t
+  -> m Item -- ^ The Item in the store to which @t@ has been written
+putInStore cacher store ifExc f x = do
+  chash <- liftIO $ contentHash x
+  constructOrWait store cacher chash >>= \case
+    Pending y -> absurd y
+    Complete item -> return item
+    Missing fp ->
+      do
+        f fp x
+        finalItem <- markComplete store chash
+        _ <- Remote.push cacher (itemHash finalItem) (Just chash) (itemPath store finalItem)
+        pure finalItem
+      `onException`
+        (do ifExc chash
+            removeFailed store chash)
