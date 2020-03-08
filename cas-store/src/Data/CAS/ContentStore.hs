@@ -480,8 +480,8 @@ constructOrAsync
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) (Async Update) Item)
-constructOrAsync store cacher hash =
-  constructIfMissing store cacher hash >>= \case
+constructOrAsync store remoteCacher hash =
+  constructIfMissing store remoteCacher hash >>= \case
     Complete item -> return $ Complete item
     Missing path -> return $ Missing path
     Pending _ -> Pending <$> liftIO (internalWatchPending store hash)
@@ -500,7 +500,7 @@ constructOrWait
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) Void Item)
-constructOrWait store cacher hash = constructOrAsync store cacher hash >>= \case
+constructOrWait store remoteCacher hash = constructOrAsync store remoteCacher hash >>= \case
   Pending a -> liftIO (wait a) >>= \case
     Completed item -> return $ Complete item
     -- XXX: Consider extending 'Status' with a 'Failed' constructor.
@@ -519,12 +519,12 @@ constructIfMissing
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) () Item)
-constructIfMissing store cacher hash = withStoreLock store $
+constructIfMissing store remoteCacher hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $ do
       let destDir :: Path Abs Dir = mkItemPath store hash
-      Remote.pull cacher hash destDir >>= \case
+      Remote.pull remoteCacher hash destDir >>= \case
         Remote.PullOK () -> return $ Complete (Item hash)
         Remote.NotInCache ->
           Missing <$> liftIO (internalMarkPending store hash)
@@ -543,9 +543,9 @@ withConstructIfMissing
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
-withConstructIfMissing store cacher hash f =
+withConstructIfMissing store remoteCacher hash f =
   bracketOnError
-    (constructIfMissing store cacher hash)
+    (constructIfMissing store remoteCacher hash)
     (\case
       Missing _ -> removeForcibly store hash
       _ -> return ())
@@ -558,7 +558,7 @@ withConstructIfMissing store cacher hash f =
           return (Missing e)
         Right x -> do
           item <- markComplete store hash
-          _ <- Remote.push cacher (itemHash item) (Just hash) (itemPath store item)
+          _ <- Remote.push remoteCacher (itemHash item) (Just hash) (itemPath store item)
           return (Complete (Just x, item)))
 
 -- | Mark a non-existent item as pending.
@@ -1083,12 +1083,12 @@ cacheKleisliIO
                 -- program has no identity, this implies that steps will be
                 -- executed without cache, even if 'Cache' has been given.
   -> Cacher i o
-  -> remoteCache
   -> ContentStore
+  -> remoteCache
   -> (i -> m o)
   -> i
   -> m o
-cacheKleisliIO confIdent c@Cache{} cacher store f i
+cacheKleisliIO confIdent c@Cache{} store remoteCacher f i
   | Just confIdent' <- confIdent = do
       let chash = cacherKey c confIdent' i
           computeAndStore fp = do
@@ -1099,7 +1099,7 @@ cacheKleisliIO confIdent c@Cache{} cacher store f i
           readItem item = do
             bs <- liftIO . BS.readFile $ simpleOutPath item
             return . cacherReadValue c $ bs
-      withConstructIfMissing store cacher chash computeAndStore >>= \case
+      withConstructIfMissing store remoteCacher chash computeAndStore >>= \case
         Missing e -> absurd e
         Pending _ ->
           liftIO (waitUntilComplete store chash) >>= \case
@@ -1118,23 +1118,23 @@ putInStore
   :: (MonadIO m, MonadMask m, MonadBaseControl IO m
      ,Remote.Cacher m remoteCacher
      ,ContentHashable IO t)
-  => remoteCacher
-  -> ContentStore
+  => ContentStore
+  -> remoteCacher
   -> (ContentHash -> m ()) -- ^ In case an exception occurs
   -> (Path Abs Dir -> t -> m ()) -- ^ The action that writes to the new store
                                  -- directory
   -> t
   -> m Item -- ^ The Item in the store to which @t@ has been written
-putInStore cacher store ifExc f x = do
+putInStore store remoteCacher ifExc f x = do
   chash <- liftIO $ contentHash x
-  constructOrWait store cacher chash >>= \case
+  constructOrWait store remoteCacher chash >>= \case
     Pending y -> absurd y
     Complete item -> return item
     Missing fp ->
       do
         f fp x
         finalItem <- markComplete store chash
-        _ <- Remote.push cacher (itemHash finalItem) (Just chash) (itemPath store finalItem)
+        _ <- Remote.push remoteCacher (itemHash finalItem) (Just chash) (itemPath store finalItem)
         pure finalItem
       `onException`
         (do ifExc chash

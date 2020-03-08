@@ -64,14 +64,14 @@ runFlowEx :: forall m c eff ex a b remoteCache.
           -> Flow eff ex a b
           -> a
           -> m b
-runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
+runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
     withStoreCache :: forall i o. CS.Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
     withStoreCache c (AsyncA f) = AsyncA $
-      CS.cacheKleisliIO confIdent c cacher store f
+      CS.cacheKleisliIO confIdent c store remoteCacher f
       
     writeMd :: forall i o. ContentHash
             -> i
@@ -139,7 +139,7 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
               throwM $ ExternalTaskFailed td ti mbStdout mbStderr
     runFlow' _ (PutInStore f) = AsyncA $
       katipAddNamespace "putInStore"
-      . CS.putInStore cacher store
+      . CS.putInStore store remoteCacher
           (\chash -> $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash)
           (\p -> liftIO . f p)
     runFlow' _ (GetFromStore f) = AsyncA $
