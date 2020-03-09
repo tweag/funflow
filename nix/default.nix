@@ -1,8 +1,7 @@
 let
-  iohk-overlay = builtins.fetchTarball
-    https://github.com/input-output-hk/haskell.nix/archive/89e3e78719ccc944d220c2d3e5e6299052eecb82.tar.gz;
+  iohk-overlay = import ./haskell.nix-src.nix;
 in
-{ pkgs ? import ./nixpkgs-src.nix (import iohk-overlay)
+{ pkgs ? import ./nixpkgs-src.nix iohk-overlay
 }:
   pkgs.haskell-nix.stackProject {
     src = pkgs.haskell-nix.haskellLib.cleanGit { src = ./..; };

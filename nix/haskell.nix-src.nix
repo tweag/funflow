@@ -1,10 +1,9 @@
-{ fetchgit, ... }:
-
 let
   spec = builtins.fromJSON (builtins.readFile ./haskell.nix-src.json);
-  haskell-iohk-overlay = fetchgit {
-    name = "haskell-lib";
-    inherit (spec) url rev sha256 fetchSubmodules;
+  src = {
+    url = "${spec.url}/archive/${spec.rev}.tar.gz";
+    inherit (spec) sha256;
   };
-in
-  import haskell-iohk-overlay
+
+in 
+  import (builtins.fetchTarball src)
