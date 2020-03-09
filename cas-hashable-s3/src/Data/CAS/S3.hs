@@ -4,11 +4,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
--- | Handling of S3 objects in Funflow.
+
+-- | Hashing of S3 objects
 --
 --   This module allows us to fetch objects from S3, taking advantage of S3's
 --   support for CAS to avoid the need to calculate our own content hashes.
-module Control.Funflow.AWS.S3 where
+module Data.CAS.ContentHashable.S3 where
 
 import qualified Aws
 import qualified Aws.S3                          as S3

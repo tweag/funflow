@@ -7,7 +7,7 @@ module Control.Funflow.AWS.Effects where
 
 import qualified Aws
 import qualified Aws.S3                          as S3
-import           Control.Funflow.AWS.S3
+import           Data.CAS.ContentHashable.S3
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Network.HTTP.Conduit            (newManager,
                                                   tlsManagerSettings)
