@@ -13,7 +13,6 @@ module Data.CAS.ContentHashable.S3 where
 
 import qualified Aws
 import qualified Aws.S3                          as S3
-import           Control.Lens
 import           Control.Monad                   ((>=>))
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
@@ -36,7 +35,15 @@ data ObjectInBucket obj = ObjectInBucket
   , _oibObject :: obj
   } deriving (Show, Generic)
 
-makeLenses ''ObjectInBucket
+-- | A lens to _oibBucket
+oibBucket :: Functor f => (S3.Bucket -> f S3.Bucket) -> ObjectInBucket obj -> f (ObjectInBucket obj)
+oibBucket f oib = rebuild <$> f (_oibBucket oib)
+  where rebuild b = oib{_oibBucket=b}
+
+-- | A lens to _oibObject
+oibObject :: Functor f => (a -> f b) -> ObjectInBucket a -> f (ObjectInBucket b)
+oibObject f oib = rebuild <$> f (_oibObject oib)
+  where rebuild o = oib{_oibObject=o}
 
 instance FromJSON (ObjectInBucket S3.Object)
 instance ToJSON (ObjectInBucket S3.Object)
