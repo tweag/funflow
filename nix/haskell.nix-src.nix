@@ -1,10 +1,9 @@
-{ pkgs }:
-
 let
   spec = builtins.fromJSON (builtins.readFile ./haskell.nix-src.json);
-  haskell-nix-src = pkgs.fetchgit {
-    name = "haskell-lib";
-    inherit (spec) url rev sha256 fetchSubmodules;
+  src = {
+    url = "${spec.url}/archive/${spec.rev}.tar.gz";
+    inherit (spec) sha256;
   };
-in
-  import haskell-nix-src { inherit pkgs; }
+
+in 
+  import (builtins.fetchTarball src)
