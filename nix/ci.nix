@@ -1,6 +1,9 @@
 let 
   default = import ./default.nix {};
   required-packages = with default; [
+    cas-hashable.components.library
+    cas-hashable-s3.components.library
+    cas-store.components.library
     funflow.components.library
     funflow.components.exes
     funflow-aws.components.library
@@ -10,6 +13,7 @@ let
     funflow-jobs.components.library
   ];
   required-tests = with default; [
+    cas-store.components.tests.unit-tests
     funflow.components.tests.unit-tests
     funflow-checkpoints.components.tests.unit-tests
   ];

@@ -23,10 +23,10 @@ import qualified Aws.S3                          as S3
 import           Control.Arrow
 import           Control.Funflow                 (ArrowFlow, putInStore, stepIO)
 import           Control.Funflow.AWS.Effects
-import           Control.Funflow.AWS.S3
 import           Control.Lens
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.CAS.ContentHashable
+import           Data.CAS.ContentHashable.S3
 import           Data.CAS.ContentStore           (Content ((:</>)))
 import qualified Data.CAS.ContentStore           as CS
 import           Data.Conduit                    (($$+-))

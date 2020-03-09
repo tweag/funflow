@@ -4,15 +4,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeOperators         #-}
--- | Handling of S3 objects in Funflow.
+
+-- | Hashing of S3 objects
 --
 --   This module allows us to fetch objects from S3, taking advantage of S3's
 --   support for CAS to avoid the need to calculate our own content hashes.
-module Control.Funflow.AWS.S3 where
+module Data.CAS.ContentHashable.S3 where
 
 import qualified Aws
 import qualified Aws.S3                          as S3
-import           Control.Lens
 import           Control.Monad                   ((>=>))
 import           Control.Monad.Trans.Resource    (runResourceT)
 import           Data.Aeson
@@ -35,7 +35,15 @@ data ObjectInBucket obj = ObjectInBucket
   , _oibObject :: obj
   } deriving (Show, Generic)
 
-makeLenses ''ObjectInBucket
+-- | A lens to _oibBucket
+oibBucket :: Functor f => (S3.Bucket -> f S3.Bucket) -> ObjectInBucket obj -> f (ObjectInBucket obj)
+oibBucket f oib = rebuild <$> f (_oibBucket oib)
+  where rebuild b = oib{_oibBucket=b}
+
+-- | A lens to _oibObject
+oibObject :: Functor f => (a -> f b) -> ObjectInBucket a -> f (ObjectInBucket b)
+oibObject f oib = rebuild <$> f (_oibObject oib)
+  where rebuild o = oib{_oibObject=o}
 
 instance FromJSON (ObjectInBucket S3.Object)
 instance ToJSON (ObjectInBucket S3.Object)
@@ -75,10 +83,10 @@ instance (Given Aws.Configuration)
       {- Create a request object with S3.getObject and run the request with pureAws. -}
       S3.GetObjectResponse { S3.gorMetadata = md } <- runResourceT $
         Aws.pureAws given s3cfg mgr $
-          S3.getObject (a ^. oibBucket) (a ^. oibObject)
+          S3.getObject (_oibBucket a) (_oibObject a)
 
-      flip contentHashUpdate (a ^. oibBucket)
-        >=> flip contentHashUpdate (a ^. oibObject)
+      flip contentHashUpdate (_oibBucket a)
+        >=> flip contentHashUpdate (_oibObject a)
         >=> flip contentHashUpdate (S3.omETag md)
           $ ctx
 
@@ -93,9 +101,9 @@ instance (Given Aws.Configuration)
 --   do S3, because we already know the S3 hash.
 instance Monad m => ContentHashable m (ObjectInBucket S3.ObjectInfo) where
   contentHashUpdate ctx a =
-    flip contentHashUpdate (a ^. oibBucket)
-      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectKey)
-      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectETag)
+    flip contentHashUpdate (_oibBucket a)
+      >=> flip contentHashUpdate (S3.objectKey $ _oibObject a)
+      >=> flip contentHashUpdate (S3.objectETag $ _oibObject a)
         $ ctx
 
 -- | Reified instance of the implication to allow us to use this as a

@@ -471,8 +471,9 @@ instance Monad m => ContentHashable m UTCTime where
 --   modification time, which can be rapidly looked up from filesystem metadata.
 --
 --   For a similar approach, see the instance for 'ObjectInBucket' in
---   Control.Funflow.AWS.S3, where we exploit the fact that S3 is already
---   content hashed to avoid performing any hashing.
+--   Data.CAS.ContentHashable.S3 (in `cas-hashable-s3` package), where we
+--   exploit the fact that S3 is already content hashed to avoid performing any
+--   hashing.
 newtype ExternallyAssuredFile = ExternallyAssuredFile (Path.Path Path.Abs Path.File)
   deriving (Generic, Show)
 
