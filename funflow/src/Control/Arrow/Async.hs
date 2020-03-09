@@ -2,6 +2,9 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DerivingVia           #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+
 -- | Asynchronous arrows over monads with MonadBaseControl IO, using
 --   lifted-async.
 module Control.Arrow.Async where
@@ -14,9 +17,25 @@ import           Control.Exception.Safe          (Exception, MonadCatch)
 import qualified Control.Exception.Safe
 import           Control.Monad.Trans.Class       (MonadTrans, lift)
 import           Control.Monad.Trans.Control     (MonadBaseControl)
+import qualified Data.Profunctor                 as P
+import qualified Data.Profunctor.Mapping         as P
+import qualified Data.Profunctor.Traversing      as P
 import           Prelude                         hiding (id, (.))
 
 newtype AsyncA m a b = AsyncA { runAsyncA :: a -> m b }
+
+deriving via P.WrappedArrow (AsyncA m)
+  instance (MonadBaseControl IO m) => P.Profunctor (AsyncA m)
+deriving via P.WrappedArrow (AsyncA m)
+  instance (MonadBaseControl IO m) => P.Strong (AsyncA m)
+deriving via P.WrappedArrow (AsyncA m)
+  instance (MonadBaseControl IO m) => P.Choice (AsyncA m)
+instance (MonadBaseControl IO m) => P.Traversing (AsyncA m) where
+  traverse' (AsyncA f) = AsyncA $ mapConcurrently f
+instance (MonadBaseControl IO m) => P.Closed (AsyncA m) where
+  closed = P.closedMapping
+instance (MonadBaseControl IO m) => P.Mapping (AsyncA m) where
+  map' = P.traverseMapping
 
 instance Monad m => Category (AsyncA m) where
   id = AsyncA return
