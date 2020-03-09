@@ -83,10 +83,10 @@ instance (Given Aws.Configuration)
       {- Create a request object with S3.getObject and run the request with pureAws. -}
       S3.GetObjectResponse { S3.gorMetadata = md } <- runResourceT $
         Aws.pureAws given s3cfg mgr $
-          S3.getObject (a ^. oibBucket) (a ^. oibObject)
+          S3.getObject (_oibBucket a) (_oibObject a)
 
-      flip contentHashUpdate (a ^. oibBucket)
-        >=> flip contentHashUpdate (a ^. oibObject)
+      flip contentHashUpdate (_oibBucket a)
+        >=> flip contentHashUpdate (_oibObject a)
         >=> flip contentHashUpdate (S3.omETag md)
           $ ctx
 
@@ -101,9 +101,9 @@ instance (Given Aws.Configuration)
 --   do S3, because we already know the S3 hash.
 instance Monad m => ContentHashable m (ObjectInBucket S3.ObjectInfo) where
   contentHashUpdate ctx a =
-    flip contentHashUpdate (a ^. oibBucket)
-      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectKey)
-      >=> flip contentHashUpdate (a ^. oibObject . to S3.objectETag)
+    flip contentHashUpdate (_oibBucket a)
+      >=> flip contentHashUpdate (S3.objectKey $ _oibObject a)
+      >=> flip contentHashUpdate (S3.objectETag $ _oibObject a)
         $ ctx
 
 -- | Reified instance of the implication to allow us to use this as a
