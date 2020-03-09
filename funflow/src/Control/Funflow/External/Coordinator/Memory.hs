@@ -7,12 +7,12 @@ module Control.Funflow.External.Coordinator.Memory where
 
 import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.STM.TVar
-import           Control.Funflow.ContentHashable      (ContentHash)
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Lens
 import           Control.Monad.IO.Class               (liftIO)
 import           Control.Monad.STM
+import           Data.CAS.ContentHashable             (ContentHash)
 import           Data.List                            (find)
 import qualified Data.Map.Strict                      as M
 import           System.Clock                         (fromNanoSecs)

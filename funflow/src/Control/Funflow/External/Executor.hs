@@ -16,16 +16,16 @@ import           Control.Concurrent                   (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe
-import qualified Control.Funflow.ContentStore         as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
-import qualified Control.Funflow.RemoteCache          as Remote
 import           Control.Lens
 import           Control.Monad                        (forever, mzero, unless)
 import           Control.Monad.Trans                  (lift)
 import           Control.Monad.Trans.Maybe
 import qualified Data.Aeson                           as Json
 import qualified Data.ByteString                      as BS
+import qualified Data.CAS.ContentStore                as CS
+import qualified Data.CAS.RemoteCache                 as Remote
 import           Data.Foldable                        (for_)
 import           Data.Maybe                           (isJust, isNothing)
 import           Data.Monoid                          ((<>))

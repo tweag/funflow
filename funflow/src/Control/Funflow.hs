@@ -11,13 +11,14 @@ module Control.Funflow
   , type (Base.==>)
   , Base.NoEffect
   , Base.Flow'(..)
-  , Base.Cacher(..)
   , Base.ExternalProperties(..)
   , Base.MDWriter
   , Base.Properties(..)
   , Base.EpPurity(..)
   , Base.alwaysRecompile
-  , Base.defaultCacherWithIdent
+  , CS.CacherM(..)
+  , CS.Cacher
+  , CS.defaultCacherWithIdent
   , Cache.defaultCacher
   , Cache.defaultCacherLoc
     -- * Defines our primitive flow functions
@@ -38,11 +39,10 @@ import           Control.Arrow.Free
 import           Control.Funflow.Base         as Base
 import qualified Control.Funflow.Cache.TH     as Cache
 import qualified Control.Funflow.Class        as Class
-import qualified Control.Funflow.ContentStore as CS
 import           Control.Funflow.Exec.Simple
 import           Control.Funflow.External
 import           Control.Funflow.Steps
-
+import qualified Data.CAS.ContentStore        as CS
 
 -- | Change the effect type present inside the 'Flow'
 hoistFlowEff :: (forall x y. eff x y -> eff' x y) -> Flow eff ex a b -> Flow eff' ex a b

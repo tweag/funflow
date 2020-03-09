@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 -- | Dedicated module for orphan instances.
-module Control.Funflow.Orphans where
+module Data.CAS.StoreOrphans where
 
 import           Data.Functor.Contravariant
 import           Data.Store                 (Store)

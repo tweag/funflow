@@ -9,7 +9,7 @@
 --   - File moves
 --   - File deletion
 --   - Attribute changes.
-module Control.Funflow.ContentStore.Notify
+module Data.CAS.ContentStore.Notify
   ( Notifier
   , initNotifier
   , killNotifier
@@ -20,9 +20,9 @@ module Control.Funflow.ContentStore.Notify
   ) where
 
 #ifdef OS_Linux
-import           Control.Funflow.ContentStore.Notify.Linux
+import           Data.CAS.ContentStore.Notify.Linux
 #else
 #  ifdef OS_BSD
-import           Control.Funflow.ContentStore.Notify.BSD
+import           Data.CAS.ContentStore.Notify.BSD
 #  endif
 #endif

@@ -12,9 +12,9 @@ import           Control.Concurrent.Async                    (wait, withAsync)
 import           Control.Concurrent.MVar
 import           Control.Exception.Safe
 import           Control.Funflow
-import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External.Coordinator.SQLite
 import           Control.Monad
+import qualified Data.CAS.ContentStore                as CS
 import           Data.Semigroup                              ((<>))
 import           Data.String                                 (fromString)
 import           Path

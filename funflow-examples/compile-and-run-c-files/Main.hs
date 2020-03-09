@@ -7,9 +7,9 @@ module Main where
 import Control.Arrow
 import Control.Exception (Exception (..))
 import Control.Funflow
-import Control.Funflow.ContentStore (Content (..))
-import qualified Control.Funflow.ContentStore as CS
 import qualified Control.Funflow.External.Docker as Docker
+import Data.CAS.ContentStore (Content (..))
+import qualified Data.CAS.ContentStore as CS
 import Path
 import Path.IO
 

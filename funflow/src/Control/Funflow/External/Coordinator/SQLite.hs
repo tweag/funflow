@@ -15,14 +15,14 @@ module Control.Funflow.External.Coordinator.SQLite
 
 import           Control.Concurrent                   (threadDelay)
 import           Control.Exception.Safe
-import           Control.Funflow.ContentHashable
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
-import           Control.Funflow.Lock
 import           Control.Lens
 import           Control.Monad.IO.Class
 import qualified Data.Aeson                           as Json
 import qualified Data.ByteString.Char8                as C8
+import           Data.CAS.ContentHashable
+import           Data.CAS.Lock
 import qualified Data.Text                            as T
 import           Data.Typeable                        (Typeable)
 import qualified Database.SQLite.Simple               as SQL

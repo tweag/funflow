@@ -18,9 +18,9 @@ module Control.Funflow.Class where
 import           Control.Arrow
 import           Control.Arrow.Free
 import qualified Control.Funflow.Base            as Base
-import           Control.Funflow.ContentHashable
-import qualified Control.Funflow.ContentStore    as CS
 import           Control.Funflow.External
+import           Data.CAS.ContentHashable
+import qualified Data.CAS.ContentStore           as CS
 import qualified Data.Profunctor.Cayley          as P
 import           Data.Default                    (def)
 import           Path

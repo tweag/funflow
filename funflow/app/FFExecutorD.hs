@@ -11,12 +11,12 @@ import           Control.Concurrent                          (myThreadId)
 import           Control.Concurrent.MVar
 import           Control.Exception.Base                      (AsyncException (UserInterrupt))
 import           Control.Exception.Safe
-import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Redis
 import           Control.Funflow.External.Coordinator.SQLite
 import           Control.Funflow.External.Executor
 import           Control.Monad                               (void)
+import qualified Data.CAS.ContentStore                       as CS
 import           Data.Monoid                                 ((<>))
 import qualified Database.Redis                              as R
 import           Network.Socket                              (PortNumber)

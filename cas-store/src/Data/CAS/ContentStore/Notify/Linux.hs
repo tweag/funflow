@@ -4,7 +4,7 @@
 
 -- | Implementation of filesystem watching functionality for linux based on
 --   inotify.
-module Control.Funflow.ContentStore.Notify.Linux
+module Data.CAS.ContentStore.Notify.Linux
   ( Notifier
   , initNotifier
   , killNotifier

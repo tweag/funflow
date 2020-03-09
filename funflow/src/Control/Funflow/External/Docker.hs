@@ -16,9 +16,9 @@ module Control.Funflow.External.Docker
   ) where
 
 import           Control.Arrow                    (Kleisli (..), second)
-import           Control.Funflow.ContentHashable
 import           Control.Funflow.External
 import           Control.Monad.Trans.State.Strict
+import           Data.CAS.ContentHashable
 import           Data.Semigroup                   (Semigroup, (<>))
 import qualified Data.Text                        as T
 import           GHC.Generics                     (Generic)

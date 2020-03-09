@@ -27,24 +27,22 @@ import           Control.Concurrent.Async                    (withAsync)
 import           Control.Exception.Safe                      (Exception,
                                                               SomeException,
                                                               bracket,
-                                                              onException,
                                                               throwM, try)
 import           Control.Funflow.Base
-import           Control.Funflow.ContentHashable
-import qualified Control.Funflow.ContentStore                as CS
 import           Control.Funflow.External
 import           Control.Funflow.External.Coordinator
 import           Control.Funflow.External.Coordinator.Memory
 import           Control.Funflow.External.Executor           (executeLoop)
-import qualified Control.Funflow.RemoteCache                 as Remote
+import           Control.Lens                                (Identity (..))
 import           Control.Monad.Catch                         (MonadCatch,
                                                               MonadMask)
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control                 (MonadBaseControl)
-import qualified Data.ByteString                             as BS
+import           Data.CAS.ContentHashable
+import qualified Data.CAS.ContentStore                       as CS
+import qualified Data.CAS.RemoteCache                        as Remote
 import           Data.Foldable                               (traverse_)
 import           Data.Monoid                                 ((<>))
-import           Data.Void
 import           Katip
 import           Path
 import           System.IO                                   (stderr)
@@ -67,35 +65,17 @@ runFlowEx :: forall m c eff ex a b remoteCache.
           -> Flow eff ex a b
           -> a
           -> m b
-runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
+runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
     hook <- initialise cfg
     runAsyncA (eval (runFlow' hook) flow) input
   where
-    simpleOutPath item = toFilePath
-      $ CS.itemPath store item </> [relfile|out|]
-    withStoreCache :: forall i o. Cacher i o
+    withStoreCache :: forall i o. CS.Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
-    withStoreCache c@Cache{} (AsyncA f)
-      | Just confIdent' <- confIdent = AsyncA $ \i -> do
-      let chash = cacherKey c confIdent' i
-          computeAndStore fp = do
-            res <- f i  -- Do the actual computation
-            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                   . cacherStoreValue c $ res
-            return $ Right res
-          readItem item = do
-            bs <- liftIO . BS.readFile $ simpleOutPath item
-            return . cacherReadValue c $ bs
-      CS.withConstructIfMissing store cacher chash computeAndStore >>= \case
-        CS.Missing e -> absurd e
-        CS.Pending _ ->
-          liftIO (CS.waitUntilComplete store chash) >>= \case
-            Just item -> readItem item
-            Nothing -> throwM $ CS.FailedToConstruct chash
-        CS.Complete (Just a, _) -> return a
-        CS.Complete (_, item) -> readItem item
-    withStoreCache _ f = f
-        
+    withStoreCache c (AsyncA f) = AsyncA $
+      let c' = c{CS.cacherKey = \ident i -> return $ runIdentity $
+                  CS.cacherKey c ident i}
+      in CS.cacheKleisliIO confIdent c' store remoteCacher f
+      
     writeMd :: forall i o. ContentHash
             -> i
             -> o
@@ -106,14 +86,13 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
       let kvs = writer i o
       in traverse_ (uncurry $ CS.setMetadata store chash) kvs
 
-
     runFlow' :: Hook c -> Flow' eff a1 b1 -> AsyncA m a1 b1
     runFlow' _ (Step props f) = withStoreCache (cache props)
       . AsyncA $ \x -> do
           let out = f x
           case cache props of
-            Cache key _ _ | Just confIdent' <- confIdent ->
-              writeMd (key confIdent' x) x out $ mdpolicy props
+            CS.Cache key _ _ | Just confIdent' <- confIdent ->
+              writeMd (runIdentity $ key confIdent' x) x out $ mdpolicy props
             _ -> return ()
           return out
     runFlow' _ (StepIO props f) = withStoreCache (cache props)
@@ -161,24 +140,13 @@ runFlowEx _ cfg store cacher runWrapped confIdent flow input = do
               mbStdout <- CS.getMetadataFile store chash [relfile|stdout|]
               mbStderr <- CS.getMetadataFile store chash [relfile|stderr|]
               throwM $ ExternalTaskFailed td ti mbStdout mbStderr
-    runFlow' _ (PutInStore f) = AsyncA $ \x -> katipAddNamespace "putInStore" $ do
-      chash <- liftIO $ contentHash x
-      CS.constructOrWait store cacher chash >>= \case
-        CS.Pending void -> absurd void
-        CS.Complete item -> return item
-        CS.Missing fp ->
-          do
-            liftIO $ f fp x
-            finalItem <- CS.markComplete store chash
-            _ <- Remote.push cacher (CS.itemHash finalItem) (Just chash) (CS.itemPath store finalItem)
-            pure finalItem
-          `onException`
-            (do $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash
-                CS.removeFailed store chash
-            )
-    runFlow' _ (GetFromStore f) = AsyncA $ \case
-      CS.All item -> liftIO . f $ CS.itemPath store item
-      item CS.:</> path -> liftIO . f $ CS.itemPath store item </> path
+    runFlow' _ (PutInStore f) = AsyncA $
+      katipAddNamespace "putInStore"
+      . CS.putInStore store remoteCacher
+          (\chash -> $(logTM) WarningS . ls $ "Exception in construction: removing " <> show chash)
+          (\p -> liftIO . f p)
+    runFlow' _ (GetFromStore f) = AsyncA $
+      liftIO . f . CS.contentPath store
     runFlow' _ (InternalManipulateStore f) = AsyncA $ \i -> liftIO $ f store i
     runFlow' _ (Wrapped props w) = withStoreCache (cache props)
       $ runWrapped w

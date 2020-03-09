@@ -28,8 +28,6 @@ Library
                    , Control.Arrow.Free
                    , Control.Funflow
                    , Control.Funflow.Cache.TH
-                   , Control.Funflow.ContentHashable
-                   , Control.Funflow.ContentStore
                    , Control.Funflow.Diagram
                    , Control.Funflow.External
                    , Control.Funflow.External.Docker
@@ -38,22 +36,20 @@ Library
                    , Control.Funflow.External.Coordinator.Memory
                    , Control.Funflow.External.Coordinator.Redis
                    , Control.Funflow.External.Coordinator.SQLite
-                   , Control.Funflow.Lock
-                   , Control.Funflow.Orphans
-                   , Control.Funflow.RemoteCache
                    , Control.Funflow.Steps
                    , Control.Funflow.Pretty
                    , Control.Funflow.Exec.Simple
    Other-modules:
                      Control.Funflow.Base
                    , Control.Funflow.Class
-                   , Control.Funflow.ContentStore.Notify
    Build-depends:
                  base                    >= 4.6 && <5
                , Glob
                , aeson                   >= 1.2.3.0
                , async
                , bytestring
+               , cas-hashable
+               , cas-store
                , clock
                , constraints
                , containers
@@ -94,21 +90,13 @@ Library
                , unordered-containers
                , vector
                , yaml
-   if os(linux)
-     CPP-options: -DOS_Linux
-     Other-modules: Control.Funflow.ContentStore.Notify.Linux
-     Build-depends: hinotify             >= 0.3.9
-   else
-     if os(darwin) || os(freebsd)
-       CPP-options: -DOS_BSD
-       Other-modules: Control.Funflow.ContentStore.Notify.BSD
-       Build-depends: kqueue
 
 Executable ffexecutord
   default-language:  Haskell2010
   main-is: app/FFExecutorD.hs
   build-depends:       base >=4.6 && <5
                      , bytestring
+                     , cas-store
                      , clock
                      , funflow
                      , hedis >= 0.12.5
@@ -126,6 +114,7 @@ Test-suite test-funflow
   main-is: TestFunflow.hs
   ghc-options:        -Wall -threaded
   build-depends:       base >=4.6 && <5
+                     , cas-store
                      , data-default
                      , funflow
                      , filepath
@@ -141,14 +130,13 @@ Test-suite unit-tests
   default-language:   Haskell2010
   hs-source-dirs:     test
   main-is:            Test.hs
-  other-modules:      Funflow.ContentStore
-                      Funflow.SQLiteCoordinator
+  other-modules:      Funflow.SQLiteCoordinator
                       Funflow.TestFlows
                       Control.Arrow.Async.Tests
   ghc-options:        -Wall -threaded
   build-depends:      base
                     , async
-                    , containers
+                    , cas-store
                     , data-default >= 0.7
                     , directory
                     , filepath

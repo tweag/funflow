@@ -21,7 +21,7 @@
 --   We also export the 'ExternallyAssuredFile' and 'ExternallyAssuredDirectory'
 --   types. These instead use the path, file size and modification time to control
 --   the hash.
-module Control.Funflow.ContentHashable
+module Data.CAS.ContentHashable
   ( ContentHash
   , toBytes
   , fromBytes
@@ -50,8 +50,7 @@ module Control.Funflow.ContentHashable
 
 
 import           Control.Exception.Safe           (catchJust)
-import           Control.Funflow.Orphans          ()
-import           Control.Monad                    (foldM, mzero, (>=>))
+import           Control.Monad                    (foldM, (>=>))
 import           Control.Monad.IO.Class           (MonadIO, liftIO)
 import           Crypto.Hash                      (Context, Digest, SHA256,
                                                    digestFromByteString,
@@ -69,6 +68,7 @@ import qualified Data.ByteString                  as BS
 import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
+import           Data.CAS.StoreOrphans            ()
 import           Data.Foldable                    (foldlM)
 import           Data.Functor.Contravariant
 import qualified Data.Hashable
@@ -92,8 +92,6 @@ import           Data.Time.Clock.POSIX            (utcTimeToPOSIXSeconds)
 import           Data.Typeable
 import qualified Data.Vector                      as V
 import           Data.Word
-import qualified Database.SQLite.Simple.FromField as SQL
-import qualified Database.SQLite.Simple.ToField   as SQL
 import           Foreign.Marshal.Utils            (with)
 import           Foreign.Ptr                      (castPtr)
 import           Foreign.Storable                 (Storable, sizeOf)
@@ -144,16 +142,6 @@ instance Store ContentHash where
     Nothing -> peekException "Store ContentHash: Illegal digest"
     Just x -> return x
   poke = poke . toBytes
-
-instance SQL.FromField ContentHash where
-  fromField f = do
-    bs <- SQL.fromField f
-    case decodeHash bs of
-      Just h  -> pure h
-      Nothing -> mzero
-
-instance SQL.ToField ContentHash where
-  toField = SQL.toField . encodeHash
 
 toBytes :: ContentHash -> BS.ByteString
 toBytes = convert . unContentHash

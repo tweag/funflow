@@ -22,14 +22,14 @@ import           Control.Exception.Safe                      (SomeException,
                                                               displayException)
 import           Control.Funflow
 import           Control.Funflow.Cache.TH                    (defaultCacher)
-import           Control.Funflow.ContentHashable             (ContentHashable)
 import           Control.Funflow.External.Coordinator.Memory
-import qualified Control.Funflow.RemoteCache                 as Remote (NoCache(..))
 import           Control.Lens                                hiding (Unwrapped,
                                                               Wrapped)
 import           Control.Monad                               (join)
 import qualified Data.Aeson                                  as Aeson
 import           Data.Aeson.Lens
+import           Data.CAS.ContentHashable                    (ContentHashable)
+import qualified Data.CAS.RemoteCache                        as Remote (NoCache(..))
 import           Data.Default                                (def)
 import qualified Data.Text                                   as T
 import           Network.Wreq

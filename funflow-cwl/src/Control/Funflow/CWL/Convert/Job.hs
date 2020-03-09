@@ -35,8 +35,8 @@ module Control.Funflow.CWL.Convert.Job
 -- Funflow
 import Control.Arrow
 import           Control.Funflow
-import Control.Funflow.ContentStore ( Content (..) )
-import Control.Funflow.ContentHashable
+import Data.CAS.ContentStore ( Content (..) )
+import Data.CAS.ContentHashable
   ( FileContent (..)
   , DirectoryContent (..)
   )

@@ -16,16 +16,14 @@ module Control.Funflow.Base where
 import           Control.Arrow                   (Kleisli (..))
 import           Control.Arrow.Free
 import           Control.Exception.Safe          (SomeException)
-import           Control.Funflow.ContentHashable
-import qualified Control.Funflow.ContentStore    as CS
 import           Control.Funflow.Diagram
 import           Control.Funflow.External
 import           Data.ByteString                 (ByteString)
+import           Data.CAS.ContentHashable
+import           Data.CAS.ContentStore           as CS
 import           Data.Default
-import           Data.Functor.Identity
 import           Data.Int                        (Int64)
 import           Data.Proxy                      (Proxy (..))
-import qualified Data.Store                      as Store
 import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
@@ -33,30 +31,6 @@ import           System.Random                   (randomIO)
 
 -- | Metadata writer
 type MDWriter i o = Maybe (i -> o -> [(T.Text, ByteString)])
-
--- | A cacher is responsible for controlling how steps are cached.
-data Cacher i o =
-    NoCache -- ^ This step cannot be cached (default).
-  | Cache
-    { -- | Function to encode the input into a content
-      --   hash.
-      --   This function additionally takes an
-      --   'identities' which gets incorporated into
-      --   the cacher.
-      cacherKey        :: Int -> i -> ContentHash
-    , cacherStoreValue :: o -> ByteString
-      -- | Attempt to read the cache value back. May throw exceptions.
-    , cacherReadValue  :: ByteString -> o
-    }
-
-defaultCacherWithIdent :: (Store.Store o, ContentHashable Identity i)
-                       => Int -- ^ Seed for the cacher
-                       -> Cacher i o
-defaultCacherWithIdent ident = Cache
-  { cacherKey = \i ident' -> runIdentity $ contentHash (ident', ident, i)
-  , cacherStoreValue = Store.encode
-  , cacherReadValue = Store.decodeEx
-  }
 
 data Properties i o = Properties
   { -- | Name of this step. Used when describing the step in diagrams

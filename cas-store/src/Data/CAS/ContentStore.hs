@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -15,11 +16,11 @@
 
 -- | Hash addressed store in file system.
 --
--- Associates a key ('Control.Funflow.ContentHashable.ContentHash')
+-- Associates a key ('Data.CAS.ContentHashable.ContentHash')
 -- with an item in the store. An item can either be
--- 'Control.Funflow.ContentStore.Missing',
--- 'Control.Funflow.ContentStore.Pending', or
--- 'Control.Funflow.ContentStore.Complete'.
+-- 'Data.CAS.ContentStore.Missing',
+-- 'Data.CAS.ContentStore.Pending', or
+-- 'Data.CAS.ContentStore.Complete'.
 -- The state is persisted in the file system.
 --
 -- Items are stored under a path derived from their hash. Therefore,
@@ -45,13 +46,22 @@
 -- * Pending items are stored writable under the path @pending-\<key>@.
 -- * Complete items are stored read-only under the path @item-\<hash>@,
 --   with a link under @complete-\<key>@ pointing to that directory.
-module Control.Funflow.ContentStore
+module Data.CAS.ContentStore
   (
   -- * Open/Close
     withStore
   , open
   , close
 
+  -- * High-level API
+  , CacherM (..)
+  , Cacher
+  , defaultCacherWithIdent
+  , defaultIOCacherWithIdent
+  , cacheKleisliIO
+  , putInStore
+  , contentPath
+  
   -- * List Contents
   , listAll
   , listPending
@@ -99,7 +109,6 @@ module Control.Funflow.ContentStore
   , itemHash
   , itemPath
   , itemRelPath
-  , contentPath
   , contentItem
   , contentFilename
   , root
@@ -123,21 +132,20 @@ import           Control.Arrow                       (second)
 import           Control.Concurrent                  (threadDelay)
 import           Control.Concurrent.Async
 import           Control.Concurrent.MVar
-import           Control.Exception.Safe              (Exception, MonadMask,
-                                                      bracket, bracketOnError,
-                                                      bracket_,
-                                                      displayException, throwIO)
-import           Control.Funflow.ContentStore.Notify
-import           Control.Funflow.Orphans             ()
+import           Control.Exception.Safe
 import           Control.Lens
 import           Control.Monad                       (forM_, forever, unless,
-                                                      void, when, (<=<), (>=>))
+                                                      void, when, (<=<), (>=>),
+                                                      mzero)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
 import           Control.Monad.Trans.Control         (MonadBaseControl)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
+import           Data.ByteString                     (ByteString)
+import qualified Data.ByteString                     as BS
 import qualified Data.ByteString.Char8               as C8
+import           Data.CAS.ContentStore.Notify
 import           Data.Foldable                       (asum)
 import qualified Data.Hashable
 import           Data.List                           (foldl', stripPrefix)
@@ -161,14 +169,14 @@ import           System.IO                           (Handle, IOMode (..),
 import           System.Posix.Files
 import           System.Posix.Types
 
-import           Control.Funflow.ContentHashable     (ContentHash,
+import           Data.CAS.ContentHashable            (ContentHash,
                                                       ContentHashable (..),
                                                       DirectoryContent (..),
                                                       contentHashUpdate_fingerprint,
-                                                      encodeHash, pathToHash,
+                                                      decodeHash, encodeHash, pathToHash,
                                                       toBytes)
-import           Control.Funflow.Lock
-import qualified Control.Funflow.RemoteCache         as Remote
+import           Data.CAS.Lock
+import qualified Data.CAS.RemoteCache                as Remote
 
 
 -- | Status of an item in the store.
@@ -311,7 +319,7 @@ instance Monad m => ContentHashable m (Content File) where
 All item ^</> path = item :</> path
 (item :</> dir) ^</> path = item :</> dir </> path
 infixl 4 ^</>
-
+  
 newtype Alias = Alias { unAlias :: T.Text }
   deriving (ContentHashable IO, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
 
@@ -369,7 +377,7 @@ close store = do
 -- | Open the store under the given root and perform the given action.
 -- Closes the store once the action is complete
 --
--- See also: 'Control.Funflow.ContentStore.open'
+-- See also: 'Data.CAS.ContentStore.open'
 withStore :: (MonadIO m, MonadMask m)
   => Path Abs Dir -> (ContentStore -> m a) -> m a
 withStore root' = bracket (liftIO $ open root') (liftIO . close)
@@ -474,8 +482,8 @@ constructOrAsync
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) (Async Update) Item)
-constructOrAsync store cacher hash =
-  constructIfMissing store cacher hash >>= \case
+constructOrAsync store remoteCacher hash =
+  constructIfMissing store remoteCacher hash >>= \case
     Complete item -> return $ Complete item
     Missing path -> return $ Missing path
     Pending _ -> Pending <$> liftIO (internalWatchPending store hash)
@@ -494,7 +502,7 @@ constructOrWait
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) Void Item)
-constructOrWait store cacher hash = constructOrAsync store cacher hash >>= \case
+constructOrWait store remoteCacher hash = constructOrAsync store remoteCacher hash >>= \case
   Pending a -> liftIO (wait a) >>= \case
     Completed item -> return $ Complete item
     -- XXX: Consider extending 'Status' with a 'Failed' constructor.
@@ -513,12 +521,12 @@ constructIfMissing
   -> remoteCache
   -> ContentHash
   -> m (Status (Path Abs Dir) () Item)
-constructIfMissing store cacher hash = withStoreLock store $
+constructIfMissing store remoteCacher hash = withStoreLock store $
   internalQuery store hash >>= \case
     Complete item -> return $ Complete item
     Missing () -> withWritableStore store $ do
       let destDir :: Path Abs Dir = mkItemPath store hash
-      Remote.pull cacher hash destDir >>= \case
+      Remote.pull remoteCacher hash destDir >>= \case
         Remote.PullOK () -> return $ Complete (Item hash)
         Remote.NotInCache ->
           Missing <$> liftIO (internalMarkPending store hash)
@@ -537,9 +545,9 @@ withConstructIfMissing
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
-withConstructIfMissing store cacher hash f =
+withConstructIfMissing store remoteCacher hash f =
   bracketOnError
-    (constructIfMissing store cacher hash)
+    (constructIfMissing store remoteCacher hash)
     (\case
       Missing _ -> removeForcibly store hash
       _ -> return ())
@@ -552,14 +560,14 @@ withConstructIfMissing store cacher hash f =
           return (Missing e)
         Right x -> do
           item <- markComplete store hash
-          _ <- Remote.push cacher (itemHash item) (Just hash) (itemPath store item)
+          _ <- Remote.push remoteCacher (itemHash item) (Just hash) (itemPath store item)
           return (Complete (Just x, item)))
 
 -- | Mark a non-existent item as pending.
 --
 -- Creates the build directory and returns its path.
 --
--- See also: 'Control.Funflow.ContentStore.constructIfMissing'.
+-- See also: 'Data.CAS.ContentStore.constructIfMissing'.
 markPending :: MonadIO m => ContentStore -> ContentHash -> m (Path Abs Dir)
 markPending store hash = liftIO . withStoreLock store $
   internalQuery store hash >>= \case
@@ -641,6 +649,17 @@ removeItemForcibly store item = liftIO . withStoreLock store $ withWritableStore
   removePathForcibly (fromAbsDir $ itemPath store item)
   -- XXX: Remove dangling links.
   --   Add back-references in some form.
+
+-- We need this orphan instance here so cas-hash doesn't depend on sqlite
+instance SQL.FromField ContentHash where
+  fromField f = do
+    bs <- SQL.fromField f
+    case decodeHash bs of
+      Just h  -> pure h
+      Nothing -> mzero
+
+instance SQL.ToField ContentHash where
+  toField = SQL.toField . encodeHash
 
 -- | Link the given alias to the given item.
 -- If the alias existed before it is overwritten.
@@ -803,7 +822,7 @@ prefixHashPath pref hash
   | Just dir <- Path.parseRelDir $ C8.unpack $ pref <> encodeHash hash
   = dir
   | otherwise = error
-      "[Control.Funflow.ContentStore.prefixHashPath] \
+      "[Data.CAS.ContentStore.prefixHashPath] \
       \Failed to construct hash path."
 
 pendingPrefix, completePrefix, hashPrefix, itemPrefix :: IsString s => s
@@ -1030,3 +1049,107 @@ addBackReference store inHash (Item outHash) =
     [ ":in" SQL.:= inHash
     , ":out" SQL.:= outHash
     ]
+
+-- | A cacher is responsible for controlling how steps are cached.
+data CacherM m i o =
+    NoCache -- ^ This step cannot be cached (default).
+  | Cache
+    { -- | Function to encode the input into a content
+      --   hash.
+      --   This function additionally takes an
+      --   'identities' which gets incorporated into
+      --   the cacher.
+      cacherKey        :: Int -> i -> m ContentHash
+    , cacherStoreValue :: o -> ByteString
+      -- | Attempt to read the cache value back. May throw exceptions.
+    , cacherReadValue  :: ByteString -> o
+    }
+
+-- | A pure 'CacherM'
+type Cacher = CacherM Identity
+
+-- | Constructs a 'Cacher' that will use hashability of input and
+-- serializability of output to make a step cacheable
+defaultCacherWithIdent :: forall m i o.
+                          (ContentHashable m i, Data.Store.Store o)
+                       => Int -- ^ Seed for the cacher
+                       -> CacherM m i o
+defaultCacherWithIdent ident = Cache
+  { cacherKey = \i ident' -> contentHash (ident', ident, i)
+  , cacherStoreValue = Data.Store.encode
+  , cacherReadValue = Data.Store.decodeEx
+  }
+
+-- | Looks for a @CacherM IO@, then lifts it
+defaultIOCacherWithIdent :: (MonadIO m, ContentHashable IO i, Data.Store.Store o)
+                         => Int -- ^ Seed for the cacher
+                         -> CacherM m i o
+defaultIOCacherWithIdent ident = c{cacherKey = \x i -> liftIO $ cacherKey c x i}
+  where c = defaultCacherWithIdent ident
+
+
+-- | Caches a Kleisli of some MonadIO action in the store given the required
+-- properties
+cacheKleisliIO
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  => Maybe Int  -- ^ This can be used to disambiguate the same program run in
+                -- multiple configurations. If Nothing, then it means this
+                -- program has no identity, this implies that steps will be
+                -- executed without cache, even if 'Cache' has been given.
+  -> CacherM m i o
+  -> ContentStore
+  -> remoteCache
+  -> (i -> m o)
+  -> i
+  -> m o
+cacheKleisliIO confIdent c@Cache{} store remoteCacher f i
+  | Just confIdent' <- confIdent = do
+      chash <- cacherKey c confIdent' i
+      let computeAndStore fp = do
+            res <- f i  -- Do the actual computation
+            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                   . cacherStoreValue c $ res
+            return $ Right res
+          readItem item = do
+            bs <- liftIO . BS.readFile $ simpleOutPath item
+            return . cacherReadValue c $ bs
+      withConstructIfMissing store remoteCacher chash computeAndStore >>= \case
+        Missing e -> absurd e
+        Pending _ ->
+          liftIO (waitUntilComplete store chash) >>= \case
+            Just item -> readItem item
+            Nothing -> throwM $ FailedToConstruct chash
+        Complete (Just a, _) -> return a
+        Complete (_, item) -> readItem item
+  where
+    simpleOutPath item =
+      toFilePath $ itemPath store item </> [relfile|out|]
+cacheKleisliIO _ _ _ _ f i = f i
+
+-- | Caches an action that writes content-addressed data to the store. Returns
+-- the Item of the written content.
+putInStore
+  :: (MonadIO m, MonadMask m, MonadBaseControl IO m
+     ,Remote.Cacher m remoteCacher
+     ,ContentHashable IO t)
+  => ContentStore
+  -> remoteCacher
+  -> (ContentHash -> m ()) -- ^ In case an exception occurs
+  -> (Path Abs Dir -> t -> m ()) -- ^ The action that writes to the new store
+                                 -- directory
+  -> t
+  -> m Item -- ^ The Item in the store to which @t@ has been written
+putInStore store remoteCacher ifExc f x = do
+  chash <- liftIO $ contentHash x
+  constructOrWait store remoteCacher chash >>= \case
+    Pending y -> absurd y
+    Complete item -> return item
+    Missing fp ->
+      do
+        f fp x
+        finalItem <- markComplete store chash
+        _ <- Remote.push remoteCacher (itemHash finalItem) (Just chash) (itemPath store finalItem)
+        pure finalItem
+      `onException`
+        (do ifExc chash
+            removeFailed store chash)
