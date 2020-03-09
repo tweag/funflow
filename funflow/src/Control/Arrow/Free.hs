@@ -38,6 +38,8 @@ module Control.Arrow.Free
   , mapA
   , mapSeqA
   , filterA
+  , hoistErrorChoiceEff
+  , expandErrorChoiceEff
   , type (~>)
   ) where
 
@@ -190,6 +192,20 @@ newtype ErrorChoice ex eff a b = ErrorChoice {
                  => (eff ~> ac) -> ac a b
 }
   deriving (P.Profunctor, P.Strong, P.Choice) via P.WrappedArrow (ErrorChoice ex eff)
+
+hoistErrorChoiceEff
+  :: (eff ~> eff')
+  -> ErrorChoice ex eff a b
+  -> ErrorChoice ex eff' a b
+hoistErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
+  ec (interp . f)
+
+expandErrorChoiceEff
+  :: (forall x y. eff x y -> ErrorChoice ex eff' x y)
+  -> ErrorChoice ex eff a b
+  -> ErrorChoice ex eff' a b
+expandErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
+  ec (\eff -> runErrorChoice (f eff) interp)
 
 instance Category (ErrorChoice ex eff) where
   id = ErrorChoice $ const id
