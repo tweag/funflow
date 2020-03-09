@@ -146,6 +146,7 @@ import           Data.ByteString                     (ByteString)
 import qualified Data.ByteString                     as BS
 import qualified Data.ByteString.Char8               as C8
 import           Data.CAS.ContentStore.Notify
+import           Data.CAS.StoreOrphans               ()
 import           Data.Foldable                       (asum)
 import qualified Data.Hashable
 import           Data.List                           (foldl', stripPrefix)

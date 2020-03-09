@@ -68,9 +68,7 @@ import qualified Data.ByteString                  as BS
 import           Data.ByteString.Builder.Extra    (defaultChunkSize)
 import qualified Data.ByteString.Char8            as C8
 import qualified Data.ByteString.Lazy             as BSL
-import           Data.CAS.StoreOrphans            ()
 import           Data.Foldable                    (foldlM)
-import           Data.Functor.Contravariant
 import qualified Data.Hashable
 import qualified Data.HashMap.Lazy                as HashMap
 import qualified Data.HashSet                     as HashSet
@@ -81,7 +79,6 @@ import           Data.Map                         (Map)
 import qualified Data.Map                         as Map
 import           Data.Ratio
 import           Data.Scientific
-import           Data.Store                       (Store (..), peekException)
 import qualified Data.Text                        as T
 import qualified Data.Text.Array                  as TA
 import qualified Data.Text.Encoding               as TE
@@ -135,13 +132,6 @@ instance Show ContentHash where
     . (showString $ C8.unpack $ encodeHash h)
     . showString "\""
     where app_prec = 10
-
-instance Store ContentHash where
-  size = contramap toBytes size
-  peek = fromBytes <$> peek >>= \case
-    Nothing -> peekException "Store ContentHash: Illegal digest"
-    Just x -> return x
-  poke = poke . toBytes
 
 toBytes :: ContentHash -> BS.ByteString
 toBytes = convert . unContentHash
@@ -488,7 +478,6 @@ newtype ExternallyAssuredFile = ExternallyAssuredFile (Path.Path Path.Abs Path.F
 
 instance Aeson.FromJSON ExternallyAssuredFile
 instance Aeson.ToJSON ExternallyAssuredFile
-instance Store ExternallyAssuredFile
 
 instance ContentHashable IO ExternallyAssuredFile where
   contentHashUpdate ctx (ExternallyAssuredFile fp) = do
@@ -518,7 +507,6 @@ newtype ExternallyAssuredDirectory = ExternallyAssuredDirectory (Path.Path Path.
 
 instance Aeson.FromJSON ExternallyAssuredDirectory
 instance Aeson.ToJSON ExternallyAssuredDirectory
-instance Store ExternallyAssuredDirectory
 
 instance ContentHashable IO ExternallyAssuredDirectory where
   contentHashUpdate ctx0 (ExternallyAssuredDirectory dir0) = do
