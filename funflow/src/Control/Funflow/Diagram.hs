@@ -3,6 +3,9 @@
 {-# LANGUAGE InstanceSigs          #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE DerivingVia           #-}
+{-# LANGUAGE RankNTypes            #-}
+
 -- | A Diagram is a representation of an arrow with labels.
 --   No computation is actually performed by a diagram, it just carries
 --   around a description.
@@ -13,6 +16,8 @@ module Control.Funflow.Diagram where
 import           Control.Arrow
 import           Control.Arrow.Free (ArrowError (..))
 import           Control.Category
+import qualified Data.Profunctor    as P
+import qualified Data.Profunctor.Traversing as P
 import           Data.Proxy         (Proxy (..))
 import qualified Data.Text          as T
 import           Prelude            hiding (id, (.))
@@ -34,6 +39,9 @@ data Diagram ex a b where
   Par :: Diagram ex a b -> Diagram ex c d -> Diagram ex (a,c) (b,d)
   Fanin :: Diagram ex a c -> Diagram ex b c -> Diagram ex (Either a b) c
   Try :: Diagram ex a b -> Diagram ex a (Either ex b)
+  Traverse :: Diagram ex a b -> Diagram ex (f a) (f b)
+  Wander :: (forall f. (Applicative f) => (a -> f b) -> s -> f t) -> Diagram ex a b -> Diagram ex s t
+  deriving (P.Profunctor, P.Strong, P.Choice) via P.WrappedArrow (Diagram ex)
 
 instance Category (Diagram ex) where
   id = Node emptyNodeProperties Proxy Proxy
@@ -52,6 +60,10 @@ instance ArrowChoice (Diagram ex) where
 
 instance ArrowError ex (Diagram ex) where
   try = Try
+
+instance P.Traversing (Diagram ex) where
+  traverse' = Traverse
+  wander = Wander
 
 -- | Construct a labelled node
 node :: forall arr a b ex. Arrow arr => arr a b -> [T.Text] -> (Diagram ex) a b

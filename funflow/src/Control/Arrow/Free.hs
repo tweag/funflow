@@ -12,6 +12,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE DerivingVia           #-}
 
 -- | Various varieties of free arrow constructions.
 --
@@ -37,26 +38,27 @@ module Control.Arrow.Free
   , mapA
   , mapSeqA
   , filterA
+  , hoistErrorChoiceEff
+  , expandErrorChoiceEff
   , type (~>)
   ) where
 
+import           Prelude                (Functor (..))
+
 import           Control.Arrow
-import           Control.Arrow.AppArrow
 import           Control.Category
 import           Control.Exception.Safe (Exception, MonadCatch)
 import qualified Control.Exception.Safe
-import           Control.Monad.Trans.Reader
-import           Control.Monad.Trans.Writer
-import qualified Control.Monad.Trans.Writer.Strict as SW
-import           Data.Bool           (Bool)
-import           Data.Constraint     (Constraint, Dict (..), mapDict, weaken1,
-                                      weaken2)
-import           Data.Either         (Either (..))
-import           Data.Function       (const, flip, ($))
-import           Data.List           (uncons)
-import           Data.Maybe          (maybe)
-import           Data.Monoid         (Monoid)
-import           Data.Tuple          (uncurry)
+import           Data.Bool              (Bool)
+import           Data.Constraint        (Constraint, Dict (..))
+import           Data.Either            (Either (..))
+import           Data.Function          (const, flip, ($))
+import           Data.List              (uncons)
+import           Data.Maybe             (maybe)
+import qualified Data.Profunctor        as P
+import qualified Data.Profunctor.Cayley as P
+import qualified Data.Profunctor.Traversing as P
+import           Data.Tuple             (uncurry)
 
 -- | A natural transformation on type constructors of two arguments.
 type x ~> y = forall a b. x a b -> y a b
@@ -77,10 +79,10 @@ class FreeArrowLike fal where
 
 -- | Annoying hackery to let us tuple constraints and still use 'effect'
 --   and 'eval'
-class Join ( a :: k -> Constraint) (b :: k -> Constraint) (x :: k) where
-  ctx :: Dict (a x, b x)
-instance (a x, b x) => Join a b x where
-  ctx = Dict
+class Join (a :: k -> Constraint) (b :: k -> Constraint) (c :: k -> Constraint) (x :: k) where
+  ctx :: (Dict (a x), Dict (b x), Dict (c x))
+instance (a x, b x, c x) => Join a b c x where
+  ctx = (Dict, Dict, Dict)
 
 --------------------------------------------------------------------------------
 -- Arrow
@@ -167,17 +169,8 @@ instance FreeArrowLike Choice where
 class ArrowError ex a where
   try :: a e c -> a e (Either ex c)
 
-instance (ArrowError ex arr) => ArrowError ex (AppArrow (Reader r) arr) where
-  try (AppArrow act) = AppArrow $ reader $ \r ->
-    try $ runReader act r
-
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (Writer w) arr) where
-  try (AppArrow act) = AppArrow $ writer (try a, w)
-    where (a, w) = runWriter act
-
-instance (ArrowError ex arr, Monoid w) => ArrowError ex (AppArrow (SW.Writer w) arr) where
-  try (AppArrow act) = AppArrow $ SW.writer (try a, w)
-    where (a, w) = SW.runWriter act
+instance (ArrowError ex arr, Functor f) => ArrowError ex (P.Cayley f arr) where
+  try (P.Cayley f) = P.Cayley $ fmap try f
 
 catch :: (ArrowError ex a, ArrowChoice a) => a e c -> a (e, ex) c -> a e c
 catch a onExc = proc e -> do
@@ -192,11 +185,27 @@ instance (Arrow (Kleisli m), Exception ex, MonadCatch m)
   => ArrowError ex (Kleisli m) where
     try (Kleisli a) = Kleisli $ Control.Exception.Safe.try . a
 
--- | Freely generated arrows with both choice and error handling.
+-- | Freely generated arrows with both choice, error handling and ability to
+-- traverse structures with Traversals.
 newtype ErrorChoice ex eff a b = ErrorChoice {
-  runErrorChoice :: forall ac. (ArrowChoice ac, ArrowError ex ac)
+  runErrorChoice :: forall ac. (ArrowChoice ac, ArrowError ex ac, P.Traversing ac)
                  => (eff ~> ac) -> ac a b
 }
+  deriving (P.Profunctor, P.Strong, P.Choice) via P.WrappedArrow (ErrorChoice ex eff)
+
+hoistErrorChoiceEff
+  :: (eff ~> eff')
+  -> ErrorChoice ex eff a b
+  -> ErrorChoice ex eff' a b
+hoistErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
+  ec (interp . f)
+
+expandErrorChoiceEff
+  :: (forall x y. eff x y -> ErrorChoice ex eff' x y)
+  -> ErrorChoice ex eff a b
+  -> ErrorChoice ex eff' a b
+expandErrorChoiceEff f (ErrorChoice ec) = ErrorChoice $ \interp ->
+  ec (\eff -> runErrorChoice (f eff) interp)
 
 instance Category (ErrorChoice ex eff) where
   id = ErrorChoice $ const id
@@ -216,19 +225,22 @@ instance ArrowChoice (ErrorChoice ex eff) where
 instance ArrowError ex (ErrorChoice ex eff) where
   try (ErrorChoice a) = ErrorChoice $ \f -> try $ a f
 
+instance P.Traversing (ErrorChoice ex eff) where
+  traverse' (ErrorChoice a) = ErrorChoice $ \f -> P.traverse' (a f)
+  wander trav (ErrorChoice a) = ErrorChoice $ \f -> P.wander trav (a f)
+
 instance FreeArrowLike (ErrorChoice ex) where
-  type Ctx (ErrorChoice ex) = Join ArrowChoice (ArrowError ex)
+  type Ctx (ErrorChoice ex) = Join ArrowChoice (ArrowError ex) P.Traversing
   effect :: eff a b -> ErrorChoice ex eff a b
   effect a = ErrorChoice $ \f -> f a
 
-  eval :: forall eff arr a0 b0. (Join ArrowChoice (ArrowError ex) arr)
+  eval :: forall eff arr a0 b0. (Join ArrowChoice (ArrowError ex) P.Traversing arr)
        => (eff ~> arr)
        -> ErrorChoice ex eff a0 b0
        -> arr a0 b0
-  eval f a = case (\x -> (mapDict weaken1 x, mapDict weaken2 x)) ctx of
-    ( Dict :: Dict (ArrowChoice arr)
-      , Dict :: Dict (ArrowError ex arr)
-      ) -> runErrorChoice a f
+  eval f a = case ctx of
+    ( Dict :: Dict (ArrowChoice arr), Dict :: Dict (ArrowError ex arr), Dict :: Dict (P.Traversing arr) )
+      -> runErrorChoice a f
 
 
 --------------------------------------------------------------------------------
