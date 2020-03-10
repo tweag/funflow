@@ -72,8 +72,9 @@ runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
     withStoreCache :: forall i o. CS.Cacher i o
                    -> AsyncA m i o -> AsyncA m i o
     withStoreCache c (AsyncA f) = AsyncA $
-      let c' = c{CS.cacherKey = \ident i -> return $ runIdentity $
-                  CS.cacherKey c ident i}
+      let c' = case c of CS.NoCache -> CS.NoCache
+                         CS.Cache k s r -> CS.Cache (\ident i -> return $ runIdentity $
+                                                      k ident i) s r
       in CS.cacheKleisliIO confIdent c' store remoteCacher f
       
     writeMd :: forall i o. ContentHash
