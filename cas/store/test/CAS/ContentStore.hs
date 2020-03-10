@@ -96,7 +96,7 @@ tests = testGroup "Content Store"
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
 
-      ContentStore.constructOrAsync store myCache hash >>= \case
+      ContentStore.constructIfMissing store myCache hash >>= \case
         ContentStore.Pending _ ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -104,15 +104,13 @@ tests = testGroup "Content Store"
         ContentStore.Missing _ ->
           return ()
 
-      a <- ContentStore.constructOrAsync store Remote.NoCache hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "under construction still missing"
-          undefined
         ContentStore.Complete _ -> do
           assertFailure "under construction already complete"
-          undefined
-        ContentStore.Pending a ->
-          return a
+        ContentStore.Pending _ ->
+          return ()
 
       b <- ContentStore.lookupOrWait store hash >>= \case
         ContentStore.Missing _ -> do
@@ -126,13 +124,10 @@ tests = testGroup "Content Store"
 
       item <- ContentStore.markComplete store hash
 
-      item' <- wait a
-      item' @?= ContentStore.Completed item
-
       item'' <- wait b
       item'' @?= ContentStore.Completed item
 
-      ContentStore.constructOrAsync store Remote.NoCache hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "complete still missing"
         ContentStore.Pending _ -> do
@@ -144,7 +139,7 @@ tests = testGroup "Content Store"
     withEmptyStore $ \store -> do
       hash <- contentHash ("test" :: String)
 
-      ContentStore.constructOrAsync store Remote.NoCache hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Pending _ ->
           assertFailure "missing already under construction"
         ContentStore.Complete _ ->
@@ -152,15 +147,13 @@ tests = testGroup "Content Store"
         ContentStore.Missing _ ->
           return ()
 
-      a <- ContentStore.constructOrAsync store Remote.NoCache hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Missing _ -> do
           assertFailure "under construction still missing"
-          undefined
         ContentStore.Complete _ -> do
           assertFailure "under construction already complete"
-          undefined
-        ContentStore.Pending a ->
-          return a
+        ContentStore.Pending _ ->
+          return ()
 
       b <- ContentStore.lookupOrWait store hash >>= \case
         ContentStore.Missing _ -> do
@@ -174,13 +167,10 @@ tests = testGroup "Content Store"
 
       ContentStore.removeFailed store hash
 
-      item' <- wait a
-      item' @?= ContentStore.Failed
-
       item'' <- wait b
       item'' @?= ContentStore.Failed
 
-      ContentStore.constructOrAsync store Remote.NoCache hash >>= \case
+      ContentStore.constructIfMissing store Remote.NoCache hash >>= \case
         ContentStore.Pending _ -> do
           assertFailure "failed still under construction"
         ContentStore.Complete _ -> do
@@ -386,32 +376,6 @@ tests = testGroup "Content Store"
         r <- ContentStore.lookupAlias store aliasB
         r @?= Nothing
 
-    , testCase "Remote caching (constructOrAsync)" $ do
-      cacher <- Remote.memoryCache
-      hash <- contentHash ("test" :: String)
-      let file = [relfile|file|]
-          expectedContent = "Hello World"
-
-      -- Populate the remote cache
-      withEmptyStore $ \store -> do
-        ContentStore.constructOrAsync store cacher hash >>= \case
-          ContentStore.Pending _ ->
-            assertFailure "missing already under construction"
-          ContentStore.Complete _ ->
-            assertFailure "missing already complete"
-          ContentStore.Missing subtree -> do
-            isWritable subtree @? "under construction not writable"
-            writeFile (fromAbsFile $ subtree </> file) expectedContent
-            Remote.push cacher hash Nothing subtree
-
-      -- Expects having the item in cache
-      withEmptyStore $ \store -> do
-        ContentStore.constructOrAsync store cacher hash >>= \case
-          ContentStore.Pending _ ->
-            assertFailure "missing already under construction"
-          ContentStore.Complete _ -> pure ()
-          ContentStore.Missing _ -> assertFailure "Not found in the cache"
-
     , testCase "Remote caching (withConstructIfMissing)" $ do
       cacher <- Remote.memoryCache
       hash <- contentHash ("test" :: String)
@@ -424,7 +388,7 @@ tests = testGroup "Content Store"
       
       -- Populates the remote cache
       withEmptyStore $ \store -> do
-        ContentStore.withConstructIfMissing store cacher hash doWrite >>= \case
+        ContentStore.withConstructIfMissing store cacher (return ()) hash doWrite >>= \case
           ContentStore.Missing _ -> assertFailure "not found in the cache"
           ContentStore.Pending _ ->
             assertFailure "missing already under construction"
@@ -435,7 +399,7 @@ tests = testGroup "Content Store"
     
       -- Expects having the item in the remote cache
       withEmptyStore $ \store -> do
-        ContentStore.withConstructIfMissing store cacher hash
+        ContentStore.withConstructIfMissing store cacher (return ()) hash
           (const $ assertFailure "should not try to write the file a second time") >>= \case
             ContentStore.Missing _ -> assertFailure "Not found in the cache"
             ContentStore.Pending _ ->

@@ -79,8 +79,6 @@ module Data.CAS.ContentStore
 
   -- * Construct Items
   , cacheComputation
-  , constructOrAsync
-  , constructOrWait
   , constructIfMissing
   , withConstructIfMissing
   , markPending
@@ -470,53 +468,6 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
     Failed -> return Nothing
 
 -- | Atomically query the state under the given key and mark pending if missing.
---
--- Returns @'Complete' item@ if the item is complete.
--- Returns @'Pending' async@ if the item is pending, where @async@ is an
--- 'Control.Concurrent.Async' to await updates on.
--- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
--- It should be constructed in the given @buildDir@,
--- and then marked as complete using 'markComplete'.
-constructOrAsync
-  :: forall m remoteCache.
-     (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
-  => ContentStore
-  -> remoteCache
-  -> ContentHash
-  -> m (Status (Path Abs Dir) (Async Update) Item)
-constructOrAsync store remoteCacher hash =
-  constructIfMissing store remoteCacher hash >>= \case
-    Complete item -> return $ Complete item
-    Missing path -> return $ Missing path
-    Pending _ -> Pending <$> liftIO (internalWatchPending store hash)
-
--- | Atomically query the state under the given key and mark pending if missing.
--- Wait for the item to be completed, if already pending.
--- Throws a 'FailedToConstruct' error if construction fails.
---
--- Returns @'Complete' item@ if the item is complete.
--- Returns @'Missing' buildDir@ if the item was missing, and is now pending.
--- It should be constructed in the given @buildDir@,
--- and then marked as complete using 'markComplete'.
-constructOrWait
-  :: (MonadIO m, MonadMask m, MonadBaseControl IO m, Remote.Cacher m remoteCache)
-  => ContentStore
-  -> remoteCache
-  -> ContentHash
-  -> m (Status (Path Abs Dir) Void Item)
-constructOrWait store remoteCacher hash = constructOrAsync store remoteCacher hash >>= \case
-  Pending a -> liftIO (wait a) >>= \case
-    Completed item -> return $ Complete item
-    -- XXX: Consider extending 'Status' with a 'Failed' constructor.
-    --   If the store contains metadata as well, it could keep track of the
-    --   number of failed attempts and further details about the failure.
-    --   If an external task is responsible for the failure, the client could
-    --   choose to resubmit a certain number of times.
-    Failed -> liftIO . throwIO $ FailedToConstruct hash
-  Complete item -> return $ Complete item
-  Missing dir -> return $ Missing dir
-
--- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
   :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
@@ -532,7 +483,7 @@ constructIfMissing store remoteCacher hash = withStoreLock store $
         Remote.PullOK () -> return $ Complete (Item hash)
         Remote.NotInCache ->
           Missing <$> liftIO (internalMarkPending store hash)
-        Remote.PullError _ ->
+        Remote.PullError _ ->  -- TODO: That error should not be silenced
           Missing <$> liftIO (internalMarkPending store hash)
     Pending _ -> return $ Pending ()
 
@@ -544,7 +495,7 @@ withConstructIfMissing
   :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
   -> remoteCache
-  -> m () -- ^ In case an exception occurs (logging for instance)
+  -> m () -- ^ In case an exception occurs (to log something for instance)
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
