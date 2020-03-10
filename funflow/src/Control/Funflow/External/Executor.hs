@@ -65,7 +65,7 @@ data ExecutionResult =
 execute :: CS.ContentStore -> TaskDescription -> KatipContextT IO ExecutionResult
 execute store td = logError $ do
      -- We should pass a Remote cacher down to it:
-  status <- CS.withConstructIfMissing store Remote.NoCache (td ^. tdOutput) $ \fp -> do
+  status <- CS.withConstructIfMissing store Remote.NoCache (return ()) (td ^. tdOutput) $ \fp -> do
     (fpOut, hOut) <- lift $
       CS.createMetadataFile store (td ^. tdOutput) [relfile|stdout|]
     (fpErr, hErr) <- lift $
