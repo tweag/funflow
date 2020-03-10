@@ -1,4 +1,4 @@
-let 
+let
   default = import ./default.nix {};
   required-packages = with default; [
     cas-hashable.components.library
@@ -13,9 +13,9 @@ let
     funflow-jobs.components.library
   ];
   required-tests = with default; [
-    cas-store.components.tests.unit-tests
-    funflow.components.tests.unit-tests
-    funflow-checkpoints.components.tests.unit-tests
+    cas-store.checks
+    funflow.checks
+    funflow-checkpoints.checks
   ];
 in {
   inherit required-packages;
