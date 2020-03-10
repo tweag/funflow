@@ -88,6 +88,8 @@ import           Data.Time.Clock                  (UTCTime)
 import           Data.Time.Clock.POSIX            (utcTimeToPOSIXSeconds)
 import           Data.Typeable
 import qualified Data.Vector                      as V
+import qualified Data.Vector.Storable             as VS
+import qualified Data.Vector.Unboxed              as VU
 import           Data.Word
 import           Foreign.Marshal.Utils            (with)
 import           Foreign.Ptr                      (castPtr)
@@ -357,6 +359,19 @@ instance (Typeable a, ContentHashable m a)
   contentHashUpdate ctx v =
     flip contentHashUpdate_fingerprint v
     >=> flip (V.foldM' contentHashUpdate) v $ ctx
+
+-- TODO: Rewrite using MemView
+instance (Typeable a, Storable a, ContentHashable m a)
+  => ContentHashable m (VS.Vector a) where
+  contentHashUpdate ctx v =
+    flip contentHashUpdate_fingerprint v
+    >=> flip (VS.foldM' contentHashUpdate) v $ ctx
+
+instance (Typeable a, VU.Unbox a, ContentHashable m a)
+  => ContentHashable m (VU.Vector a) where
+  contentHashUpdate ctx v =
+    flip contentHashUpdate_fingerprint v
+    >=> flip (VU.foldM' contentHashUpdate) v $ ctx
 
 instance Monad m => ContentHashable m ()
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (a, b)
