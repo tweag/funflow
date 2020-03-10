@@ -78,6 +78,7 @@ module Data.CAS.ContentStore
   , waitUntilComplete
 
   -- * Construct Items
+  , cacheComputation
   , constructOrAsync
   , constructOrWait
   , constructIfMissing
@@ -543,15 +544,18 @@ withConstructIfMissing
   :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
   -> remoteCache
+  -> m () -- ^ In case an exception occurs (logging for instance)
   -> ContentHash
   -> (Path Abs Dir -> m (Either e a))
   -> m (Status e () (Maybe a, Item))
-withConstructIfMissing store remoteCacher hash f =
+withConstructIfMissing store remoteCacher ifExc hash f =
   bracketOnError
     (constructIfMissing store remoteCacher hash)
-    (\case
-      Missing _ -> removeForcibly store hash
-      _ -> return ())
+    (\status -> do
+        case status of
+          Missing _ -> removeForcibly store hash
+          _ -> return ()
+        ifExc)
     (\case
       Pending () -> return (Pending ())
       Complete item -> return (Complete (Nothing, item))
@@ -785,8 +789,8 @@ createMetadataFile store hash file = liftIO . withStoreLock store $
     Pending _ -> do
       let path = mkMetadataFilePath store hash file
       createDirIfMissing True (parent path)
-      handle <- openFile (fromAbsFile path) WriteMode
-      pure (path, handle)
+      hndl <- openFile (fromAbsFile path) WriteMode
+      pure (path, hndl)
     _ -> throwIO $ NotPending hash
 
 -- | Return the path to a metadata file if it exists.
@@ -1088,6 +1092,26 @@ defaultIOCacherWithIdent :: (MonadIO m, ContentHashable IO i, Data.Store.Store o
 defaultIOCacherWithIdent ident = c{cacherKey = \x i -> liftIO $ cacherKey c x i}
   where c = defaultCacherWithIdent ident
 
+-- | Runs a computation only if the ContentHash isn't already associated to an
+-- entry in the store
+cacheComputation
+  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  => ContentStore
+  -> remoteCache
+  -> m ()                  -- ^ In case an exception occurs
+  -> ContentHash           -- ^ A ContentHash to identify the computation inputs
+  -> (Path Abs Dir -> m a) -- ^ The computation to cache, receving the path of a
+                           -- store folder to which it should write its results
+  -> m (Maybe a, Item)     -- ^ The result if it was just computed, and the item
+                           -- corresponding to the store folder
+cacheComputation store remoteCacher ifExc inputCHash computation =
+  withConstructIfMissing store remoteCacher ifExc inputCHash (fmap Right . computation) >>= \case
+    Missing e -> absurd e
+    Pending _ ->
+      liftIO (waitUntilComplete store inputCHash) >>= \case
+        Just item -> return (Nothing, item)
+        Nothing -> throwM $ FailedToConstruct inputCHash
+    Complete resultAndItem -> return resultAndItem
 
 -- | Caches a Kleisli of some MonadIO action in the store given the required
 -- properties
@@ -1106,25 +1130,17 @@ cacheKleisliIO
 cacheKleisliIO confIdent c@Cache{} store remoteCacher f i
   | Just confIdent' <- confIdent = do
       chash <- cacherKey c confIdent' i
-      let computeAndStore fp = do
-            res <- f i  -- Do the actual computation
-            liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-                   . cacherStoreValue c $ res
-            return $ Right res
-          readItem item = do
-            bs <- liftIO . BS.readFile $ simpleOutPath item
-            return . cacherReadValue c $ bs
-      withConstructIfMissing store remoteCacher chash computeAndStore >>= \case
-        Missing e -> absurd e
-        Pending _ ->
-          liftIO (waitUntilComplete store chash) >>= \case
-            Just item -> readItem item
-            Nothing -> throwM $ FailedToConstruct chash
-        Complete (Just a, _) -> return a
-        Complete (_, item) -> readItem item
-  where
-    simpleOutPath item =
-      toFilePath $ itemPath store item </> [relfile|out|]
+      (res, item) <- cacheComputation store remoteCacher (return ()) chash computeAndStore
+      case res of
+        Just r -> return r
+        Nothing -> do
+          bs <- liftIO . BS.readFile $ toFilePath $ itemPath store item </> [relfile|out|]
+          return $ cacherReadValue c $ bs
+  where computeAndStore fp = do
+          res <- f i  -- Do the actual computation
+          liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
+                 $ cacherStoreValue c $ res
+          return res
 cacheKleisliIO _ _ _ _ f i = f i
 
 -- | Caches an action that writes content-addressed data to the store. Returns
@@ -1142,15 +1158,4 @@ putInStore
   -> m Item -- ^ The Item in the store to which @t@ has been written
 putInStore store remoteCacher ifExc f x = do
   chash <- liftIO $ contentHash x
-  constructOrWait store remoteCacher chash >>= \case
-    Pending y -> absurd y
-    Complete item -> return item
-    Missing fp ->
-      do
-        f fp x
-        finalItem <- markComplete store chash
-        _ <- Remote.push remoteCacher (itemHash finalItem) (Just chash) (itemPath store finalItem)
-        pure finalItem
-      `onException`
-        (do ifExc chash
-            removeFailed store chash)
+  snd <$> cacheComputation store remoteCacher (ifExc chash) chash (flip f x)
