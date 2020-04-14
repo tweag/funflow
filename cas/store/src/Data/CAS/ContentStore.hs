@@ -61,7 +61,7 @@ module Data.CAS.ContentStore
   , cacheKleisliIO
   , putInStore
   , contentPath
-  
+
   -- * List Contents
   , listAll
   , listPending
@@ -137,7 +137,6 @@ import           Control.Monad                       (forM_, forever, unless,
                                                       void, when, (<=<), (>=>),
                                                       mzero)
 import           Control.Monad.IO.Class              (MonadIO, liftIO)
-import           Control.Monad.Trans.Control         (MonadBaseControl)
 import           Crypto.Hash                         (hashUpdate)
 import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.Bits                           (complement)
@@ -177,6 +176,7 @@ import           Data.CAS.ContentHashable            (ContentHash,
                                                       toBytes)
 import           Data.CAS.Lock
 import qualified Data.CAS.RemoteCache                as Remote
+import           UnliftIO                            (MonadUnliftIO)
 
 
 -- | Status of an item in the store.
@@ -319,7 +319,7 @@ instance Monad m => ContentHashable m (Content File) where
 All item ^</> path = item :</> path
 (item :</> dir) ^</> path = item :</> dir </> path
 infixl 4 ^</>
-  
+
 newtype Alias = Alias { unAlias :: T.Text }
   deriving (ContentHashable IO, Eq, Ord, Show, SQL.FromField, SQL.ToField, Data.Store.Store)
 
@@ -469,7 +469,7 @@ waitUntilComplete store hash = lookupOrWait store hash >>= \case
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing
-  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  :: (MonadIO m, MonadUnliftIO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
   -> remoteCache
   -> ContentHash
@@ -492,7 +492,7 @@ constructIfMissing store remoteCacher hash = withStoreLock store $
 -- and remove on failure. Forcibly removes if an uncaught exception occurs
 -- during item construction.
 withConstructIfMissing
-  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  :: (MonadIO m, MonadUnliftIO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
   -> remoteCache
   -> m () -- ^ In case an exception occurs (to log something for instance)
@@ -770,7 +770,7 @@ metadataPath = (</> [reldir|metadata|])
 
 -- | Holds a lock on the global 'MVar' and on the global lock file
 -- for the duration of the given action.
-withStoreLock :: MonadBaseControl IO m => ContentStore -> m a -> m a
+withStoreLock :: MonadUnliftIO m => ContentStore -> m a -> m a
 withStoreLock store = withLock (storeLock store)
 
 prefixHashPath :: C8.ByteString -> ContentHash -> Path Rel Dir
@@ -1046,7 +1046,7 @@ defaultIOCacherWithIdent ident = c{cacherKey = \x i -> liftIO $ cacherKey c x i}
 -- | Runs a computation only if the ContentHash isn't already associated to an
 -- entry in the store
 cacheComputation
-  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  :: (MonadIO m, MonadUnliftIO m, MonadMask m, Remote.Cacher m remoteCache)
   => ContentStore
   -> remoteCache
   -> m ()                  -- ^ In case an exception occurs
@@ -1067,7 +1067,7 @@ cacheComputation store remoteCacher ifExc inputCHash computation =
 -- | Caches a Kleisli of some MonadIO action in the store given the required
 -- properties
 cacheKleisliIO
-  :: (MonadIO m, MonadBaseControl IO m, MonadMask m, Remote.Cacher m remoteCache)
+  :: (MonadIO m, MonadUnliftIO m, MonadMask m, Remote.Cacher m remoteCache)
   => Maybe Int  -- ^ This can be used to disambiguate the same program run in
                 -- multiple configurations. If Nothing, then it means this
                 -- program has no identity, this implies that steps will be
@@ -1097,7 +1097,7 @@ cacheKleisliIO _ _ _ _ f i = f i
 -- | Caches an action that writes content-addressed data to the store. Returns
 -- the Item of the written content.
 putInStore
-  :: (MonadIO m, MonadMask m, MonadBaseControl IO m
+  :: (MonadIO m, MonadMask m, MonadUnliftIO m
      ,Remote.Cacher m remoteCacher
      ,ContentHashable IO t)
   => ContentStore

@@ -31,7 +31,6 @@ import           Control.Monad.Base
 import           Control.Monad.Catch
 import           Control.Monad.Except
 import           Control.Monad.State.Strict
-import           Control.Monad.Trans.Control
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString.Char8       as BS8
 import           Data.Either                 (rights)
@@ -41,6 +40,7 @@ import           Data.Store
 import qualified Data.Text                   as T
 import qualified Database.Redis              as R
 import           GHC.Generics
+import           UnliftIO                    (MonadUnliftIO, withRunInIO, wrappedWithRunInIO)
 
 type NameSpace = ByteString
 
@@ -49,10 +49,8 @@ type RFlowM a = ExceptT String (StateT FlowST R.Redis) a
 instance MonadBase IO R.Redis where
   liftBase = liftIO
 
-instance MonadBaseControl IO R.Redis where
-  type StM R.Redis a = a
-  liftBaseWith f = R.reRedis $ liftBaseWith $ \q -> f (q . R.unRedis)
-  restoreM = R.reRedis . restoreM
+instance MonadUnliftIO R.Redis where
+  withRunInIO = wrappedWithRunInIO R.reRedis R.unRedis
 
 instance MonadThrow R.Redis where
   throwM = liftIO . throwM

@@ -37,7 +37,7 @@ import           Control.Lens                                (Identity (..))
 import           Control.Monad.Catch                         (MonadCatch,
                                                               MonadMask)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Control                 (MonadBaseControl)
+import           UnliftIO                                    (MonadUnliftIO)
 import           Data.CAS.ContentHashable
 import qualified Data.CAS.ContentStore                       as CS
 import qualified Data.CAS.RemoteCache                        as Remote
@@ -49,7 +49,7 @@ import           System.IO                                   (stderr)
 
 -- | Simple evaulation of a flow
 runFlowEx :: forall m c eff ex a b remoteCache.
-             (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+             (Coordinator c, Exception ex, MonadIO m, MonadUnliftIO m
              ,MonadCatch m, MonadMask m, KatipContext m, Remote.Cacher m remoteCache)
           => c
           -> Config c
@@ -76,7 +76,7 @@ runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
                          CS.Cache k s r -> CS.Cache (\ident i -> return $ runIdentity $
                                                       k ident i) s r
       in CS.cacheKleisliIO confIdent c' store remoteCacher f
-      
+
     writeMd :: forall i o. ContentHash
             -> i
             -> o
@@ -154,7 +154,7 @@ runFlowEx _ cfg store remoteCacher runWrapped confIdent flow input = do
 
 -- | Run a flow in a logging context.
 runFlowLog :: forall m c eff ex a b remoteCache.
-              (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+              (Coordinator c, Exception ex, MonadIO m, MonadUnliftIO m
               ,MonadCatch m, MonadMask m, KatipContext m, Remote.Cacher m remoteCache)
            => c
            -> Config c
@@ -172,7 +172,7 @@ runFlowLog c cfg store cacher runWrapped confIdent flow input =
 
 -- | Run a flow, discarding all logging.
 runFlow :: forall m c eff ex a b remoteCache.
-           (Coordinator c, Exception ex, MonadIO m, MonadBaseControl IO m
+           (Coordinator c, Exception ex, MonadIO m, MonadUnliftIO m
            ,MonadCatch m, MonadMask m, Remote.Cacher (KatipContextT m) remoteCache)
         => c
         -> Config c
@@ -192,7 +192,7 @@ runFlow c cfg store cacher runWrapped confIdent flow input = do
 
 -- | Run a simple flow. Logging will be sent to stderr
 runSimpleFlow :: forall m c a b.
-                 (Coordinator c, MonadIO m, MonadBaseControl IO m
+                 (Coordinator c, MonadIO m, MonadUnliftIO m
                  ,MonadCatch m, MonadMask m)
         => c
         -> Config c
