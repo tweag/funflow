@@ -6,6 +6,9 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE TypeOperators             #-}
 {-# LANGUAGE ViewPatterns              #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 -- | Core Funflow types and functions.
 --
@@ -13,7 +16,7 @@
 --   type of all Funflow workflows.
 module Control.Funflow.Base where
 
-import           Control.Arrow                   (Kleisli (..))
+import           Control.Arrow
 import           Control.Arrow.Free
 import           Control.Exception.Safe          (SomeException)
 import           Control.Funflow.Diagram
@@ -28,6 +31,8 @@ import qualified Data.Text                       as T
 import           Path
 import           Prelude                         hiding (id, (.))
 import           System.Random                   (randomIO)
+import Control.Kernmantle.Rope
+
 
 -- | Metadata writer
 type MDWriter i o = Maybe (i -> o -> [(T.Text, ByteString)])
@@ -73,38 +78,54 @@ instance Default (ExternalProperties a) where
     , ep_impure = def
     }
 
-data Flow' eff a b where
-  Step :: Properties a b -> (a -> b) -> Flow' eff a b
-  StepIO :: Properties a b -> (a -> IO b) -> Flow' eff a b
+data CachedStep a b where
+  Step :: Properties a b -> (a -> b) -> CachedStep a b
+  StepIO :: Properties a b -> (a -> IO b) -> CachedStep a b
+
+data ExternalStep a b where
   External :: ExternalProperties a
            -> (a -> ExternalTask)
-           -> Flow' eff a CS.Item
+           -> ExternalStep a CS.Item
+
+data DirectStoreAccess a b where
   -- XXX: Constrain allowed user actions.
-  PutInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> Flow' eff a CS.Item
+  PutInStore :: ContentHashable IO a
+             => (Path Abs Dir -> a -> IO ())
+             -> DirectStoreAccess a CS.Item
   -- XXX: Constrain allowed user actions.
-  GetFromStore :: (Path Abs t -> IO a) -> Flow' eff (CS.Content t) a
-  -- Internally manipulate the store. This should not be used by
-  -- client libraries.
+  GetFromStore :: (Path Abs t -> IO a)
+               -> DirectStoreAccess (CS.Content t) a
   InternalManipulateStore :: (CS.ContentStore -> a -> IO b)
-                          -> Flow' eff a b
-  Wrapped :: Properties a b -> eff a b -> Flow' eff a b
+                          -> DirectStoreAccess a b
 
-type Flow eff ex = ErrorChoice ex (Flow' eff)
+type FunflowStrands = '[ '("externalStep", ExternalStep)
+                       , '("cachedStep", CachedStep)
+                       , '("directStoreAccess", DirectStoreAccess) ]
 
-data NoEffect a b
+type Flow ex a b = TightRopeWith FunflowStrands
+                                 '[TryEffect ex, ArrowChoice]
+                                 a b
 
--- | Since there are no constructors for 'NoEffect', this code can never be
---   reached and so is fine.
-runNoEffect :: forall arr. NoEffect ~> arr
-runNoEffect = error "Impossible!"
+type RunnableFlow ex a b = forall core.
+                            (TryEffect ex core, ArrowChoice core)
+                         => TightRope FunflowStrands core a b
 
-type SimpleFlow = Flow NoEffect SomeException
-type (==>) = SimpleFlow
+type SimpleFlow a b = forall core. (TryEffect SomeException core, ArrowChoice core)
+                    => TightRope FunflowStrands core a b
+type (==>) a b = SimpleFlow a b
 
--- | Convert a flow to a diagram, for inspection/pretty printing
-toDiagram :: Flow eff ex a b -> Diagram ex a b
-toDiagram = eval toDiagram' where
-  toDiagram' (Step (name -> Just n) f)  = node f [n]
-  toDiagram' (StepIO (name -> Just n) f)  = node (Kleisli f) [n]
+-- | Convert a 'Flow' stripped of all extra effects to a diagram, for
+-- inspection/pretty printing
+toDiagram :: RunnableFlow ex a b -> Diagram ex a b
+toDiagram flow = flow & loosen
+                      & weave' #externalStep toDiagram'
+                      & weave' #cachedStep stepToDiagram
+                      & weave' #directStoreAccess toDiagram'
+                      & untwine
+  where
+  stepToDiagram step = case step of
+    Step (name -> Just n) f   -> node f [n]
+    StepIO (name -> Just n) f -> node (Kleisli f) [n]
+    _ -> error "toDiagram: should not happen"
   toDiagram' _
       = Node emptyNodeProperties (Proxy :: Proxy a1) (Proxy :: Proxy b1)

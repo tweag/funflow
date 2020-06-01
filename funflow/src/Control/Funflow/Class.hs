@@ -3,6 +3,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE OverloadedLabels #-}
 
 -- | Defines a class for types which can be used as workflows.
 --
@@ -24,8 +25,10 @@ import qualified Data.CAS.ContentStore           as CS
 import qualified Data.Profunctor.Cayley          as P
 import           Data.Default                    (def)
 import           Path
+import Control.Kernmantle.Rope
 
-class (Arrow arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex where
+
+class (Arrow arr, TryEffect ex arr) => ArrowFlow eff ex arr | arr -> eff ex where
   -- | Create a flow from a pure function.
   step' :: Base.Properties a b -> (a -> b) -> arr a b
   -- | Create a flow from an IO action.
@@ -34,8 +37,8 @@ class (Arrow arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex whe
   external :: (a -> ExternalTask) -> arr a CS.Item
   -- | Create an external task with additional properties
   external' :: Base.ExternalProperties a -> (a -> ExternalTask) -> arr a CS.Item
-  -- | Create a flow from a user-defined effect.
-  wrap' :: Base.Properties a b -> eff a b -> arr a b
+  -- -- | Create a flow from a user-defined effect.
+  -- wrap' :: Base.Properties a b -> eff a b -> arr a b
   -- | Create a flow which will write its incoming data to the store.
   putInStore :: ContentHashable IO a => (Path Abs Dir -> a -> IO ()) -> arr a CS.Item
   -- | Create a flow which will read data from the given store item.
@@ -43,15 +46,16 @@ class (Arrow arr, ArrowError ex arr) => ArrowFlow eff ex arr | arr -> eff ex whe
   -- | Perform some internal manipulation of the content store.
   internalManipulateStore :: (CS.ContentStore -> a -> IO b) -> arr a b
 
-instance ArrowFlow eff ex (Base.Flow eff ex) where
-  step' props = effect . Base.Step props
-  stepIO' props = effect . Base.StepIO props
-  external = effect . Base.External def
-  external' p td = effect $ Base.External p td
-  wrap' p eff = effect $ Base.Wrapped p eff
-  putInStore = effect . Base.PutInStore
-  getFromStore = effect . Base.GetFromStore
-  internalManipulateStore = effect . Base.InternalManipulateStore
+instance (Rope r mantle core `Entwines` Base.FunflowStrands)
+      => ArrowFlow eff ex (Rope r mantle core) where
+  step' props = strand #cachedStep . Base.Step props
+  stepIO' props = strand #cachedStep . Base.StepIO props
+  external = strand #externalStep . Base.External def
+  external' p td = strand #externalStep $ Base.External p td
+  -- wrap' p eff = effect $ Base.Wrapped p eff
+  putInStore = strand #directStoreAccess . Base.PutInStore
+  getFromStore = strand #directStoreAccess . Base.GetFromStore
+  internalManipulateStore = strand #directStoreAccess . Base.InternalManipulateStore
 
 -- | Create a flow from a pure function.
 --   This is a variant on 'step'' which uses the default properties.
@@ -63,8 +67,8 @@ step = step' def
 stepIO :: ArrowFlow eff ex arr => (a -> IO b) -> arr a b
 stepIO = stepIO' def
 
-wrap :: ArrowFlow eff ex arr => eff a b -> arr a b
-wrap = wrap' def
+-- wrap :: ArrowFlow eff ex arr => eff a b -> arr a b
+-- wrap = wrap' def
 
 instance ( Applicative app
          , ArrowError ex (arr eff ex)

@@ -14,13 +14,14 @@
 module Control.Funflow.Diagram where
 
 import           Control.Arrow
-import           Control.Arrow.Free (ArrowError (..))
 import           Control.Category
 import qualified Data.Profunctor    as P
 import qualified Data.Profunctor.Traversing as P
 import           Data.Proxy         (Proxy (..))
 import qualified Data.Text          as T
 import           Prelude            hiding (id, (.))
+
+import Control.Kernmantle.Error
 
 
 newtype NodeProperties = NodeProperties {
@@ -58,8 +59,8 @@ instance ArrowChoice (Diagram ex) where
   f +++ g = (f >>> arr Left) ||| (g >>> arr Right)
   f ||| g = Fanin f g
 
-instance ArrowError ex (Diagram ex) where
-  try = Try
+instance TryEffect ex (Diagram ex) where
+  tryE = Try
 
 instance P.Traversing (Diagram ex) where
   traverse' = Traverse
