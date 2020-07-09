@@ -1,0 +1,928 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE GADTs #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE OverloadedLabels #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE QuasiQuotes #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Funflow.Run</span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Funflow.Run.html#FlowExecutionConfig"><span class="hs-identifier">FlowExecutionConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Funflow.Run.html#CommandExecutionHandler"><span class="hs-identifier">CommandExecutionHandler</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Funflow.Run.html#runFlow"><span class="hs-identifier">runFlow</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Arrow</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">arr</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">bracket</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">Control.External</span></a></span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">EnvExplicit</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">ExternalTask</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">StdOutCapture</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">TaskDescription</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier">execute</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-caching-0.1.0.0/docs/src"><span class="hs-identifier">localStoreWithId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">Control.Kernmantle.Rope</span></a></span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">Entwines</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">HasKleisliIO</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">LooseRope</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">SatisfiesAll</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">liftKleisliIO</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">perform</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">runReader</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-35"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">strand</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-36"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">untwine</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">weave</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-38"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier">weave'</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-39"></span><span>    </span><span class="annot"><span class="hs-operator">(&amp;)</span></span><span class="hs-special">,</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">liftIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/cas-hashable-1.0.1/docs/src"><span class="hs-identifier">contentHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/cas-store-1.1.0/docs/src"><span class="hs-identifier">Data.CAS.ContentStore</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CS</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.String</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">fromString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">unpack</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Debug.Trace</span></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Flow.html"><span class="hs-identifier">Funflow.Flow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flow.html#Flow"><span class="hs-identifier">Flow</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html"><span class="hs-identifier">Funflow.Flows.Command</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier">CommandFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier">CommandFlow</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#ShellCommandFlow"><span class="hs-identifier">ShellCommandFlow</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier">CommandFlowConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier">CommandFlowConfig</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-52"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html"><span class="hs-identifier">Funflow.Flows.Command</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CF</span></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Flows.Docker.html"><span class="hs-identifier">Funflow.Flows.Docker</span></a></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlow"><span class="hs-identifier">DockerFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlow"><span class="hs-identifier">DockerFlow</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-56"></span><span>    </span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlowConfig"><span class="hs-identifier">DockerFlowConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlowConfig"><span class="hs-identifier">DockerFlowConfig</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Funflow.Flows.Docker.html"><span class="hs-identifier">Funflow.Flows.Docker</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">DF</span></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html"><span class="hs-identifier">Funflow.Flows.Nix</span></a></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlow"><span class="hs-identifier">NixFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlow"><span class="hs-identifier">NixFlow</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlowConfig"><span class="hs-identifier">NixFlowConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlowConfig"><span class="hs-identifier">NixFlowConfig</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html"><span class="hs-identifier">Funflow.Flows.Nix</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NF</span></span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Flows.Simple.html"><span class="hs-identifier">Funflow.Flows.Simple</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Simple.html#SimpleFlow"><span class="hs-identifier">SimpleFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Simple.html#IO"><span class="hs-identifier">IO</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Funflow.Flows.Simple.html#Pure"><span class="hs-identifier">Pure</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Funflow.Util.html"><span class="hs-identifier">Funflow.Util</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Util.html#mapPair"><span class="hs-identifier">mapPair</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">Katip</span></a></span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">ColorIfTerminal</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-68"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">InfoS</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">V2</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">closeScribes</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">defaultScribeSettings</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">initLogEnv</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-73"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">mkHandleScribe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-74"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">permitItem</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-75"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">registerScribe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-76"></span><span>    </span><span class="annot"><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier">runKatipContextT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/path-0.7.1/docs/src"><span class="hs-identifier">absdir</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Environment</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">getEnv</span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">stdout</span></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Unsafe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">unsafePerformIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Process</span></span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier">CmdSpec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">RawCommand</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ShellCommand</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-84"></span><span>    </span><span class="annot"><span class="hs-identifier">CreateProcess</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">CreateProcess</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-85"></span><span>    </span><span class="annot"><span class="hs-identifier">StdStream</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Inherit</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-86"></span><span>    </span><span class="annot"><span class="hs-identifier">child_group</span></span><span class="hs-special">,</span><span>
+</span><span id="line-87"></span><span>    </span><span class="annot"><span class="hs-identifier">child_user</span></span><span class="hs-special">,</span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><span class="hs-identifier">close_fds</span></span><span class="hs-special">,</span><span>
+</span><span id="line-89"></span><span>    </span><span class="annot"><span class="hs-identifier">cmdspec</span></span><span class="hs-special">,</span><span>
+</span><span id="line-90"></span><span>    </span><span class="annot"><span class="hs-identifier">createProcess</span></span><span class="hs-special">,</span><span>
+</span><span id="line-91"></span><span>    </span><span class="annot"><span class="hs-identifier">create_group</span></span><span class="hs-special">,</span><span>
+</span><span id="line-92"></span><span>    </span><span class="annot"><span class="hs-identifier">create_new_console</span></span><span class="hs-special">,</span><span>
+</span><span id="line-93"></span><span>    </span><span class="annot"><span class="hs-identifier">cwd</span></span><span class="hs-special">,</span><span>
+</span><span id="line-94"></span><span>    </span><span class="annot"><span class="hs-identifier">delegate_ctlc</span></span><span class="hs-special">,</span><span>
+</span><span id="line-95"></span><span>    </span><span class="annot"><span class="hs-identifier">detach_console</span></span><span class="hs-special">,</span><span>
+</span><span id="line-96"></span><span>    </span><span class="annot"><span class="hs-identifier">env</span></span><span class="hs-special">,</span><span>
+</span><span id="line-97"></span><span>    </span><span class="annot"><span class="hs-identifier">new_session</span></span><span class="hs-special">,</span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="hs-identifier">std_err</span></span><span class="hs-special">,</span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><span class="hs-identifier">std_in</span></span><span class="hs-special">,</span><span>
+</span><span id="line-100"></span><span>    </span><span class="annot"><span class="hs-identifier">std_out</span></span><span class="hs-special">,</span><span>
+</span><span id="line-101"></span><span>    </span><span class="annot"><span class="hs-identifier">use_process_jobs</span></span><span class="hs-special">,</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/modern-uri-0.3.2.0/docs/src"><span class="hs-identifier">Text.URI</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">URI</span></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- Run a flow</span><span>
+</span><span id="line-106"></span><span class="hs-keyword">data</span><span> </span><span id="FlowExecutionConfig"><span class="annot"><a href="Funflow.Run.html#FlowExecutionConfig"><span class="hs-identifier hs-var">FlowExecutionConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FlowExecutionConfig"><span class="annot"><a href="Funflow.Run.html#FlowExecutionConfig"><span class="hs-identifier hs-var">FlowExecutionConfig</span></a></span></span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="commandExecution"><span class="annot"><span class="annottext">FlowExecutionConfig -&gt; CommandExecutionHandler
+</span><a href="Funflow.Run.html#commandExecution"><span class="hs-identifier hs-var hs-var">commandExecution</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Run.html#CommandExecutionHandler"><span class="hs-identifier hs-type">CommandExecutionHandler</span></a></span><span>
+</span><span id="line-108"></span><span>  </span><span class="hs-comment">-- , executionEnvironment :: CommandExecutionEnvironment</span><span>
+</span><span id="line-109"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span class="hs-keyword">data</span><span> </span><span id="CommandExecutionHandler"><span class="annot"><a href="Funflow.Run.html#CommandExecutionHandler"><span class="hs-identifier hs-var">CommandExecutionHandler</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SystemExecutor"><span class="annot"><a href="Funflow.Run.html#SystemExecutor"><span class="hs-identifier hs-var">SystemExecutor</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="ExternalExecutor"><span class="annot"><a href="Funflow.Run.html#ExternalExecutor"><span class="hs-identifier hs-var">ExternalExecutor</span></a></span></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- data CommandHashStrategy = Smart | Rigorous</span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- data CommandExecutionEnvironment = SystemEnvironment | Nix | Docker</span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span id="local-6989586621679237543"><span id="local-6989586621679237544"><span class="annot"><a href="Funflow.Run.html#runFlow"><span class="hs-identifier hs-type">runFlow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Run.html#FlowExecutionConfig"><span class="hs-identifier hs-type">FlowExecutionConfig</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Funflow.Flow.html#Flow"><span class="hs-identifier hs-type">Flow</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237544"><span class="hs-identifier hs-type">input</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237543"><span class="hs-identifier hs-type">output</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237544"><span class="hs-identifier hs-type">input</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679237543"><span class="hs-identifier hs-type">output</span></a></span></span></span><span>
+</span><span id="line-117"></span><span id="runFlow"><span class="annot"><span class="annottext">runFlow :: FlowExecutionConfig -&gt; Flow input output -&gt; input -&gt; IO output
+</span><a href="Funflow.Run.html#runFlow"><span class="hs-identifier hs-var hs-var">runFlow</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Run.html#FlowExecutionConfig"><span class="hs-identifier hs-type">FlowExecutionConfig</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679237542"><span class="annot"><span class="annottext">CommandExecutionHandler
+commandExecution :: CommandExecutionHandler
+commandExecution :: FlowExecutionConfig -&gt; CommandExecutionHandler
+</span><a href="#local-6989586621679237542"><span class="hs-identifier hs-var hs-var">commandExecution</span></a></span></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span id="local-6989586621679237541"><span class="annot"><span class="annottext">flow :: Flow input output
+</span><a href="#local-6989586621679237541"><span class="hs-identifier hs-var">flow</span></a></span></span><span> </span><span id="local-6989586621679237540"><span class="annot"><span class="annottext">input :: input
+</span><a href="#local-6989586621679237540"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-118"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span class="hs-comment">-- TODO choose path</span><span>
+</span><span id="line-119"></span><span>      </span><span id="local-6989586621679237539"><span class="annot"><span class="annottext">defaultPath :: Path Abs Dir
+</span><a href="#local-6989586621679237539"><span class="hs-identifier hs-var hs-var">defaultPath</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="">[absdir|/tmp/funflow/store|]</span></span><span>
+</span><span id="line-120"></span><span>      </span><span id="local-6989586621679237537"><span class="annot"><span class="annottext">defaultCachingId :: Maybe Int
+</span><a href="#local-6989586621679237537"><span class="hs-identifier hs-var hs-var">defaultCachingId</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Maybe Int
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span>
+</span><span id="line-121"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="hs-comment">-- Run with store to enable caching (with default path to store)</span><span>
+</span><span id="line-122"></span><span>      </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; (ContentStore -&gt; IO output) -&gt; IO output
+forall (m :: * -&gt; *) a.
+(MonadIO m, MonadMask m) =&gt;
+Path Abs Dir -&gt; (ContentStore -&gt; m a) -&gt; m a
+</span><a href="../https://hackage.haskell.org/package/cas-store-1.1.0/docs/src"><span class="hs-identifier hs-var">CS.withStore</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679237539"><span class="hs-identifier hs-var">defaultPath</span></a></span><span> </span><span class="annot"><span class="annottext">((ContentStore -&gt; IO output) -&gt; IO output)
+-&gt; (ContentStore -&gt; IO output) -&gt; IO output
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679237535"><span class="annot"><span class="annottext">store :: ContentStore
+</span><a href="#local-6989586621679237535"><span class="hs-identifier hs-var">store</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-123"></span><span>        </span><span class="annot"><span class="annottext">Rope
+  Rec
+  '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+     '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+  (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+  input
+  output
+Flow input output
+</span><a href="#local-6989586621679237541"><span class="hs-identifier hs-var">flow</span></a></span><span>
+</span><span id="line-124"></span><span>          </span><span class="hs-comment">-- Weave effects</span><span>
+</span><span id="line-125"></span><span>          </span><span class="annot"><span class="annottext">Rope
+  Rec
+  '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+     '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+  (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+  input
+  output
+-&gt; (Rope
+      Rec
+      '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+         '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+      (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+      input
+      output
+    -&gt; LooseRope
+         '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+            '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+         input
+         output)
+-&gt; LooseRope
+     '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+        '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+     input
+     output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;docker&quot;
+-&gt; ((LooseRope
+       '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+          '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+       (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+     :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+    -&gt; DockerFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; LooseRope
+     '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+        '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+   :-&gt; LooseRope
+         '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+            '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+forall (name :: Symbol) (binEff :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Label name
+-&gt; ((LooseRope ('(name, binEff) : mantle) core :-&gt; core)
+    -&gt; binEff :-&gt; core)
+-&gt; LooseRope ('(name, binEff) : mantle) core
+   :-&gt; LooseRope mantle core
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">weave</span></a></span><span> </span><span class="annot"><span class="annottext">IsLabel &quot;docker&quot; (Label &quot;docker&quot;)
+Label &quot;docker&quot;
+</span><a href="#local-6989586621679237534"><span class="hs-var">#docker</span></a></span><span> </span><span class="annot"><span class="annottext">(LooseRope
+   '[ '(&quot;docker&quot;, DockerFlow), '(&quot;nix&quot;, NixFlow),
+      '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+   (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+ :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; DockerFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO)
+WeaverFor &quot;docker&quot; DockerFlow '[ '(&quot;command&quot;, CommandFlow)] '[]
+</span><a href="Funflow.Run.html#interpretDockerFlow"><span class="hs-identifier hs-var">interpretDockerFlow</span></a></span><span>
+</span><span id="line-126"></span><span>          </span><span class="annot"><span class="annottext">LooseRope
+  '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+     '(&quot;simple&quot;, SimpleFlow)]
+  (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+  input
+  output
+-&gt; (LooseRope
+      '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+         '(&quot;simple&quot;, SimpleFlow)]
+      (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+      input
+      output
+    -&gt; LooseRope
+         '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+         input
+         output)
+-&gt; LooseRope
+     '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+     input
+     output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;nix&quot;
+-&gt; ((LooseRope
+       '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+          '(&quot;simple&quot;, SimpleFlow)]
+       (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+     :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+    -&gt; NixFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; LooseRope
+     '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+        '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+   :-&gt; LooseRope
+         '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+forall (name :: Symbol) (binEff :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Label name
+-&gt; ((LooseRope ('(name, binEff) : mantle) core :-&gt; core)
+    -&gt; binEff :-&gt; core)
+-&gt; LooseRope ('(name, binEff) : mantle) core
+   :-&gt; LooseRope mantle core
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">weave</span></a></span><span> </span><span class="annot"><span class="annottext">IsLabel &quot;nix&quot; (Label &quot;nix&quot;)
+Label &quot;nix&quot;
+</span><a href="#local-6989586621679237532"><span class="hs-var">#nix</span></a></span><span> </span><span class="annot"><span class="annottext">(LooseRope
+   '[ '(&quot;nix&quot;, NixFlow), '(&quot;command&quot;, CommandFlow),
+      '(&quot;simple&quot;, SimpleFlow)]
+   (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+ :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; NixFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO)
+WeaverFor &quot;nix&quot; NixFlow '[ '(&quot;command&quot;, CommandFlow)] '[]
+</span><a href="Funflow.Run.html#interpretNixFlow"><span class="hs-identifier hs-var">interpretNixFlow</span></a></span><span>
+</span><span id="line-127"></span><span>          </span><span class="annot"><span class="annottext">LooseRope
+  '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+  (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+  input
+  output
+-&gt; (LooseRope
+      '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+      (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+      input
+      output
+    -&gt; LooseRope
+         '[ '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+         input
+         output)
+-&gt; LooseRope
+     '[ '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+     input
+     output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;command&quot;
+-&gt; (CommandFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; LooseRope
+     '[ '(&quot;command&quot;, CommandFlow), '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+   :-&gt; LooseRope
+         '[ '(&quot;simple&quot;, SimpleFlow)]
+         (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+forall (name :: Symbol) (binEff :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Label name
+-&gt; (binEff :-&gt; core)
+-&gt; LooseRope ('(name, binEff) : mantle) core
+   :-&gt; LooseRope mantle core
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">weave'</span></a></span><span class="hs-cpp">
+            #command
+</span><span>            </span><span class="hs-special">(</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CommandExecutionHandler
+</span><a href="#local-6989586621679237542"><span class="hs-identifier hs-var">commandExecution</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-130"></span><span>                </span><span class="annot"><a href="Funflow.Run.html#SystemExecutor"><span class="hs-identifier hs-type">SystemExecutor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">CommandFlow a b
+-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) a b
+forall (a :: BinEff) (m :: * -&gt; *) i o.
+(Arrow a, HasKleisliIO m a) =&gt;
+CommandFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretCommandFlowSystemExecutor"><span class="hs-identifier hs-var">interpretCommandFlowSystemExecutor</span></a></span><span>
+</span><span id="line-131"></span><span>                </span><span class="hs-comment">-- change</span><span>
+</span><span id="line-132"></span><span>                </span><span class="annot"><a href="Funflow.Run.html#ExternalExecutor"><span class="hs-identifier hs-type">ExternalExecutor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ContentStore
+-&gt; CommandFlow a b
+-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) a b
+forall (a :: BinEff) (m :: * -&gt; *) i o.
+(Arrow a, HasKleisliIO m a) =&gt;
+ContentStore -&gt; CommandFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretCommandFlowExternalExecutor"><span class="hs-identifier hs-var">interpretCommandFlowExternalExecutor</span></a></span><span> </span><span class="annot"><span class="annottext">ContentStore
+</span><a href="#local-6989586621679237535"><span class="hs-identifier hs-var">store</span></a></span><span>
+</span><span id="line-133"></span><span>            </span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>          </span><span class="annot"><span class="annottext">LooseRope
+  '[ '(&quot;simple&quot;, SimpleFlow)]
+  (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+  input
+  output
+-&gt; (LooseRope
+      '[ '(&quot;simple&quot;, SimpleFlow)]
+      (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+      input
+      output
+    -&gt; LooseRope
+         '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO)) input output)
+-&gt; LooseRope
+     '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO)) input output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;simple&quot;
+-&gt; (SimpleFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO))
+-&gt; LooseRope
+     '[ '(&quot;simple&quot;, SimpleFlow)]
+     (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+   :-&gt; LooseRope '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO))
+forall (name :: Symbol) (binEff :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Label name
+-&gt; (binEff :-&gt; core)
+-&gt; LooseRope ('(name, binEff) : mantle) core
+   :-&gt; LooseRope mantle core
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">weave'</span></a></span><span> </span><span class="annot"><span class="annottext">IsLabel &quot;simple&quot; (Label &quot;simple&quot;)
+Label &quot;simple&quot;
+</span><a href="#local-6989586621679237527"><span class="hs-var">#simple</span></a></span><span> </span><span class="annot"><span class="annottext">SimpleFlow :-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO)
+forall (a :: BinEff) (m :: * -&gt; *) i o.
+(Arrow a, HasKleisliIO m a) =&gt;
+SimpleFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretSimpleFlow"><span class="hs-identifier hs-var">interpretSimpleFlow</span></a></span><span>
+</span><span id="line-135"></span><span>          </span><span class="hs-comment">-- Strip of empty list of strands (after all weaves)</span><span>
+</span><span id="line-136"></span><span>          </span><span class="annot"><span class="annottext">LooseRope
+  '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO)) input output
+-&gt; (LooseRope
+      '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO)) input output
+    -&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) input output)
+-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) input output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">LooseRope
+  '[] (Cayley (Reader LocalStoreWithId) (Kleisli IO)) input output
+-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) input output
+forall (core :: BinEff). LooseRope '[] core :-&gt; core
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">untwine</span></a></span><span>
+</span><span id="line-137"></span><span>          </span><span class="hs-comment">-- Define the caching</span><span>
+</span><span id="line-138"></span><span>          </span><span class="hs-comment">-- The `Just n` is a number that is used to compute caching hashes, changing it will recompute all</span><span>
+</span><span id="line-139"></span><span>          </span><span class="annot"><span class="annottext">Cayley (Reader LocalStoreWithId) (Kleisli IO) input output
+-&gt; (Cayley (Reader LocalStoreWithId) (Kleisli IO) input output
+    -&gt; Kleisli IO input output)
+-&gt; Kleisli IO input output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">LocalStoreWithId
+-&gt; Cayley (Reader LocalStoreWithId) (Kleisli IO) input output
+-&gt; Kleisli IO input output
+forall t (eff :: BinEff) a b.
+t -&gt; (~&gt;) (Reader t) eff a b -&gt; eff a b
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">runReader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ContentStore -&gt; Maybe Int -&gt; LocalStoreWithId
+</span><a href="../https://hackage.haskell.org/package/kernmantle-caching-0.1.0.0/docs/src"><span class="hs-identifier hs-var">localStoreWithId</span></a></span><span> </span><span class="annot"><span class="annottext">ContentStore
+</span><a href="#local-6989586621679237535"><span class="hs-identifier hs-var">store</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe Int -&gt; LocalStoreWithId) -&gt; Maybe Int -&gt; LocalStoreWithId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679237537"><span class="hs-identifier hs-var">defaultCachingId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-140"></span><span>          </span><span class="hs-comment">-- Finally, run</span><span>
+</span><span id="line-141"></span><span>          </span><span class="annot"><span class="annottext">Kleisli IO input output
+-&gt; (Kleisli IO input output -&gt; IO output) -&gt; IO output
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">input -&gt; Kleisli IO input output -&gt; IO output
+forall a (m :: * -&gt; *) b. a -&gt; Kleisli m a b -&gt; m b
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">perform</span></a></span><span> </span><span class="annot"><span class="annottext">input
+</span><a href="#local-6989586621679237540"><span class="hs-identifier hs-var">input</span></a></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- Interpret simple flow</span><span>
+</span><span id="line-144"></span><span id="local-6989586621679237727"><span id="local-6989586621679237728"><span id="local-6989586621679237729"><span id="local-6989586621679237730"><span class="annot"><a href="Funflow.Run.html#interpretSimpleFlow"><span class="hs-identifier hs-type">interpretSimpleFlow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679237730"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-type">HasKleisliIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237729"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237730"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Funflow.Flows.Simple.html#SimpleFlow"><span class="hs-identifier hs-type">SimpleFlow</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237728"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237727"><span class="hs-identifier hs-type">o</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237730"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237728"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237727"><span class="hs-identifier hs-type">o</span></a></span></span></span></span></span><span>
+</span><span id="line-145"></span><span id="interpretSimpleFlow"><span class="annot"><span class="annottext">interpretSimpleFlow :: SimpleFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretSimpleFlow"><span class="hs-identifier hs-var hs-var">interpretSimpleFlow</span></a></span></span><span> </span><span id="local-6989586621679237525"><span class="annot"><span class="annottext">simpleFlow :: SimpleFlow i o
+</span><a href="#local-6989586621679237525"><span class="hs-identifier hs-var">simpleFlow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">SimpleFlow i o
+</span><a href="#local-6989586621679237525"><span class="hs-identifier hs-var">simpleFlow</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-146"></span><span>  </span><span class="annot"><a href="Funflow.Flows.Simple.html#Pure"><span class="hs-identifier hs-type">Pure</span></a></span><span> </span><span id="local-6989586621679237524"><span class="annot"><span class="annottext">f :: i -&gt; o
+</span><a href="#local-6989586621679237524"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(i -&gt; o) -&gt; a i o
+forall (a :: BinEff) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="annot"><span class="annottext">i -&gt; o
+</span><a href="#local-6989586621679237524"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-147"></span><span>  </span><span class="annot"><a href="Funflow.Flows.Simple.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span id="local-6989586621679237523"><span class="annot"><span class="annottext">f :: i -&gt; IO o
+</span><a href="#local-6989586621679237523"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(i -&gt; IO o) -&gt; a i o
+forall (m :: * -&gt; *) (eff :: BinEff) a b.
+HasKleisliIO m eff =&gt;
+(a -&gt; IO b) -&gt; eff a b
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">liftKleisliIO</span></a></span><span> </span><span class="annot"><span class="annottext">i -&gt; IO o
+</span><a href="#local-6989586621679237523"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-148"></span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- Possible interpreters for the command flow</span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- System executor: just spawn processes</span><span>
+</span><span id="line-152"></span><span id="local-6989586621679237735"><span id="local-6989586621679237736"><span id="local-6989586621679237738"><span id="local-6989586621679237740"><span class="annot"><a href="Funflow.Run.html#interpretCommandFlowSystemExecutor"><span class="hs-identifier hs-type">interpretCommandFlowSystemExecutor</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679237740"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-type">HasKleisliIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237738"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237740"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237736"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237735"><span class="hs-identifier hs-type">o</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237740"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237736"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237735"><span class="hs-identifier hs-type">o</span></a></span></span></span></span></span><span>
+</span><span id="line-153"></span><span id="interpretCommandFlowSystemExecutor"><span class="annot"><span class="annottext">interpretCommandFlowSystemExecutor :: CommandFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretCommandFlowSystemExecutor"><span class="hs-identifier hs-var hs-var">interpretCommandFlowSystemExecutor</span></a></span></span><span> </span><span id="local-6989586621679237522"><span class="annot"><span class="annottext">commandFlow :: CommandFlow i o
+</span><a href="#local-6989586621679237522"><span class="hs-identifier hs-var">commandFlow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-154"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237521"><span class="annot"><span class="annottext">runProcess :: p -&gt; CmdSpec -&gt; eff () ()
+</span><a href="#local-6989586621679237521"><span class="hs-identifier hs-var hs-var">runProcess</span></a></span></span><span> </span><span class="hs-identifier">_</span><span> </span><span id="local-6989586621679237520"><span class="annot"><span class="annottext">spec :: CmdSpec
+</span><a href="#local-6989586621679237520"><span class="hs-identifier hs-var">spec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(() -&gt; IO ()) -&gt; eff () ()
+forall (m :: * -&gt; *) (eff :: BinEff) a b.
+HasKleisliIO m eff =&gt;
+(a -&gt; IO b) -&gt; eff a b
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">liftKleisliIO</span></a></span><span> </span><span class="annot"><span class="annottext">((() -&gt; IO ()) -&gt; eff () ()) -&gt; (() -&gt; IO ()) -&gt; eff () ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-155"></span><span>        </span><span class="hs-keyword">do</span><span>
+</span><span id="line-156"></span><span>          </span><span class="annot"><span class="annottext">(Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-157"></span><span>            </span><span class="annot"><span class="annottext">CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><span class="hs-identifier hs-var">createProcess</span></span><span> </span><span class="annot"><span class="annottext">(CreateProcess
+ -&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle))
+-&gt; CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-158"></span><span>              </span><span class="annot"><span class="annottext">CreateProcess :: CmdSpec
+-&gt; Maybe FilePath
+-&gt; Maybe [(FilePath, FilePath)]
+-&gt; StdStream
+-&gt; StdStream
+-&gt; StdStream
+-&gt; Bool
+-&gt; Bool
+-&gt; Bool
+-&gt; Bool
+-&gt; Bool
+-&gt; Bool
+-&gt; Maybe GroupID
+-&gt; Maybe UserID
+-&gt; Bool
+-&gt; CreateProcess
+</span><span class="hs-identifier hs-type hs-type">CreateProcess</span></span><span>
+</span><span id="line-159"></span><span>                </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">cmdspec :: CmdSpec
+</span><span class="hs-identifier hs-var">cmdspec</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CmdSpec -&gt; CmdSpec -&gt; CmdSpec
+forall a b. Show a =&gt; a -&gt; b -&gt; b
+</span><span class="hs-identifier hs-var">traceShow</span></span><span> </span><span class="annot"><span class="annottext">CmdSpec
+</span><a href="#local-6989586621679237520"><span class="hs-identifier hs-var">spec</span></a></span><span> </span><span class="annot"><span class="annottext">CmdSpec
+</span><a href="#local-6989586621679237520"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-160"></span><span>                  </span><span class="annot"><span class="annottext">env :: Maybe [(FilePath, FilePath)]
+</span><span class="hs-identifier hs-var">env</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe [(FilePath, FilePath)]
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">,</span><span>
+</span><span id="line-161"></span><span>                  </span><span class="annot"><span class="annottext">cwd :: Maybe FilePath
+</span><span class="hs-identifier hs-var">cwd</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe FilePath
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">,</span><span>
+</span><span id="line-162"></span><span>                  </span><span class="annot"><span class="annottext">std_in :: StdStream
+</span><span class="hs-identifier hs-var">std_in</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><span class="hs-identifier hs-var">Inherit</span></span><span class="hs-special">,</span><span>
+</span><span id="line-163"></span><span>                  </span><span class="annot"><span class="annottext">std_out :: StdStream
+</span><span class="hs-identifier hs-var">std_out</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><span class="hs-identifier hs-var">Inherit</span></span><span class="hs-special">,</span><span>
+</span><span id="line-164"></span><span>                  </span><span class="annot"><span class="annottext">std_err :: StdStream
+</span><span class="hs-identifier hs-var">std_err</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><span class="hs-identifier hs-var">Inherit</span></span><span class="hs-special">,</span><span>
+</span><span id="line-165"></span><span>                  </span><span class="annot"><span class="annottext">close_fds :: Bool
+</span><span class="hs-identifier hs-var">close_fds</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-166"></span><span>                  </span><span class="annot"><span class="annottext">create_group :: Bool
+</span><span class="hs-identifier hs-var">create_group</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-167"></span><span>                  </span><span class="annot"><span class="annottext">delegate_ctlc :: Bool
+</span><span class="hs-identifier hs-var">delegate_ctlc</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-168"></span><span>                  </span><span class="annot"><span class="annottext">detach_console :: Bool
+</span><span class="hs-identifier hs-var">detach_console</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-169"></span><span>                  </span><span class="annot"><span class="annottext">create_new_console :: Bool
+</span><span class="hs-identifier hs-var">create_new_console</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-170"></span><span>                  </span><span class="annot"><span class="annottext">new_session :: Bool
+</span><span class="hs-identifier hs-var">new_session</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span>
+</span><span id="line-171"></span><span>                  </span><span class="annot"><span class="annottext">child_group :: Maybe GroupID
+</span><span class="hs-identifier hs-var">child_group</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe GroupID
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">,</span><span>
+</span><span id="line-172"></span><span>                  </span><span class="annot"><span class="annottext">child_user :: Maybe UserID
+</span><span class="hs-identifier hs-var">child_user</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe UserID
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">,</span><span>
+</span><span id="line-173"></span><span>                  </span><span class="annot"><span class="annottext">use_process_jobs :: Bool
+</span><span class="hs-identifier hs-var">use_process_jobs</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-174"></span><span>                </span><span class="hs-special">}</span><span>
+</span><span id="line-175"></span><span>          </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-176"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CommandFlow i o
+</span><a href="#local-6989586621679237522"><span class="hs-identifier hs-var">commandFlow</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-177"></span><span>        </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier hs-type">CommandFlowConfig</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679237517"><span class="annot"><span class="annottext">Text
+command :: CommandFlowConfig -&gt; Text
+command :: Text
+</span><a href="Funflow.Flows.Command.html#command"><span class="hs-identifier hs-var hs-var">CF.command</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237515"><span class="annot"><span class="annottext">[Text]
+args :: CommandFlowConfig -&gt; [Text]
+args :: [Text]
+</span><a href="Funflow.Flows.Command.html#args"><span class="hs-identifier hs-var hs-var">CF.args</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237513"><span class="annot"><span class="annottext">[(Text, Text)]
+env :: CommandFlowConfig -&gt; [(Text, Text)]
+env :: [(Text, Text)]
+</span><a href="Funflow.Flows.Command.html#env"><span class="hs-identifier hs-var hs-var">CF.env</span></a></span></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-178"></span><span>          </span><span class="annot"><span class="annottext">[(Text, Text)] -&gt; CmdSpec -&gt; a () ()
+forall (m :: * -&gt; *) (eff :: BinEff) p.
+(SieveTrans m eff, MonadIO m) =&gt;
+p -&gt; CmdSpec -&gt; eff () ()
+</span><a href="#local-6989586621679237521"><span class="hs-identifier hs-var">runProcess</span></a></span><span> </span><span class="annot"><span class="annottext">[(Text, Text)]
+</span><a href="#local-6989586621679237513"><span class="hs-identifier hs-var">env</span></a></span><span> </span><span class="annot"><span class="annottext">(CmdSpec -&gt; a i o) -&gt; CmdSpec -&gt; a i o
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; [FilePath] -&gt; CmdSpec
+</span><span class="hs-identifier hs-var">RawCommand</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; FilePath
+</span><span class="hs-identifier hs-var">T.unpack</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237517"><span class="hs-identifier hs-var">command</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Text -&gt; FilePath) -&gt; [Text] -&gt; [FilePath]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; FilePath
+</span><span class="hs-identifier hs-var">T.unpack</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679237515"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-179"></span><span>        </span><span class="annot"><a href="Funflow.Flows.Command.html#ShellCommandFlow"><span class="hs-identifier hs-type">ShellCommandFlow</span></a></span><span> </span><span id="local-6989586621679237511"><span class="annot"><span class="annottext">shellCommand :: Text
+</span><a href="#local-6989586621679237511"><span class="hs-identifier hs-var">shellCommand</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-180"></span><span>          </span><span class="annot"><span class="annottext">[Any] -&gt; CmdSpec -&gt; a () ()
+forall (m :: * -&gt; *) (eff :: BinEff) p.
+(SieveTrans m eff, MonadIO m) =&gt;
+p -&gt; CmdSpec -&gt; eff () ()
+</span><a href="#local-6989586621679237521"><span class="hs-identifier hs-var">runProcess</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">(CmdSpec -&gt; a i o) -&gt; CmdSpec -&gt; a i o
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; CmdSpec
+</span><span class="hs-identifier hs-var">ShellCommand</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; FilePath
+</span><span class="hs-identifier hs-var">T.unpack</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237511"><span class="hs-identifier hs-var">shellCommand</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- External executor: use the external-executor package</span><span>
+</span><span id="line-183"></span><span class="hs-comment">-- TODO currently little to no benefits, need to allow setting SQL, Redis, etc</span><span>
+</span><span id="line-184"></span><span id="local-6989586621679237731"><span id="local-6989586621679237732"><span id="local-6989586621679237733"><span id="local-6989586621679237734"><span class="annot"><a href="Funflow.Run.html#interpretCommandFlowExternalExecutor"><span class="hs-identifier hs-type">interpretCommandFlowExternalExecutor</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679237734"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/cas-store-1.1.0/docs/src"><span class="hs-identifier hs-type">CS.ContentStore</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237732"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237731"><span class="hs-identifier hs-type">o</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237734"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237732"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237731"><span class="hs-identifier hs-type">o</span></a></span></span></span></span></span><span>
+</span><span id="line-185"></span><span id="interpretCommandFlowExternalExecutor"><span class="annot"><span class="annottext">interpretCommandFlowExternalExecutor :: ContentStore -&gt; CommandFlow i o -&gt; a i o
+</span><a href="Funflow.Run.html#interpretCommandFlowExternalExecutor"><span class="hs-identifier hs-var hs-var">interpretCommandFlowExternalExecutor</span></a></span></span><span> </span><span id="local-6989586621679237510"><span class="annot"><span class="annottext">store :: ContentStore
+</span><a href="#local-6989586621679237510"><span class="hs-identifier hs-var">store</span></a></span></span><span> </span><span id="local-6989586621679237509"><span class="annot"><span class="annottext">commandFlow :: CommandFlow i o
+</span><a href="#local-6989586621679237509"><span class="hs-identifier hs-var">commandFlow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-186"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237637"><span id="local-6989586621679237638"><span id="local-6989586621679237639"><span class="annot"><a href="#local-6989586621679237508"><span class="hs-identifier hs-type">runTask</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679237639"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-type">ExternalTask</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237639"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237637"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-187"></span><span>      </span><span id="local-6989586621679237508"><span class="annot"><span class="annottext">runTask :: ExternalTask -&gt; a i ()
+</span><a href="#local-6989586621679237508"><span class="hs-identifier hs-var hs-var">runTask</span></a></span></span><span> </span><span id="local-6989586621679237507"><span class="annot"><span class="annottext">task :: ExternalTask
+</span><a href="#local-6989586621679237507"><span class="hs-identifier hs-var">task</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(i -&gt; IO ()) -&gt; a i ()
+forall (m :: * -&gt; *) (eff :: BinEff) a b.
+HasKleisliIO m eff =&gt;
+(a -&gt; IO b) -&gt; eff a b
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">liftKleisliIO</span></a></span><span> </span><span class="annot"><span class="annottext">((i -&gt; IO ()) -&gt; a i ()) -&gt; (i -&gt; IO ()) -&gt; a i ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-188"></span><span>        </span><span class="hs-comment">-- Hash computation, then bundle it with the task</span><span>
+</span><span id="line-189"></span><span>        </span><span id="local-6989586621679237506"><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679237506"><span class="hs-identifier hs-var">hash</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO ContentHash -&gt; IO ContentHash
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ContentHash -&gt; IO ContentHash)
+-&gt; IO ContentHash -&gt; IO ContentHash
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ExternalTask -&gt; IO ContentHash
+forall (m :: * -&gt; *) a. ContentHashable m a =&gt; a -&gt; m ContentHash
+</span><a href="../https://hackage.haskell.org/package/cas-hashable-1.0.1/docs/src"><span class="hs-identifier hs-var">contentHash</span></a></span><span> </span><span class="annot"><span class="annottext">ExternalTask
+</span><a href="#local-6989586621679237507"><span class="hs-identifier hs-var">task</span></a></span><span>
+</span><span id="line-190"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237505"><span class="annot"><span class="annottext">taskDescription :: TaskDescription
+</span><a href="#local-6989586621679237505"><span class="hs-identifier hs-var hs-var">taskDescription</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-191"></span><span>              </span><span class="annot"><span class="annottext">TaskDescription :: ContentHash -&gt; ExternalTask -&gt; TaskDescription
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-type hs-type">TaskDescription</span></a></span><span>
+</span><span id="line-192"></span><span>                </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_tdOutput :: ContentHash
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_tdOutput</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679237506"><span class="hs-identifier hs-var">hash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-193"></span><span>                  </span><span class="annot"><span class="annottext">_tdTask :: ExternalTask
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_tdTask</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ExternalTask
+</span><a href="#local-6989586621679237507"><span class="hs-identifier hs-var">task</span></a></span><span>
+</span><span id="line-194"></span><span>                </span><span class="hs-special">}</span><span>
+</span><span id="line-195"></span><span>        </span><span class="hs-comment">-- Katip machinery</span><span>
+</span><span id="line-196"></span><span>        </span><span id="local-6989586621679237500"><span class="annot"><span class="annottext">Scribe
+</span><a href="#local-6989586621679237500"><span class="hs-identifier hs-var">handleScribe</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Scribe -&gt; IO Scribe
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO Scribe -&gt; IO Scribe) -&gt; IO Scribe -&gt; IO Scribe
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ColorStrategy -&gt; Handle -&gt; PermitFunc -&gt; Verbosity -&gt; IO Scribe
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">mkHandleScribe</span></a></span><span> </span><span class="annot"><span class="annottext">ColorStrategy
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">ColorIfTerminal</span></a></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdout</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Severity -&gt; Item a -&gt; IO Bool
+forall (m :: * -&gt; *) a. Monad m =&gt; Severity -&gt; Item a -&gt; m Bool
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">permitItem</span></a></span><span> </span><span class="annot"><span class="annottext">Severity
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">InfoS</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Verbosity
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">V2</span></a></span><span>
+</span><span id="line-197"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237499"><span class="annot"><span class="annottext">makeLogEnv :: IO LogEnv
+</span><a href="#local-6989586621679237499"><span class="hs-identifier hs-var hs-var">makeLogEnv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Scribe -&gt; ScribeSettings -&gt; LogEnv -&gt; IO LogEnv
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">registerScribe</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;stdout&quot;</span></span><span> </span><span class="annot"><span class="annottext">Scribe
+</span><a href="#local-6989586621679237500"><span class="hs-identifier hs-var">handleScribe</span></a></span><span> </span><span class="annot"><span class="annottext">ScribeSettings
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">defaultScribeSettings</span></a></span><span> </span><span class="annot"><span class="annottext">(LogEnv -&gt; IO LogEnv) -&gt; IO LogEnv -&gt; IO LogEnv
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span> </span><span class="annot"><span class="annottext">Namespace -&gt; Environment -&gt; IO LogEnv
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">initLogEnv</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;funflow&quot;</span></span><span> </span><span class="annot"><span class="hs-string">&quot;executor&quot;</span></span><span>
+</span><span id="line-198"></span><span>        </span><span class="annot"><span class="annottext">ExecutionResult
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO LogEnv
+-&gt; (LogEnv -&gt; IO LogEnv)
+-&gt; (LogEnv -&gt; IO ExecutionResult)
+-&gt; IO ExecutionResult
+forall a b c. IO a -&gt; (a -&gt; IO b) -&gt; (a -&gt; IO c) -&gt; IO c
+</span><span class="hs-identifier hs-var">bracket</span></span><span> </span><span class="annot"><span class="annottext">IO LogEnv
+</span><a href="#local-6989586621679237499"><span class="hs-identifier hs-var">makeLogEnv</span></a></span><span> </span><span class="annot"><span class="annottext">LogEnv -&gt; IO LogEnv
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">closeScribes</span></a></span><span> </span><span class="annot"><span class="annottext">((LogEnv -&gt; IO ExecutionResult) -&gt; IO ExecutionResult)
+-&gt; (LogEnv -&gt; IO ExecutionResult) -&gt; IO ExecutionResult
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679237497"><span class="annot"><span class="annottext">logEnv :: LogEnv
+</span><a href="#local-6989586621679237497"><span class="hs-identifier hs-var">logEnv</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-199"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237496"><span class="annot"><span class="annottext">initialContext :: ()
+</span><a href="#local-6989586621679237496"><span class="hs-identifier hs-var hs-var">initialContext</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237495"><span class="annot"><span class="annottext">initialNamespace :: Namespace
+</span><a href="#local-6989586621679237495"><span class="hs-identifier hs-var hs-var">initialNamespace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-string">&quot;funflow&quot;</span></span><span>
+</span><span id="line-201"></span><span>          </span><span class="annot"><span class="annottext">LogEnv
+-&gt; ()
+-&gt; Namespace
+-&gt; KatipContextT IO ExecutionResult
+-&gt; IO ExecutionResult
+forall c (m :: * -&gt; *) a.
+LogItem c =&gt;
+LogEnv -&gt; c -&gt; Namespace -&gt; KatipContextT m a -&gt; m a
+</span><a href="../https://hackage.haskell.org/package/katip-0.8.4.0/docs/src"><span class="hs-identifier hs-var">runKatipContextT</span></a></span><span> </span><span class="annot"><span class="annottext">LogEnv
+</span><a href="#local-6989586621679237497"><span class="hs-identifier hs-var">logEnv</span></a></span><span> </span><span class="annot"><span class="annottext">()
+</span><a href="#local-6989586621679237496"><span class="hs-identifier hs-var">initialContext</span></a></span><span> </span><span class="annot"><span class="annottext">Namespace
+</span><a href="#local-6989586621679237495"><span class="hs-identifier hs-var">initialNamespace</span></a></span><span> </span><span class="annot"><span class="annottext">(KatipContextT IO ExecutionResult -&gt; IO ExecutionResult)
+-&gt; KatipContextT IO ExecutionResult -&gt; IO ExecutionResult
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContentStore -&gt; TaskDescription -&gt; KatipContextT IO ExecutionResult
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">execute</span></a></span><span> </span><span class="annot"><span class="annottext">ContentStore
+</span><a href="#local-6989586621679237510"><span class="hs-identifier hs-var">store</span></a></span><span> </span><span class="annot"><span class="annottext">TaskDescription
+</span><a href="#local-6989586621679237505"><span class="hs-identifier hs-var">taskDescription</span></a></span><span>
+</span><span id="line-202"></span><span>        </span><span class="hs-comment">-- Finish</span><span>
+</span><span id="line-203"></span><span>        </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-204"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CommandFlow i o
+</span><a href="#local-6989586621679237509"><span class="hs-identifier hs-var">commandFlow</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-205"></span><span>        </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier hs-type">CommandFlowConfig</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679237494"><span class="annot"><span class="annottext">Text
+command :: Text
+command :: CommandFlowConfig -&gt; Text
+</span><a href="#local-6989586621679237494"><span class="hs-identifier hs-var hs-var">CF.command</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237493"><span class="annot"><span class="annottext">[Text]
+args :: [Text]
+args :: CommandFlowConfig -&gt; [Text]
+</span><a href="#local-6989586621679237493"><span class="hs-identifier hs-var hs-var">CF.args</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237492"><span class="annot"><span class="annottext">[(Text, Text)]
+env :: [(Text, Text)]
+env :: CommandFlowConfig -&gt; [(Text, Text)]
+</span><a href="#local-6989586621679237492"><span class="hs-identifier hs-var hs-var">CF.env</span></a></span></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-206"></span><span>          </span><span class="hs-comment">-- Create the task description (task + cache hash)</span><span>
+</span><span id="line-207"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span class="annot"><a href="#local-6989586621679237491"><span class="hs-identifier hs-type">task</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-type">ExternalTask</span></a></span><span>
+</span><span id="line-208"></span><span>              </span><span id="local-6989586621679237491"><span class="annot"><span class="annottext">task :: ExternalTask
+</span><a href="#local-6989586621679237491"><span class="hs-identifier hs-var hs-var">task</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-209"></span><span>                </span><span class="annot"><span class="annottext">ExternalTask :: Text -&gt; [Param] -&gt; Env -&gt; OutputCapture -&gt; ExternalTask
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-type hs-type">ExternalTask</span></a></span><span>
+</span><span id="line-210"></span><span>                  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_etCommand :: Text
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etCommand</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237494"><span class="hs-identifier hs-var">command</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-211"></span><span>                    </span><span class="hs-comment">-- TODO use input env</span><span>
+</span><span id="line-212"></span><span>                    </span><span class="annot"><span class="annottext">_etEnv :: Env
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etEnv</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Text, Param)] -&gt; Env
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">EnvExplicit</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237486"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; Param
+forall a. IsString a =&gt; FilePath -&gt; a
+</span><span class="hs-identifier hs-var">fromString</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Param) -&gt; (Text -&gt; FilePath) -&gt; Text -&gt; Param
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; FilePath
+</span><span class="hs-identifier hs-var">unpack</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237484"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679237486"><span class="annot"><span class="annottext">x :: Text
+</span><a href="#local-6989586621679237486"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237484"><span class="annot"><span class="annottext">y :: Text
+</span><a href="#local-6989586621679237484"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[(Text, Text)]
+</span><a href="#local-6989586621679237492"><span class="hs-identifier hs-var">env</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-213"></span><span>                    </span><span class="hs-comment">-- TODO use input args</span><span>
+</span><span id="line-214"></span><span>                    </span><span class="annot"><span class="annottext">_etParams :: [Param]
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etParams</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Param) -&gt; [Text] -&gt; [Param]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; Param
+forall a. IsString a =&gt; FilePath -&gt; a
+</span><span class="hs-identifier hs-var">fromString</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Param) -&gt; (Text -&gt; FilePath) -&gt; Text -&gt; Param
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; FilePath
+</span><span class="hs-identifier hs-var">unpack</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679237493"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-215"></span><span>                    </span><span class="annot"><span class="annottext">_etWriteToStdOut :: OutputCapture
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etWriteToStdOut</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OutputCapture
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">StdOutCapture</span></a></span><span>
+</span><span id="line-216"></span><span>                  </span><span class="hs-special">}</span><span>
+</span><span id="line-217"></span><span>           </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">ExternalTask -&gt; a i ()
+forall (a :: BinEff) (m :: * -&gt; *) i.
+(Arrow a, HasKleisliIO m a) =&gt;
+ExternalTask -&gt; a i ()
+</span><a href="#local-6989586621679237508"><span class="hs-identifier hs-var">runTask</span></a></span><span> </span><span class="annot"><span class="annottext">ExternalTask
+</span><a href="#local-6989586621679237491"><span class="hs-identifier hs-var">task</span></a></span><span>
+</span><span id="line-218"></span><span>        </span><span class="annot"><a href="Funflow.Flows.Command.html#ShellCommandFlow"><span class="hs-identifier hs-type">ShellCommandFlow</span></a></span><span> </span><span id="local-6989586621679237481"><span class="annot"><span class="annottext">shellCommand :: Text
+</span><a href="#local-6989586621679237481"><span class="hs-identifier hs-var">shellCommand</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-219"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237480"><span class="annot"><span class="annottext">task :: ExternalTask
+</span><a href="#local-6989586621679237480"><span class="hs-identifier hs-var hs-var">task</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-220"></span><span>                </span><span class="annot"><span class="annottext">ExternalTask :: Text -&gt; [Param] -&gt; Env -&gt; OutputCapture -&gt; ExternalTask
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-type hs-type">ExternalTask</span></a></span><span>
+</span><span id="line-221"></span><span>                  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_etCommand :: Text
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etCommand</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237481"><span class="hs-identifier hs-var">shellCommand</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-222"></span><span>                    </span><span class="hs-comment">-- TODO use input env</span><span>
+</span><span id="line-223"></span><span>                    </span><span class="annot"><span class="annottext">_etEnv :: Env
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etEnv</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Text, Param)] -&gt; Env
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">EnvExplicit</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-224"></span><span>                    </span><span class="hs-comment">-- TODO use input args</span><span>
+</span><span id="line-225"></span><span>                    </span><span class="annot"><span class="annottext">_etParams :: [Param]
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etParams</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-226"></span><span>                    </span><span class="annot"><span class="annottext">_etWriteToStdOut :: OutputCapture
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">_etWriteToStdOut</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OutputCapture
+</span><a href="../https://hackage.haskell.org/package/external-executor-0.1.0/docs/src"><span class="hs-identifier hs-var">StdOutCapture</span></a></span><span>
+</span><span id="line-227"></span><span>                  </span><span class="hs-special">}</span><span>
+</span><span id="line-228"></span><span>           </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">ExternalTask -&gt; a i ()
+forall (a :: BinEff) (m :: * -&gt; *) i.
+(Arrow a, HasKleisliIO m a) =&gt;
+ExternalTask -&gt; a i ()
+</span><a href="#local-6989586621679237508"><span class="hs-identifier hs-var">runTask</span></a></span><span> </span><span class="annot"><span class="annottext">ExternalTask
+</span><a href="#local-6989586621679237480"><span class="hs-identifier hs-var">task</span></a></span><span>
+</span><span id="line-229"></span><span>
+</span><span id="line-230"></span><span class="hs-comment">-- A type alias to clarify the type of functions that will reinterpret</span><span>
+</span><span id="line-231"></span><span class="hs-comment">-- to use for interpretation functions that will be called by `weave`</span><span>
+</span><span id="line-232"></span><span class="hs-keyword">type</span><span> </span><span id="WeaverFor"><span class="annot"><a href="Funflow.Run.html#WeaverFor"><span class="hs-identifier hs-var">WeaverFor</span></a></span></span><span> </span><span id="local-6989586621679237479"><span class="annot"><a href="#local-6989586621679237479"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621679237478"><span class="annot"><a href="#local-6989586621679237478"><span class="hs-identifier hs-type">eff</span></a></span></span><span> </span><span id="local-6989586621679237477"><span class="annot"><a href="#local-6989586621679237477"><span class="hs-identifier hs-type">strands</span></a></span></span><span> </span><span id="local-6989586621679237476"><span class="annot"><a href="#local-6989586621679237476"><span class="hs-identifier hs-type">coreConstraints</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-233"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679237475"><span class="annot"><a href="#local-6989586621679237475"><span class="hs-identifier hs-type">mantle</span></a></span></span><span> </span><span id="local-6989586621679237474"><span class="annot"><a href="#local-6989586621679237474"><span class="hs-identifier hs-type">core</span></a></span></span><span> </span><span id="local-6989586621679237473"><span class="annot"><a href="#local-6989586621679237473"><span class="hs-identifier hs-type">i</span></a></span></span><span> </span><span id="local-6989586621679237472"><span class="annot"><a href="#local-6989586621679237472"><span class="hs-identifier hs-type">o</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-234"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-type">SatisfiesAll</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237474"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237476"><span class="hs-identifier hs-type">coreConstraints</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-235"></span><span>  </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679237634"><span class="annot"><a href="#local-6989586621679237634"><span class="hs-identifier hs-type">x</span></a></span></span><span> </span><span id="local-6989586621679237633"><span class="annot"><a href="#local-6989586621679237633"><span class="hs-identifier hs-type">y</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-type">LooseRope</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">'</span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679237479"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679237478"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="#local-6989586621679237475"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679237474"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237634"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237633"><span class="hs-identifier hs-type">y</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679237474"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237634"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237633"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-236"></span><span>  </span><span class="annot"><a href="#local-6989586621679237478"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237473"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237472"><span class="hs-identifier hs-type">o</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-237"></span><span>  </span><span class="annot"><a href="#local-6989586621679237474"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237473"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679237472"><span class="hs-identifier hs-type">o</span></a></span><span>
+</span><span id="line-238"></span><span>
+</span><span id="line-239"></span><span class="hs-comment">-- Interpret docker flow</span><span>
+</span><span id="line-240"></span><span class="annot"><a href="Funflow.Run.html#interpretDockerFlow"><span class="hs-identifier hs-type">interpretDockerFlow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Run.html#WeaverFor"><span class="hs-identifier hs-type">WeaverFor</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;docker&quot;</span></span><span> </span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlow"><span class="hs-identifier hs-type">DockerFlow</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span> </span><span class="hs-special">'</span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;command&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-241"></span><span id="interpretDockerFlow"><span class="annot"><span class="annottext">interpretDockerFlow :: (forall x y.
+ LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core x y -&gt; core x y)
+-&gt; DockerFlow i o -&gt; core i o
+</span><a href="Funflow.Run.html#interpretDockerFlow"><span class="hs-identifier hs-var hs-var">interpretDockerFlow</span></a></span></span><span> </span><span id="local-6989586621679237471"><span class="annot"><span class="annottext">reinterpret :: forall x y.
+LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core x y -&gt; core x y
+</span><a href="#local-6989586621679237471"><span class="hs-identifier hs-var">reinterpret</span></a></span></span><span> </span><span id="local-6989586621679237470"><span class="annot"><span class="annottext">dockerFlow :: DockerFlow i o
+</span><a href="#local-6989586621679237470"><span class="hs-identifier hs-var">dockerFlow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">DockerFlow i o
+</span><a href="#local-6989586621679237470"><span class="hs-identifier hs-var">dockerFlow</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-242"></span><span>  </span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlow"><span class="hs-identifier hs-type">DockerFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Docker.html#DockerFlowConfig"><span class="hs-identifier hs-type">DockerFlowConfig</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679237469"><span class="annot"><span class="annottext">Text
+image :: DockerFlowConfig -&gt; Text
+image :: Text
+</span><a href="Funflow.Flows.Docker.html#image"><span class="hs-identifier hs-var hs-var">DF.image</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237467"><span class="annot"><span class="annottext">Text
+command :: DockerFlowConfig -&gt; Text
+command :: Text
+</span><a href="Funflow.Flows.Docker.html#command"><span class="hs-identifier hs-var hs-var">DF.command</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237465"><span class="annot"><span class="annottext">[Text]
+args :: DockerFlowConfig -&gt; [Text]
+args :: [Text]
+</span><a href="Funflow.Flows.Docker.html#args"><span class="hs-identifier hs-var hs-var">DF.args</span></a></span></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-243"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237463"><span class="annot"><span class="annottext">commandConfig :: CommandFlowConfig
+</span><a href="#local-6989586621679237463"><span class="hs-identifier hs-var hs-var">commandConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-244"></span><span>          </span><span class="annot"><span class="annottext">CommandFlowConfig :: Text -&gt; [Text] -&gt; [(Text, Text)] -&gt; CommandFlowConfig
+</span><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier hs-type hs-type">CommandFlowConfig</span></a></span><span>
+</span><span id="line-245"></span><span>            </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">command :: Text
+</span><a href="Funflow.Flows.Command.html#command"><span class="hs-identifier hs-var">CF.command</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-string">&quot;docker&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-246"></span><span>              </span><span class="annot"><span class="annottext">args :: [Text]
+</span><a href="Funflow.Flows.Command.html#args"><span class="hs-identifier hs-var">CF.args</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-string">&quot;run&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; [Text]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237469"><span class="hs-identifier hs-var">image</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; [Text]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237467"><span class="hs-identifier hs-var">command</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; [Text]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679237465"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-247"></span><span>              </span><span class="annot"><span class="annottext">env :: [(Text, Text)]
+</span><a href="Funflow.Flows.Command.html#env"><span class="hs-identifier hs-var">CF.env</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-248"></span><span>            </span><span class="hs-special">}</span><span>
+</span><span id="line-249"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core () () -&gt; core i o
+forall x y.
+LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core x y -&gt; core x y
+</span><a href="#local-6989586621679237471"><span class="hs-identifier hs-var">reinterpret</span></a></span><span> </span><span class="annot"><span class="annottext">(LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core () ()
+ -&gt; core i o)
+-&gt; LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core () ()
+-&gt; core i o
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;command&quot;
+-&gt; CommandFlow :-&gt; Rope Rec ('(&quot;docker&quot;, DockerFlow) : mantle) core
+forall (l :: Symbol) (eff :: BinEff) (r :: RopeRec) (m :: [Strand])
+       (c :: BinEff).
+InRope l eff (Rope r m c) =&gt;
+Label l -&gt; eff :-&gt; Rope r m c
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">strand</span></a></span><span> </span><span class="annot"><span class="annottext">IsLabel &quot;command&quot; (Label &quot;command&quot;)
+Label &quot;command&quot;
+</span><a href="#local-6989586621679237461"><span class="hs-var">#command</span></a></span><span> </span><span class="annot"><span class="annottext">(CommandFlow () ()
+ -&gt; LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core () ())
+-&gt; CommandFlow () ()
+-&gt; LooseRope ('(&quot;docker&quot;, DockerFlow) : mantle) core () ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">CommandFlowConfig -&gt; CommandFlow () ()
+</span><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-var">CommandFlow</span></a></span><span> </span><span class="annot"><span class="annottext">(CommandFlowConfig -&gt; CommandFlow () ())
+-&gt; CommandFlowConfig -&gt; CommandFlow () ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">CommandFlowConfig
+</span><a href="#local-6989586621679237463"><span class="hs-identifier hs-var">commandConfig</span></a></span><span>
+</span><span id="line-250"></span><span>
+</span><span id="line-251"></span><span class="hs-comment">-- Interpret nix flow</span><span>
+</span><span id="line-252"></span><span class="annot"><a href="Funflow.Run.html#interpretNixFlow"><span class="hs-identifier hs-type">interpretNixFlow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Run.html#WeaverFor"><span class="hs-identifier hs-type">WeaverFor</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;nix&quot;</span></span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlow"><span class="hs-identifier hs-type">NixFlow</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span> </span><span class="hs-special">'</span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;command&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-type">CommandFlow</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-253"></span><span id="interpretNixFlow"><span class="annot"><span class="annottext">interpretNixFlow :: (forall x y.
+ LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core x y -&gt; core x y)
+-&gt; NixFlow i o -&gt; core i o
+</span><a href="Funflow.Run.html#interpretNixFlow"><span class="hs-identifier hs-var hs-var">interpretNixFlow</span></a></span></span><span> </span><span id="local-6989586621679237460"><span class="annot"><span class="annottext">reinterpret :: forall x y.
+LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core x y -&gt; core x y
+</span><a href="#local-6989586621679237460"><span class="hs-identifier hs-var">reinterpret</span></a></span></span><span> </span><span id="local-6989586621679237459"><span class="annot"><span class="annottext">nixFlow :: NixFlow i o
+</span><a href="#local-6989586621679237459"><span class="hs-identifier hs-var">nixFlow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-254"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span class="hs-comment">-- Turn either a Nix file or a set of packages into the right list of arguments for `nix-shell`</span><span>
+</span><span id="line-255"></span><span>      </span><span class="annot"><a href="#local-6989586621679237458"><span class="hs-identifier hs-type">packageSpec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html#Environment"><span class="hs-identifier hs-type">NF.Environment</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">]</span><span>
+</span><span id="line-256"></span><span>      </span><span id="local-6989586621679237458"><span class="annot"><span class="annottext">packageSpec :: Environment -&gt; [Text]
+</span><a href="#local-6989586621679237458"><span class="hs-identifier hs-var hs-var">packageSpec</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#ShellFile"><span class="hs-identifier hs-type">NF.ShellFile</span></a></span><span> </span><span id="local-6989586621679237456"><span class="annot"><span class="annottext">shellFile :: Text
+</span><a href="#local-6989586621679237456"><span class="hs-identifier hs-var">shellFile</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237456"><span class="hs-identifier hs-var">shellFile</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-257"></span><span>      </span><span class="annot"><a href="#local-6989586621679237458"><span class="hs-identifier hs-var">packageSpec</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#PackageList"><span class="hs-identifier hs-type">NF.PackageList</span></a></span><span> </span><span id="local-6989586621679237454"><span class="annot"><span class="annottext">packageNames :: [Text]
+</span><a href="#local-6989586621679237454"><span class="hs-identifier hs-var">packageNames</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;-p &quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Text
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237453"><span class="hs-identifier hs-var">packageName</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679237453"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237453"><span class="hs-identifier hs-var">packageName</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679237454"><span class="hs-identifier hs-var">packageNames</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-258"></span><span>      </span><span class="hs-comment">-- Turn a NIX_PATH or an URI to a tarball into the right list of arguments for `nix-shell`</span><span>
+</span><span id="line-259"></span><span>      </span><span class="annot"><a href="#local-6989586621679237452"><span class="hs-identifier hs-type">nixpkgsSourceToParam</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html#NixpkgsSource"><span class="hs-identifier hs-type">NF.NixpkgsSource</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-260"></span><span>      </span><span class="hs-comment">-- TODO This is DIRTY as HELL</span><span>
+</span><span id="line-261"></span><span>      </span><span id="local-6989586621679237452"><span class="annot"><span class="annottext">nixpkgsSourceToParam :: NixpkgsSource -&gt; Text
+</span><a href="#local-6989586621679237452"><span class="hs-identifier hs-var hs-var">nixpkgsSourceToParam</span></a></span></span><span> </span><span class="annot"><a href="Funflow.Flows.Nix.html#NIX_PATH"><span class="hs-identifier hs-type">NF.NIX_PATH</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-262"></span><span>        </span><span class="annot"><span class="annottext">FilePath -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Text) -&gt; FilePath -&gt; Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO FilePath -&gt; FilePath
+forall a. IO a -&gt; a
+</span><span class="hs-identifier hs-var">unsafePerformIO</span></span><span> </span><span class="annot"><span class="annottext">(IO FilePath -&gt; FilePath) -&gt; IO FilePath -&gt; FilePath
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO FilePath
+</span><span class="hs-identifier hs-var">getEnv</span></span><span> </span><span class="annot"><span class="hs-string">&quot;NIX_PATH&quot;</span></span><span>
+</span><span id="line-263"></span><span>      </span><span class="annot"><a href="#local-6989586621679237452"><span class="hs-identifier hs-var">nixpkgsSourceToParam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#NixpkgsTarball"><span class="hs-identifier hs-type">NF.NixpkgsTarball</span></a></span><span> </span><span id="local-6989586621679237448"><span class="annot"><span class="annottext">uri :: URI
+</span><a href="#local-6989586621679237448"><span class="hs-identifier hs-var">uri</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;nixpkgs=&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Text
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">URI -&gt; Text
+</span><a href="../https://hackage.haskell.org/package/modern-uri-0.3.2.0/docs/src"><span class="hs-identifier hs-var">URI.render</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679237448"><span class="hs-identifier hs-var">uri</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-264"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">NixFlow i o
+</span><a href="#local-6989586621679237459"><span class="hs-identifier hs-var">nixFlow</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-265"></span><span>        </span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlow"><span class="hs-identifier hs-type">NixFlow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Funflow.Flows.Nix.html#NixFlowConfig"><span class="hs-identifier hs-type">NixFlowConfig</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679237446"><span class="annot"><span class="annottext">Environment
+nixEnv :: NixFlowConfig -&gt; Environment
+nixEnv :: Environment
+</span><a href="Funflow.Flows.Nix.html#nixEnv"><span class="hs-identifier hs-var hs-var">NF.nixEnv</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237444"><span class="annot"><span class="annottext">NixpkgsSource
+nixpkgsSource :: NixFlowConfig -&gt; NixpkgsSource
+nixpkgsSource :: NixpkgsSource
+</span><a href="Funflow.Flows.Nix.html#nixpkgsSource"><span class="hs-identifier hs-var hs-var">NF.nixpkgsSource</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237442"><span class="annot"><span class="annottext">Text
+command :: NixFlowConfig -&gt; Text
+command :: Text
+</span><a href="Funflow.Flows.Nix.html#command"><span class="hs-identifier hs-var hs-var">NF.command</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237440"><span class="annot"><span class="annottext">[Text]
+args :: NixFlowConfig -&gt; [Text]
+args :: [Text]
+</span><a href="Funflow.Flows.Nix.html#args"><span class="hs-identifier hs-var hs-var">NF.args</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679237438"><span class="annot"><span class="annottext">[(Text, Text)]
+env :: NixFlowConfig -&gt; [(Text, Text)]
+env :: [(Text, Text)]
+</span><a href="Funflow.Flows.Nix.html#env"><span class="hs-identifier hs-var hs-var">NF.env</span></a></span></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-266"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679237436"><span class="annot"><span class="annottext">nixPathEnvValue :: Text
+</span><a href="#local-6989586621679237436"><span class="hs-identifier hs-var hs-var">nixPathEnvValue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NixpkgsSource -&gt; Text
+</span><a href="#local-6989586621679237452"><span class="hs-identifier hs-var">nixpkgsSourceToParam</span></a></span><span> </span><span class="annot"><span class="annottext">NixpkgsSource
+</span><a href="#local-6989586621679237444"><span class="hs-identifier hs-var">nixpkgsSource</span></a></span><span>
+</span><span id="line-267"></span><span>              </span><span id="local-6989586621679237435"><span class="annot"><span class="annottext">commandConfig :: CommandFlowConfig
+</span><a href="#local-6989586621679237435"><span class="hs-identifier hs-var hs-var">commandConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-268"></span><span>                </span><span class="annot"><span class="annottext">CommandFlowConfig :: Text -&gt; [Text] -&gt; [(Text, Text)] -&gt; CommandFlowConfig
+</span><a href="Funflow.Flows.Command.html#CommandFlowConfig"><span class="hs-identifier hs-type hs-type">CommandFlowConfig</span></a></span><span>
+</span><span id="line-269"></span><span>                  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">command :: Text
+</span><a href="Funflow.Flows.Command.html#command"><span class="hs-identifier hs-var">CF.command</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-string">&quot;nix-shell&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-270"></span><span>                    </span><span class="annot"><span class="annottext">args :: [Text]
+</span><a href="Funflow.Flows.Command.html#args"><span class="hs-identifier hs-var">CF.args</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;--run&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; [Text]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237442"><span class="hs-identifier hs-var">command</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; [Text]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679237440"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Environment -&gt; [Text]
+</span><a href="#local-6989586621679237458"><span class="hs-identifier hs-var">packageSpec</span></a></span><span> </span><span class="annot"><span class="annottext">Environment
+</span><a href="#local-6989586621679237446"><span class="hs-identifier hs-var">nixEnv</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-271"></span><span>                    </span><span class="annot"><span class="annottext">env :: [(Text, Text)]
+</span><a href="Funflow.Flows.Command.html#env"><span class="hs-identifier hs-var">CF.env</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-string">&quot;NIX_PATH&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679237436"><span class="hs-identifier hs-var">nixPathEnvValue</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Text, Text) -&gt; [(Text, Text)] -&gt; [(Text, Text)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[(Text, Text)]
+</span><a href="#local-6989586621679237438"><span class="hs-identifier hs-var">env</span></a></span><span>
+</span><span id="line-272"></span><span>                  </span><span class="hs-special">}</span><span>
+</span><span id="line-273"></span><span>           </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core () () -&gt; core i o
+forall x y.
+LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core x y -&gt; core x y
+</span><a href="#local-6989586621679237460"><span class="hs-identifier hs-var">reinterpret</span></a></span><span> </span><span class="annot"><span class="annottext">(LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core () () -&gt; core i o)
+-&gt; LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core () () -&gt; core i o
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Label &quot;command&quot;
+-&gt; CommandFlow :-&gt; Rope Rec ('(&quot;nix&quot;, NixFlow) : mantle) core
+forall (l :: Symbol) (eff :: BinEff) (r :: RopeRec) (m :: [Strand])
+       (c :: BinEff).
+InRope l eff (Rope r m c) =&gt;
+Label l -&gt; eff :-&gt; Rope r m c
+</span><a href="../https://hackage.haskell.org/package/kernmantle-0.1.0.0/docs/src"><span class="hs-identifier hs-var">strand</span></a></span><span> </span><span class="annot"><span class="annottext">IsLabel &quot;command&quot; (Label &quot;command&quot;)
+Label &quot;command&quot;
+</span><a href="#local-6989586621679237434"><span class="hs-var">#command</span></a></span><span> </span><span class="annot"><span class="annottext">(CommandFlow () ()
+ -&gt; LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core () ())
+-&gt; CommandFlow () ()
+-&gt; LooseRope ('(&quot;nix&quot;, NixFlow) : mantle) core () ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">CommandFlowConfig -&gt; CommandFlow () ()
+</span><a href="Funflow.Flows.Command.html#CommandFlow"><span class="hs-identifier hs-var">CommandFlow</span></a></span><span> </span><span class="annot"><span class="annottext">(CommandFlowConfig -&gt; CommandFlow () ())
+-&gt; CommandFlowConfig -&gt; CommandFlow () ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">CommandFlowConfig
+</span><a href="#local-6989586621679237435"><span class="hs-identifier hs-var">commandConfig</span></a></span><span>
+</span><span id="line-274"></span></pre></body></html>

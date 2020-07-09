@@ -9,7 +9,13 @@
 @version 0.1.0
 
 module Funflow.Flows.Command
+data CommandFlowConfig
+CommandFlowConfig :: Text -> [Text] -> [(Text, Text)] -> CommandFlowConfig
+[command] :: CommandFlowConfig -> Text
+[args] :: CommandFlowConfig -> [Text]
+[env] :: CommandFlowConfig -> [(Text, Text)]
 data CommandFlow i o
+[CommandFlow] :: CommandFlowConfig -> CommandFlow () ()
 [ShellCommandFlow] :: Text -> CommandFlow () ()
 
 module Funflow.Flows.Docker
@@ -20,15 +26,6 @@ DockerFlowConfig :: Text -> Text -> [Text] -> DockerFlowConfig
 [args] :: DockerFlowConfig -> [Text]
 data DockerFlow i o
 [DockerFlow] :: DockerFlowConfig -> DockerFlow () ()
-
-module Funflow.Flows.Executor
-data ExecutorFlowConfig
-ExecutorFlowConfig :: Text -> [Text] -> [(Text, Text)] -> ExecutorFlowConfig
-[command] :: ExecutorFlowConfig -> Text
-[args] :: ExecutorFlowConfig -> [Text]
-[env] :: ExecutorFlowConfig -> [(Text, Text)]
-data ExecutorFlow i o
-[ExecutorFlow] :: ExecutorFlowConfig -> ExecutorFlow () ()
 
 module Funflow.Flows.Nix
 data NixpkgsSource
@@ -74,25 +71,38 @@ data SimpleFlow i o
 [Pure] :: (i -> o) -> SimpleFlow i o
 [IO] :: (i -> IO o) -> SimpleFlow i o
 
-module Funflow.Base
+module Funflow.Flow
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
-type RequiredStrands = '[ '("simple", SimpleFlow), '("command", CommandFlow), '("executor", ExecutorFlow), '("docker", DockerFlow), '("nix", NixFlow)]
-type RequiredCoreEffects m = '[Arrow, ProvidesCaching, HasKleisli m]
-runFlow :: Flow input output -> input -> IO output
-interpretSimpleFlow :: (Arrow a, HasKleisliIO m a) => SimpleFlow i o -> a i o
-interpretExecutorFlow :: (Arrow a, HasKleisliIO m a) => ContentStore -> ExecutorFlow i o -> a i o
 
 module Funflow.Flows
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
 shellFlow :: Text -> Flow () ()
-executorFlow :: ExecutorFlowConfig -> Flow () ()
+commandFlow :: CommandFlowConfig -> Flow () ()
 dockerFlow :: DockerFlowConfig -> Flow () ()
 nixFlow :: NixFlowConfig -> Flow () ()
 
+module Funflow.Util
+mapPair :: (a -> b) -> (a, a) -> (b, b)
+
+module Funflow.Run
+data FlowExecutionConfig
+FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
+[commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
+data CommandExecutionHandler
+SystemExecutor :: CommandExecutionHandler
+ExternalExecutor :: CommandExecutionHandler
+runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
+
 module Funflow
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
-runFlow :: Flow input output -> input -> IO output
+data FlowExecutionConfig
+FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
+[commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
+data CommandExecutionHandler
+SystemExecutor :: CommandExecutionHandler
+ExternalExecutor :: CommandExecutionHandler
+runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 
 -- | Any rope whose core provides caching can run cached tasks. The task is
 --   identified by an explicit identifier
@@ -100,6 +110,6 @@ caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantl
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
 shellFlow :: Text -> Flow () ()
-executorFlow :: ExecutorFlowConfig -> Flow () ()
+commandFlow :: CommandFlowConfig -> Flow () ()
 dockerFlow :: DockerFlowConfig -> Flow () ()
 nixFlow :: NixFlowConfig -> Flow () ()
