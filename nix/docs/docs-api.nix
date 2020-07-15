@@ -1,7 +1,7 @@
 let
-    pkgs = import ./nixpkgs.nix {};
+    pkgs = import ./../nixpkgs.nix {};
 
-    project = import ./default.nix;
+    project = import ./../default.nix;
     funflow2-lib-doc = project.funflow2.components.library.doc;
 in
     pkgs.runCommand
