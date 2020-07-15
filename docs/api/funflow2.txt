@@ -92,24 +92,27 @@ FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
 data CommandExecutionHandler
 SystemExecutor :: CommandExecutionHandler
 ExternalExecutor :: CommandExecutionHandler
+defaultExecutionConfig :: FlowExecutionConfig
 runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 
 module Funflow
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
+(>>>) :: forall k cat (a :: k) (b :: k) (c :: k). Category cat => cat a b -> cat b c -> cat a c
 data FlowExecutionConfig
 FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
 [commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
 data CommandExecutionHandler
 SystemExecutor :: CommandExecutionHandler
 ExternalExecutor :: CommandExecutionHandler
+defaultExecutionConfig :: FlowExecutionConfig
 runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
-
--- | Any rope whose core provides caching can run cached tasks. The task is
---   identified by an explicit identifier
-caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantle :: [Strand]). (Arrow core, ProvidesCaching core, ContentHashable IO ident, ContentHashable IO a, Store b) => ident -> Rope r mantle core a b -> Rope r mantle core a b
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
 shellFlow :: Text -> Flow () ()
 commandFlow :: CommandFlowConfig -> Flow () ()
 dockerFlow :: DockerFlowConfig -> Flow () ()
 nixFlow :: NixFlowConfig -> Flow () ()
+
+-- | Any rope whose core provides caching can run cached tasks. The task is
+--   identified by an explicit identifier
+caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantle :: [Strand]). (Arrow core, ProvidesCaching core, ContentHashable IO ident, ContentHashable IO a, Store b) => ident -> Rope r mantle core a b -> Rope r mantle core a b
