@@ -1,0 +1,35 @@
+name: funflow2 CI (Linux, Nix)
+
+on: [push]
+
+jobs:
+  build:
+    name: funflow2 [build >> tests >> doc]
+    runs-on: ubuntu-latest
+    steps:
+      # Setup
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v9
+        with:
+          skip_adding_nixpkgs_channel: true
+      - uses: cachix/cachix-action@v6
+        with:
+          name: tweag-funflow2
+          signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
+      # Builds
+      - run: nix-build nix -A funflow2.components.library
+      - run: nix-build nix -A funflow2.components.exes
+      - run: |
+          echo Build tests
+          TESTS_PATH=$(nix-build nix -A funflow2.components.tests)
+          echo Running tests
+          $TESTS_PATH/bin/test-funflow
+      # Build documentation and create symlink to ./result-doc
+      - run: nix-build -o result-docs nix/docs.nix
+      # Deploy documentation to a github page
+      - name: deploy-doc
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/funflow2'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          publish_dir: ./result-docs/doc/funflow2/html
