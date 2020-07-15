@@ -10,6 +10,7 @@
 module Funflow.Run
   ( FlowExecutionConfig (..),
     CommandExecutionHandler (..),
+    defaultExecutionConfig,
     runFlow,
   )
 where
@@ -112,6 +113,9 @@ data CommandExecutionHandler = SystemExecutor | ExternalExecutor
 
 -- data CommandHashStrategy = Smart | Rigorous
 -- data CommandExecutionEnvironment = SystemEnvironment | Nix | Docker
+
+defaultExecutionConfig :: FlowExecutionConfig
+defaultExecutionConfig = FlowExecutionConfig { commandExecution = SystemExecutor }
 
 runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 runFlow (FlowExecutionConfig {commandExecution}) flow input =

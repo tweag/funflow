@@ -4,21 +4,26 @@
 module Funflow
   ( -- Basics
     Flow,
+    (>>>),
+    -- Run flow
     FlowExecutionConfig (..),
     CommandExecutionHandler (..),
+    defaultExecutionConfig,
     runFlow,
-    -- Caching
-    caching,
-    -- Helpers to make flows in an idiomatic way
+    -- "smart constructors" to make flows in an idiomatic way
     pureFlow,
     ioFlow,
     shellFlow,
     commandFlow,
     dockerFlow,
     nixFlow,
+    -- Caching
+    caching,
   )
+
 where
 
+import Control.Arrow ( (>>>) )
 import Control.Kernmantle.Caching (caching)
 import Funflow.Flow (Flow)
 import Funflow.Flows
@@ -29,4 +34,9 @@ import Funflow.Flows
     pureFlow,
     shellFlow,
   )
-import Funflow.Run (CommandExecutionHandler (..), FlowExecutionConfig (..), runFlow)
+import Funflow.Run
+  ( defaultExecutionConfig,
+    CommandExecutionHandler (..),
+    FlowExecutionConfig (..),
+    runFlow
+  )
