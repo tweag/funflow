@@ -45,7 +45,6 @@ import qualified Data.CAS.ContentStore as CS
 import Data.String (fromString)
 import Data.Text (Text, unpack)
 import qualified Data.Text as T
-import Debug.Trace
 import Funflow.Flow (Flow)
 import Funflow.Flows.Command
   ( CommandFlow (CommandFlow, ShellCommandFlow),
@@ -63,7 +62,6 @@ import Funflow.Flows.Nix
   )
 import qualified Funflow.Flows.Nix as NF
 import Funflow.Flows.Simple (SimpleFlow (IO, Pure))
-import Funflow.Util (mapPair)
 import Katip
   ( ColorStrategy (ColorIfTerminal),
     Severity (InfoS),
@@ -160,7 +158,7 @@ interpretCommandFlowSystemExecutor commandFlow =
           _ <-
             createProcess $
               CreateProcess
-                { cmdspec = traceShow spec spec,
+                { cmdspec = spec,
                   env = Nothing,
                   cwd = Nothing,
                   std_in = Inherit,
