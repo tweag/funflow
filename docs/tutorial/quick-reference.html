@@ -1,0 +1,144 @@
+Hello world
+<!DOCTYPE HTML><html>
+<head><meta charset="utf-8"><link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet"><link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" rel="stylesheet"><script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script></head>
+<body><div class="container"><div class="row"><div class="col-sm-12">
+<h1>funflow2: Quick reference</h1>
+<p>This document presents how to use the API through short examples.</p>
+<p>All imports are available in the <code>Funflow</code> module:</p>
+<pre class="haskell"><code>import Funflow
+</code></pre>
+<h2>1. A minimal flow</h2>
+<div class="row">
+<div class="col-md-1">
+In
+</div>
+<div class="col-md-11">
+<pre class="haskell"><code>let
+      -- A flow from a pure function
+      -- which takes a `String` as input and outputs a `String`
+      flow :: Flow String String
+      flow = pureFlow $ \input -> "Hello " ++ input ++ " !"
+      
+      -- Some input to run the flow on
+      input :: String
+      input = "Watson"
+    in
+      -- Run the flow with given input
+      -- Returns an `IO output`, here `output` is `String`
+      runFlow defaultExecutionConfig flow input :: IO String
+</code></pre>
+</div>
+</div>
+<div class="row">
+<div class="col-md-1">
+Out
+</div>
+<div class="col-md-11">
+<pre class="text"><code>"Hello Watson !"
+</code></pre>
+</div>
+</div>
+<h3>2. Composing flows</h3>
+<div class="row">
+<div class="col-md-1">
+In
+</div>
+<div class="col-md-11">
+<pre class="haskell"><code>let
+      -- Two flows
+      flow1 :: Flow () String
+      flow1 = pureFlow $ \input -> "Hello"
+
+      flow2 :: Flow String String
+      flow2 = pureFlow $ \input -> input ++ " world"
+      
+      -- Combine both flows using `>>>`
+      flow :: Flow () String
+      flow = flow1 >>> flow2
+    in
+      runFlow defaultExecutionConfig flow () :: IO String
+</code></pre>
+</div>
+</div>
+<div class="row">
+<div class="col-md-1">
+Out
+</div>
+<div class="col-md-11">
+<pre class="text"><code>"Hello world"
+</code></pre>
+</div>
+</div>
+<h3>3. Running a shell command</h3>
+<div class="row">
+<div class="col-md-1">
+In
+</div>
+<div class="col-md-11">
+<pre class="haskell"><code>let
+      -- Prints "Hello world" to stdout and produces no output
+      flow :: Flow () ()
+      flow = shellFlow "echo Hello world"
+    in
+      runFlow defaultExecutionConfig flow () :: IO ()
+</code></pre>
+</div>
+</div>
+<div class="row">
+<div class="col-md-1">
+Out
+</div>
+<div class="col-md-11">
+<pre class="text"><code>()
+</code></pre>
+</div>
+</div>
+<h3>4. Caching a flow</h3>
+<div class="row">
+<div class="col-md-1">
+In
+</div>
+<div class="col-md-11">
+<pre class="haskell"><code>let
+      -- Prints "Increment!" everytime it runs
+      increment :: Flow Int Int
+      increment = ioFlow $ \input -> do
+        putStrLn "Increment!"
+        return $ input + 1
+      -- Reset any count to zero
+      reset :: Flow Int Int
+      reset = pureFlow $ \input -> 0
+      -- Caching the `increment` flow
+      cachedIncrement :: Flow Int Int
+      cachedIncrement = caching ("increment" :: String) increment
+      -- Without caching
+      flow1 :: Flow Int Int
+      flow1 = reset >>> increment >>> reset >>> increment
+      -- With caching
+      flow2 :: Flow Int Int
+      flow2 = reset >>> cachedIncrement >>> reset >>> cachedIncrement
+    in
+      do
+        -- Prints "Increment!" twice to stdout
+        runFlow defaultExecutionConfig flow1 (0 :: Int) :: IO Int
+        -- Prints "Increment!" once to stdout
+        runFlow defaultExecutionConfig flow2 (0 :: Int) :: IO Int
+        return ()
+</code></pre>
+</div>
+</div>
+<div class="row">
+<div class="col-md-1">
+Out
+</div>
+<div class="col-md-11">
+<pre class="text"><code>Increment!
+Increment!
+Increment!
+()
+</code></pre>
+</div>
+</div>
+<h3>Configuration Option</h3>
+<h3>Controlling Effects</h3>
+</div></div></div></body></html>
