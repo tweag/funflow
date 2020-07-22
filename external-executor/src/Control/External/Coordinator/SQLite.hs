@@ -37,11 +37,10 @@ import System.Clock
 data SQLite = SQLite
 
 -- | SQLite coordinator hook.
-data SQLiteHook
-  = SQLiteHook
-      { _sqlConn :: SQL.Connection,
-        _sqlLock :: Lock
-      }
+data SQLiteHook = SQLiteHook
+  { _sqlConn :: SQL.Connection,
+    _sqlLock :: Lock
+  }
 
 makeLenses ''SQLiteHook
 
@@ -75,13 +74,12 @@ instance SQL.ToField SqlExecutor where
   toField (SqlExecutor (Executor host)) = SQL.toField host
 
 -- | SQLite task info query result.
-data SqlTaskInfo
-  = SqlTaskInfo
-      { _stiStatus :: SqlTaskStatus,
-        _stiExecutor :: Maybe SqlExecutor,
-        _stiElapsed :: Maybe Integer,
-        _stiExitCode :: Maybe Int
-      }
+data SqlTaskInfo = SqlTaskInfo
+  { _stiStatus :: SqlTaskStatus,
+    _stiExecutor :: Maybe SqlExecutor,
+    _stiElapsed :: Maybe Integer,
+    _stiExitCode :: Maybe Int
+  }
 
 makeLenses ''SqlTaskInfo
 
@@ -232,19 +230,19 @@ instance Coordinator SQLite where
             _sqlLock = lock
           }
 
-  submitTask hook td = liftIO
-    $ withSQLite hook
-    $ \conn ->
-      SQL.executeNamed
-        conn
-        "INSERT OR REPLACE INTO\
-        \  tasks (output, status, task)\
-        \ VALUES\
-        \  (:output, :status, :task)"
-        [ ":output" SQL.:= (td ^. tdOutput),
-          ":status" SQL.:= SqlPending,
-          ":task" SQL.:= SqlExternal (td ^. tdTask)
-        ]
+  submitTask hook td = liftIO $
+    withSQLite hook $
+      \conn ->
+        SQL.executeNamed
+          conn
+          "INSERT OR REPLACE INTO\
+          \  tasks (output, status, task)\
+          \ VALUES\
+          \  (:output, :status, :task)"
+          [ ":output" SQL.:= (td ^. tdOutput),
+            ":status" SQL.:= SqlPending,
+            ":task" SQL.:= SqlExternal (td ^. tdTask)
+          ]
 
   queueSize hook = liftIO $ do
     [[n]] <- withSQLite hook $ \conn ->
@@ -258,106 +256,107 @@ instance Coordinator SQLite where
     liftIO $
       taskInfo' hook output
 
-  popTask hook executor = liftIO
-    $ withSQLite hook
-    $ \conn -> SQL.withTransaction conn $ do
-      r <-
-        SQL.queryNamed
-          conn
-          "SELECT output, task FROM tasks\
-          \ WHERE\
-          \  status = :pending\
-          \ LIMIT 1"
-          [":pending" SQL.:= SqlPending]
-      case r of
-        [] -> pure Nothing
-        (SqlTask td : _) -> do
-          SQL.executeNamed
+  popTask hook executor = liftIO $
+    withSQLite hook $
+      \conn -> SQL.withTransaction conn $ do
+        r <-
+          SQL.queryNamed
             conn
-            "UPDATE tasks\
-            \ SET\
-            \  status = :status,\
-            \  executor = :executor\
+            "SELECT output, task FROM tasks\
             \ WHERE\
-            \  output = :output"
-            [ ":status" SQL.:= SqlRunning,
-              ":executor" SQL.:= SqlExecutor executor,
-              ":output" SQL.:= td ^. tdOutput
-            ]
-          pure $! Just td
+            \  status = :pending\
+            \ LIMIT 1"
+            [":pending" SQL.:= SqlPending]
+        case r of
+          [] -> pure Nothing
+          (SqlTask td : _) -> do
+            SQL.executeNamed
+              conn
+              "UPDATE tasks\
+              \ SET\
+              \  status = :status,\
+              \  executor = :executor\
+              \ WHERE\
+              \  output = :output"
+              [ ":status" SQL.:= SqlRunning,
+                ":executor" SQL.:= SqlExecutor executor,
+                ":output" SQL.:= td ^. tdOutput
+              ]
+            pure $! Just td
 
   awaitTask hook output = liftIO $ loop
     where
       -- XXX: SQLite has callback mechanisms built-in (e.g. @sqlite3_commit_hook@).
       --   Unfortunately, @direct-sqlite@, which @sqlite-simple@ builds on top of,
       --   doesn't expose this functionality at the moment.
-      loop = taskInfo' hook output >>= \case
-        KnownTask Pending -> sleep >> loop
-        KnownTask (Running _) -> sleep >> loop
-        ti -> pure ti
+      loop =
+        taskInfo' hook output >>= \case
+          KnownTask Pending -> sleep >> loop
+          KnownTask (Running _) -> sleep >> loop
+          ti -> pure ti
       sleep = liftIO $ threadDelay oneSeconds
       oneSeconds = 1000000
 
-  updateTaskStatus hook output ts = liftIO
-    $ withSQLite hook
-    $ \conn -> SQL.withTransaction conn $ do
-      r <-
-        SQL.queryNamed
-          conn
-          "SELECT status FROM tasks\
-          \ WHERE\
-          \  output = :output"
-          [":output" SQL.:= output]
-      case r of
-        [SqlRunning] : _ -> case ts of
-          Completed ei ->
-            SQL.executeNamed
-              conn
-              "UPDATE tasks\
-              \ SET\
-              \  status = :completed,\
-              \  elapsed = :elapsed\
-              \ WHERE\
-              \  output = :output"
-              [ ":completed" SQL.:= SqlCompleted,
-                ":elapsed" SQL.:= toNanoSecs (ei ^. eiElapsed),
-                ":output" SQL.:= output
-              ]
-          Failed ei exitCode ->
-            SQL.executeNamed
-              conn
-              "UPDATE tasks\
-              \ SET\
-              \  status = :failed,\
-              \  elapsed = :elapsed,\
-              \  exit_code = :exit_code\
-              \ WHERE\
-              \  output = :output"
-              [ ":failed" SQL.:= SqlFailed,
-                ":elapsed" SQL.:= toNanoSecs (ei ^. eiElapsed),
-                ":exit_code" SQL.:= exitCode,
-                ":output" SQL.:= output
-              ]
-          Pending ->
-            SQL.executeNamed
-              conn
-              "UPDATE tasks\
-              \ SET\
-              \  status = :pending\
-              \ WHERE\
-              \  output = :output"
-              [ ":pending" SQL.:= SqlPending,
-                ":output" SQL.:= output
-              ]
-          Running _ -> throwIO $ IllegalStatusUpdate output ts
-        _ -> throwIO $ NonRunningTask output
+  updateTaskStatus hook output ts = liftIO $
+    withSQLite hook $
+      \conn -> SQL.withTransaction conn $ do
+        r <-
+          SQL.queryNamed
+            conn
+            "SELECT status FROM tasks\
+            \ WHERE\
+            \  output = :output"
+            [":output" SQL.:= output]
+        case r of
+          [SqlRunning] : _ -> case ts of
+            Completed ei ->
+              SQL.executeNamed
+                conn
+                "UPDATE tasks\
+                \ SET\
+                \  status = :completed,\
+                \  elapsed = :elapsed\
+                \ WHERE\
+                \  output = :output"
+                [ ":completed" SQL.:= SqlCompleted,
+                  ":elapsed" SQL.:= toNanoSecs (ei ^. eiElapsed),
+                  ":output" SQL.:= output
+                ]
+            Failed ei exitCode ->
+              SQL.executeNamed
+                conn
+                "UPDATE tasks\
+                \ SET\
+                \  status = :failed,\
+                \  elapsed = :elapsed,\
+                \  exit_code = :exit_code\
+                \ WHERE\
+                \  output = :output"
+                [ ":failed" SQL.:= SqlFailed,
+                  ":elapsed" SQL.:= toNanoSecs (ei ^. eiElapsed),
+                  ":exit_code" SQL.:= exitCode,
+                  ":output" SQL.:= output
+                ]
+            Pending ->
+              SQL.executeNamed
+                conn
+                "UPDATE tasks\
+                \ SET\
+                \  status = :pending\
+                \ WHERE\
+                \  output = :output"
+                [ ":pending" SQL.:= SqlPending,
+                  ":output" SQL.:= output
+                ]
+            Running _ -> throwIO $ IllegalStatusUpdate output ts
+          _ -> throwIO $ NonRunningTask output
 
-  dropTasks hook = liftIO
-    $ withSQLite hook
-    $ \conn ->
-      SQL.executeNamed
-        conn
-        "DELETE FROM tasks\
-        \ WHERE\
-        \  status = :pending"
-        [":pending" SQL.:= SqlPending]
+  dropTasks hook = liftIO $
+    withSQLite hook $
+      \conn ->
+        SQL.executeNamed
+          conn
+          "DELETE FROM tasks\
+          \ WHERE\
+          \  status = :pending"
+          [":pending" SQL.:= SqlPending]

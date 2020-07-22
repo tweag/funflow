@@ -34,46 +34,47 @@ instance Coordinator Redis where
   initialise = liftIO . R.connect
 
   submitTask conn td =
-    liftIO
-      $ R.runRedis conn
-      $ do
-        void $ R.rpush "jobs_queue" [encode (jid, td ^. tdTask)]
-        void $ R.set jid (encode Pending)
+    liftIO $
+      R.runRedis conn $
+        do
+          void $ R.rpush "jobs_queue" [encode (jid, td ^. tdTask)]
+          void $ R.set jid (encode Pending)
     where
       jid = CHash.toBytes $ td ^. tdOutput
 
   queueSize conn =
-    liftIO $ R.runRedis conn $
-      fromIntegral . either (const 0) id <$> R.llen "jobs_queue"
+    liftIO $
+      R.runRedis conn $
+        fromIntegral . either (const 0) id <$> R.llen "jobs_queue"
 
-  taskInfo conn chash = liftIO
-    $ R.runRedis conn
-    $ do
-      eoutput <- R.get $ CHash.toBytes chash
-      case eoutput of
-        Left r -> fail $ "Redis fail: " ++ show r
-        Right Nothing -> return UnknownTask
-        Right (Just bs) -> case decode bs of
-          Left r -> fail $ "Decode fail: " ++ show r
-          Right ti -> return $ KnownTask ti
+  taskInfo conn chash = liftIO $
+    R.runRedis conn $
+      do
+        eoutput <- R.get $ CHash.toBytes chash
+        case eoutput of
+          Left r -> fail $ "Redis fail: " ++ show r
+          Right Nothing -> return UnknownTask
+          Right (Just bs) -> case decode bs of
+            Left r -> fail $ "Decode fail: " ++ show r
+            Right ti -> return $ KnownTask ti
 
-  awaitTask conn chash = liftIO . R.runRedis conn
-    $ fix
-    $ \waitGet -> do
-      ti <- taskInfo conn chash
-      case ti of
-        UnknownTask -> return UnknownTask
-        info@(KnownTask (Completed _)) -> return info
-        info@(KnownTask (Failed _ _)) -> return info
-        _ -> do
-          liftIO $ threadDelay 500000
-          waitGet
+  awaitTask conn chash = liftIO . R.runRedis conn $
+    fix $
+      \waitGet -> do
+        ti <- taskInfo conn chash
+        case ti of
+          UnknownTask -> return UnknownTask
+          info@(KnownTask (Completed _)) -> return info
+          info@(KnownTask (Failed _ _)) -> return info
+          _ -> do
+            liftIO $ threadDelay 500000
+            waitGet
 
   updateTaskStatus conn chash status =
-    liftIO
-      $ R.runRedis conn
-      $ void
-      $ R.set (CHash.toBytes chash) (encode status)
+    liftIO $
+      R.runRedis conn $
+        void $
+          R.set (CHash.toBytes chash) (encode status)
 
   popTask conn executor = liftIO . R.runRedis conn $ do
     job <- R.brpoplpush "jobs_queue" "job_running" 1

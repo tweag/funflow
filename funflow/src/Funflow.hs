@@ -20,10 +20,9 @@ module Funflow
     -- Caching
     caching,
   )
-
 where
 
-import Control.Arrow ( (>>>) )
+import Control.Arrow ((>>>))
 import Control.Kernmantle.Caching (caching)
 import Funflow.Flow (Flow)
 import Funflow.Flows
@@ -35,8 +34,8 @@ import Funflow.Flows
     shellFlow,
   )
 import Funflow.Run
-  ( defaultExecutionConfig,
-    CommandExecutionHandler (..),
+  ( CommandExecutionHandler (..),
     FlowExecutionConfig (..),
-    runFlow
+    defaultExecutionConfig,
+    runFlow,
   )

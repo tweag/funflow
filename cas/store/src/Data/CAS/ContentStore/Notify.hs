@@ -10,14 +10,14 @@
 --   - File deletion
 --   - Attribute changes.
 module Data.CAS.ContentStore.Notify
-  ( Notifier
-  , initNotifier
-  , killNotifier
-
-  , Watch
-  , addDirWatch
-  , removeDirWatch
-  ) where
+  ( Notifier,
+    initNotifier,
+    killNotifier,
+    Watch,
+    addDirWatch,
+    removeDirWatch,
+  )
+where
 
 #ifdef OS_Linux
 import           Data.CAS.ContentStore.Notify.Linux

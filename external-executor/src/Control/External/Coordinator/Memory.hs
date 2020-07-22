@@ -20,11 +20,10 @@ import System.Clock (fromNanoSecs)
 
 data MemoryCoordinator = MemoryCoordinator
 
-data MemHook
-  = MemHook
-      { _mhTaskQueue :: TVar [TaskDescription],
-        _mhExecutionQueue :: TVar (M.Map ContentHash TaskStatus)
-      }
+data MemHook = MemHook
+  { _mhTaskQueue :: TVar [TaskDescription],
+    _mhExecutionQueue :: TVar (M.Map ContentHash TaskStatus)
+  }
 
 makeLenses ''MemHook
 
@@ -41,9 +40,9 @@ instance Coordinator MemoryCoordinator where
   initialise = return
 
   submitTask mh td =
-    liftIO
-      $ atomically
-      $ modifyTVar (mh ^. mhTaskQueue) (td :)
+    liftIO $
+      atomically $
+        modifyTVar (mh ^. mhTaskQueue) (td :)
 
   queueSize mh = liftIO $ do
     queue <- atomically . readTVar $ mh ^. mhTaskQueue
@@ -83,14 +82,14 @@ instance Coordinator MemoryCoordinator where
                 M.insert (td ^. tdOutput) taskStatus eq
               return $ Just td
 
-  updateTaskStatus mh tid stat = liftIO . atomically
-    $ modifyTVar (mh ^. mhExecutionQueue)
-    $ \eq ->
-      if M.member tid eq
-        then M.insert tid stat eq
-        else error "Cannot update task status: task not executing."
+  updateTaskStatus mh tid stat = liftIO . atomically $
+    modifyTVar (mh ^. mhExecutionQueue) $
+      \eq ->
+        if M.member tid eq
+          then M.insert tid stat eq
+          else error "Cannot update task status: task not executing."
 
   dropTasks mh =
-    liftIO . atomically
-      $ modifyTVar (mh ^. mhTaskQueue)
-      $ const []
+    liftIO . atomically $
+      modifyTVar (mh ^. mhTaskQueue) $
+        const []

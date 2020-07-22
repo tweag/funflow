@@ -131,14 +131,14 @@ import Control.Concurrent.MVar
 import Control.Exception.Safe
 import Control.Lens
 import Control.Monad
-  ( (<=<),
-    (>=>),
-    forM_,
+  ( forM_,
     forever,
     mzero,
     unless,
     void,
     when,
+    (<=<),
+    (>=>),
   )
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Crypto.Hash (hashUpdate)
@@ -268,20 +268,19 @@ instance Exception StoreError where
         ++ "' is malformed."
 
 -- | A hash addressed store on the file system.
-data ContentStore
-  = ContentStore
-      { -- | Root directory of the content store.
-        -- The process must be able to create this directory if missing,
-        -- change permissions, and create files and directories within.
-        storeRoot :: Path Abs Dir,
-        -- | Write lock on store metadata to ensure multi thread and process safety.
-        -- The lock is taken when item state is changed or queried.
-        storeLock :: Lock,
-        -- | Used to watch for updates on store items.
-        storeNotifier :: Notifier,
-        -- | Connection to the metadata SQLite database.
-        storeDb :: SQL.Connection
-      }
+data ContentStore = ContentStore
+  { -- | Root directory of the content store.
+    -- The process must be able to create this directory if missing,
+    -- change permissions, and create files and directories within.
+    storeRoot :: Path Abs Dir,
+    -- | Write lock on store metadata to ensure multi thread and process safety.
+    -- The lock is taken when item state is changed or queried.
+    storeLock :: Lock,
+    -- | Used to watch for updates on store items.
+    storeNotifier :: Notifier,
+    -- | Connection to the metadata SQLite database.
+    storeDb :: SQL.Connection
+  }
 
 -- | A completed item in the 'ContentStore'.
 data Item = Item {itemHash :: ContentHash}
@@ -377,12 +376,13 @@ open :: Path Abs Dir -> IO ContentStore
 open storeRoot = do
   createDirIfMissing True storeRoot
   storeLock <- openLock (lockPath storeRoot)
-  withLock storeLock $ withWritableStoreRoot storeRoot $ do
-    storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
-    initDb storeRoot storeDb
-    createDirIfMissing True (metadataPath storeRoot)
-    storeNotifier <- initNotifier
-    return ContentStore {..}
+  withLock storeLock $
+    withWritableStoreRoot storeRoot $ do
+      storeDb <- SQL.open (fromAbsFile $ dbPath storeRoot)
+      initDb storeRoot storeDb
+      createDirIfMissing True (metadataPath storeRoot)
+      storeNotifier <- initNotifier
+      return ContentStore {..}
 
 -- | Free the resources associated with the given store object.
 --
@@ -441,11 +441,13 @@ listItems = fmap (^. _3) . listAll
 
 -- | Query the state of the item under the given key.
 query :: MonadIO m => ContentStore -> ContentHash -> m (Status () () ())
-query store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= pure . \case
-    Missing _ -> Missing ()
-    Pending _ -> Pending ()
-    Complete _ -> Complete ()
+query store hash =
+  liftIO . withStoreLock store $
+    internalQuery store hash
+      >>= pure . \case
+        Missing _ -> Missing ()
+        Pending _ -> Pending ()
+        Complete _ -> Complete ()
 
 -- | Check if there is no complete or pending item under the given key.
 isMissing :: MonadIO m => ContentStore -> ContentHash -> m Bool
@@ -462,11 +464,12 @@ isComplete store hash = (== Complete ()) <$> query store hash
 -- | Query the state under the given key and return the item if completed.
 -- Doesn't block if the item is pending.
 lookup :: MonadIO m => ContentStore -> ContentHash -> m (Status () () Item)
-lookup store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
-    Missing () -> return $ Missing ()
-    Pending _ -> return $ Pending ()
-    Complete item -> return $ Complete item
+lookup store hash =
+  liftIO . withStoreLock store $
+    internalQuery store hash >>= \case
+      Missing () -> return $ Missing ()
+      Pending _ -> return $ Pending ()
+      Complete item -> return $ Complete item
 
 -- | Query the state under the given key and return the item if completed.
 -- Return an 'Control.Concurrent.Async' to await an update, if pending.
@@ -475,22 +478,25 @@ lookupOrWait ::
   ContentStore ->
   ContentHash ->
   m (Status () (Async Update) Item)
-lookupOrWait store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
-    Complete item -> return $ Complete item
-    Missing () -> return $ Missing ()
-    Pending _ -> Pending <$> internalWatchPending store hash
+lookupOrWait store hash =
+  liftIO . withStoreLock store $
+    internalQuery store hash >>= \case
+      Complete item -> return $ Complete item
+      Missing () -> return $ Missing ()
+      Pending _ -> Pending <$> internalWatchPending store hash
 
 -- | Query the state under the given key and return the item once completed.
 -- Blocks if the item is pending.
 -- Returns 'Nothing' if the item is missing, or failed to be completed.
 waitUntilComplete :: MonadIO m => ContentStore -> ContentHash -> m (Maybe Item)
-waitUntilComplete store hash = lookupOrWait store hash >>= \case
-  Complete item -> return $ Just item
-  Missing () -> return Nothing
-  Pending a -> liftIO (wait a) >>= \case
-    Completed item -> return $ Just item
-    Failed -> return Nothing
+waitUntilComplete store hash =
+  lookupOrWait store hash >>= \case
+    Complete item -> return $ Just item
+    Missing () -> return Nothing
+    Pending a ->
+      liftIO (wait a) >>= \case
+        Completed item -> return $ Just item
+        Failed -> return Nothing
 
 -- | Atomically query the state under the given key and mark pending if missing.
 constructIfMissing ::
@@ -499,19 +505,20 @@ constructIfMissing ::
   remoteCache ->
   ContentHash ->
   m (Status (Path Abs Dir) () Item)
-constructIfMissing store remoteCacher hash = withStoreLock store $
-  internalQuery store hash >>= \case
-    Complete item -> return $ Complete item
-    Missing () -> withWritableStore store $ do
-      let destDir :: Path Abs Dir = mkItemPath store hash
-      Remote.pull remoteCacher hash destDir >>= \case
-        Remote.PullOK () -> return $ Complete (Item hash)
-        Remote.NotInCache ->
-          Missing <$> liftIO (internalMarkPending store hash)
-        Remote.PullError _ ->
-          -- TODO: That error should not be silenced
-          Missing <$> liftIO (internalMarkPending store hash)
-    Pending _ -> return $ Pending ()
+constructIfMissing store remoteCacher hash =
+  withStoreLock store $
+    internalQuery store hash >>= \case
+      Complete item -> return $ Complete item
+      Missing () -> withWritableStore store $ do
+        let destDir :: Path Abs Dir = mkItemPath store hash
+        Remote.pull remoteCacher hash destDir >>= \case
+          Remote.PullOK () -> return $ Complete (Item hash)
+          Remote.NotInCache ->
+            Missing <$> liftIO (internalMarkPending store hash)
+          Remote.PullError _ ->
+            -- TODO: That error should not be silenced
+            Missing <$> liftIO (internalMarkPending store hash)
+      Pending _ -> return $ Pending ()
 
 -- | Atomically query the state under the given key and mark pending if missing.
 -- Execute the given function to construct the item, mark as complete on success
@@ -538,14 +545,15 @@ withConstructIfMissing store remoteCacher ifExc hash f =
     ( \case
         Pending () -> return (Pending ())
         Complete item -> return (Complete (Nothing, item))
-        Missing fp -> f fp >>= \case
-          Left e -> do
-            removeFailed store hash
-            return (Missing e)
-          Right x -> do
-            item <- markComplete store hash
-            _ <- Remote.push remoteCacher (itemHash item) (Just hash) (itemPath store item)
-            return (Complete (Just x, item))
+        Missing fp ->
+          f fp >>= \case
+            Left e -> do
+              removeFailed store hash
+              return (Missing e)
+            Right x -> do
+              item <- markComplete store hash
+              _ <- Remote.push remoteCacher (itemHash item) (Just hash) (itemPath store item)
+              return (Complete (Just x, item))
     )
 
 -- | Mark a non-existent item as pending.
@@ -554,55 +562,59 @@ withConstructIfMissing store remoteCacher ifExc hash f =
 --
 -- See also: 'Data.CAS.ContentStore.constructIfMissing'.
 markPending :: MonadIO m => ContentStore -> ContentHash -> m (Path Abs Dir)
-markPending store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
-    Complete _ -> throwIO (AlreadyComplete hash)
-    Pending _ -> throwIO (AlreadyPending hash)
-    Missing () ->
-      withWritableStore store $
-        internalMarkPending store hash
+markPending store hash =
+  liftIO . withStoreLock store $
+    internalQuery store hash >>= \case
+      Complete _ -> throwIO (AlreadyComplete hash)
+      Pending _ -> throwIO (AlreadyPending hash)
+      Missing () ->
+        withWritableStore store $
+          internalMarkPending store hash
 
 -- | Mark a pending item as complete.
 markComplete :: MonadIO m => ContentStore -> ContentHash -> m Item
-markComplete store inHash = liftIO . withStoreLock store $
-  internalQuery store inHash >>= \case
-    Missing () -> throwIO (NotPending inHash)
-    Complete _ -> throwIO (AlreadyComplete inHash)
-    Pending build -> withWritableStore store $ liftIO $ do
-      do
-        let metadataDir = mkMetadataDirPath store inHash
-        exists <- doesDirExist metadataDir
-        when exists $
-          unsetWritableRecursively metadataDir
-      -- XXX: Hashing large data can take some time,
-      --   could we avoid locking the store for all that time?
-      outHash <- contentHash (DirectoryContent build)
-      let out = mkItemPath store outHash
-          link' = mkCompletePath store inHash
-      doesDirExist out >>= \case
-        True -> removePathForcibly (fromAbsDir build)
-        False -> do
-          renameDir build out
-          unsetWritableRecursively out
-      rel <- makeRelative (parent link') out
-      let from' = dropTrailingPathSeparator $ fromAbsDir link'
-          to' = dropTrailingPathSeparator $ fromRelDir rel
-      createSymbolicLink to' from'
-      addBackReference store inHash (Item outHash)
-      pure $! Item outHash
+markComplete store inHash =
+  liftIO . withStoreLock store $
+    internalQuery store inHash >>= \case
+      Missing () -> throwIO (NotPending inHash)
+      Complete _ -> throwIO (AlreadyComplete inHash)
+      Pending build -> withWritableStore store $
+        liftIO $ do
+          do
+            let metadataDir = mkMetadataDirPath store inHash
+            exists <- doesDirExist metadataDir
+            when exists $
+              unsetWritableRecursively metadataDir
+          -- XXX: Hashing large data can take some time,
+          --   could we avoid locking the store for all that time?
+          outHash <- contentHash (DirectoryContent build)
+          let out = mkItemPath store outHash
+              link' = mkCompletePath store inHash
+          doesDirExist out >>= \case
+            True -> removePathForcibly (fromAbsDir build)
+            False -> do
+              renameDir build out
+              unsetWritableRecursively out
+          rel <- makeRelative (parent link') out
+          let from' = dropTrailingPathSeparator $ fromAbsDir link'
+              to' = dropTrailingPathSeparator $ fromRelDir rel
+          createSymbolicLink to' from'
+          addBackReference store inHash (Item outHash)
+          pure $! Item outHash
 
 -- | Remove a pending item.
 --
 -- It is the callers responsibility to ensure that no other threads or processes
 -- will attempt to access the item's contents afterwards.
 removeFailed :: MonadIO m => ContentStore -> ContentHash -> m ()
-removeFailed store hash = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
-    Missing () -> throwIO (NotPending hash)
-    Complete _ -> throwIO (AlreadyComplete hash)
-    Pending build ->
-      withWritableStore store $
-        removePathForcibly (fromAbsDir build)
+removeFailed store hash =
+  liftIO . withStoreLock store $
+    internalQuery store hash >>= \case
+      Missing () -> throwIO (NotPending hash)
+      Complete _ -> throwIO (AlreadyComplete hash)
+      Pending build ->
+        withWritableStore store $
+          removePathForcibly (fromAbsDir build)
 
 -- | Remove a key association independent of the corresponding item state.
 -- Do nothing if no item exists under the given key.
@@ -613,16 +625,18 @@ removeFailed store hash = liftIO . withStoreLock store $
 -- Note, this will leave an orphan item behind if no other keys point to it.
 -- There is no garbage collection mechanism in place at the moment.
 removeForcibly :: MonadIO m => ContentStore -> ContentHash -> m ()
-removeForcibly store hash = liftIO . withStoreLock store $ withWritableStore store $
-  internalQuery store hash >>= \case
-    Missing () -> pure ()
-    Pending build -> liftIO $ removePathForcibly (fromAbsDir build)
-    Complete _out ->
-      liftIO
-        $ removePathForcibly
-        $ dropTrailingPathSeparator
-        $ fromAbsDir
-        $ mkCompletePath store hash
+removeForcibly store hash =
+  liftIO . withStoreLock store $
+    withWritableStore store $
+      internalQuery store hash >>= \case
+        Missing () -> pure ()
+        Pending build -> liftIO $ removePathForcibly (fromAbsDir build)
+        Complete _out ->
+          liftIO $
+            removePathForcibly $
+              dropTrailingPathSeparator $
+                fromAbsDir $
+                  mkCompletePath store hash
 
 -- XXX: This will leave orphan store items behind.
 --   Add GC in some form.
@@ -637,8 +651,9 @@ removeForcibly store hash = liftIO . withStoreLock store $ withWritableStore sto
 -- There is no garbage collection mechanism in place at the moment.
 removeItemForcibly :: MonadIO m => ContentStore -> Item -> m ()
 removeItemForcibly store item =
-  liftIO . withStoreLock store $ withWritableStore store $
-    removePathForcibly (fromAbsDir $ itemPath store item)
+  liftIO . withStoreLock store $
+    withWritableStore store $
+      removePathForcibly (fromAbsDir $ itemPath store item)
 
 -- XXX: Remove dangling links.
 --   Add back-references in some form.
@@ -658,18 +673,19 @@ instance SQL.ToField ContentHash where
 -- If the alias existed before it is overwritten.
 assignAlias :: MonadIO m => ContentStore -> Alias -> Item -> m ()
 assignAlias store alias item =
-  liftIO . withStoreLock store $ withWritableStore store $ do
-    hash <- contentHash alias
-    SQL.executeNamed
-      (storeDb store)
-      "INSERT OR REPLACE INTO\
-      \  aliases\
-      \ VALUES\
-      \  (:hash, :dest, :name)"
-      [ ":hash" SQL.:= hash,
-        ":dest" SQL.:= itemHash item,
-        ":name" SQL.:= alias
-      ]
+  liftIO . withStoreLock store $
+    withWritableStore store $ do
+      hash <- contentHash alias
+      SQL.executeNamed
+        (storeDb store)
+        "INSERT OR REPLACE INTO\
+        \  aliases\
+        \ VALUES\
+        \  (:hash, :dest, :name)"
+        [ ":hash" SQL.:= hash,
+          ":dest" SQL.:= itemHash item,
+          ":name" SQL.:= alias
+        ]
 
 -- | Lookup an item under the given alias.
 -- Returns 'Nothing' if the alias does not exist.
@@ -689,23 +705,24 @@ lookupAlias store alias =
 -- | Remove the given alias.
 removeAlias :: MonadIO m => ContentStore -> Alias -> m ()
 removeAlias store alias =
-  liftIO . withStoreLock store $ withWritableStore store $ do
-    hash <- contentHash alias
-    SQL.executeNamed
-      (storeDb store)
-      "DELETE FROM aliases\
-      \ WHERE\
-      \  hash = :hash"
-      [":hash" SQL.:= hash]
+  liftIO . withStoreLock store $
+    withWritableStore store $ do
+      hash <- contentHash alias
+      SQL.executeNamed
+        (storeDb store)
+        "DELETE FROM aliases\
+        \ WHERE\
+        \  hash = :hash"
+        [":hash" SQL.:= hash]
 
 -- | List all aliases and the respective items.
 listAliases :: MonadIO m => ContentStore -> m [(Alias, Item)]
 listAliases store =
-  liftIO . withStoreLock store
-    $ fmap (map (second Item))
-    $ SQL.query_
-      (storeDb store)
-      "SELECT name, dest FROM aliases"
+  liftIO . withStoreLock store $
+    fmap (map (second Item)) $
+      SQL.query_
+        (storeDb store)
+        "SELECT name, dest FROM aliases"
 
 -- | Get all hashes that resulted in the given item.
 getBackReferences :: MonadIO m => ContentStore -> Item -> m [ContentHash]
@@ -721,21 +738,22 @@ getBackReferences store (Item outHash) =
 
 -- | Define the input items to a subtree.
 setInputs :: MonadIO m => ContentStore -> ContentHash -> [Item] -> m ()
-setInputs store hash items = liftIO
-  $ withStoreLock store
-  $ withWritableStore store
-  $ internalQuery store hash >>= \case
-    Pending _ -> forM_ items $ \(Item input) ->
-      SQL.executeNamed
-        (storeDb store)
-        "INSERT OR REPLACE INTO\
-        \  inputs (hash, input)\
-        \ VALUES\
-        \  (:hash, :input)"
-        [ ":hash" SQL.:= hash,
-          ":input" SQL.:= input
-        ]
-    _ -> throwIO $ NotPending hash
+setInputs store hash items =
+  liftIO $
+    withStoreLock store $
+      withWritableStore store $
+        internalQuery store hash >>= \case
+          Pending _ -> forM_ items $ \(Item input) ->
+            SQL.executeNamed
+              (storeDb store)
+              "INSERT OR REPLACE INTO\
+              \  inputs (hash, input)\
+              \ VALUES\
+              \  (:hash, :input)"
+              [ ":hash" SQL.:= hash,
+                ":input" SQL.:= input
+              ]
+          _ -> throwIO $ NotPending hash
 
 -- | Get the input items to a subtree if any were defined.
 getInputs :: MonadIO m => ContentStore -> ContentHash -> m [Item]
@@ -758,19 +776,19 @@ setMetadata ::
   v ->
   m ()
 setMetadata store hash k v =
-  liftIO
-    $ withStoreLock store
-    $ withWritableStore store
-    $ SQL.executeNamed
-      (storeDb store)
-      "INSERT OR REPLACE INTO\
-      \  metadata (hash, key, value)\
-      \ VALUES\
-      \  (:hash, :key, :value)"
-      [ ":hash" SQL.:= hash,
-        ":key" SQL.:= k,
-        ":value" SQL.:= v
-      ]
+  liftIO $
+    withStoreLock store $
+      withWritableStore store $
+        SQL.executeNamed
+          (storeDb store)
+          "INSERT OR REPLACE INTO\
+          \  metadata (hash, key, value)\
+          \ VALUES\
+          \  (:hash, :key, :value)"
+          [ ":hash" SQL.:= hash,
+            ":key" SQL.:= k,
+            ":value" SQL.:= v
+          ]
 
 -- | Retrieve a metadata entry on an item, or 'Nothing' if missing.
 getMetadata ::
@@ -801,14 +819,15 @@ createMetadataFile ::
   ContentHash ->
   Path Rel File ->
   m (Path Abs File, Handle)
-createMetadataFile store hash file = liftIO . withStoreLock store $
-  internalQuery store hash >>= \case
-    Pending _ -> do
-      let path = mkMetadataFilePath store hash file
-      createDirIfMissing True (parent path)
-      hndl <- openFile (fromAbsFile path) WriteMode
-      pure (path, hndl)
-    _ -> throwIO $ NotPending hash
+createMetadataFile store hash file =
+  liftIO . withStoreLock store $
+    internalQuery store hash >>= \case
+      Pending _ -> do
+        let path = mkMetadataFilePath store hash file
+        createDirIfMissing True (parent path)
+        hndl <- openFile (fromAbsFile path) WriteMode
+        pure (path, hndl)
+      _ -> throwIO $ NotPending hash
 
 -- | Return the path to a metadata file if it exists.
 getMetadataFile ::
@@ -945,10 +964,11 @@ internalWatchPending store hash = do
   -- If the status changed, fill in the update.
   update <- newEmptyMVar
   let query' = liftIO . withStoreLock store $ internalQuery store hash
-      loop = takeMVar signal >> query' >>= \case
-        Pending _ -> loop
-        Complete item -> tryPutMVar update $ Completed item
-        Missing () -> tryPutMVar update Failed
+      loop =
+        takeMVar signal >> query' >>= \case
+          Pending _ -> loop
+          Complete item -> tryPutMVar update $ Completed item
+          Missing () -> tryPutMVar update Failed
   void $ async loop
   -- Wait for the update asynchronously.
   -- Stop watching when it arrives.
@@ -1040,9 +1060,9 @@ initDb storeDir db = do
       SQL.execute_ db $
         "PRAGMA user_version = " <> fromString (show storeVersion)
     else
-      unless (version == storeVersion)
-        $ throwIO
-        $ IncompatibleStoreVersion storeDir version storeVersion
+      unless (version == storeVersion) $
+        throwIO $
+          IncompatibleStoreVersion storeDir version storeVersion
   -- Aliases to items.
   SQL.execute_
     db
@@ -1191,9 +1211,10 @@ cacheKleisliIO confIdent c@Cache {} store remoteCacher f i
   where
     computeAndStore fp = do
       res <- f i -- Do the actual computation
-      liftIO $ BS.writeFile (toFilePath $ fp </> [relfile|out|])
-        $ cacherStoreValue c
-        $ res
+      liftIO $
+        BS.writeFile (toFilePath $ fp </> [relfile|out|]) $
+          cacherStoreValue c $
+            res
       return res
 cacheKleisliIO _ _ _ _ f i = f i
 

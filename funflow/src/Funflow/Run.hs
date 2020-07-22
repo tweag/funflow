@@ -113,7 +113,7 @@ data CommandExecutionHandler = SystemExecutor | ExternalExecutor
 -- data CommandExecutionEnvironment = SystemEnvironment | Nix | Docker
 
 defaultExecutionConfig :: FlowExecutionConfig
-defaultExecutionConfig = FlowExecutionConfig { commandExecution = SystemExecutor }
+defaultExecutionConfig = FlowExecutionConfig {commandExecution = SystemExecutor}
 
 runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 runFlow (FlowExecutionConfig {commandExecution}) flow input =
@@ -210,9 +210,7 @@ interpretCommandFlowExternalExecutor store commandFlow =
               task =
                 ExternalTask
                   { _etCommand = command,
-                    -- TODO use input env
                     _etEnv = EnvExplicit [(x, (fromString . unpack) y) | (x, y) <- env],
-                    -- TODO use input args
                     _etParams = fmap (fromString . unpack) args,
                     _etWriteToStdOut = StdOutCapture
                   }
@@ -221,9 +219,7 @@ interpretCommandFlowExternalExecutor store commandFlow =
           let task =
                 ExternalTask
                   { _etCommand = shellCommand,
-                    -- TODO use input env
                     _etEnv = EnvExplicit [],
-                    -- TODO use input args
                     _etParams = [],
                     _etWriteToStdOut = StdOutCapture
                   }
@@ -259,7 +255,7 @@ interpretNixFlow reinterpret nixFlow =
       packageSpec (NF.PackageList packageNames) = [("-p " <> packageName) | packageName <- packageNames]
       -- Turn a NIX_PATH or an URI to a tarball into the right list of arguments for `nix-shell`
       nixpkgsSourceToParam :: NF.NixpkgsSource -> Text
-      -- TODO This is DIRTY as HELL
+      -- FIXME This is DIRTY as HELL
       nixpkgsSourceToParam NF.NIX_PATH =
         T.pack $ unsafePerformIO $ getEnv "NIX_PATH"
       nixpkgsSourceToParam (NF.NixpkgsTarball uri) = ("nixpkgs=" <> URI.render uri)
