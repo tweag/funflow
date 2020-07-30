@@ -12,7 +12,7 @@ module Funflow.Flow
   )
 where
 
-import Control.Arrow (Arrow)
+import Control.Arrow (Arrow, ArrowChoice)
 import Control.Kernmantle.Caching (ProvidesCaching)
 import Control.Kernmantle.Rope (AnyRopeWith, HasKleisli)
 import Control.Monad.IO.Class (MonadIO)
@@ -24,10 +24,10 @@ import Funflow.Flows.Simple (SimpleFlow)
 -- The constraints on the set of "strands"
 -- These will be "interpreted" into "core effects" (which have contraints defined below).
 type RequiredStrands =
-  '[ '("simple", SimpleFlow),
-     '("command", CommandFlow),
-     '("docker", DockerFlow),
-     '("nix", NixFlow)
+  '[  '("simple", SimpleFlow),
+      '("command", CommandFlow),
+      '("docker", DockerFlow),
+      '("nix", NixFlow)
    ]
 
 -- The class constraints on the "core effect".
@@ -35,6 +35,7 @@ type RequiredStrands =
 type RequiredCoreEffects m =
   '[ -- Basic requirement
      Arrow,
+     ArrowChoice,
      -- Support IO
      HasKleisli m,
      -- Support caching
