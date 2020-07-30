@@ -4,6 +4,10 @@ Hello world
 <body><div class="container"><div class="row"><div class="col-sm-12">
 <h1>funflow2: Quick reference</h1>
 <p>This document presents how to use the API through short examples.</p>
+<p>This document uses the following language extensions:</p>
+<pre class="haskell"><code>{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Arrows #-}
+</code></pre>
 <p>All imports are available in the <code>Funflow</code> module:</p>
 <pre class="haskell"><code>import Funflow
 </code></pre>
@@ -62,7 +66,43 @@ Out
 </code></pre>
 </div>
 </div>
-<h3>3. Running a shell command</h3>
+<h3>3. Conditional branching</h3>
+<div class="row">
+<div class="col-md-1">
+In
+</div>
+<div class="col-md-11">
+<pre class="haskell"><code>let
+      increment :: Flow Int Int
+      increment = pureFlow (+ 1)
+
+      reset :: Flow Int Int
+      reset = pureFlow (const 0)
+
+      limitedIncrement :: Flow Int Int
+      limitedIncrement = proc n -> do
+        if n < 10
+          then do increment -< n
+          else reset -< n
+
+      flow :: Flow Int Int
+      flow = limitedIncrement >>> limitedIncrement >>> limitedIncrement
+    in
+      do
+        runFlow defaultExecutionConfig flow (9 :: Int) :: IO Int
+</code></pre>
+</div>
+</div>
+<div class="row">
+<div class="col-md-1">
+Out
+</div>
+<div class="col-md-11">
+<pre class="text"><code>1
+</code></pre>
+</div>
+</div>
+<h3>4. Running a shell command</h3>
 <div class="row">
 <div class="col-md-1">
 In
@@ -85,7 +125,7 @@ Out
 </code></pre>
 </div>
 </div>
-<h3>4. Caching a flow</h3>
+<h3>5. Caching a flow</h3>
 <div class="row">
 <div class="col-md-1">
 In
@@ -130,6 +170,4 @@ Increment!
 </code></pre>
 </div>
 </div>
-<h3>Configuration Option</h3>
-<h3>Controlling Effects</h3>
 </div></div></div></body></html>
