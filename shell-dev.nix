@@ -54,6 +54,7 @@ in
       ++
         [
           pkgs.cabal-install
+          pkgs.haskellPackages.inliterate
         ]
     ;
     
