@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -9,25 +10,33 @@
 
 module Funflow.Flow
   ( Flow,
+    toFlow,
+    pureFlow,
+    ioFlow,
+    commandFlow,
+    shellFlow,
+    dockerFlow,
+    nixFlow,
   )
 where
 
 import Control.Arrow (Arrow, ArrowChoice)
 import Control.Kernmantle.Caching (ProvidesCaching)
-import Control.Kernmantle.Rope (AnyRopeWith, HasKleisli)
+import Control.Kernmantle.Rope (AnyRopeWith, HasKleisli, strand)
 import Control.Monad.IO.Class (MonadIO)
-import Funflow.Flows.Command (CommandFlow)
-import Funflow.Flows.Docker (DockerFlow)
-import Funflow.Flows.Nix (NixFlow)
-import Funflow.Flows.Simple (SimpleFlow)
+import Data.Text (Text)
+import Funflow.Effects.Command (CommandEffect (..), CommandEffectConfig)
+import Funflow.Effects.Docker (DockerEffect (..), DockerEffectConfig)
+import Funflow.Effects.Nix (NixEffect (..), NixEffectConfig)
+import Funflow.Effects.Simple (SimpleEffect (..))
 
 -- The constraints on the set of "strands"
 -- These will be "interpreted" into "core effects" (which have contraints defined below).
 type RequiredStrands =
-  '[  '("simple", SimpleFlow),
-      '("command", CommandFlow),
-      '("docker", DockerFlow),
-      '("nix", NixFlow)
+  '[  '("simple", SimpleEffect),
+      '("command", CommandEffect),
+      '("docker", DockerEffect),
+      '("nix", NixEffect)
    ]
 
 -- The class constraints on the "core effect".
@@ -53,3 +62,36 @@ type Flow input output =
     (RequiredCoreEffects m)
     input
     output
+
+class IsFlow binEff where
+  toFlow :: binEff i o -> Flow i o
+
+instance IsFlow SimpleEffect where
+  toFlow = strand #simple
+
+pureFlow :: (i -> o) -> Flow i o
+pureFlow = toFlow . PureEffect
+
+ioFlow :: (i -> IO o) -> Flow i o
+ioFlow = toFlow . IOEffect
+
+instance IsFlow CommandEffect where
+  toFlow = strand #command
+
+commandFlow :: CommandEffectConfig -> Flow () ()
+commandFlow = toFlow . CommandEffect
+
+shellFlow :: Text -> Flow () ()
+shellFlow = toFlow . ShellCommandEffect
+
+instance IsFlow DockerEffect where
+  toFlow = strand #docker
+
+dockerFlow :: DockerEffectConfig -> Flow () ()
+dockerFlow = toFlow . DockerEffect
+
+instance IsFlow NixEffect where
+  toFlow = strand #nix
+
+nixFlow :: NixEffectConfig -> Flow () ()
+nixFlow = toFlow . NixEffect

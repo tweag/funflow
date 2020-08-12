@@ -5,9 +5,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-
- - "Nix" flows allow to run tasks in Docker
+ - "Nix" effects allow to run tasks in Docker
  -}
-module Funflow.Flows.Nix where
+module Funflow.Effects.Nix
+  ( NixEffectConfig (..),
+    NixEffect (..),
+    NixpkgsSource (..),
+    Environment (..),
+  )
+where
 
 import Data.CAS.ContentHashable
   ( ContentHashable,
@@ -27,7 +33,7 @@ data NixpkgsSource
   deriving (Generic)
 
 -- Configure what task to run in Docker
-data NixFlowConfig = NixFlowConfig
+data NixEffectConfig = NixEffectConfig
   { -- | Specification of the nix environment
     nixEnv :: Environment,
     -- | Which version of nixpkgs to use
@@ -55,6 +61,6 @@ instance ContentHashable IO NixpkgsSource where
   contentHashUpdate ctx NIX_PATH = contentHashUpdate_fingerprint ctx NIX_PATH
   contentHashUpdate ctx (NixpkgsTarball s) = contentHashUpdate ctx (URI.render s)
 
--- Docker flows to perform external tasks
-data NixFlow i o where
-  NixFlow :: NixFlowConfig -> NixFlow () ()
+-- Docker effects to perform external tasks
+data NixEffect i o where
+  NixEffect :: NixEffectConfig -> NixEffect () ()

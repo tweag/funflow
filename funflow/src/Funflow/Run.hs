@@ -26,7 +26,8 @@ import Control.External
 import Control.External.Executor (execute)
 import Control.Kernmantle.Caching (localStoreWithId)
 import Control.Kernmantle.Rope
-  ( Entwines,
+  ( (&),
+    Entwines,
     HasKleisliIO,
     LooseRope,
     SatisfiesAll,
@@ -37,7 +38,6 @@ import Control.Kernmantle.Rope
     untwine,
     weave,
     weave',
-    (&),
   )
 import Control.Monad.IO.Class (liftIO)
 import Data.CAS.ContentHashable (contentHash)
@@ -45,23 +45,23 @@ import qualified Data.CAS.ContentStore as CS
 import Data.String (fromString)
 import Data.Text (Text, unpack)
 import qualified Data.Text as T
+import Funflow.Effects.Command
+  ( CommandEffect (CommandEffect, ShellCommandEffect),
+    CommandEffectConfig (CommandEffectConfig),
+  )
+import qualified Funflow.Effects.Command as CF
+import Funflow.Effects.Docker
+  ( DockerEffect (DockerEffect),
+    DockerEffectConfig (DockerEffectConfig),
+  )
+import qualified Funflow.Effects.Docker as DF
+import Funflow.Effects.Nix
+  ( NixEffect (NixEffect),
+    NixEffectConfig (NixEffectConfig),
+  )
+import qualified Funflow.Effects.Nix as NF
 import Funflow.Flow (Flow)
-import Funflow.Flows.Command
-  ( CommandFlow (CommandFlow, ShellCommandFlow),
-    CommandFlowConfig (CommandFlowConfig),
-  )
-import qualified Funflow.Flows.Command as CF
-import Funflow.Flows.Docker
-  ( DockerFlow (DockerFlow),
-    DockerFlowConfig (DockerFlowConfig),
-  )
-import qualified Funflow.Flows.Docker as DF
-import Funflow.Flows.Nix
-  ( NixFlow (NixFlow),
-    NixFlowConfig (NixFlowConfig),
-  )
-import qualified Funflow.Flows.Nix as NF
-import Funflow.Flows.Simple (SimpleFlow (IO, Pure))
+import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
 import Katip
   ( ColorStrategy (ColorIfTerminal),
     Severity (InfoS),
@@ -104,7 +104,7 @@ import qualified Text.URI as URI
 -- Run a flow
 data FlowExecutionConfig = FlowExecutionConfig
   { commandExecution :: CommandExecutionHandler
-  -- , executionEnvironment :: CommandExecutionEnvironment
+    -- , executionEnvironment :: CommandExecutionEnvironment
   }
 
 data CommandExecutionHandler = SystemExecutor | ExternalExecutor
@@ -124,16 +124,16 @@ runFlow (FlowExecutionConfig {commandExecution}) flow input =
       CS.withStore defaultPath $ \store -> do
         flow
           -- Weave effects
-          & weave #docker interpretDockerFlow
-          & weave #nix interpretNixFlow
+          & weave #docker interpretDockerEffect
+          & weave #nix interpretNixEffect
           & weave'
             #command
             ( case commandExecution of
-                SystemExecutor -> interpretCommandFlowSystemExecutor
+                SystemExecutor -> interpretCommandEffectSystemExecutor
                 -- change
-                ExternalExecutor -> interpretCommandFlowExternalExecutor store
+                ExternalExecutor -> interpretCommandEffectExternalExecutor store
             )
-          & weave' #simple interpretSimpleFlow
+          & weave' #simple interpretSimpleEffect
           -- Strip of empty list of strands (after all weaves)
           & untwine
           -- Define the caching
@@ -142,17 +142,17 @@ runFlow (FlowExecutionConfig {commandExecution}) flow input =
           -- Finally, run
           & perform input
 
--- Interpret simple flow
-interpretSimpleFlow :: (Arrow a, HasKleisliIO m a) => SimpleFlow i o -> a i o
-interpretSimpleFlow simpleFlow = case simpleFlow of
-  Pure f -> arr f
-  IO f -> liftKleisliIO f
+-- Interpret simple effect
+interpretSimpleEffect :: (Arrow a, HasKleisliIO m a) => SimpleEffect i o -> a i o
+interpretSimpleEffect simpleEffect = case simpleEffect of
+  PureEffect f -> arr f
+  IOEffect f -> liftKleisliIO f
 
--- Possible interpreters for the command flow
+-- Possible interpreters for the command effect
 
 -- System executor: just spawn processes
-interpretCommandFlowSystemExecutor :: (Arrow a, HasKleisliIO m a) => CommandFlow i o -> a i o
-interpretCommandFlowSystemExecutor commandFlow =
+interpretCommandEffectSystemExecutor :: (Arrow a, HasKleisliIO m a) => CommandEffect i o -> a i o
+interpretCommandEffectSystemExecutor commandEffect =
   let runProcess _ spec = liftKleisliIO $ \() ->
         do
           _ <-
@@ -175,16 +175,16 @@ interpretCommandFlowSystemExecutor commandFlow =
                   use_process_jobs = False
                 }
           return ()
-   in case commandFlow of
-        CommandFlow (CommandFlowConfig {CF.command, CF.args, CF.env}) ->
+   in case commandEffect of
+        CommandEffect (CommandEffectConfig {CF.command, CF.args, CF.env}) ->
           runProcess env $ RawCommand (T.unpack command) (fmap T.unpack args)
-        ShellCommandFlow shellCommand ->
+        ShellCommandEffect shellCommand ->
           runProcess [] $ ShellCommand (T.unpack shellCommand)
 
 -- External executor: use the external-executor package
 -- TODO currently little to no benefits, need to allow setting SQL, Redis, etc
-interpretCommandFlowExternalExecutor :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> CommandFlow i o -> a i o
-interpretCommandFlowExternalExecutor store commandFlow =
+interpretCommandEffectExternalExecutor :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> CommandEffect i o -> a i o
+interpretCommandEffectExternalExecutor store commandEffect =
   let runTask :: (Arrow a, HasKleisliIO m a) => ExternalTask -> a i ()
       runTask task = liftKleisliIO $ \_ -> do
         -- Hash computation, then bundle it with the task
@@ -203,8 +203,8 @@ interpretCommandFlowExternalExecutor store commandFlow =
           runKatipContextT logEnv initialContext initialNamespace $ execute store taskDescription
         -- Finish
         return ()
-   in case commandFlow of
-        CommandFlow (CommandFlowConfig {CF.command, CF.args, CF.env}) ->
+   in case commandEffect of
+        CommandEffect (CommandEffectConfig {CF.command, CF.args, CF.env}) ->
           -- Create the task description (task + cache hash)
           let task :: ExternalTask
               task =
@@ -215,7 +215,7 @@ interpretCommandFlowExternalExecutor store commandFlow =
                     _etWriteToStdOut = StdOutCapture
                   }
            in runTask task
-        ShellCommandFlow shellCommand ->
+        ShellCommandEffect shellCommand ->
           let task =
                 ExternalTask
                   { _etCommand = shellCommand,
@@ -234,21 +234,21 @@ type WeaverFor name eff strands coreConstraints =
   eff i o ->
   core i o
 
--- Interpret docker flow
-interpretDockerFlow :: WeaverFor "docker" DockerFlow '[ '("command", CommandFlow)] '[]
-interpretDockerFlow reinterpret dockerFlow = case dockerFlow of
-  DockerFlow (DockerFlowConfig {DF.image, DF.command, DF.args}) ->
+-- Interpret docker effect
+interpretDockerEffect :: WeaverFor "docker" DockerEffect '[ '("command", CommandEffect)] '[]
+interpretDockerEffect reinterpret dockerEffect = case dockerEffect of
+  DockerEffect (DockerEffectConfig {DF.image, DF.command, DF.args}) ->
     let commandConfig =
-          CommandFlowConfig
+          CommandEffectConfig
             { CF.command = "docker",
               CF.args = "run" : image : command : args,
               CF.env = []
             }
-     in reinterpret $ strand #command $ CommandFlow $ commandConfig
+     in reinterpret $ strand #command $ CommandEffect $ commandConfig
 
--- Interpret nix flow
-interpretNixFlow :: WeaverFor "nix" NixFlow '[ '("command", CommandFlow)] '[]
-interpretNixFlow reinterpret nixFlow =
+-- Interpret nix effect
+interpretNixEffect :: WeaverFor "nix" NixEffect '[ '("command", CommandEffect)] '[]
+interpretNixEffect reinterpret nixEffect =
   let -- Turn either a Nix file or a set of packages into the right list of arguments for `nix-shell`
       packageSpec :: NF.Environment -> [Text]
       packageSpec (NF.ShellFile shellFile) = [shellFile]
@@ -259,13 +259,13 @@ interpretNixFlow reinterpret nixFlow =
       nixpkgsSourceToParam NF.NIX_PATH =
         T.pack $ unsafePerformIO $ getEnv "NIX_PATH"
       nixpkgsSourceToParam (NF.NixpkgsTarball uri) = ("nixpkgs=" <> URI.render uri)
-   in case nixFlow of
-        NixFlow (NixFlowConfig {NF.nixEnv, NF.nixpkgsSource, NF.command, NF.args, NF.env}) ->
+   in case nixEffect of
+        NixEffect (NixEffectConfig {NF.nixEnv, NF.nixpkgsSource, NF.command, NF.args, NF.env}) ->
           let nixPathEnvValue = nixpkgsSourceToParam nixpkgsSource
               commandConfig =
-                CommandFlowConfig
+                CommandEffectConfig
                   { CF.command = "nix-shell",
                     CF.args = ("--run" : command : args) ++ packageSpec nixEnv,
                     CF.env = ("NIX_PATH", nixPathEnvValue) : env
                   }
-           in reinterpret $ strand #command $ CommandFlow $ commandConfig
+           in reinterpret $ strand #command $ CommandEffect $ commandConfig

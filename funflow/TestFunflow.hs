@@ -5,31 +5,24 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
--- Common imports
-
--- Standard way of building flows
 import Funflow
   ( CommandExecutionHandler (SystemExecutor),
     Flow,
     FlowExecutionConfig (FlowExecutionConfig),
+    SimpleEffect (..),
+    CommandEffect(..),
+    DockerEffect(..),
+    NixEffect(..),
     caching,
     commandExecution,
-    commandFlow,
-    dockerFlow,
-    ioFlow,
-    nixFlow,
-    pureFlow,
     runFlow,
-    shellFlow,
+    toFlow,
   )
--- Required to build a Docker flow
-
--- Required to build an executor flow
-import Funflow.Flows.Command (CommandFlowConfig (CommandFlowConfig))
-import qualified Funflow.Flows.Command as CF
-import Funflow.Flows.Docker (DockerFlowConfig (DockerFlowConfig))
-import qualified Funflow.Flows.Docker as DF
-import qualified Funflow.Flows.Nix as NF
+import Funflow.Effects.Command (CommandEffectConfig (CommandEffectConfig))
+import qualified Funflow.Effects.Command as CF
+import Funflow.Effects.Docker (DockerEffectConfig (DockerEffectConfig))
+import qualified Funflow.Effects.Docker as DF
+import qualified Funflow.Effects.Nix as NF
 
 main :: IO ()
 main = do
@@ -61,24 +54,24 @@ testFlow label flow input = do
 
 someCachedFlow :: Flow () ()
 someCachedFlow = proc () -> do
-  () <- caching ("someComputation" :: String) $ ioFlow (\() -> putStrLn "This message should appear at most once") -< ()
-  () <- caching ("someComputation" :: String) $ ioFlow (\() -> putStrLn "This message should appear at most once") -< ()
-  ioFlow (\() -> putStrLn "If nothing printed, then it works") -< ()
+  () <- caching ("someComputation" :: String) $ toFlow . IOEffect $ (\() -> putStrLn "This message should appear at most once") -< ()
+  () <- caching ("someComputation" :: String) $ toFlow . IOEffect $ (\() -> putStrLn "This message should appear at most once") -< ()
+  toFlow . IOEffect $ (\() -> putStrLn "If nothing printed, then it works") -< ()
 
 somePureFlow :: Flow Int Int
-somePureFlow = pureFlow (+ 1)
+somePureFlow = toFlow . PureEffect $ (+ 1)
 
 someIoFlow :: Flow () ()
-someIoFlow = ioFlow $ const $ putStrLn "Some IO operation"
+someIoFlow = toFlow . IOEffect $ const $ putStrLn "Some IO operation"
 
 someShellFlow :: Flow () ()
-someShellFlow = shellFlow "echo someShellFlow worked"
+someShellFlow = toFlow . ShellCommandEffect $ "echo someShellFlow worked"
 
 someCommandFlow :: Flow () ()
-someCommandFlow = commandFlow (CommandFlowConfig {CF.command = "echo", CF.args = ["someCommandFlow worked"], CF.env = []})
+someCommandFlow = toFlow . CommandEffect $ (CommandEffectConfig {CF.command = "echo", CF.args = ["someCommandFlow worked"], CF.env = []})
 
 someDockerFlow :: Flow () ()
-someDockerFlow = dockerFlow (DockerFlowConfig {DF.image = "python", DF.command = "python", DF.args = ["-c", "print('someDockerFlow worked')"]})
+someDockerFlow = toFlow . DockerEffect $ (DockerEffectConfig {DF.image = "python", DF.command = "python", DF.args = ["-c", "print('someDockerFlow worked')"]})
 
 someNixFlow :: Flow () ()
-someNixFlow = nixFlow (NF.NixFlowConfig {NF.nixEnv = NF.PackageList ["python"], NF.command = "python -c \"print('someNixFlow worked')\"", NF.args = [], NF.env = [], NF.nixpkgsSource = NF.NIX_PATH})
+someNixFlow = toFlow . NixEffect $ (NF.NixEffectConfig {NF.nixEnv = NF.PackageList ["python"], NF.command = "python -c \"print('someNixFlow worked')\"", NF.args = [], NF.env = [], NF.nixpkgsSource = NF.NIX_PATH})

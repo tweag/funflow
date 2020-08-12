@@ -41,18 +41,28 @@ flow :: Flow Int Int
 
 ## How to make flows
 
-In order to build flows, use the functions defined in the module `Funflow.Flows` (also available in the module `Funflow`).
-This module provides functions called _smart constructors_.
-They facilitate building flows.
+In order to build flows, use the function `toFlow` defined in the module `Funflow.Flow` (also exported in the module `Funflow`).
+This function can turn an *"effect"* into a `Flow`.
 
-The most basic exemple is the *PureFlow*.
-It allows to run any pure function (a function is pure if it does not have any side effect, such as reading a file or running a command).
+But what is an effect?
+An effect is basically the representation of a computation.
+An effect is not per-se usable as a `Flow`: we have to "promote" it to a flow manually using this `toFlow` function.
+
+The most basic exemple is the *PureEffect*.
+It represent the computation of running a pure function (a function is pure if it does not have any "side effect", such as reading a file or running a command).
 
 For example, let us make a function that increments the input by 1.
 
 ```haskell top
 flow :: Flow Int Int
-flow = pureFlow (+1)
+flow = toFlow . PureEffect $ (+1)
+```
+
+Most of the time you will write:
+
+```haskell
+flowName :: Flow inputType outputType
+flowName = toFlow . EffectName $ (things to configure your effect)
 ```
 
 ### Execute a flow

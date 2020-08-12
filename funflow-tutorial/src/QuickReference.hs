@@ -28,7 +28,7 @@ import Funflow
 ```haskell eval
     let
       flow :: Flow String String
-      flow = pureFlow $ \input -> "Hello " ++ input ++ " !"
+      flow = toFlow . PureEffect $ \input -> "Hello " ++ input ++ " !"
       
       input :: String
       input = "Watson"
@@ -42,10 +42,10 @@ import Funflow
 ```haskell eval
     let
       flow1 :: Flow () String
-      flow1 = pureFlow $ \input -> "Hello"
+      flow1 = toFlow . PureEffect $ \input -> "Hello"
 
       flow2 :: Flow String String
-      flow2 = pureFlow $ \input -> input ++ " world"
+      flow2 = toFlow . PureEffect $ \input -> input ++ " world"
       
       flow :: Flow () String
       flow = flow1 >>> flow2
@@ -58,10 +58,10 @@ import Funflow
 ```haskell eval
     let
       increment :: Flow Int Int
-      increment = pureFlow (+ 1)
+      increment = toFlow . PureEffect $ (+ 1)
 
       reset :: Flow Int Int
-      reset = pureFlow (const 0)
+      reset = toFlow . PureEffect $ (const 0)
 
       limitedIncrement :: Flow Int Int
       limitedIncrement = proc n -> do
@@ -81,7 +81,7 @@ import Funflow
 ```haskell eval
     let
       flow :: Flow () ()
-      flow = shellFlow "echo Hello world"
+      flow = toFlow . ShellCommandEffect $ "echo Hello world"
     in
       runFlow defaultExecutionConfig flow () :: IO ()
 ```
@@ -91,12 +91,12 @@ import Funflow
 ```haskell eval
     let
       increment :: Flow Int Int
-      increment = ioFlow $ \input -> do
+      increment = toFlow . IOEffect $ \input -> do
         putStrLn "Increment!"
         return $ input + 1
 
       reset :: Flow Int Int
-      reset = pureFlow $ \input -> 0
+      reset = toFlow . PureEffect $ \input -> 0
 
       cachedIncrement :: Flow Int Int
       cachedIncrement = caching ("increment" :: String) increment

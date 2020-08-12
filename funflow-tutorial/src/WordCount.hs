@@ -4,7 +4,7 @@
 
 In this example, we'll implement a simple pipeline which 
 calculates word frequencies in a plain text document. Our
-example pipeline will make use of `pureFlow` and `ioFlow`, which 
+example pipeline will make use of `PureEffect` and `IOEffect`, which 
 allow us to define our pipeline's tasks in terms of Haskell functions. 
 
 This example may look familiar to users of Apache Beam, which 
@@ -97,10 +97,10 @@ tasks and pipelines into Operator and DAG objects.
 ```haskell top
 -- Individual task definitions (remember that each task is also a full "Flow")
 readDocument :: Flow String T.Text
-readDocument = ioFlow T.readFile
+readDocument = toFlow . IOEffect $ T.readFile
 
 countWordsAndSummarize :: Flow T.Text T.Text
-countWordsAndSummarize = pureFlow (T.unlines . formatCounts . countWordsSortedDesc . filterWords. T.words . removePunctuation)
+countWordsAndSummarize = toFlow . PureEffect $ (T.unlines . formatCounts . countWordsSortedDesc . filterWords. T.words . removePunctuation)
 
 writeResult :: Flow (String, T.Text) ()
 writeResult = let
@@ -109,7 +109,7 @@ writeResult = let
             T.putStrLn "Normally we would write the result to a file with T.writeFile, but for this example we can instead print the output:"
             T.putStrLn countText 
             return ()
-    in ioFlow writeOutputMessage
+    in toFlow . IOEffect $ writeOutputMessage
 
 -- Build the final pipeline using the task Flows defined above
 --   Note: Using arrow syntax to control which inputs get passed to
