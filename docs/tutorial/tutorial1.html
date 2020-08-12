@@ -21,14 +21,20 @@ For instance a flow working on numbers might have the following type signature:<
 <pre class="haskell"><code>flow :: Flow Int Int
 </code></pre>
 <h2>How to make flows</h2>
-<p>In order to build flows, use the functions defined in the module <code>Funflow.Flows</code> (also available in the module <code>Funflow</code>).
-This module provides functions called <em>smart constructors</em>.
-They facilitate building flows.</p>
-<p>The most basic exemple is the <em>PureFlow</em>.
-It allows to run any pure function (a function is pure if it does not have any side effect, such as reading a file or running a command).</p>
+<p>In order to build flows, use the function <code>toFlow</code> defined in the module <code>Funflow.Flow</code> (also exported in the module <code>Funflow</code>).
+This function can turn an <em>&quot;effect&quot;</em> into a <code>Flow</code>.</p>
+<p>But what is an effect?
+An effect is basically the representation of a computation.
+An effect is not per-se usable as a <code>Flow</code>: we have to &quot;promote&quot; it to a flow manually using this <code>toFlow</code> function.</p>
+<p>The most basic exemple is the <em>PureEffect</em>.
+It represent the computation of running a pure function (a function is pure if it does not have any &quot;side effect&quot;, such as reading a file or running a command).</p>
 <p>For example, let us make a function that increments the input by 1.</p>
 <pre class="haskell"><code>flow :: Flow Int Int
-flow = pureFlow (+1)
+flow = toFlow . PureEffect $ (+1)
+</code></pre>
+<p>Most of the time you will write:</p>
+<pre class="haskell"><code>flowName :: Flow inputType outputType
+flowName = toFlow . EffectName $ (things to configure your effect)
 </code></pre>
 <h3>Execute a flow</h3>
 <p>Everything needed to run flows is available in the module <code>Funflow.Run</code>.

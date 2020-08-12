@@ -8,26 +8,45 @@
 @package funflow
 @version 2.0.0
 
-module Funflow.Flows.Command
-data CommandFlowConfig
-CommandFlowConfig :: Text -> [Text] -> [(Text, Text)] -> CommandFlowConfig
-[command] :: CommandFlowConfig -> Text
-[args] :: CommandFlowConfig -> [Text]
-[env] :: CommandFlowConfig -> [(Text, Text)]
-data CommandFlow i o
-[CommandFlow] :: CommandFlowConfig -> CommandFlow () ()
-[ShellCommandFlow] :: Text -> CommandFlow () ()
+module Funflow.Effects.Command
+data CommandEffectConfig
+CommandEffectConfig :: Text -> [Text] -> [(Text, Text)] -> CommandEffectConfig
+[command] :: CommandEffectConfig -> Text
+[args] :: CommandEffectConfig -> [Text]
+[env] :: CommandEffectConfig -> [(Text, Text)]
+data CommandEffect i o
+[CommandEffect] :: CommandEffectConfig -> CommandEffect () ()
+[ShellCommandEffect] :: Text -> CommandEffect () ()
 
-module Funflow.Flows.Docker
-data DockerFlowConfig
-DockerFlowConfig :: Text -> Text -> [Text] -> DockerFlowConfig
-[image] :: DockerFlowConfig -> Text
-[command] :: DockerFlowConfig -> Text
-[args] :: DockerFlowConfig -> [Text]
-data DockerFlow i o
-[DockerFlow] :: DockerFlowConfig -> DockerFlow () ()
+module Funflow.Effects.Docker
+data DockerEffectConfig
+DockerEffectConfig :: Text -> Text -> [Text] -> DockerEffectConfig
+[image] :: DockerEffectConfig -> Text
+[command] :: DockerEffectConfig -> Text
+[args] :: DockerEffectConfig -> [Text]
+data DockerEffect i o
+[DockerEffect] :: DockerEffectConfig -> DockerEffect () ()
 
-module Funflow.Flows.Nix
+module Funflow.Effects.Nix
+data NixEffectConfig
+NixEffectConfig :: Environment -> NixpkgsSource -> Text -> [Text] -> [(Text, Text)] -> NixEffectConfig
+
+-- | Specification of the nix environment
+[nixEnv] :: NixEffectConfig -> Environment
+
+-- | Which version of nixpkgs to use
+[nixpkgsSource] :: NixEffectConfig -> NixpkgsSource
+
+-- | The command to run in the environment
+[command] :: NixEffectConfig -> Text
+
+-- | Arguments to pass to the command
+[args] :: NixEffectConfig -> [Text]
+
+-- | Environmental variables which are set in the environment
+[env] :: NixEffectConfig -> [(Text, Text)]
+data NixEffect i o
+[NixEffect] :: NixEffectConfig -> NixEffect () ()
 data NixpkgsSource
 
 -- | Inherit the <tt>NIX_PATH</tt> from the environment
@@ -35,23 +54,6 @@ NIX_PATH :: NixpkgsSource
 
 -- | The <a>URI</a> pointing to a nixpkgs tarball
 NixpkgsTarball :: URI -> NixpkgsSource
-data NixFlowConfig
-NixFlowConfig :: Environment -> NixpkgsSource -> Text -> [Text] -> [(Text, Text)] -> NixFlowConfig
-
--- | Specification of the nix environment
-[nixEnv] :: NixFlowConfig -> Environment
-
--- | Which version of nixpkgs to use
-[nixpkgsSource] :: NixFlowConfig -> NixpkgsSource
-
--- | The command to run in the environment
-[command] :: NixFlowConfig -> Text
-
--- | Arguments to pass to the command
-[args] :: NixFlowConfig -> [Text]
-
--- | Environmental variables which are set in the environment
-[env] :: NixFlowConfig -> [(Text, Text)]
 data Environment
 
 -- | Path to a shell.nix file
@@ -59,28 +61,29 @@ ShellFile :: Text -> Environment
 
 -- | A list of packages that will be passed by <tt>-p</tt>.
 PackageList :: [Text] -> Environment
-data NixFlow i o
-[NixFlow] :: NixFlowConfig -> NixFlow () ()
-instance GHC.Generics.Generic Funflow.Flows.Nix.Environment
-instance GHC.Generics.Generic Funflow.Flows.Nix.NixpkgsSource
-instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Flows.Nix.Environment
-instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Flows.Nix.NixpkgsSource
+instance GHC.Generics.Generic Funflow.Effects.Nix.Environment
+instance GHC.Generics.Generic Funflow.Effects.Nix.NixpkgsSource
+instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Effects.Nix.Environment
+instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Effects.Nix.NixpkgsSource
 
-module Funflow.Flows.Simple
-data SimpleFlow i o
-[Pure] :: (i -> o) -> SimpleFlow i o
-[IO] :: (i -> IO o) -> SimpleFlow i o
+module Funflow.Effects.Simple
+data SimpleEffect i o
+[PureEffect] :: (i -> o) -> SimpleEffect i o
+[IOEffect] :: (i -> IO o) -> SimpleEffect i o
 
 module Funflow.Flow
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
-
-module Funflow.Flows
+toFlow :: IsFlow binEff => binEff i o -> Flow i o
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
+commandFlow :: CommandEffectConfig -> Flow () ()
 shellFlow :: Text -> Flow () ()
-commandFlow :: CommandFlowConfig -> Flow () ()
-dockerFlow :: DockerFlowConfig -> Flow () ()
-nixFlow :: NixFlowConfig -> Flow () ()
+dockerFlow :: DockerEffectConfig -> Flow () ()
+nixFlow :: NixEffectConfig -> Flow () ()
+instance Funflow.Flow.IsFlow Funflow.Effects.Simple.SimpleEffect
+instance Funflow.Flow.IsFlow Funflow.Effects.Command.CommandEffect
+instance Funflow.Flow.IsFlow Funflow.Effects.Docker.DockerEffect
+instance Funflow.Flow.IsFlow Funflow.Effects.Nix.NixEffect
 
 module Funflow.Run
 data FlowExecutionConfig
@@ -95,6 +98,17 @@ runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 module Funflow
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
 (>>>) :: forall k cat (a :: k) (b :: k) (c :: k). Category cat => cat a b -> cat b c -> cat a c
+toFlow :: IsFlow binEff => binEff i o -> Flow i o
+data SimpleEffect i o
+[PureEffect] :: (i -> o) -> SimpleEffect i o
+[IOEffect] :: (i -> IO o) -> SimpleEffect i o
+data CommandEffect i o
+[CommandEffect] :: CommandEffectConfig -> CommandEffect () ()
+[ShellCommandEffect] :: Text -> CommandEffect () ()
+data DockerEffect i o
+[DockerEffect] :: DockerEffectConfig -> DockerEffect () ()
+data NixEffect i o
+[NixEffect] :: NixEffectConfig -> NixEffect () ()
 data FlowExecutionConfig
 FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
 [commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
@@ -103,16 +117,16 @@ SystemExecutor :: CommandExecutionHandler
 ExternalExecutor :: CommandExecutionHandler
 defaultExecutionConfig :: FlowExecutionConfig
 runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
-pureFlow :: (i -> o) -> Flow i o
-ioFlow :: (i -> IO o) -> Flow i o
-shellFlow :: Text -> Flow () ()
-commandFlow :: CommandFlowConfig -> Flow () ()
-dockerFlow :: DockerFlowConfig -> Flow () ()
-nixFlow :: NixFlowConfig -> Flow () ()
 
 -- | Any rope whose core provides caching can run cached tasks. The task is
 --   identified by an explicit identifier
 caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantle :: [Strand]). (Arrow core, ProvidesCaching core, ContentHashable IO ident, ContentHashable IO a, Store b) => ident -> Rope r mantle core a b -> Rope r mantle core a b
+pureFlow :: (i -> o) -> Flow i o
+ioFlow :: (i -> IO o) -> Flow i o
+commandFlow :: CommandEffectConfig -> Flow () ()
+shellFlow :: Text -> Flow () ()
+dockerFlow :: DockerEffectConfig -> Flow () ()
+nixFlow :: NixEffectConfig -> Flow () ()
 
 module Funflow.Util
 mapPair :: (a -> b) -> (a, a) -> (b, b)
