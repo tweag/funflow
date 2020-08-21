@@ -23,7 +23,7 @@ All imports are available in the `Funflow` module:
 import Funflow
 ```
 
-## 1. A minimal flow
+## A minimal flow
 
 ```haskell eval
 let
@@ -33,11 +33,11 @@ let
   input :: String
   input = "Watson"
 in
-  runFlow defaultExecutionConfig flow input :: IO String
+  runFlow flow input :: IO String
 ```
 
 
-### 2. Composing flows
+### Composing flows
 
 ```haskell eval
 let
@@ -50,10 +50,10 @@ let
   flow :: Flow () String
   flow = flow1 >>> flow2
 in
-  runFlow defaultExecutionConfig flow () :: IO String
+  runFlow flow () :: IO String
 ```
 
-### 3. Conditional branching
+### Conditional branching
 
 ```haskell eval
 let
@@ -73,20 +73,10 @@ let
   flow = limitedIncrement >>> limitedIncrement >>> limitedIncrement
 in
   do
-    runFlow defaultExecutionConfig flow (9 :: Int) :: IO Int
+    runFlow flow (9 :: Int) :: IO Int
 ```
 
-### 4. Running a shell command
-
-```haskell eval
-let
-  flow :: Flow () ()
-  flow = shellFlow "echo Hello world"
-in
-  runFlow defaultExecutionConfig flow () :: IO ()
-```
-
-### 5. Caching a flow
+### Caching a flow
 
 ```haskell eval
 let
@@ -109,8 +99,8 @@ let
 in
   do
     -- Prints "Increment!" twice to stdout
-    runFlow defaultExecutionConfig flow1 (0 :: Int) :: IO Int
+    runFlow flow1 (0 :: Int) :: IO Int
     -- Prints "Increment!" once to stdout
-    runFlow defaultExecutionConfig flow2 (0 :: Int) :: IO Int
+    runFlow flow2 (0 :: Int) :: IO Int
     return ()
 ```

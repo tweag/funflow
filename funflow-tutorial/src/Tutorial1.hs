@@ -13,17 +13,18 @@ import Funflow
 
 `funflow` is a library to programmatically author workflows.
 
-Use `funflow` to author workflows as Direct Acyclic Graphs of tasks.
+Use `funflow` to write workflows as Direct Acyclic Graphs (DAG) of tasks.
 
-Backed by the powerful abstractions allowed by the Haskell language, `funflow` workflows can be themsleves used as tasks.
+Backed by the powerful abstractions allowed by the Haskell language, `funflow` workflows have the great property of being tasks themselves.
 This allows to define modular workflows that you can compose together.
 _Write less, do more!_
 
 ## From "workflows and tasks" to "flows"
 
 In `funflow`, there is no distinction between a workflow and a task.
-Indeed, we can compose tasks into bigger tasks, which would be called workflows, but then again it would be a task that is itself reusable to build bigger tasks.
-Because we can no longer make a distinction between a task and a workflow, we prefer to use the word *flow*.
+Indeed, we can compose tasks into bigger tasks, which would be called workflows.
+However, this workflow is nothing more than a task, which is then reusable to build bigger workflows.
+Because we can no longer make a distinction between a task and a workflow, we prefer to use the word _flow_.
 
 A flow is a task that takes an input and produces an output.
 This library provides a unique and simple type to define flows:
@@ -32,38 +33,55 @@ This library provides a unique and simple type to define flows:
 flow :: Flow input output
 ```
 
-`input` and `output` are the types of the flow.
+`input` and `output` are the types of the input and output values of the flow.
 For instance a flow working on numbers might have the following type signature:
 
 ```haskell
 flow :: Flow Int Int
 ```
 
+taking an integer as input, and producing an integer as its output.
+
 ## How to make flows
 
 In order to build flows, use the function `toFlow` defined in the module `Funflow.Flow` (also exported in the module `Funflow`).
-This function can turn an *"effect"* into a `Flow`.
+This function can turn an _effect_ into a `Flow`.
 
 But what is an effect?
 An effect is basically the representation of a computation.
-An effect is not per-se usable as a `Flow`: we have to "promote" it to a flow manually using this `toFlow` function.
+An effect is not per-se usable as a `Flow`: we have to _strand_ it to a flow manually using this `toFlow` function.
 
-The most basic exemple is the *PureEffect*.
-It represent the computation of running a pure function (a function is pure if it does not have any "side effect", such as reading a file or running a command).
+> We'll get to that notion of _strand_ later on, when extending our flow with custom effects.
+
+The most basic exemple is the _PureEffect_.
+It represent a computation from a pure function, which has not "side effect" such as reading a file or running a command.
 
 For example, let us make a function that increments the input by 1.
 
-```haskell top
+```haskell
 flow :: Flow Int Int
 flow = toFlow . PureEffect $ (+1)
 ```
 
-Most of the time you will write:
+#### Smart constructors
+
+All effects internally implemented in `funflow` can be created using _smart constructors_.
+
+For instance instead of the previous
 
 ```haskell
-flowName :: Flow inputType outputType
-flowName = toFlow . EffectName $ (things to configure your effect)
+flow :: Flow Int Int
+flow = toFlow . PureEffect $ (+1)
 ```
+
+one can write
+
+```haskell top
+flow :: Flow Int Int
+flow = pureFlow (+1)
+```
+
+this directly makes a flow: the effect is created and _stranded_ internally (we will talk about strands later on).
 
 ### Execute a flow
 
@@ -72,12 +90,11 @@ In order to run a flow, use the function `runFlow`.
 It is used as follow:
 
 ```haskell
-runFlow config flow input
+runFlow flow input
 ```
 
 where
 
-- `config` is the execution configuration, we will get to that later and use `defaultExecutionConfig` for now
 - `flow` is the `Flow` to run
 - `input` is the input, with the same type as the input type of `flow`
 
@@ -86,10 +103,11 @@ It will return a result of type `IO output` where `output` is the output type of
 Let's run our flow:
 
 ```haskell eval
-runFlow defaultExecutionConfig flow (1 :: Int) :: IO Int
+runFlow flow (1 :: Int) :: IO Int
 ```
 
 As expected, it returned 2.
 
-You can explore the available smart constructors in the module `Funflow.Flows`.
+### Available effects
 
+Available effects are defined in `Funflow.Effects`, and their smart constructors are defined in `Funflow.Flow`

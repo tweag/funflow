@@ -1,4 +1,4 @@
-{ nixpkgs ? <nixpkgs>
+{ nixpkgs ? ./nix/nixpkgs.nix
 , ghcide ? false
 , haskellLanguageServer ? true
 , python-language-server ? true
@@ -54,7 +54,7 @@ in
       ++
         [
           pkgs.cabal-install
-          pkgs.haskellPackages.inliterate
+          pkgs.haskell.packages.ghc883.inliterate
         ]
     ;
     

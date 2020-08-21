@@ -1,28 +1,23 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
+import qualified Data.CAS.ContentStore as CS
 import Funflow
-  ( CommandExecutionHandler (SystemExecutor),
-    Flow,
-    FlowExecutionConfig (FlowExecutionConfig),
-    SimpleEffect (..),
-    CommandEffect(..),
-    DockerEffect(..),
-    NixEffect(..),
+  ( Flow,
     caching,
-    commandExecution,
+    dockerFlow,
+    ioFlow,
+    pureFlow,
     runFlow,
-    toFlow,
   )
-import Funflow.Effects.Command (CommandEffectConfig (CommandEffectConfig))
-import qualified Funflow.Effects.Command as CF
-import Funflow.Effects.Docker (DockerEffectConfig (DockerEffectConfig))
-import qualified Funflow.Effects.Docker as DF
-import qualified Funflow.Effects.Nix as NF
+import Funflow.Effects.Docker (DockerEffectConfig (DockerEffectConfig), DockerEffectInput (DockerEffectInput), VolumeBinding (VolumeBinding))
+import qualified Funflow.Effects.Docker as DE
+import Path (Abs, Dir, absdir)
 
 main :: IO ()
 main = do
@@ -34,44 +29,34 @@ main = do
   putStr "\n---------------------\n"
   testFlow @() @() "a flow with caching" someCachedFlow ()
   putStr "\n---------------------\n"
-  testFlow @() @() "a flow running a shell string command" someShellFlow ()
+  testFlow @() @CS.Item "a flow running a task in docker" someDockerFlow ()
   putStr "\n---------------------\n"
-  testFlow @() @() "a flow running a command" someCommandFlow ()
-  putStr "\n---------------------\n"
-  testFlow @() @() "a flow running a task in docker" someDockerFlow ()
-  putStr "\n---------------------\n"
-  testFlow @() @() "a flow running a task in a nix shell" someNixFlow ()
+  testFlow @() @CS.Item "a flow running a task in docker, using the output of one as input of another" someDockerFlowWithInputs ()
   putStr "\n------  DONE   ------\n"
-
-testFlowExecutionConfig :: FlowExecutionConfig
-testFlowExecutionConfig = FlowExecutionConfig {commandExecution = SystemExecutor}
 
 testFlow :: forall i o. (Show i, Show o) => String -> Flow i o -> i -> IO ()
 testFlow label flow input = do
   putStrLn $ "Testing " ++ label
-  result <- runFlow @i @o testFlowExecutionConfig flow input
+  result <- runFlow @i @o flow input
   putStrLn $ "Got " ++ (show result) ++ " from input " ++ (show input)
 
 someCachedFlow :: Flow () ()
 someCachedFlow = proc () -> do
-  () <- caching ("someComputation" :: String) $ toFlow . IOEffect $ (\() -> putStrLn "This message should appear at most once") -< ()
-  () <- caching ("someComputation" :: String) $ toFlow . IOEffect $ (\() -> putStrLn "This message should appear at most once") -< ()
-  toFlow . IOEffect $ (\() -> putStrLn "If nothing printed, then it works") -< ()
+  () <- caching ("someComputation" :: String) $ ioFlow $ (\() -> putStrLn "This message should appear at most once") -< ()
+  () <- caching ("someComputation" :: String) $ ioFlow $ (\() -> putStrLn "This message should appear at most once") -< ()
+  ioFlow $ (\() -> putStrLn "If nothing printed, then it works") -< ()
 
 somePureFlow :: Flow Int Int
-somePureFlow = toFlow . PureEffect $ (+ 1)
+somePureFlow = pureFlow $ (+ 1)
 
 someIoFlow :: Flow () ()
-someIoFlow = toFlow . IOEffect $ const $ putStrLn "Some IO operation"
+someIoFlow = ioFlow $ const $ putStrLn "Some IO operation"
 
-someShellFlow :: Flow () ()
-someShellFlow = toFlow . ShellCommandEffect $ "echo someShellFlow worked"
+someDockerFlow :: Flow () CS.Item
+someDockerFlow = proc () -> do
+  dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerEffectInput {DE.inputBindings = [], DE.argsVals = mempty}
 
-someCommandFlow :: Flow () ()
-someCommandFlow = toFlow . CommandEffect $ (CommandEffectConfig {CF.command = "echo", CF.args = ["someCommandFlow worked"], CF.env = []})
-
-someDockerFlow :: Flow () ()
-someDockerFlow = toFlow . DockerEffect $ (DockerEffectConfig {DF.image = "python", DF.command = "python", DF.args = ["-c", "print('someDockerFlow worked')"]})
-
-someNixFlow :: Flow () ()
-someNixFlow = toFlow . NixEffect $ (NF.NixEffectConfig {NF.nixEnv = NF.PackageList ["python"], NF.command = "python -c \"print('someNixFlow worked')\"", NF.args = [], NF.env = [], NF.nixpkgsSource = NF.NIX_PATH})
+someDockerFlowWithInputs :: Flow () CS.Item
+someDockerFlowWithInputs = proc () -> do
+  item <- dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerEffectInput {DE.inputBindings = [], DE.argsVals = mempty}
+  dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerEffectInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}

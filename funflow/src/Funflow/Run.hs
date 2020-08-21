@@ -1,3 +1,4 @@
+{-# LANGUAGE Arrows #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -7,11 +8,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 
+-- | This module defines how to run your flows
 module Funflow.Run
-  ( FlowExecutionConfig (..),
-    CommandExecutionHandler (..),
-    defaultExecutionConfig,
-    runFlow,
+  ( runFlow,
   )
 where
 
@@ -22,46 +21,37 @@ import Control.External
     ExternalTask (..),
     OutputCapture (StdOutCapture),
     TaskDescription (..),
+    outParam,
+    uidParam,
   )
 import Control.External.Executor (execute)
 import Control.Kernmantle.Caching (localStoreWithId)
 import Control.Kernmantle.Rope
-  ( (&),
-    Entwines,
-    HasKleisliIO,
-    LooseRope,
-    SatisfiesAll,
+  ( HasKleisliIO,
     liftKleisliIO,
     perform,
     runReader,
-    strand,
     untwine,
-    weave,
+    (&),
     weave',
   )
 import Control.Monad.IO.Class (liftIO)
 import Data.CAS.ContentHashable (contentHash)
 import qualified Data.CAS.ContentStore as CS
+import Data.Either (isLeft)
+import qualified Data.Map.Lazy as Map
 import Data.String (fromString)
-import Data.Text (Text, unpack)
 import qualified Data.Text as T
-import Funflow.Effects.Command
-  ( CommandEffect (CommandEffect, ShellCommandEffect),
-    CommandEffectConfig (CommandEffectConfig),
-  )
-import qualified Funflow.Effects.Command as CF
 import Funflow.Effects.Docker
-  ( DockerEffect (DockerEffect),
+  ( Arg (Arg, Placeholder),
+    DockerEffect (DockerEffect),
     DockerEffectConfig (DockerEffectConfig),
+    DockerEffectInput (DockerEffectInput),
+    VolumeBinding (VolumeBinding),
   )
-import qualified Funflow.Effects.Docker as DF
-import Funflow.Effects.Nix
-  ( NixEffect (NixEffect),
-    NixEffectConfig (NixEffectConfig),
-  )
-import qualified Funflow.Effects.Nix as NF
+import qualified Funflow.Effects.Docker as DE
+import Funflow.Effects.Simple (SimpleEffect (..))
 import Funflow.Flow (Flow)
-import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
 import Katip
   ( ColorStrategy (ColorIfTerminal),
     Severity (InfoS),
@@ -74,49 +64,19 @@ import Katip
     registerScribe,
     runKatipContextT,
   )
-import Path (Abs, Dir, absdir)
-import System.Environment (getEnv)
+import Path (Abs, Dir, absdir, toFilePath)
 import System.IO (stdout)
-import System.IO.Unsafe (unsafePerformIO)
-import System.Process
-  ( CmdSpec (RawCommand, ShellCommand),
-    CreateProcess (CreateProcess),
-    StdStream (Inherit),
-    child_group,
-    child_user,
-    close_fds,
-    cmdspec,
-    createProcess,
-    create_group,
-    create_new_console,
-    cwd,
-    delegate_ctlc,
-    detach_console,
-    env,
-    new_session,
-    std_err,
-    std_in,
-    std_out,
-    use_process_jobs,
-  )
-import qualified Text.URI as URI
 
--- Run a flow
-data FlowExecutionConfig = FlowExecutionConfig
-  { commandExecution :: CommandExecutionHandler
-    -- , executionEnvironment :: CommandExecutionEnvironment
-  }
+-- * Flow execution
 
-data CommandExecutionHandler = SystemExecutor | ExternalExecutor
-
--- data CommandHashStrategy = Smart | Rigorous
--- data CommandExecutionEnvironment = SystemEnvironment | Nix | Docker
-
-defaultExecutionConfig :: FlowExecutionConfig
-defaultExecutionConfig = FlowExecutionConfig {commandExecution = SystemExecutor}
-
-runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
-runFlow (FlowExecutionConfig {commandExecution}) flow input =
+-- | Run a flow
+runFlow ::
+  -- | The flow to run
+  Flow input output ->
+  -- | The input to evaluate the flow against
+  input ->
+  IO output
+runFlow flow input =
   let -- TODO choose path
       defaultPath = [absdir|/tmp/funflow/store|]
       defaultCachingId = Just 1
@@ -124,15 +84,7 @@ runFlow (FlowExecutionConfig {commandExecution}) flow input =
       CS.withStore defaultPath $ \store -> do
         flow
           -- Weave effects
-          & weave #docker interpretDockerEffect
-          & weave #nix interpretNixEffect
-          & weave'
-            #command
-            ( case commandExecution of
-                SystemExecutor -> interpretCommandEffectSystemExecutor
-                -- change
-                ExternalExecutor -> interpretCommandEffectExternalExecutor store
-            )
+          & weave' #docker (interpretDockerEffect store)
           & weave' #simple interpretSimpleEffect
           -- Strip of empty list of strands (after all weaves)
           & untwine
@@ -142,130 +94,86 @@ runFlow (FlowExecutionConfig {commandExecution}) flow input =
           -- Finally, run
           & perform input
 
--- Interpret simple effect
+-- * Interpreters
+
+-- ** @SimpleEffect@ interpreter
+
+-- | Interpret @SimpleEffect@
 interpretSimpleEffect :: (Arrow a, HasKleisliIO m a) => SimpleEffect i o -> a i o
 interpretSimpleEffect simpleEffect = case simpleEffect of
   PureEffect f -> arr f
   IOEffect f -> liftKleisliIO f
 
--- Possible interpreters for the command effect
+-- ** @CommandEffect@ interpreters
 
--- System executor: just spawn processes
-interpretCommandEffectSystemExecutor :: (Arrow a, HasKleisliIO m a) => CommandEffect i o -> a i o
-interpretCommandEffectSystemExecutor commandEffect =
-  let runProcess _ spec = liftKleisliIO $ \() ->
-        do
-          _ <-
-            createProcess $
-              CreateProcess
-                { cmdspec = spec,
-                  env = Nothing,
-                  cwd = Nothing,
-                  std_in = Inherit,
-                  std_out = Inherit,
-                  std_err = Inherit,
-                  close_fds = False,
-                  create_group = False,
-                  delegate_ctlc = False,
-                  detach_console = False,
-                  create_new_console = False,
-                  new_session = False,
-                  child_group = Nothing,
-                  child_user = Nothing,
-                  use_process_jobs = False
-                }
-          return ()
-   in case commandEffect of
-        CommandEffect (CommandEffectConfig {CF.command, CF.args, CF.env}) ->
-          runProcess env $ RawCommand (T.unpack command) (fmap T.unpack args)
-        ShellCommandEffect shellCommand ->
-          runProcess [] $ ShellCommand (T.unpack shellCommand)
+-- | Run a task using external-executor, get a CS.Item
+runTask :: CS.ContentStore -> ExternalTask -> IO CS.Item
+runTask store task = do
+  -- Hash computation, then bundle it with the task
+  hash <- liftIO $ contentHash task
+  -- Katip machinery
+  handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
+  let makeLogEnv = registerScribe "stdout" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "executor"
+  _ <- bracket makeLogEnv closeScribes $ \logEnv -> do
+    let initialContext = ()
+    let initialNamespace = "funflow"
+    runKatipContextT logEnv initialContext initialNamespace $
+      execute store $
+        TaskDescription
+          { _tdOutput = hash,
+            _tdTask = task
+          }
+  -- Finish
+  CS.Complete completedItem <- CS.lookup store hash
+  return completedItem
 
--- External executor: use the external-executor package
--- TODO currently little to no benefits, need to allow setting SQL, Redis, etc
-interpretCommandEffectExternalExecutor :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> CommandEffect i o -> a i o
-interpretCommandEffectExternalExecutor store commandEffect =
-  let runTask :: (Arrow a, HasKleisliIO m a) => ExternalTask -> a i ()
-      runTask task = liftKleisliIO $ \_ -> do
-        -- Hash computation, then bundle it with the task
-        hash <- liftIO $ contentHash task
-        let taskDescription =
-              TaskDescription
-                { _tdOutput = hash,
-                  _tdTask = task
-                }
-        -- Katip machinery
-        handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
-        let makeLogEnv = registerScribe "stdout" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "executor"
-        _ <- bracket makeLogEnv closeScribes $ \logEnv -> do
-          let initialContext = ()
-          let initialNamespace = "funflow"
-          runKatipContextT logEnv initialContext initialNamespace $ execute store taskDescription
-        -- Finish
-        return ()
-   in case commandEffect of
-        CommandEffect (CommandEffectConfig {CF.command, CF.args, CF.env}) ->
-          -- Create the task description (task + cache hash)
-          let task :: ExternalTask
-              task =
-                ExternalTask
-                  { _etCommand = command,
-                    _etEnv = EnvExplicit [(x, (fromString . unpack) y) | (x, y) <- env],
-                    _etParams = fmap (fromString . unpack) args,
-                    _etWriteToStdOut = StdOutCapture
-                  }
-           in runTask task
-        ShellCommandEffect shellCommand ->
-          let task =
-                ExternalTask
-                  { _etCommand = shellCommand,
-                    _etEnv = EnvExplicit [],
-                    _etParams = [],
-                    _etWriteToStdOut = StdOutCapture
-                  }
-           in runTask task
+-- ** @DockerEffect@ interpreter
 
--- A type alias to clarify the type of functions that will reinterpret
--- to use for interpretation functions that will be called by `weave`
-type WeaverFor name eff strands coreConstraints =
-  forall mantle core i o.
-  (Entwines (LooseRope mantle core) strands, SatisfiesAll core coreConstraints) =>
-  (forall x y. (LooseRope ('(name, eff) ': mantle) core x y -> core x y)) ->
-  eff i o ->
-  core i o
-
--- Interpret docker effect
-interpretDockerEffect :: WeaverFor "docker" DockerEffect '[ '("command", CommandEffect)] '[]
-interpretDockerEffect reinterpret dockerEffect = case dockerEffect of
-  DockerEffect (DockerEffectConfig {DF.image, DF.command, DF.args}) ->
-    let commandConfig =
-          CommandEffectConfig
-            { CF.command = "docker",
-              CF.args = "run" : image : command : args,
-              CF.env = []
-            }
-     in reinterpret $ strand #command $ CommandEffect $ commandConfig
-
--- Interpret nix effect
-interpretNixEffect :: WeaverFor "nix" NixEffect '[ '("command", CommandEffect)] '[]
-interpretNixEffect reinterpret nixEffect =
-  let -- Turn either a Nix file or a set of packages into the right list of arguments for `nix-shell`
-      packageSpec :: NF.Environment -> [Text]
-      packageSpec (NF.ShellFile shellFile) = [shellFile]
-      packageSpec (NF.PackageList packageNames) = [("-p " <> packageName) | packageName <- packageNames]
-      -- Turn a NIX_PATH or an URI to a tarball into the right list of arguments for `nix-shell`
-      nixpkgsSourceToParam :: NF.NixpkgsSource -> Text
-      -- FIXME This is DIRTY as HELL
-      nixpkgsSourceToParam NF.NIX_PATH =
-        T.pack $ unsafePerformIO $ getEnv "NIX_PATH"
-      nixpkgsSourceToParam (NF.NixpkgsTarball uri) = ("nixpkgs=" <> URI.render uri)
-   in case nixEffect of
-        NixEffect (NixEffectConfig {NF.nixEnv, NF.nixpkgsSource, NF.command, NF.args, NF.env}) ->
-          let nixPathEnvValue = nixpkgsSourceToParam nixpkgsSource
-              commandConfig =
-                CommandEffectConfig
-                  { CF.command = "nix-shell",
-                    CF.args = ("--run" : command : args) ++ packageSpec nixEnv,
-                    CF.env = ("NIX_PATH", nixPathEnvValue) : env
-                  }
-           in reinterpret $ strand #command $ CommandEffect $ commandConfig
+-- | Interpret docker effect
+interpretDockerEffect :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerEffect i o -> a i o
+interpretDockerEffect store (DockerEffect (DockerEffectConfig {DE.image, DE.command, DE.args})) =
+  liftKleisliIO $ \(DockerEffectInput {DE.inputBindings, DE.argsVals}) ->
+    -- Check args placeholder fullfillment, right is value, left is unfullfilled label
+    let argsFilled =
+          [ ( case arg of
+                Arg value -> Right value
+                Placeholder label ->
+                  let maybeVal = Map.lookup label argsVals
+                   in case maybeVal of
+                        Nothing -> Left label
+                        Just val -> Right val
+            )
+            | arg <- args
+          ]
+     in -- Error if one of the required arg label is not filled
+        if any isLeft argsFilled
+          then
+            let unfullfilledLabels = [label | (Left label) <- argsFilled]
+             in -- TODO gracefully exit
+                error $ "Missing arguments with labels: " ++ show unfullfilledLabels
+          else do
+            let argsFilledChecked = [argVal | (Right argVal) <- argsFilled]
+             in runTask store $
+                  ExternalTask
+                    { _etCommand = "docker",
+                      _etParams =
+                        [ "run",
+                          -- set the user in the container to the current user instead of root (prevent permission errors)
+                          "--user=" <> uidParam,
+                          -- set CWD in container
+                          "--workdir=/workdir"
+                        ]
+                          -- bind output (which is also the CWD in the container)
+                          ++ ["--volume=" <> outParam <> ":/workdir"]
+                          -- volumes to bind
+                          ++ [fromString $ "--volume=" <> (toFilePath $ CS.itemPath store item) <> ":/" <> (toFilePath mount) | VolumeBinding {DE.item, DE.mount} <- inputBindings]
+                          ++ [ -- docker image
+                               fromString . T.unpack $ image,
+                               -- command
+                               fromString . T.unpack $ command
+                             ]
+                          -- args
+                          ++ map (fromString . T.unpack) argsFilledChecked,
+                      _etEnv = EnvExplicit [],
+                      _etWriteToStdOut = StdOutCapture
+                    }
