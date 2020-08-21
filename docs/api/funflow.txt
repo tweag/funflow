@@ -8,125 +8,97 @@
 @package funflow
 @version 2.0.0
 
-module Funflow.Effects.Command
-data CommandEffectConfig
-CommandEffectConfig :: Text -> [Text] -> [(Text, Text)] -> CommandEffectConfig
-[command] :: CommandEffectConfig -> Text
-[args] :: CommandEffectConfig -> [Text]
-[env] :: CommandEffectConfig -> [(Text, Text)]
-data CommandEffect i o
-[CommandEffect] :: CommandEffectConfig -> CommandEffect () ()
-[ShellCommandEffect] :: Text -> CommandEffect () ()
 
+-- | Run commands using Docker
 module Funflow.Effects.Docker
+
+-- | Configure what task to run in Docker
 data DockerEffectConfig
-DockerEffectConfig :: Text -> Text -> [Text] -> DockerEffectConfig
+DockerEffectConfig :: Text -> Text -> [Arg] -> DockerEffectConfig
+
+-- | The name of the docker image
 [image] :: DockerEffectConfig -> Text
+
+-- | The command to run
 [command] :: DockerEffectConfig -> Text
-[args] :: DockerEffectConfig -> [Text]
+
+-- | The arguments to pass to the command run inside of the container
+[args] :: DockerEffectConfig -> [Arg]
 data DockerEffect i o
-[DockerEffect] :: DockerEffectConfig -> DockerEffect () ()
+[DockerEffect] :: DockerEffectConfig -> DockerEffect DockerEffectInput Item
 
-module Funflow.Effects.Nix
-data NixEffectConfig
-NixEffectConfig :: Environment -> NixpkgsSource -> Text -> [Text] -> [(Text, Text)] -> NixEffectConfig
+-- | Input to a Docker effect to finalize its configuration
+data DockerEffectInput
+DockerEffectInput :: [VolumeBinding] -> Map String Text -> DockerEffectInput
 
--- | Specification of the nix environment
-[nixEnv] :: NixEffectConfig -> Environment
+-- | Input items to mount on the container
+[inputBindings] :: DockerEffectInput -> [VolumeBinding]
 
--- | Which version of nixpkgs to use
-[nixpkgsSource] :: NixEffectConfig -> NixpkgsSource
+-- | A map representing how to fill the argument placeholders (placeholder
+--   label -&gt; argument value)
+[argsVals] :: DockerEffectInput -> Map String Text
 
--- | The command to run in the environment
-[command] :: NixEffectConfig -> Text
+-- | Represent how to bind a directory from cas-store (<tt>CS.Item</tt>) to
+--   a container internal file system
+data VolumeBinding
+VolumeBinding :: Item -> Path Abs Dir -> VolumeBinding
+[item] :: VolumeBinding -> Item
+[mount] :: VolumeBinding -> Path Abs Dir
 
--- | Arguments to pass to the command
-[args] :: NixEffectConfig -> [Text]
+-- | Represent an argument to pass to the command run inside of a Docker
+--   container
+data Arg
 
--- | Environmental variables which are set in the environment
-[env] :: NixEffectConfig -> [(Text, Text)]
-data NixEffect i o
-[NixEffect] :: NixEffectConfig -> NixEffect () ()
-data NixpkgsSource
+-- | Raw text argument
+Arg :: Text -> Arg
 
--- | Inherit the <tt>NIX_PATH</tt> from the environment
-NIX_PATH :: NixpkgsSource
+-- | A placeholder for an argument to be passed as runtime input to the
+--   effect (filled by <tt>argsVals</tt>)
+Placeholder :: String -> Arg
+instance Data.String.IsString Funflow.Effects.Docker.Arg
 
--- | The <a>URI</a> pointing to a nixpkgs tarball
-NixpkgsTarball :: URI -> NixpkgsSource
-data Environment
 
--- | Path to a shell.nix file
-ShellFile :: Text -> Environment
-
--- | A list of packages that will be passed by <tt>-p</tt>.
-PackageList :: [Text] -> Environment
-instance GHC.Generics.Generic Funflow.Effects.Nix.Environment
-instance GHC.Generics.Generic Funflow.Effects.Nix.NixpkgsSource
-instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Effects.Nix.Environment
-instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Funflow.Effects.Nix.NixpkgsSource
-
+-- | Run a pure function or an IO monadic continuation
 module Funflow.Effects.Simple
 data SimpleEffect i o
 [PureEffect] :: (i -> o) -> SimpleEffect i o
 [IOEffect] :: (i -> IO o) -> SimpleEffect i o
 
 module Funflow.Flow
+
+-- | Flow is the main type of Funflow. It is a task that takes an input
+--   value of type <tt>input</tt> and produces an output value of type
+--   <tt>output</tt>. It can use any named effect (strand) that is defined
+--   in <tt>RequiredStrands</tt>.
 type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
+
+-- | The constraints on the set of "strands" These will be "interpreted"
+--   into "core effects" (which have contraints defined below).
+type RequiredStrands = '[ '("simple", SimpleEffect), '("docker", DockerEffect)]
+
+-- | The class constraints on the "core effect". The "core effect" is the
+--   effect used to run any kind of "binary effect" ("strand")
+type RequiredCoreEffects m = '[Arrow, ArrowChoice, HasKleisli m, ProvidesCaching]
 toFlow :: IsFlow binEff => binEff i o -> Flow i o
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
-commandFlow :: CommandEffectConfig -> Flow () ()
-shellFlow :: Text -> Flow () ()
-dockerFlow :: DockerEffectConfig -> Flow () ()
-nixFlow :: NixEffectConfig -> Flow () ()
+dockerFlow :: DockerEffectConfig -> Flow DockerEffectInput Item
 instance Funflow.Flow.IsFlow Funflow.Effects.Simple.SimpleEffect
-instance Funflow.Flow.IsFlow Funflow.Effects.Command.CommandEffect
 instance Funflow.Flow.IsFlow Funflow.Effects.Docker.DockerEffect
-instance Funflow.Flow.IsFlow Funflow.Effects.Nix.NixEffect
 
+
+-- | This module defines how to run your flows
 module Funflow.Run
-data FlowExecutionConfig
-FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
-[commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
-data CommandExecutionHandler
-SystemExecutor :: CommandExecutionHandler
-ExternalExecutor :: CommandExecutionHandler
-defaultExecutionConfig :: FlowExecutionConfig
-runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
+
+-- | Run a flow
+runFlow :: Flow input output -> input -> IO output
 
 module Funflow
-type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
 (>>>) :: forall k cat (a :: k) (b :: k) (c :: k). Category cat => cat a b -> cat b c -> cat a c
-toFlow :: IsFlow binEff => binEff i o -> Flow i o
-data SimpleEffect i o
-[PureEffect] :: (i -> o) -> SimpleEffect i o
-[IOEffect] :: (i -> IO o) -> SimpleEffect i o
-data CommandEffect i o
-[CommandEffect] :: CommandEffectConfig -> CommandEffect () ()
-[ShellCommandEffect] :: Text -> CommandEffect () ()
-data DockerEffect i o
-[DockerEffect] :: DockerEffectConfig -> DockerEffect () ()
-data NixEffect i o
-[NixEffect] :: NixEffectConfig -> NixEffect () ()
-data FlowExecutionConfig
-FlowExecutionConfig :: CommandExecutionHandler -> FlowExecutionConfig
-[commandExecution] :: FlowExecutionConfig -> CommandExecutionHandler
-data CommandExecutionHandler
-SystemExecutor :: CommandExecutionHandler
-ExternalExecutor :: CommandExecutionHandler
-defaultExecutionConfig :: FlowExecutionConfig
-runFlow :: FlowExecutionConfig -> Flow input output -> input -> IO output
 
 -- | Any rope whose core provides caching can run cached tasks. The task is
 --   identified by an explicit identifier
 caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantle :: [Strand]). (Arrow core, ProvidesCaching core, ContentHashable IO ident, ContentHashable IO a, Store b) => ident -> Rope r mantle core a b -> Rope r mantle core a b
-pureFlow :: (i -> o) -> Flow i o
-ioFlow :: (i -> IO o) -> Flow i o
-commandFlow :: CommandEffectConfig -> Flow () ()
-shellFlow :: Text -> Flow () ()
-dockerFlow :: DockerEffectConfig -> Flow () ()
-nixFlow :: NixEffectConfig -> Flow () ()
 
-module Funflow.Util
-mapPair :: (a -> b) -> (a, a) -> (b, b)
+-- | Run a flow
+runFlow :: Flow input output -> input -> IO output

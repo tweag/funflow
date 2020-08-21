@@ -4,7 +4,7 @@
 <h1>Example: WordCount</h1>
 <p>In this example, we&#39;ll implement a simple pipeline which
 calculates word frequencies in a plain text document. Our
-example pipeline will make use of <code>PureEffect</code> and <code>IOEffect</code>, which
+example pipeline will make use of <code>pureFlow</code> and <code>ioFlow</code>, which
 allow us to define our pipeline&#39;s tasks in terms of Haskell functions.</p>
 <p>This example may look familiar to users of Apache Beam, which
 also includes a WordCount example <a href="https://beam.apache.org/get-started/wordcount-example/">https://beam.apache.org/get-started/wordcount-example/</a>.</p>
@@ -80,10 +80,10 @@ type, a Flow. This is in contract to applications like Airflow, which separate o
 tasks and pipelines into Operator and DAG objects.</p>
 <pre class="haskell"><code>-- Individual task definitions (remember that each task is also a full &quot;Flow&quot;)
 readDocument :: Flow String T.Text
-readDocument = toFlow . IOEffect $ T.readFile
+readDocument = ioFlow T.readFile
 
 countWordsAndSummarize :: Flow T.Text T.Text
-countWordsAndSummarize = toFlow . PureEffect $ (T.unlines . formatCounts . countWordsSortedDesc . filterWords. T.words . removePunctuation)
+countWordsAndSummarize = pureFlow $ (T.unlines . formatCounts . countWordsSortedDesc . filterWords. T.words . removePunctuation)
 
 writeResult :: Flow (String, T.Text) ()
 writeResult = let
@@ -92,7 +92,7 @@ writeResult = let
             T.putStrLn &quot;Normally we would write the result to a file with T.writeFile, but for this example we can instead print the output:&quot;
             T.putStrLn countText 
             return ()
-    in toFlow . IOEffect $ writeOutputMessage
+    in ioFlow writeOutputMessage
 
 -- Build the final pipeline using the task Flows defined above
 --   Note: Using arrow syntax to control which inputs get passed to
@@ -110,7 +110,7 @@ flow = proc (documentFilePath, outputSummaryFilePath) -&gt; do
 In
 </div>
 <div class="col-md-11">
-<pre class="haskell"><code>runFlow defaultExecutionConfig flow ("words.txt":: String, "outputs/counts.txt"::String) :: IO ()
+<pre class="haskell"><code>runFlow flow ("words.txt":: String, "outputs/counts.txt"::String) :: IO ()
 </code></pre>
 </div>
 </div>
