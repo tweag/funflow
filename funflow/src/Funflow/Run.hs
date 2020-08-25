@@ -1,4 +1,5 @@
 {-# LANGUAGE Arrows #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -11,6 +12,8 @@
 -- | This module defines how to run your flows
 module Funflow.Run
   ( runFlow,
+    runFlowWithConfig,
+    RunFlowConfig (..),
   )
 where
 
@@ -36,8 +39,9 @@ import Control.Kernmantle.Rope
     weave',
   )
 import Control.Monad.IO.Class (liftIO)
-import Data.CAS.ContentHashable (contentHash)
+import Data.CAS.ContentHashable (DirectoryContent (DirectoryContent), contentHash)
 import qualified Data.CAS.ContentStore as CS
+import qualified Data.CAS.RemoteCache as RC
 import Data.Either (isLeft)
 import qualified Data.Map.Lazy as Map
 import Data.String (fromString)
@@ -50,7 +54,8 @@ import Funflow.Effects.Docker
     VolumeBinding (VolumeBinding),
   )
 import qualified Funflow.Effects.Docker as DE
-import Funflow.Effects.Simple (SimpleEffect (..))
+import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
+import Funflow.Effects.Store (StoreEffect (GetDir, PutDir))
 import Funflow.Flow (Flow)
 import Katip
   ( ColorStrategy (ColorIfTerminal),
@@ -64,27 +69,34 @@ import Katip
     registerScribe,
     runKatipContextT,
   )
-import Path (Abs, Dir, absdir, toFilePath)
+import Path (Abs, Dir, Path, absdir, toFilePath)
 import System.IO (stdout)
+import Path.IO (copyDirRecur)
 
 -- * Flow execution
 
+-- | Flow execution configuration
+data RunFlowConfig = RunFlowConfig {storePath :: Path Abs Dir}
+
 -- | Run a flow
-runFlow ::
+runFlowWithConfig ::
+  -- | The configuration of the flow
+  RunFlowConfig ->
   -- | The flow to run
   Flow input output ->
-  -- | The input to evaluate the flow against
+  -- | The input to evaluate the flow with
   input ->
   IO output
-runFlow flow input =
-  let -- TODO choose path
-      defaultPath = [absdir|/tmp/funflow/store|]
+runFlowWithConfig config flow input =
+  let -- Expand config
+      (RunFlowConfig {storePath}) = config
       defaultCachingId = Just 1
    in -- Run with store to enable caching (with default path to store)
-      CS.withStore defaultPath $ \store -> do
+      CS.withStore storePath $ \store -> do
         flow
           -- Weave effects
           & weave' #docker (interpretDockerEffect store)
+          & weave' #store (interpretStoreEffect store)
           & weave' #simple interpretSimpleEffect
           -- Strip of empty list of strands (after all weaves)
           & untwine
@@ -93,6 +105,15 @@ runFlow flow input =
           & runReader (localStoreWithId store $ defaultCachingId)
           -- Finally, run
           & perform input
+
+-- | Run a flow with the default configuration
+runFlow ::
+  -- | The flow to run
+  Flow input output ->
+  -- | The input to evaluate the flow with
+  input ->
+  IO output
+runFlow = runFlowWithConfig (RunFlowConfig {storePath = [absdir|/tmp/funflow/store/|]})
 
 -- * Interpreters
 
@@ -104,7 +125,28 @@ interpretSimpleEffect simpleEffect = case simpleEffect of
   PureEffect f -> arr f
   IOEffect f -> liftKleisliIO f
 
--- ** @CommandEffect@ interpreters
+-- ** @StoreEffect@ interpreters
+
+-- | Interpret @StoreEffect@
+interpretStoreEffect :: (Arrow a, HasKleisliIO m a, RC.Cacher m RC.NoCache) => CS.ContentStore -> StoreEffect i o -> a i o
+interpretStoreEffect store storeEffect = case storeEffect of
+  PutDir ->
+    liftKleisliIO $ \dirPath ->
+      let -- Use the DirectoryContent type
+          -- this will give a hash through `ContentHashable` that takes into account the content of the directory
+          directoryContent = DirectoryContent dirPath
+          -- Handle errors
+          handleError hash = error $ "Could not put directory " <> show dirPath <> " in store item " <> show hash
+          -- Copy recursively a directory from a DirectoryContent type
+          copy :: Path Abs Dir -> DirectoryContent -> IO ()
+          copy destinationPath (DirectoryContent sourcePath) = copyDirRecur sourcePath destinationPath
+       in -- Use cas-store putInStore to generate the item in which to copy
+          CS.putInStore store RC.NoCache handleError copy directoryContent
+  GetDir ->
+    -- Get path of item from store
+    arr $ \item -> CS.itemPath store item
+
+-- ** @DockerEffect@ interpreter
 
 -- | Run a task using external-executor, get a CS.Item
 runTask :: CS.ContentStore -> ExternalTask -> IO CS.Item
@@ -126,8 +168,6 @@ runTask store task = do
   -- Finish
   CS.Complete completedItem <- CS.lookup store hash
   return completedItem
-
--- ** @DockerEffect@ interpreter
 
 -- | Interpret docker effect
 interpretDockerEffect :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerEffect i o -> a i o

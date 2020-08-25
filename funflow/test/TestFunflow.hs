@@ -9,15 +9,19 @@
 import qualified Data.CAS.ContentStore as CS
 import Funflow
   ( Flow,
+    RunFlowConfig (..),
     caching,
     dockerFlow,
+    getDir,
     ioFlow,
     pureFlow,
-    runFlow,
+    putDir,
+    runFlowWithConfig,
   )
 import Funflow.Effects.Docker (DockerEffectConfig (DockerEffectConfig), DockerEffectInput (DockerEffectInput), VolumeBinding (VolumeBinding))
 import qualified Funflow.Effects.Docker as DE
-import Path (Abs, Dir, absdir)
+import Path (Abs, Dir, Rel, absdir, parseAbsDir, reldir, (</>))
+import System.Directory (getCurrentDirectory)
 
 main :: IO ()
 main = do
@@ -29,6 +33,8 @@ main = do
   putStr "\n---------------------\n"
   testFlow @() @() "a flow with caching" someCachedFlow ()
   putStr "\n---------------------\n"
+  testFlow @() @() "a flow copying a directory to the store" someStoreFlow ()
+  putStr "\n---------------------\n"
   testFlow @() @CS.Item "a flow running a task in docker" someDockerFlow ()
   putStr "\n---------------------\n"
   testFlow @() @CS.Item "a flow running a task in docker, using the output of one as input of another" someDockerFlowWithInputs ()
@@ -36,8 +42,14 @@ main = do
 
 testFlow :: forall i o. (Show i, Show o) => String -> Flow i o -> i -> IO ()
 testFlow label flow input = do
+  -- Get current working directory as Path Abs Dir
+  cwd <- parseAbsDir =<< getCurrentDirectory
+  let storeDirPath = cwd </> [reldir|./.tmp/store|]
+      runFlow :: Flow i o -> i -> IO o
+      runFlow = runFlowWithConfig (RunFlowConfig {storePath = storeDirPath})
   putStrLn $ "Testing " ++ label
-  result <- runFlow @i @o flow input
+  putStrLn $ "Store opened at " <> show storeDirPath
+  result <- runFlow flow input
   putStrLn $ "Got " ++ (show result) ++ " from input " ++ (show input)
 
 someCachedFlow :: Flow () ()
@@ -51,6 +63,17 @@ somePureFlow = pureFlow $ (+ 1)
 
 someIoFlow :: Flow () ()
 someIoFlow = ioFlow $ const $ putStrLn "Some IO operation"
+
+someStoreFlow :: Flow () ()
+someStoreFlow = proc () -> do
+  -- Prepare the test
+  -- Note: the relative path is specific to running the test with Nix with `$(nix-build nix -A funflow.components.tests)/bin/test-funflow`
+  --   which is the case in the CI
+  testDir <- ioFlow (\() -> return . flip (</>) [reldir|./funflow/test/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
+  -- The actual test
+  item <- putDir -< testDir
+  path <- getDir -< item
+  ioFlow $ (\(item, itemDirPath) -> putStrLn $ "Copied directory to item " <> show item <> " with path " <> show itemDirPath) -< (item, path)
 
 someDockerFlow :: Flow () CS.Item
 someDockerFlow = proc () -> do

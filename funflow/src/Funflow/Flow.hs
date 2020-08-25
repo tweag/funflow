@@ -16,6 +16,8 @@ module Funflow.Flow
     pureFlow,
     ioFlow,
     dockerFlow,
+    putDir,
+    getDir,
   )
 where
 
@@ -24,13 +26,16 @@ import Control.Kernmantle.Caching (ProvidesCaching)
 import Control.Kernmantle.Rope (AnyRopeWith, HasKleisli, strand)
 import Control.Monad.IO.Class (MonadIO)
 import Data.CAS.ContentStore as CS
-import Funflow.Effects.Docker (DockerEffect (..), DockerEffectConfig, DockerEffectInput)
-import Funflow.Effects.Simple (SimpleEffect (..))
+import Funflow.Effects.Docker (DockerEffect (DockerEffect), DockerEffectConfig, DockerEffectInput)
+import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
+import Funflow.Effects.Store (StoreEffect (GetDir, PutDir))
+import Path (Abs, Dir, Path)
 
 -- | The constraints on the set of "strands"
 --   These will be "interpreted" into "core effects" (which have contraints defined below).
 type RequiredStrands =
   '[ '("simple", SimpleEffect),
+     '("store", StoreEffect),
      '("docker", DockerEffect)
    ]
 
@@ -73,6 +78,9 @@ instance IsFlow SimpleEffect where
 instance IsFlow DockerEffect where
   toFlow = strand #docker
 
+instance IsFlow StoreEffect where
+  toFlow = strand #store
+
 pureFlow :: (i -> o) -> Flow i o
 pureFlow = toFlow . PureEffect
 
@@ -81,3 +89,9 @@ ioFlow = toFlow . IOEffect
 
 dockerFlow :: DockerEffectConfig -> Flow DockerEffectInput CS.Item
 dockerFlow = toFlow . DockerEffect
+
+putDir :: Flow (Path Abs Dir) CS.Item
+putDir = toFlow PutDir
+
+getDir :: Flow (CS.Item) (Path Abs Dir)
+getDir = toFlow GetDir
