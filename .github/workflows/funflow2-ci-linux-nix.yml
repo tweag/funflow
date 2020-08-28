@@ -27,7 +27,11 @@ jobs:
           $TESTS_PATH/bin/test-funflow
       # Build documentation
       - name: Build docs and tutorials
-        run: nix-build -A combined-docs -o funflow-docs
+        run: |
+          nix-build -A combined-docs -o funflow-docs
+          # Need to materialize documentation symlinks here
+          # since the deploy stage below doesn't deep copy
+          cp -rL ./funflow-docs ./funflow-docs-materialized
       # Deploy documentation to a github page
       - name: Deploy docs
         # Push to GitHub Pages only on master
@@ -35,4 +39,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-          publish_dir: ./funflow-docs/share
+          publish_dir: ./funflow-docs-materialized/share
