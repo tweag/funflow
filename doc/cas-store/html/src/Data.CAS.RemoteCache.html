@@ -1,1 +1,573 @@
-/nix/store/af09x62gn23k149b7hq25vimcaj1ifik-haddock-join/share/doc/cas-store/html/src/Data.CAS.RemoteCache.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_Jei7RTGY66uLFuoYsi5ueJ"><span id="%24con2tag_5eyd3JP71cV05lBhZ7NAF3"></span></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- This module defines the remote caching mechanism of funflow which is used to</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- keep several funflow stores (possibly on different machines) in sync.</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.CAS.RemoteCache</span><span>
+</span><span id="line-9"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier">Cacher</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullResult"><span class="hs-identifier">PullResult</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PushResult"><span class="hs-identifier">PushResult</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#AliasResult"><span class="hs-identifier">AliasResult</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier">NoCache</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#memoryCache"><span class="hs-identifier">memoryCache</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#pullAsArchive"><span class="hs-identifier">pullAsArchive</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#pushAsArchive"><span class="hs-identifier">pushAsArchive</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../file:///nix/store/16ipgwnh7scig9bj3hbn711l431das3w-tar-lib-tar-0.5.1.1-haddock-doc/share/doc/tar/html/src"><span class="hs-identifier">Codec.Archive.Tar</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Tar</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent.MVar</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadIO</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">liftIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier">Data.CAS.ContentHashable</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map.Strict</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Map</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map.Strict</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">Path</span></a></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- The result of a tentative pull from the remote cache</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">data</span><span> </span><span id="PullResult"><span class="annot"><a href="Data.CAS.RemoteCache.html#PullResult"><span class="hs-identifier hs-var">PullResult</span></a></span></span><span> </span><span id="local-6989586621679279517"><span class="annot"><a href="#local-6989586621679279517"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="PullOK"><span class="annot"><a href="Data.CAS.RemoteCache.html#PullOK"><span class="hs-identifier hs-var">PullOK</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621679279517"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="NotInCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#NotInCache"><span class="hs-identifier hs-var">NotInCache</span></a></span></span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="PullError"><span class="annot"><a href="Data.CAS.RemoteCache.html#PullError"><span class="hs-identifier hs-var">PullError</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679279475"><span id="local-6989586621679279477"><span class="annot"><span class="annottext">PullResult a -&gt; PullResult a -&gt; Bool
+(PullResult a -&gt; PullResult a -&gt; Bool)
+-&gt; (PullResult a -&gt; PullResult a -&gt; Bool) -&gt; Eq (PullResult a)
+forall a. Eq a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PullResult a -&gt; PullResult a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+== :: PullResult a -&gt; PullResult a -&gt; Bool
+$c== :: forall a. Eq a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679279459"><span id="local-6989586621679279461"><span id="local-6989586621679279463"><span id="local-6989586621679279465"><span id="local-6989586621679279467"><span id="local-6989586621679279469"><span id="local-6989586621679279471"><span class="annot"><span class="annottext">Eq (PullResult a)
+Eq (PullResult a) =&gt;
+(PullResult a -&gt; PullResult a -&gt; Ordering)
+-&gt; (PullResult a -&gt; PullResult a -&gt; Bool)
+-&gt; (PullResult a -&gt; PullResult a -&gt; Bool)
+-&gt; (PullResult a -&gt; PullResult a -&gt; Bool)
+-&gt; (PullResult a -&gt; PullResult a -&gt; Bool)
+-&gt; (PullResult a -&gt; PullResult a -&gt; PullResult a)
+-&gt; (PullResult a -&gt; PullResult a -&gt; PullResult a)
+-&gt; Ord (PullResult a)
+PullResult a -&gt; PullResult a -&gt; Bool
+PullResult a -&gt; PullResult a -&gt; Ordering
+PullResult a -&gt; PullResult a -&gt; PullResult a
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall a. Ord a =&gt; Eq (PullResult a)
+forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Ordering
+forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; PullResult a
+min :: PullResult a -&gt; PullResult a -&gt; PullResult a
+$cmin :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; PullResult a
+max :: PullResult a -&gt; PullResult a -&gt; PullResult a
+$cmax :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; PullResult a
+&gt;= :: PullResult a -&gt; PullResult a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+&gt; :: PullResult a -&gt; PullResult a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+&lt;= :: PullResult a -&gt; PullResult a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+&lt; :: PullResult a -&gt; PullResult a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Bool
+compare :: PullResult a -&gt; PullResult a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; PullResult a -&gt; PullResult a -&gt; Ordering
+$cp1Ord :: forall a. Ord a =&gt; Eq (PullResult a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679279452"><span id="local-6989586621679279454"><span id="local-6989586621679279456"><span class="annot"><span class="annottext">Int -&gt; PullResult a -&gt; ShowS
+[PullResult a] -&gt; ShowS
+PullResult a -&gt; String
+(Int -&gt; PullResult a -&gt; ShowS)
+-&gt; (PullResult a -&gt; String)
+-&gt; ([PullResult a] -&gt; ShowS)
+-&gt; Show (PullResult a)
+forall a. Show a =&gt; Int -&gt; PullResult a -&gt; ShowS
+forall a. Show a =&gt; [PullResult a] -&gt; ShowS
+forall a. Show a =&gt; PullResult a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PullResult a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [PullResult a] -&gt; ShowS
+show :: PullResult a -&gt; String
+$cshow :: forall a. Show a =&gt; PullResult a -&gt; String
+showsPrec :: Int -&gt; PullResult a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; PullResult a -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- The result of a tentative push to the remote cache</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">data</span><span> </span><span id="PushResult"><span class="annot"><a href="Data.CAS.RemoteCache.html#PushResult"><span class="hs-identifier hs-var">PushResult</span></a></span></span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="PushOK"><span class="annot"><a href="Data.CAS.RemoteCache.html#PushOK"><span class="hs-identifier hs-var">PushOK</span></a></span></span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="PushError"><span class="annot"><a href="Data.CAS.RemoteCache.html#PushError"><span class="hs-identifier hs-var">PushError</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679279445"><span id="local-6989586621679279447"><span class="annot"><span class="annottext">PushResult -&gt; PushResult -&gt; Bool
+(PushResult -&gt; PushResult -&gt; Bool)
+-&gt; (PushResult -&gt; PushResult -&gt; Bool) -&gt; Eq PushResult
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PushResult -&gt; PushResult -&gt; Bool
+$c/= :: PushResult -&gt; PushResult -&gt; Bool
+== :: PushResult -&gt; PushResult -&gt; Bool
+$c== :: PushResult -&gt; PushResult -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679279430"><span id="local-6989586621679279432"><span id="local-6989586621679279434"><span id="local-6989586621679279436"><span id="local-6989586621679279438"><span id="local-6989586621679279440"><span id="local-6989586621679279442"><span class="annot"><span class="annottext">Eq PushResult
+Eq PushResult =&gt;
+(PushResult -&gt; PushResult -&gt; Ordering)
+-&gt; (PushResult -&gt; PushResult -&gt; Bool)
+-&gt; (PushResult -&gt; PushResult -&gt; Bool)
+-&gt; (PushResult -&gt; PushResult -&gt; Bool)
+-&gt; (PushResult -&gt; PushResult -&gt; Bool)
+-&gt; (PushResult -&gt; PushResult -&gt; PushResult)
+-&gt; (PushResult -&gt; PushResult -&gt; PushResult)
+-&gt; Ord PushResult
+PushResult -&gt; PushResult -&gt; Bool
+PushResult -&gt; PushResult -&gt; Ordering
+PushResult -&gt; PushResult -&gt; PushResult
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: PushResult -&gt; PushResult -&gt; PushResult
+$cmin :: PushResult -&gt; PushResult -&gt; PushResult
+max :: PushResult -&gt; PushResult -&gt; PushResult
+$cmax :: PushResult -&gt; PushResult -&gt; PushResult
+&gt;= :: PushResult -&gt; PushResult -&gt; Bool
+$c&gt;= :: PushResult -&gt; PushResult -&gt; Bool
+&gt; :: PushResult -&gt; PushResult -&gt; Bool
+$c&gt; :: PushResult -&gt; PushResult -&gt; Bool
+&lt;= :: PushResult -&gt; PushResult -&gt; Bool
+$c&lt;= :: PushResult -&gt; PushResult -&gt; Bool
+&lt; :: PushResult -&gt; PushResult -&gt; Bool
+$c&lt; :: PushResult -&gt; PushResult -&gt; Bool
+compare :: PushResult -&gt; PushResult -&gt; Ordering
+$ccompare :: PushResult -&gt; PushResult -&gt; Ordering
+$cp1Ord :: Eq PushResult
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679279424"><span id="local-6989586621679279426"><span id="local-6989586621679279428"><span class="annot"><span class="annottext">Int -&gt; PushResult -&gt; ShowS
+[PushResult] -&gt; ShowS
+PushResult -&gt; String
+(Int -&gt; PushResult -&gt; ShowS)
+-&gt; (PushResult -&gt; String)
+-&gt; ([PushResult] -&gt; ShowS)
+-&gt; Show PushResult
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PushResult] -&gt; ShowS
+$cshowList :: [PushResult] -&gt; ShowS
+show :: PushResult -&gt; String
+$cshow :: PushResult -&gt; String
+showsPrec :: Int -&gt; PushResult -&gt; ShowS
+$cshowsPrec :: Int -&gt; PushResult -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="AliasResult"><span class="annot"><a href="Data.CAS.RemoteCache.html#AliasResult"><span class="hs-identifier hs-var">AliasResult</span></a></span></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="AliasOK"><span class="annot"><a href="Data.CAS.RemoteCache.html#AliasOK"><span class="hs-identifier hs-var">AliasOK</span></a></span></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TargetNotInCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#TargetNotInCache"><span class="hs-identifier hs-var">TargetNotInCache</span></a></span></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="AliasError"><span class="annot"><a href="Data.CAS.RemoteCache.html#AliasError"><span class="hs-identifier hs-var">AliasError</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- A simple mechanism for remote-caching.</span><span>
+</span><span id="line-51"></span><span class="hs-comment">--</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- Provides a way to push a path to the cache and pull it back.</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- No assumption is made on the availability of a store path. In particular,</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- pushing a path to the cache doesn't mean that we can pull it back.</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">class</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679279513"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="Cacher"><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier hs-var">Cacher</span></a></span></span><span> </span><span id="local-6989586621679279513"><span class="annot"><a href="#local-6989586621679279513"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679279512"><span class="annot"><a href="#local-6989586621679279512"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-57"></span><span>  </span><span id="push"><span class="annot"><a href="Data.CAS.RemoteCache.html#push"><span class="hs-identifier hs-type">push</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><a href="#local-6989586621679279512"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-comment">-- | &quot;Primary&quot; key: hash of the content</span><span>
+</span><span id="line-60"></span><span>    </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- | &quot;Secondary&quot; key: hash of the dependencies</span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-comment">-- | Path to the content</span><span>
+</span><span id="line-64"></span><span>    </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-65"></span><span>    </span><span class="annot"><a href="#local-6989586621679279513"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PushResult"><span class="hs-identifier hs-type">PushResult</span></a></span><span>
+</span><span id="line-66"></span><span>  </span><span id="pull"><span class="annot"><a href="Data.CAS.RemoteCache.html#pull"><span class="hs-identifier hs-type">pull</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679279512"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679279513"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullResult"><span class="hs-identifier hs-type">PullResult</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- Push the path as an archive to the remote cache</span><span>
+</span><span id="line-70"></span><span id="local-6989586621679279503"><span class="annot"><a href="Data.CAS.RemoteCache.html#pushAsArchive"><span class="hs-identifier hs-type">pushAsArchive</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-71"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679279503"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-72"></span><span>  </span><span class="hs-comment">-- | How to create the aliases</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679279503"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-comment">-- | How to push the content</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679279503"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PushResult"><span class="hs-identifier hs-type">PushResult</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-comment">-- | Primary key</span><span>
+</span><span id="line-77"></span><span>  </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-comment">-- | Secondary key</span><span>
+</span><span id="line-79"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-81"></span><span>  </span><span class="annot"><a href="#local-6989586621679279503"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PushResult"><span class="hs-identifier hs-type">PushResult</span></a></span></span><span>
+</span><span id="line-82"></span><span id="pushAsArchive"><span class="annot"><span class="annottext">pushAsArchive :: (ContentHash -&gt; ContentHash -&gt; m (Either String ()))
+-&gt; (ContentHash -&gt; ByteString -&gt; m PushResult)
+-&gt; ContentHash
+-&gt; Maybe ContentHash
+-&gt; Path Abs Dir
+-&gt; m PushResult
+</span><a href="Data.CAS.RemoteCache.html#pushAsArchive"><span class="hs-identifier hs-var hs-var">pushAsArchive</span></a></span></span><span> </span><span id="local-6989586621679279418"><span class="annot"><span class="annottext">alias :: ContentHash -&gt; ContentHash -&gt; m (Either String ())
+</span><a href="#local-6989586621679279418"><span class="hs-identifier hs-var">alias</span></a></span></span><span> </span><span id="local-6989586621679279417"><span class="annot"><span class="annottext">pushArchive :: ContentHash -&gt; ByteString -&gt; m PushResult
+</span><a href="#local-6989586621679279417"><span class="hs-identifier hs-var">pushArchive</span></a></span></span><span> </span><span id="local-6989586621679279416"><span class="annot"><span class="annottext">primaryKey :: ContentHash
+</span><a href="#local-6989586621679279416"><span class="hs-identifier hs-var">primaryKey</span></a></span></span><span> </span><span id="local-6989586621679279415"><span class="annot"><span class="annottext">mSecondaryKey :: Maybe ContentHash
+</span><a href="#local-6989586621679279415"><span class="hs-identifier hs-var">mSecondaryKey</span></a></span></span><span> </span><span id="local-6989586621679279414"><span class="annot"><span class="annottext">path :: Path Abs Dir
+</span><a href="#local-6989586621679279414"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-83"></span><span>  </span><span id="local-6989586621679279413"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679279413"><span class="hs-identifier hs-var">archive</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO ByteString -&gt; m ByteString
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ByteString -&gt; m ByteString) -&gt; IO ByteString -&gt; m ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Entry] -&gt; ByteString
+</span><a href="../file:///nix/store/16ipgwnh7scig9bj3hbn711l431das3w-tar-lib-tar-0.5.1.1-haddock-doc/share/doc/tar/html/src"><span class="hs-identifier hs-var">Tar.write</span></a></span><span> </span><span class="annot"><span class="annottext">([Entry] -&gt; ByteString) -&gt; IO [Entry] -&gt; IO ByteString
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; [String] -&gt; IO [Entry]
+</span><a href="../file:///nix/store/16ipgwnh7scig9bj3hbn711l431das3w-tar-lib-tar-0.5.1.1-haddock-doc/share/doc/tar/html/src"><span class="hs-identifier hs-var">Tar.pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs Dir -&gt; String
+forall b t. Path b t -&gt; String
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679279414"><span class="hs-identifier hs-var">path</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-string">&quot;.&quot;</span></span><span class="hs-special">]</span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><span class="annottext">ContentHash -&gt; ByteString -&gt; m PushResult
+</span><a href="#local-6989586621679279417"><span class="hs-identifier hs-var">pushArchive</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279416"><span class="hs-identifier hs-var">primaryKey</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679279413"><span class="hs-identifier hs-var">archive</span></a></span><span> </span><span class="annot"><span class="annottext">m PushResult -&gt; (PushResult -&gt; m PushResult) -&gt; m PushResult
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-85"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PushError"><span class="hs-identifier hs-type">PushError</span></a></span><span> </span><span id="local-6989586621679279408"><span class="annot"><span class="annottext">e :: String
+</span><a href="#local-6989586621679279408"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(PushResult -&gt; m PushResult) -&gt; PushResult -&gt; m PushResult
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; PushResult
+</span><a href="Data.CAS.RemoteCache.html#PushError"><span class="hs-identifier hs-var">PushError</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679279408"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span id="local-6989586621679279407"><span class="annot"><span class="annottext">res :: PushResult
+</span><a href="#local-6989586621679279407"><span class="hs-identifier hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-87"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ContentHash
+</span><a href="#local-6989586621679279415"><span class="hs-identifier hs-var">mSecondaryKey</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-88"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679279406"><span class="annot"><span class="annottext">secondaryKey :: ContentHash
+</span><a href="#local-6989586621679279406"><span class="hs-identifier hs-var">secondaryKey</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-89"></span><span>          </span><span class="annot"><span class="annottext">ContentHash -&gt; ContentHash -&gt; m (Either String ())
+</span><a href="#local-6989586621679279418"><span class="hs-identifier hs-var">alias</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279416"><span class="hs-identifier hs-var">primaryKey</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279406"><span class="hs-identifier hs-var">secondaryKey</span></a></span><span> </span><span class="annot"><span class="annottext">m (Either String ())
+-&gt; (Either String () -&gt; m PushResult) -&gt; m PushResult
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-90"></span><span>            </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679279405"><span class="annot"><span class="annottext">err :: String
+</span><a href="#local-6989586621679279405"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(PushResult -&gt; m PushResult) -&gt; PushResult -&gt; m PushResult
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; PushResult
+</span><a href="Data.CAS.RemoteCache.html#PushError"><span class="hs-identifier hs-var">PushError</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679279405"><span class="hs-identifier hs-var">err</span></a></span><span>
+</span><span id="line-91"></span><span>            </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PushResult
+</span><a href="#local-6989586621679279407"><span class="hs-identifier hs-var">res</span></a></span><span>
+</span><span id="line-92"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PushResult
+</span><a href="#local-6989586621679279407"><span class="hs-identifier hs-var">res</span></a></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span id="local-6989586621679279507"><span class="annot"><a href="Data.CAS.RemoteCache.html#pullAsArchive"><span class="hs-identifier hs-type">pullAsArchive</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-95"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679279507"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679279507"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullResult"><span class="hs-identifier hs-type">PullResult</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-98"></span><span>  </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-99"></span><span>  </span><span class="annot"><a href="#local-6989586621679279507"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullResult"><span class="hs-identifier hs-type">PullResult</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-100"></span><span id="pullAsArchive"><span class="annot"><span class="annottext">pullAsArchive :: (ContentHash -&gt; m (PullResult ByteString))
+-&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="Data.CAS.RemoteCache.html#pullAsArchive"><span class="hs-identifier hs-var hs-var">pullAsArchive</span></a></span></span><span> </span><span id="local-6989586621679279404"><span class="annot"><span class="annottext">pullArchive :: ContentHash -&gt; m (PullResult ByteString)
+</span><a href="#local-6989586621679279404"><span class="hs-identifier hs-var">pullArchive</span></a></span></span><span> </span><span id="local-6989586621679279403"><span class="annot"><span class="annottext">hash :: ContentHash
+</span><a href="#local-6989586621679279403"><span class="hs-identifier hs-var">hash</span></a></span></span><span> </span><span id="local-6989586621679279402"><span class="annot"><span class="annottext">path :: Path Abs Dir
+</span><a href="#local-6989586621679279402"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-101"></span><span>  </span><span class="annot"><span class="annottext">ContentHash -&gt; m (PullResult ByteString)
+</span><a href="#local-6989586621679279404"><span class="hs-identifier hs-var">pullArchive</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279403"><span class="hs-identifier hs-var">hash</span></a></span><span> </span><span class="annot"><span class="annottext">m (PullResult ByteString)
+-&gt; (PullResult ByteString -&gt; m (PullResult ()))
+-&gt; m (PullResult ())
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-102"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullOK"><span class="hs-identifier hs-type">PullOK</span></a></span><span> </span><span id="local-6989586621679279401"><span class="annot"><span class="annottext">archive :: ByteString
+</span><a href="#local-6989586621679279401"><span class="hs-identifier hs-var">archive</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-103"></span><span>      </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; IO () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Entries FormatError -&gt; IO ()
+forall e. Exception e =&gt; String -&gt; Entries e -&gt; IO ()
+</span><a href="../file:///nix/store/16ipgwnh7scig9bj3hbn711l431das3w-tar-lib-tar-0.5.1.1-haddock-doc/share/doc/tar/html/src"><span class="hs-identifier hs-var">Tar.unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs Dir -&gt; String
+forall b t. Path b t -&gt; String
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679279402"><span class="hs-identifier hs-var">path</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Entries FormatError -&gt; IO ()) -&gt; Entries FormatError -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Entries FormatError
+</span><a href="../file:///nix/store/16ipgwnh7scig9bj3hbn711l431das3w-tar-lib-tar-0.5.1.1-haddock-doc/share/doc/tar/html/src"><span class="hs-identifier hs-var">Tar.read</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679279401"><span class="hs-identifier hs-var">archive</span></a></span><span>
+</span><span id="line-104"></span><span>      </span><span class="annot"><span class="annottext">PullResult () -&gt; m (PullResult ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(PullResult () -&gt; m (PullResult ()))
+-&gt; PullResult () -&gt; m (PullResult ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">() -&gt; PullResult ()
+forall a. a -&gt; PullResult a
+</span><a href="Data.CAS.RemoteCache.html#PullOK"><span class="hs-identifier hs-var">PullOK</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#NotInCache"><span class="hs-identifier hs-type">NotInCache</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PullResult () -&gt; m (PullResult ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PullResult ()
+forall a. PullResult a
+</span><a href="Data.CAS.RemoteCache.html#NotInCache"><span class="hs-identifier hs-var">NotInCache</span></a></span><span>
+</span><span id="line-106"></span><span>    </span><span class="annot"><a href="Data.CAS.RemoteCache.html#PullError"><span class="hs-identifier hs-type">PullError</span></a></span><span> </span><span id="local-6989586621679279398"><span class="annot"><span class="annottext">e :: String
+</span><a href="#local-6989586621679279398"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PullResult () -&gt; m (PullResult ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(PullResult () -&gt; m (PullResult ()))
+-&gt; PullResult () -&gt; m (PullResult ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; PullResult ()
+forall a. String -&gt; PullResult a
+</span><a href="Data.CAS.RemoteCache.html#PullError"><span class="hs-identifier hs-var">PullError</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679279398"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- A dummy remote cache implementation which does nothing</span><span>
+</span><span id="line-110"></span><span class="hs-keyword">data</span><span> </span><span id="NoCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier hs-var">NoCache</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="NoCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier hs-var">NoCache</span></a></span></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span id="local-6989586621679279396"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679279396"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier hs-type">Cacher</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679279396"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier hs-type">NoCache</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-113"></span><span>  </span><span id="local-6989586621679279391"><span class="annot"><span class="annottext">pull :: NoCache -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="#local-6989586621679279391"><span class="hs-identifier hs-var hs-var hs-var hs-var">pull</span></a></span></span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PullResult () -&gt; m (PullResult ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PullResult ()
+forall a. PullResult a
+</span><a href="Data.CAS.RemoteCache.html#NotInCache"><span class="hs-identifier hs-var">NotInCache</span></a></span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679279390"><span class="annot"><span class="annottext">push :: NoCache
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+</span><a href="#local-6989586621679279390"><span class="hs-identifier hs-var hs-var hs-var hs-var">push</span></a></span></span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PushResult
+</span><a href="Data.CAS.RemoteCache.html#PushOK"><span class="hs-identifier hs-var">PushOK</span></a></span></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- An in-memory cache, for testing purposes</span><span>
+</span><span id="line-118"></span><span class="hs-keyword">data</span><span> </span><span id="MemoryCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-var">MemoryCache</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="MemoryCache"><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-var">MemoryCache</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Map</span></span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span id="local-6989586621679279388"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679279388"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier hs-type">Cacher</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679279388"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-type">MemoryCache</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-121"></span><span>  </span><span id="local-6989586621679279384"><span class="annot"><span class="annottext">pull :: MemoryCache -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="#local-6989586621679279384"><span class="hs-identifier hs-var hs-var hs-var hs-var">pull</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-type">MemoryCache</span></a></span><span> </span><span id="local-6989586621679279383"><span class="annot"><span class="annottext">cacheVar :: MVar (Map ContentHash ByteString)
+</span><a href="#local-6989586621679279383"><span class="hs-identifier hs-var">cacheVar</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ContentHash -&gt; m (PullResult ByteString))
+-&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+forall (m :: * -&gt; *).
+MonadIO m =&gt;
+(ContentHash -&gt; m (PullResult ByteString))
+-&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="Data.CAS.RemoteCache.html#pullAsArchive"><span class="hs-identifier hs-var">pullAsArchive</span></a></span><span> </span><span class="annot"><span class="annottext">((ContentHash -&gt; m (PullResult ByteString))
+ -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ()))
+-&gt; (ContentHash -&gt; m (PullResult ByteString))
+-&gt; ContentHash
+-&gt; Path Abs Dir
+-&gt; m (PullResult ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679279382"><span class="annot"><span class="annottext">hash :: ContentHash
+</span><a href="#local-6989586621679279382"><span class="hs-identifier hs-var">hash</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679279381"><span class="annot"><span class="annottext">Map ContentHash ByteString
+</span><a href="#local-6989586621679279381"><span class="hs-identifier hs-var">cacheMap</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (Map ContentHash ByteString) -&gt; m (Map ContentHash ByteString)
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO (Map ContentHash ByteString) -&gt; m (Map ContentHash ByteString))
+-&gt; IO (Map ContentHash ByteString)
+-&gt; m (Map ContentHash ByteString)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+-&gt; IO (Map ContentHash ByteString)
+forall a. MVar a -&gt; IO a
+</span><span class="hs-identifier hs-var">readMVar</span></span><span> </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+</span><a href="#local-6989586621679279383"><span class="hs-identifier hs-var">cacheVar</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ContentHash -&gt; Map ContentHash ByteString -&gt; Maybe ByteString
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Map.lookup</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279382"><span class="hs-identifier hs-var">hash</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString
+</span><a href="#local-6989586621679279381"><span class="hs-identifier hs-var">cacheMap</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-124"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PullResult ByteString -&gt; m (PullResult ByteString)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PullResult ByteString
+forall a. PullResult a
+</span><a href="Data.CAS.RemoteCache.html#NotInCache"><span class="hs-identifier hs-var">NotInCache</span></a></span><span>
+</span><span id="line-125"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679279378"><span class="annot"><span class="annottext">x :: ByteString
+</span><a href="#local-6989586621679279378"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PullResult ByteString -&gt; m (PullResult ByteString)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; PullResult ByteString
+forall a. a -&gt; PullResult a
+</span><a href="Data.CAS.RemoteCache.html#PullOK"><span class="hs-identifier hs-var">PullOK</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679279378"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>  </span><span id="local-6989586621679279377"><span class="annot"><span class="annottext">push :: MemoryCache
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+</span><a href="#local-6989586621679279377"><span class="hs-identifier hs-var hs-var hs-var hs-var">push</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-type">MemoryCache</span></a></span><span> </span><span id="local-6989586621679279376"><span class="annot"><span class="annottext">cacheVar :: MVar (Map ContentHash ByteString)
+</span><a href="#local-6989586621679279376"><span class="hs-identifier hs-var">cacheVar</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ContentHash -&gt; ContentHash -&gt; m (Either String ()))
+-&gt; (ContentHash -&gt; ByteString -&gt; m PushResult)
+-&gt; ContentHash
+-&gt; Maybe ContentHash
+-&gt; Path Abs Dir
+-&gt; m PushResult
+forall (m :: * -&gt; *).
+MonadIO m =&gt;
+(ContentHash -&gt; ContentHash -&gt; m (Either String ()))
+-&gt; (ContentHash -&gt; ByteString -&gt; m PushResult)
+-&gt; ContentHash
+-&gt; Maybe ContentHash
+-&gt; Path Abs Dir
+-&gt; m PushResult
+</span><a href="Data.CAS.RemoteCache.html#pushAsArchive"><span class="hs-identifier hs-var">pushAsArchive</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash -&gt; ContentHash -&gt; m (Either String ())
+forall (m :: * -&gt; *) a.
+MonadIO m =&gt;
+ContentHash -&gt; ContentHash -&gt; m (Either a ())
+</span><a href="#local-6989586621679279375"><span class="hs-identifier hs-var">alias</span></a></span><span> </span><span class="annot"><span class="annottext">((ContentHash -&gt; ByteString -&gt; m PushResult)
+ -&gt; ContentHash
+ -&gt; Maybe ContentHash
+ -&gt; Path Abs Dir
+ -&gt; m PushResult)
+-&gt; (ContentHash -&gt; ByteString -&gt; m PushResult)
+-&gt; ContentHash
+-&gt; Maybe ContentHash
+-&gt; Path Abs Dir
+-&gt; m PushResult
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679279374"><span class="annot"><span class="annottext">hash :: ContentHash
+</span><a href="#local-6989586621679279374"><span class="hs-identifier hs-var">hash</span></a></span></span><span> </span><span id="local-6989586621679279373"><span class="annot"><span class="annottext">content :: ByteString
+</span><a href="#local-6989586621679279373"><span class="hs-identifier hs-var">content</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-127"></span><span>    </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; IO () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-128"></span><span>      </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+-&gt; (Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString))
+-&gt; IO ()
+forall a. MVar a -&gt; (a -&gt; IO a) -&gt; IO ()
+</span><span class="hs-identifier hs-var">modifyMVar_</span></span><span>
+</span><span id="line-129"></span><span>        </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+</span><a href="#local-6989586621679279376"><span class="hs-identifier hs-var">cacheVar</span></a></span><span>
+</span><span id="line-130"></span><span>        </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679279371"><span class="annot"><span class="annottext">cacheMap :: Map ContentHash ByteString
+</span><a href="#local-6989586621679279371"><span class="hs-identifier hs-var">cacheMap</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString))
+-&gt; Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+-&gt; ByteString
+-&gt; Map ContentHash ByteString
+-&gt; Map ContentHash ByteString
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><span class="hs-identifier hs-var">Map.insert</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279374"><span class="hs-identifier hs-var">hash</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679279373"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString
+</span><a href="#local-6989586621679279371"><span class="hs-identifier hs-var">cacheMap</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>    </span><span class="annot"><span class="annottext">PushResult -&gt; m PushResult
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">PushResult
+</span><a href="Data.CAS.RemoteCache.html#PushOK"><span class="hs-identifier hs-var">PushOK</span></a></span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-133"></span><span>      </span><span id="local-6989586621679279375"><span class="annot"><span class="annottext">alias :: ContentHash -&gt; ContentHash -&gt; m (Either a ())
+</span><a href="#local-6989586621679279375"><span class="hs-identifier hs-var hs-var">alias</span></a></span></span><span> </span><span id="local-6989586621679279369"><span class="annot"><span class="annottext">from :: ContentHash
+</span><a href="#local-6989586621679279369"><span class="hs-identifier hs-var">from</span></a></span></span><span> </span><span id="local-6989586621679279368"><span class="annot"><span class="annottext">to :: ContentHash
+</span><a href="#local-6989586621679279368"><span class="hs-identifier hs-var">to</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-134"></span><span>        </span><span class="annot"><span class="annottext">IO (Either a ()) -&gt; m (Either a ())
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO (Either a ()) -&gt; m (Either a ()))
+-&gt; IO (Either a ()) -&gt; m (Either a ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-135"></span><span>          </span><span class="annot"><span class="annottext">() -&gt; Either a ()
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span>
+</span><span id="line-136"></span><span>            </span><span class="annot"><span class="annottext">(() -&gt; Either a ()) -&gt; IO () -&gt; IO (Either a ())
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+-&gt; (Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString))
+-&gt; IO ()
+forall a. MVar a -&gt; (a -&gt; IO a) -&gt; IO ()
+</span><span class="hs-identifier hs-var">modifyMVar_</span></span><span>
+</span><span id="line-137"></span><span>              </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString)
+</span><a href="#local-6989586621679279376"><span class="hs-identifier hs-var">cacheVar</span></a></span><span>
+</span><span id="line-138"></span><span>              </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679279367"><span class="annot"><span class="annottext">cacheMap :: Map ContentHash ByteString
+</span><a href="#local-6989586621679279367"><span class="hs-identifier hs-var">cacheMap</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString))
+-&gt; Map ContentHash ByteString -&gt; IO (Map ContentHash ByteString)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+-&gt; ByteString
+-&gt; Map ContentHash ByteString
+-&gt; Map ContentHash ByteString
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><span class="hs-identifier hs-var">Map.insert</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279368"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ContentHash ByteString
+</span><a href="#local-6989586621679279367"><span class="hs-identifier hs-var">cacheMap</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString -&gt; ContentHash -&gt; ByteString
+forall k a. Ord k =&gt; Map k a -&gt; k -&gt; a
+</span><span class="hs-operator hs-var">Map.!</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679279369"><span class="hs-identifier hs-var">from</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString
+</span><a href="#local-6989586621679279367"><span class="hs-identifier hs-var">cacheMap</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-139"></span><span>
+</span><span id="line-140"></span><span id="local-6989586621679279365"><span class="annot"><a href="Data.CAS.RemoteCache.html#memoryCache"><span class="hs-identifier hs-type">memoryCache</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679279365"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679279365"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-type">MemoryCache</span></a></span></span><span>
+</span><span id="line-141"></span><span id="memoryCache"><span class="annot"><span class="annottext">memoryCache :: m MemoryCache
+</span><a href="Data.CAS.RemoteCache.html#memoryCache"><span class="hs-identifier hs-var hs-var">memoryCache</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO MemoryCache -&gt; m MemoryCache
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO MemoryCache -&gt; m MemoryCache)
+-&gt; IO MemoryCache -&gt; m MemoryCache
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">MVar (Map ContentHash ByteString) -&gt; MemoryCache
+</span><a href="Data.CAS.RemoteCache.html#MemoryCache"><span class="hs-identifier hs-var">MemoryCache</span></a></span><span> </span><span class="annot"><span class="annottext">(MVar (Map ContentHash ByteString) -&gt; MemoryCache)
+-&gt; IO (MVar (Map ContentHash ByteString)) -&gt; IO MemoryCache
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString
+-&gt; IO (MVar (Map ContentHash ByteString))
+forall a. a -&gt; IO (MVar a)
+</span><span class="hs-identifier hs-var">newMVar</span></span><span> </span><span class="annot"><span class="annottext">Map ContentHash ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-144"></span><span class="hs-comment">-- If 'a' is a 'Cacher' then 'Maybe a' is a cacher such that 'Just x' behavies</span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- like 'x' and 'Nothing' doesn't cache anything</span><span>
+</span><span id="line-146"></span><span id="local-6989586621679279362"><span id="local-6989586621679279363"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier hs-type">Cacher</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679279363"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679279362"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.CAS.RemoteCache.html#Cacher"><span class="hs-identifier hs-type">Cacher</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679279363"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679279362"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-147"></span><span>  </span><span id="local-6989586621679279358"><span class="annot"><span class="annottext">pull :: Maybe a -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="#local-6989586621679279358"><span class="hs-identifier hs-var hs-var hs-var hs-var">pull</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679279357"><span class="annot"><span class="annottext">x :: a
+</span><a href="#local-6989586621679279357"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+forall (m :: * -&gt; *) a.
+Cacher m a =&gt;
+a -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="Data.CAS.RemoteCache.html#pull"><span class="hs-identifier hs-var">pull</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679279357"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-148"></span><span>  </span><span class="annot"><a href="Data.CAS.RemoteCache.html#pull"><span class="hs-identifier hs-var">pull</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NoCache -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+forall (m :: * -&gt; *) a.
+Cacher m a =&gt;
+a -&gt; ContentHash -&gt; Path Abs Dir -&gt; m (PullResult ())
+</span><a href="Data.CAS.RemoteCache.html#pull"><span class="hs-identifier hs-var">pull</span></a></span><span> </span><span class="annot"><span class="annottext">NoCache
+</span><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier hs-var">NoCache</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span>  </span><span id="local-6989586621679279356"><span class="annot"><span class="annottext">push :: Maybe a
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+</span><a href="#local-6989586621679279356"><span class="hs-identifier hs-var hs-var hs-var hs-var">push</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679279355"><span class="annot"><span class="annottext">x :: a
+</span><a href="#local-6989586621679279355"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+forall (m :: * -&gt; *) a.
+Cacher m a =&gt;
+a
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+</span><a href="Data.CAS.RemoteCache.html#push"><span class="hs-identifier hs-var">push</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679279355"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-151"></span><span>  </span><span class="annot"><a href="Data.CAS.RemoteCache.html#push"><span class="hs-identifier hs-var">push</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NoCache
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+forall (m :: * -&gt; *) a.
+Cacher m a =&gt;
+a
+-&gt; ContentHash -&gt; Maybe ContentHash -&gt; Path Abs Dir -&gt; m PushResult
+</span><a href="Data.CAS.RemoteCache.html#push"><span class="hs-identifier hs-var">push</span></a></span><span> </span><span class="annot"><span class="annottext">NoCache
+</span><a href="Data.CAS.RemoteCache.html#NoCache"><span class="hs-identifier hs-var">NoCache</span></a></span></span></span><span>
+</span><span id="line-152"></span></pre></body></html>

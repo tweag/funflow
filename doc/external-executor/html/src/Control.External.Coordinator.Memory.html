@@ -1,1 +1,482 @@
-/nix/store/af09x62gn23k149b7hq25vimcaj1ifik-haddock-join/share/doc/external-executor/html/src/Control.External.Coordinator.Memory.html
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE EmptyDataDecls #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- | In-memory co-ordinator for funflow. This module is not greatly useful</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--   except for testing purposes.</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.External.Coordinator.Memory</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">threadDelay</span></span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM.TVar</span></a></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.External.html"><span class="hs-identifier">Control.External</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.External.Coordinator.html"><span class="hs-identifier">Control.External.Coordinator</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">liftIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Monad.STM</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier">Data.CAS.ContentHashable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier">ContentHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">find</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map.Strict</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">M</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/azryzd3vkyvpasnzcshrfkxs2m455rhz-clock-lib-clock-0.8-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">System.Clock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/azryzd3vkyvpasnzcshrfkxs2m455rhz-clock-lib-clock-0.8-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">fromNanoSecs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">data</span><span> </span><span id="MemoryCoordinator"><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemoryCoordinator"><span class="hs-identifier hs-var">MemoryCoordinator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="MemoryCoordinator"><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemoryCoordinator"><span class="hs-identifier hs-var">MemoryCoordinator</span></a></span></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">data</span><span> </span><span id="MemHook"><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-var">MemHook</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="MemHook"><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-var">MemHook</span></a></span></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="_mhTaskQueue"><span class="annot"><span class="annottext">MemHook -&gt; TVar [TaskDescription]
+</span><a href="Control.External.Coordinator.Memory.html#_mhTaskQueue"><span class="hs-identifier hs-var hs-var">_mhTaskQueue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Control.External.html#TaskDescription"><span class="hs-identifier hs-type">TaskDescription</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span id="_mhExecutionQueue"><span class="annot"><span class="annottext">MemHook -&gt; TVar (Map ContentHash TaskStatus)
+</span><a href="Control.External.Coordinator.Memory.html#_mhExecutionQueue"><span class="hs-identifier hs-var hs-var">_mhExecutionQueue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M.Map</span></span><span> </span><span class="annot"><a href="../../../../cas-hashable/html/src"><span class="hs-identifier hs-type">ContentHash</span></a></span><span> </span><span class="annot"><a href="Control.External.Coordinator.html#TaskStatus"><span class="hs-identifier hs-type">TaskStatus</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span id="mhTaskQueue"><span id="mhExecutionQueue"><span class="hs-identifier">makeLenses</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">MemHook</span></span></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="annot"><a href="Control.External.Coordinator.Memory.html#createMemoryCoordinator"><span class="hs-identifier hs-type">createMemoryCoordinator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-type">MemHook</span></a></span><span>
+</span><span id="line-31"></span><span id="createMemoryCoordinator"><span class="annot"><span class="annottext">createMemoryCoordinator :: IO MemHook
+</span><a href="Control.External.Coordinator.Memory.html#createMemoryCoordinator"><span class="hs-identifier hs-var hs-var">createMemoryCoordinator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO MemHook -&gt; IO MemHook
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO MemHook -&gt; IO MemHook)
+-&gt; (STM MemHook -&gt; IO MemHook) -&gt; STM MemHook -&gt; IO MemHook
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">STM MemHook -&gt; IO MemHook
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM MemHook -&gt; IO MemHook) -&gt; STM MemHook -&gt; IO MemHook
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-32"></span><span>  </span><span id="local-6989586621679342142"><span class="annot"><span class="annottext">TVar [TaskDescription]
+</span><a href="#local-6989586621679342142"><span class="hs-identifier hs-var">taskQueue</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[TaskDescription] -&gt; STM (TVar [TaskDescription])
+forall a. a -&gt; STM (TVar a)
+</span><span class="hs-identifier hs-var">newTVar</span></span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-33"></span><span>  </span><span id="local-6989586621679342140"><span class="annot"><span class="annottext">TVar (Map ContentHash TaskStatus)
+</span><a href="#local-6989586621679342140"><span class="hs-identifier hs-var">executionQueue</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+-&gt; STM (TVar (Map ContentHash TaskStatus))
+forall a. a -&gt; STM (TVar a)
+</span><span class="hs-identifier hs-var">newTVar</span></span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-34"></span><span>  </span><span class="annot"><span class="annottext">MemHook -&gt; STM MemHook
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(MemHook -&gt; STM MemHook) -&gt; MemHook -&gt; STM MemHook
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TVar [TaskDescription]
+-&gt; TVar (Map ContentHash TaskStatus) -&gt; MemHook
+</span><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-var">MemHook</span></a></span><span> </span><span class="annot"><span class="annottext">TVar [TaskDescription]
+</span><a href="#local-6989586621679342142"><span class="hs-identifier hs-var">taskQueue</span></a></span><span> </span><span class="annot"><span class="annottext">TVar (Map ContentHash TaskStatus)
+</span><a href="#local-6989586621679342140"><span class="hs-identifier hs-var">executionQueue</span></a></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.External.Coordinator.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemoryCoordinator"><span class="hs-identifier hs-type">MemoryCoordinator</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="Config"><span class="annot"><a href="Control.External.Coordinator.html#Config"><span class="hs-identifier hs-var">Config</span></a></span></span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemoryCoordinator"><span class="hs-identifier hs-type">MemoryCoordinator</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-type">MemHook</span></a></span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="Hook"><span class="annot"><a href="Control.External.Coordinator.html#Hook"><span class="hs-identifier hs-var">Hook</span></a></span></span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemoryCoordinator"><span class="hs-identifier hs-type">MemoryCoordinator</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Control.External.Coordinator.Memory.html#MemHook"><span class="hs-identifier hs-type">MemHook</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span>  </span><span id="local-6989586621679342130"><span class="annot"><span class="annottext">initialise :: Config MemoryCoordinator -&gt; m (Hook MemoryCoordinator)
+</span><a href="Control.External.Coordinator.html#initialise"><span class="hs-identifier hs-var hs-var hs-var hs-var">initialise</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Config MemoryCoordinator -&gt; m (Hook MemoryCoordinator)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span>  </span><span id="local-6989586621679342128"><span class="annot"><span class="annottext">submitTask :: Hook MemoryCoordinator -&gt; TaskDescription -&gt; m ()
+</span><a href="Control.External.Coordinator.html#submitTask"><span class="hs-identifier hs-var hs-var hs-var hs-var">submitTask</span></a></span></span><span> </span><span id="local-6989586621679342126"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342126"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span id="local-6989586621679342125"><span class="annot"><span class="annottext">td :: TaskDescription
+</span><a href="#local-6989586621679342125"><span class="hs-identifier hs-var">td</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-43"></span><span>    </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; IO () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-44"></span><span>      </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; IO ()) -&gt; STM () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-45"></span><span>        </span><span class="annot"><span class="annottext">TVar [TaskDescription]
+-&gt; ([TaskDescription] -&gt; [TaskDescription]) -&gt; STM ()
+forall a. TVar a -&gt; (a -&gt; a) -&gt; STM ()
+</span><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342126"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TaskDescription
+</span><a href="#local-6989586621679342125"><span class="hs-identifier hs-var">td</span></a></span><span> </span><span class="annot"><span class="annottext">TaskDescription -&gt; [TaskDescription] -&gt; [TaskDescription]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span>  </span><span id="local-6989586621679342122"><span class="annot"><span class="annottext">queueSize :: Hook MemoryCoordinator -&gt; m Int
+</span><a href="Control.External.Coordinator.html#queueSize"><span class="hs-identifier hs-var hs-var hs-var hs-var">queueSize</span></a></span></span><span> </span><span id="local-6989586621679342120"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342120"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Int -&gt; m Int
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO Int -&gt; m Int) -&gt; IO Int -&gt; m Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621679342119"><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342119"><span class="hs-identifier hs-var">queue</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM [TaskDescription] -&gt; IO [TaskDescription]
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM [TaskDescription] -&gt; IO [TaskDescription])
+-&gt; (TVar [TaskDescription] -&gt; STM [TaskDescription])
+-&gt; TVar [TaskDescription]
+-&gt; IO [TaskDescription]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">TVar [TaskDescription] -&gt; STM [TaskDescription]
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="annot"><span class="annottext">(TVar [TaskDescription] -&gt; IO [TaskDescription])
+-&gt; TVar [TaskDescription] -&gt; IO [TaskDescription]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342120"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; IO Int) -&gt; Int -&gt; IO Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[TaskDescription] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><span class="hs-identifier hs-var">length</span></span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342119"><span class="hs-identifier hs-var">queue</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span>  </span><span id="local-6989586621679342116"><span class="annot"><span class="annottext">taskInfo :: Hook MemoryCoordinator -&gt; ContentHash -&gt; m TaskInfo
+</span><a href="Control.External.Coordinator.html#taskInfo"><span class="hs-identifier hs-var hs-var hs-var hs-var">taskInfo</span></a></span></span><span> </span><span id="local-6989586621679342114"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342114"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span id="local-6989586621679342113"><span class="annot"><span class="annottext">tid :: ContentHash
+</span><a href="#local-6989586621679342113"><span class="hs-identifier hs-var">tid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO TaskInfo -&gt; m TaskInfo
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO TaskInfo -&gt; m TaskInfo) -&gt; IO TaskInfo -&gt; m TaskInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679342112"><span class="annot"><span class="annottext">eq :: Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342112"><span class="hs-identifier hs-var">eq</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679342111"><span class="annot"><span class="annottext">tq :: [TaskDescription]
+</span><a href="#local-6989586621679342111"><span class="hs-identifier hs-var">tq</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (Map ContentHash TaskStatus, [TaskDescription])
+-&gt; IO (Map ContentHash TaskStatus, [TaskDescription])
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM (Map ContentHash TaskStatus, [TaskDescription])
+ -&gt; IO (Map ContentHash TaskStatus, [TaskDescription]))
+-&gt; STM (Map ContentHash TaskStatus, [TaskDescription])
+-&gt; IO (Map ContentHash TaskStatus, [TaskDescription])
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-53"></span><span>      </span><span id="local-6989586621679342110"><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342110"><span class="hs-identifier hs-var">eq</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar (Map ContentHash TaskStatus)
+-&gt; STM (Map ContentHash TaskStatus)
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342114"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar (Map ContentHash TaskStatus))
+     MemHook
+     (TVar (Map ContentHash TaskStatus))
+-&gt; TVar (Map ContentHash TaskStatus)
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (TVar (Map ContentHash TaskStatus))
+  MemHook
+  (TVar (Map ContentHash TaskStatus))
+Lens' MemHook (TVar (Map ContentHash TaskStatus))
+</span><a href="Control.External.Coordinator.Memory.html#mhExecutionQueue"><span class="hs-identifier hs-var">mhExecutionQueue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>      </span><span id="local-6989586621679342109"><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342109"><span class="hs-identifier hs-var">tq</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar [TaskDescription] -&gt; STM [TaskDescription]
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342114"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span>      </span><span class="annot"><span class="annottext">(Map ContentHash TaskStatus, [TaskDescription])
+-&gt; STM (Map ContentHash TaskStatus, [TaskDescription])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342110"><span class="hs-identifier hs-var">eq</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342109"><span class="hs-identifier hs-var">tq</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>    </span><span class="annot"><span class="annottext">TaskInfo -&gt; IO TaskInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(TaskInfo -&gt; IO TaskInfo) -&gt; TaskInfo -&gt; IO TaskInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ContentHash -&gt; Map ContentHash TaskStatus -&gt; Maybe TaskStatus
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">M.lookup</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342113"><span class="hs-identifier hs-var">tid</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342112"><span class="hs-identifier hs-var">eq</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-57"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679342107"><span class="annot"><span class="annottext">ti :: TaskStatus
+</span><a href="#local-6989586621679342107"><span class="hs-identifier hs-var">ti</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskStatus -&gt; TaskInfo
+</span><a href="Control.External.Coordinator.html#KnownTask"><span class="hs-identifier hs-var">KnownTask</span></a></span><span> </span><span class="annot"><span class="annottext">TaskStatus
+</span><a href="#local-6989586621679342107"><span class="hs-identifier hs-var">ti</span></a></span><span>
+</span><span id="line-58"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">(TaskDescription -&gt; Bool)
+-&gt; [TaskDescription] -&gt; Maybe TaskDescription
+forall (t :: * -&gt; *) a. Foldable t =&gt; (a -&gt; Bool) -&gt; t a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">find</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">ContentHash -&gt; ContentHash -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342113"><span class="hs-identifier hs-var">tid</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ContentHash -&gt; Bool)
+-&gt; (TaskDescription -&gt; ContentHash) -&gt; TaskDescription -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TaskDescription
+-&gt; Getting ContentHash TaskDescription ContentHash -&gt; ContentHash
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting ContentHash TaskDescription ContentHash
+Lens' TaskDescription ContentHash
+</span><a href="Control.External.html#tdOutput"><span class="hs-identifier hs-var">tdOutput</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342111"><span class="hs-identifier hs-var">tq</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-59"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskStatus -&gt; TaskInfo
+</span><a href="Control.External.Coordinator.html#KnownTask"><span class="hs-identifier hs-var">KnownTask</span></a></span><span> </span><span class="annot"><span class="annottext">TaskStatus
+</span><a href="Control.External.Coordinator.html#Pending"><span class="hs-identifier hs-var">Pending</span></a></span><span>
+</span><span id="line-60"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskInfo
+</span><a href="Control.External.Coordinator.html#UnknownTask"><span class="hs-identifier hs-var">UnknownTask</span></a></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621679342102"><span class="annot"><span class="annottext">awaitTask :: Hook MemoryCoordinator -&gt; ContentHash -&gt; m TaskInfo
+</span><a href="Control.External.Coordinator.html#awaitTask"><span class="hs-identifier hs-var hs-var hs-var hs-var">awaitTask</span></a></span></span><span> </span><span id="local-6989586621679342100"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342100"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span id="local-6989586621679342099"><span class="annot"><span class="annottext">tid :: ContentHash
+</span><a href="#local-6989586621679342099"><span class="hs-identifier hs-var">tid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO TaskInfo -&gt; m TaskInfo
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO TaskInfo -&gt; m TaskInfo) -&gt; IO TaskInfo -&gt; m TaskInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621679342098"><span class="annot"><span class="annottext">TaskInfo
+</span><a href="#local-6989586621679342098"><span class="hs-identifier hs-var">ti</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Hook MemoryCoordinator -&gt; ContentHash -&gt; IO TaskInfo
+forall c (m :: * -&gt; *).
+(Coordinator c, MonadIO m) =&gt;
+Hook c -&gt; ContentHash -&gt; m TaskInfo
+</span><a href="Control.External.Coordinator.html#taskInfo"><span class="hs-identifier hs-var">taskInfo</span></a></span><span> </span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+</span><a href="#local-6989586621679342100"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342099"><span class="hs-identifier hs-var">tid</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">TaskInfo
+</span><a href="#local-6989586621679342098"><span class="hs-identifier hs-var">ti</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-65"></span><span>      </span><span class="annot"><a href="Control.External.Coordinator.html#UnknownTask"><span class="hs-identifier hs-type">UnknownTask</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskInfo -&gt; IO TaskInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">TaskInfo
+</span><a href="Control.External.Coordinator.html#UnknownTask"><span class="hs-identifier hs-var">UnknownTask</span></a></span><span>
+</span><span id="line-66"></span><span>      </span><span id="local-6989586621679342097"><span class="annot"><span class="annottext">info :: TaskInfo
+</span><a href="#local-6989586621679342097"><span class="hs-identifier hs-var">info</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Control.External.Coordinator.html#KnownTask"><span class="hs-identifier hs-type">KnownTask</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.External.Coordinator.html#Completed"><span class="hs-identifier hs-type">Completed</span></a></span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskInfo -&gt; IO TaskInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">TaskInfo
+</span><a href="#local-6989586621679342097"><span class="hs-identifier hs-var">info</span></a></span><span>
+</span><span id="line-67"></span><span>      </span><span id="local-6989586621679342095"><span class="annot"><span class="annottext">info :: TaskInfo
+</span><a href="#local-6989586621679342095"><span class="hs-identifier hs-var">info</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Control.External.Coordinator.html#KnownTask"><span class="hs-identifier hs-type">KnownTask</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.External.Coordinator.html#Failed"><span class="hs-identifier hs-type">Failed</span></a></span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TaskInfo -&gt; IO TaskInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">TaskInfo
+</span><a href="#local-6989586621679342095"><span class="hs-identifier hs-var">info</span></a></span><span>
+</span><span id="line-68"></span><span>      </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-69"></span><span>        </span><span class="annot"><span class="annottext">Int -&gt; IO ()
+</span><span class="hs-identifier hs-var">threadDelay</span></span><span> </span><span class="annot"><span class="hs-number">1000000</span></span><span>
+</span><span id="line-70"></span><span>        </span><span class="annot"><span class="annottext">Hook MemoryCoordinator -&gt; ContentHash -&gt; IO TaskInfo
+forall c (m :: * -&gt; *).
+(Coordinator c, MonadIO m) =&gt;
+Hook c -&gt; ContentHash -&gt; m TaskInfo
+</span><a href="Control.External.Coordinator.html#awaitTask"><span class="hs-identifier hs-var">awaitTask</span></a></span><span> </span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+</span><a href="#local-6989586621679342100"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342099"><span class="hs-identifier hs-var">tid</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span>  </span><span id="local-6989586621679342093"><span class="annot"><span class="annottext">popTask :: Hook MemoryCoordinator -&gt; Executor -&gt; m (Maybe TaskDescription)
+</span><a href="Control.External.Coordinator.html#popTask"><span class="hs-identifier hs-var hs-var hs-var hs-var">popTask</span></a></span></span><span> </span><span id="local-6989586621679342091"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342091"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span id="local-6989586621679342090"><span class="annot"><span class="annottext">executor :: Executor
+</span><a href="#local-6989586621679342090"><span class="hs-identifier hs-var">executor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679342089"><span class="annot"><span class="annottext">executionInfo :: ExecutionInfo
+</span><a href="#local-6989586621679342089"><span class="hs-identifier hs-var hs-var">executionInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Executor -&gt; TimeSpec -&gt; ExecutionInfo
+</span><a href="Control.External.Coordinator.html#ExecutionInfo"><span class="hs-identifier hs-var">ExecutionInfo</span></a></span><span> </span><span class="annot"><span class="annottext">Executor
+</span><a href="#local-6989586621679342090"><span class="hs-identifier hs-var">executor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; TimeSpec
+</span><a href="../file:///nix/store/azryzd3vkyvpasnzcshrfkxs2m455rhz-clock-lib-clock-0.8-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">fromNanoSecs</span></a></span><span> </span><span class="annot"><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span>        </span><span id="local-6989586621679342087"><span class="annot"><span class="annottext">taskStatus :: TaskStatus
+</span><a href="#local-6989586621679342087"><span class="hs-identifier hs-var hs-var">taskStatus</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ExecutionInfo -&gt; TaskStatus
+</span><a href="Control.External.Coordinator.html#Running"><span class="hs-identifier hs-var">Running</span></a></span><span> </span><span class="annot"><span class="annottext">ExecutionInfo
+</span><a href="#local-6989586621679342089"><span class="hs-identifier hs-var">executionInfo</span></a></span><span>
+</span><span id="line-75"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">IO (Maybe TaskDescription) -&gt; m (Maybe TaskDescription)
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe TaskDescription) -&gt; m (Maybe TaskDescription))
+-&gt; (STM (Maybe TaskDescription) -&gt; IO (Maybe TaskDescription))
+-&gt; STM (Maybe TaskDescription)
+-&gt; m (Maybe TaskDescription)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">STM (Maybe TaskDescription) -&gt; IO (Maybe TaskDescription)
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM (Maybe TaskDescription) -&gt; m (Maybe TaskDescription))
+-&gt; STM (Maybe TaskDescription) -&gt; m (Maybe TaskDescription)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-76"></span><span>          </span><span id="local-6989586621679342085"><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342085"><span class="hs-identifier hs-var">tq</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar [TaskDescription] -&gt; STM [TaskDescription]
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342091"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[TaskDescription] -&gt; [TaskDescription]
+forall a. [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">reverse</span></span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342085"><span class="hs-identifier hs-var">tq</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-78"></span><span>            </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe TaskDescription -&gt; STM (Maybe TaskDescription)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe TaskDescription
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-79"></span><span>            </span><span class="hs-special">(</span><span id="local-6989586621679342083"><span class="annot"><span class="annottext">td :: TaskDescription
+</span><a href="#local-6989586621679342083"><span class="hs-identifier hs-var">td</span></a></span></span><span> </span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span> </span><span id="local-6989586621679342082"><span class="annot"><span class="annottext">xs :: [TaskDescription]
+</span><a href="#local-6989586621679342082"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-80"></span><span>              </span><span class="annot"><span class="annottext">TVar [TaskDescription] -&gt; [TaskDescription] -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342091"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TaskDescription]
+</span><a href="#local-6989586621679342082"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-81"></span><span>              </span><span class="annot"><span class="annottext">TVar (Map ContentHash TaskStatus)
+-&gt; (Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+-&gt; STM ()
+forall a. TVar a -&gt; (a -&gt; a) -&gt; STM ()
+</span><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342091"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar (Map ContentHash TaskStatus))
+     MemHook
+     (TVar (Map ContentHash TaskStatus))
+-&gt; TVar (Map ContentHash TaskStatus)
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (TVar (Map ContentHash TaskStatus))
+  MemHook
+  (TVar (Map ContentHash TaskStatus))
+Lens' MemHook (TVar (Map ContentHash TaskStatus))
+</span><a href="Control.External.Coordinator.Memory.html#mhExecutionQueue"><span class="hs-identifier hs-var">mhExecutionQueue</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+ -&gt; STM ())
+-&gt; (Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+-&gt; STM ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679342080"><span class="annot"><span class="annottext">eq :: Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342080"><span class="hs-identifier hs-var">eq</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-82"></span><span>                </span><span class="annot"><span class="annottext">ContentHash
+-&gt; TaskStatus
+-&gt; Map ContentHash TaskStatus
+-&gt; Map ContentHash TaskStatus
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><span class="hs-identifier hs-var">M.insert</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TaskDescription
+</span><a href="#local-6989586621679342083"><span class="hs-identifier hs-var">td</span></a></span><span> </span><span class="annot"><span class="annottext">TaskDescription
+-&gt; Getting ContentHash TaskDescription ContentHash -&gt; ContentHash
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting ContentHash TaskDescription ContentHash
+Lens' TaskDescription ContentHash
+</span><a href="Control.External.html#tdOutput"><span class="hs-identifier hs-var">tdOutput</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TaskStatus
+</span><a href="#local-6989586621679342087"><span class="hs-identifier hs-var">taskStatus</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342080"><span class="hs-identifier hs-var">eq</span></a></span><span>
+</span><span id="line-83"></span><span>              </span><span class="annot"><span class="annottext">Maybe TaskDescription -&gt; STM (Maybe TaskDescription)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Maybe TaskDescription -&gt; STM (Maybe TaskDescription))
+-&gt; Maybe TaskDescription -&gt; STM (Maybe TaskDescription)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TaskDescription -&gt; Maybe TaskDescription
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">TaskDescription
+</span><a href="#local-6989586621679342083"><span class="hs-identifier hs-var">td</span></a></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span>  </span><span id="local-6989586621679342078"><span class="annot"><span class="annottext">updateTaskStatus :: Hook MemoryCoordinator -&gt; ContentHash -&gt; TaskStatus -&gt; m ()
+</span><a href="Control.External.Coordinator.html#updateTaskStatus"><span class="hs-identifier hs-var hs-var hs-var hs-var">updateTaskStatus</span></a></span></span><span> </span><span id="local-6989586621679342076"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342076"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span id="local-6989586621679342075"><span class="annot"><span class="annottext">tid :: ContentHash
+</span><a href="#local-6989586621679342075"><span class="hs-identifier hs-var">tid</span></a></span></span><span> </span><span id="local-6989586621679342074"><span class="annot"><span class="annottext">stat :: TaskStatus
+</span><a href="#local-6989586621679342074"><span class="hs-identifier hs-var">stat</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; (STM () -&gt; IO ()) -&gt; STM () -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; m ()) -&gt; STM () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-86"></span><span>    </span><span class="annot"><span class="annottext">TVar (Map ContentHash TaskStatus)
+-&gt; (Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+-&gt; STM ()
+forall a. TVar a -&gt; (a -&gt; a) -&gt; STM ()
+</span><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342076"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar (Map ContentHash TaskStatus))
+     MemHook
+     (TVar (Map ContentHash TaskStatus))
+-&gt; TVar (Map ContentHash TaskStatus)
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (TVar (Map ContentHash TaskStatus))
+  MemHook
+  (TVar (Map ContentHash TaskStatus))
+Lens' MemHook (TVar (Map ContentHash TaskStatus))
+</span><a href="Control.External.Coordinator.Memory.html#mhExecutionQueue"><span class="hs-identifier hs-var">mhExecutionQueue</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+ -&gt; STM ())
+-&gt; (Map ContentHash TaskStatus -&gt; Map ContentHash TaskStatus)
+-&gt; STM ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-87"></span><span>      </span><span class="hs-glyph">\</span><span id="local-6989586621679342073"><span class="annot"><span class="annottext">eq :: Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342073"><span class="hs-identifier hs-var">eq</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-88"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">ContentHash -&gt; Map ContentHash TaskStatus -&gt; Bool
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Bool
+</span><span class="hs-identifier hs-var">M.member</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342075"><span class="hs-identifier hs-var">tid</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342073"><span class="hs-identifier hs-var">eq</span></a></span><span>
+</span><span id="line-89"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">ContentHash
+-&gt; TaskStatus
+-&gt; Map ContentHash TaskStatus
+-&gt; Map ContentHash TaskStatus
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><span class="hs-identifier hs-var">M.insert</span></span><span> </span><span class="annot"><span class="annottext">ContentHash
+</span><a href="#local-6989586621679342075"><span class="hs-identifier hs-var">tid</span></a></span><span> </span><span class="annot"><span class="annottext">TaskStatus
+</span><a href="#local-6989586621679342074"><span class="hs-identifier hs-var">stat</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContentHash TaskStatus
+</span><a href="#local-6989586621679342073"><span class="hs-identifier hs-var">eq</span></a></span><span>
+</span><span id="line-90"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Map ContentHash TaskStatus
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="hs-string">&quot;Cannot update task status: task not executing.&quot;</span></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span>  </span><span id="local-6989586621679342070"><span class="annot"><span class="annottext">dropTasks :: Hook MemoryCoordinator -&gt; m ()
+</span><a href="Control.External.Coordinator.html#dropTasks"><span class="hs-identifier hs-var hs-var hs-var hs-var">dropTasks</span></a></span></span><span> </span><span id="local-6989586621679342068"><span class="annot"><span class="annottext">mh :: Hook MemoryCoordinator
+</span><a href="#local-6989586621679342068"><span class="hs-identifier hs-var">mh</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-93"></span><span>    </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; (STM () -&gt; IO ()) -&gt; STM () -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; m ()) -&gt; STM () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-94"></span><span>      </span><span class="annot"><span class="annottext">TVar [TaskDescription]
+-&gt; ([TaskDescription] -&gt; [TaskDescription]) -&gt; STM ()
+forall a. TVar a -&gt; (a -&gt; a) -&gt; STM ()
+</span><a href="../file:///nix/store/snwgblqjwvrcpm21dvwl2g9dbxxg4y4v-stm-lib-stm-2.5.0.0-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">modifyTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hook MemoryCoordinator
+MemHook
+</span><a href="#local-6989586621679342068"><span class="hs-identifier hs-var">mh</span></a></span><span> </span><span class="annot"><span class="annottext">MemHook
+-&gt; Getting
+     (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+-&gt; TVar [TaskDescription]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/h794vsslldap0skagfwqgv01y2gd6kcd-lens-lib-lens-4.18.1-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (TVar [TaskDescription]) MemHook (TVar [TaskDescription])
+Lens' MemHook (TVar [TaskDescription])
+</span><a href="Control.External.Coordinator.Memory.html#mhTaskQueue"><span class="hs-identifier hs-var">mhTaskQueue</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(([TaskDescription] -&gt; [TaskDescription]) -&gt; STM ())
+-&gt; ([TaskDescription] -&gt; [TaskDescription]) -&gt; STM ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><span class="annottext">[TaskDescription] -&gt; [TaskDescription] -&gt; [TaskDescription]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-96"></span></pre></body></html>
