@@ -5,5 +5,5 @@ let
     inherit (spec) sha256;
   };
 
-in 
-  import (builtins.fetchTarball src)
+in
+import (builtins.fetchTarball src)
