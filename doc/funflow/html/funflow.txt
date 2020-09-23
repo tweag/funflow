@@ -10,33 +10,33 @@
 
 
 -- | Run commands using Docker
-module Funflow.Effects.Docker
+module Funflow.Tasks.Docker
 
 -- | Configure what task to run in Docker
-data DockerEffectConfig
-DockerEffectConfig :: Text -> Text -> [Arg] -> DockerEffectConfig
+data DockerTaskConfig
+DockerTaskConfig :: Text -> Text -> [Arg] -> DockerTaskConfig
 
 -- | The name of the docker image
-[image] :: DockerEffectConfig -> Text
+[image] :: DockerTaskConfig -> Text
 
 -- | The command to run
-[command] :: DockerEffectConfig -> Text
+[command] :: DockerTaskConfig -> Text
 
 -- | The arguments to pass to the command run inside of the container
-[args] :: DockerEffectConfig -> [Arg]
-data DockerEffect i o
-[DockerEffect] :: DockerEffectConfig -> DockerEffect DockerEffectInput Item
+[args] :: DockerTaskConfig -> [Arg]
+data DockerTask i o
+[DockerTask] :: DockerTaskConfig -> DockerTask DockerTaskInput Item
 
--- | Input to a Docker effect to finalize its configuration
-data DockerEffectInput
-DockerEffectInput :: [VolumeBinding] -> Map String Text -> DockerEffectInput
+-- | Input to a Docker task to finalize its configuration
+data DockerTaskInput
+DockerTaskInput :: [VolumeBinding] -> Map String Text -> DockerTaskInput
 
 -- | Input items to mount on the container
-[inputBindings] :: DockerEffectInput -> [VolumeBinding]
+[inputBindings] :: DockerTaskInput -> [VolumeBinding]
 
 -- | A map representing how to fill the argument placeholders (placeholder
 --   label -&gt; argument value)
-[argsVals] :: DockerEffectInput -> Map String Text
+[argsVals] :: DockerTaskInput -> Map String Text
 
 -- | Represent how to bind a directory from cas-store (<tt>CS.Item</tt>) to
 --   a container internal file system
@@ -53,48 +53,48 @@ data Arg
 Arg :: Text -> Arg
 
 -- | A placeholder for an argument to be passed as runtime input to the
---   effect (filled by <tt>argsVals</tt>)
+--   task (filled by <tt>argsVals</tt>)
 Placeholder :: String -> Arg
-instance Data.String.IsString Funflow.Effects.Docker.Arg
+instance Data.String.IsString Funflow.Tasks.Docker.Arg
 
 
 -- | Run a pure function or an IO monadic continuation
-module Funflow.Effects.Simple
-data SimpleEffect i o
-[PureEffect] :: (i -> o) -> SimpleEffect i o
-[IOEffect] :: (i -> IO o) -> SimpleEffect i o
+module Funflow.Tasks.Simple
+data SimpleTask i o
+[PureTask] :: (i -> o) -> SimpleTask i o
+[IOTask] :: (i -> IO o) -> SimpleTask i o
 
 
 -- | Run a pure function or an IO monadic continuation
-module Funflow.Effects.Store
-data StoreEffect i o
-[PutDir] :: StoreEffect (Path Abs Dir) Item
-[GetDir] :: StoreEffect Item (Path Abs Dir)
+module Funflow.Tasks.Store
+data StoreTask i o
+[PutDir] :: StoreTask (Path Abs Dir) Item
+[GetDir] :: StoreTask Item (Path Abs Dir)
 
 module Funflow.Flow
 
 -- | Flow is the main type of Funflow. It is a task that takes an input
 --   value of type <tt>input</tt> and produces an output value of type
---   <tt>output</tt>. It can use any named effect (strand) that is defined
---   in <tt>RequiredStrands</tt>.
-type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreEffects m) input output
+--   <tt>output</tt>. It can use any named task (strand) that is defined in
+--   <tt>RequiredStrands</tt>.
+type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreTasks m) input output
 
 -- | The constraints on the set of "strands" These will be "interpreted"
---   into "core effects" (which have contraints defined below).
-type RequiredStrands = '[ '("simple", SimpleEffect), '("store", StoreEffect), '("docker", DockerEffect)]
+--   into "core tasks" (which have contraints defined below).
+type RequiredStrands = '[ '("simple", SimpleTask), '("store", StoreTask), '("docker", DockerTask)]
 
--- | The class constraints on the "core effect". The "core effect" is the
---   effect used to run any kind of "binary effect" ("strand")
-type RequiredCoreEffects m = '[Arrow, ArrowChoice, HasKleisli m, ProvidesCaching]
+-- | The class constraints on the "core task". The "core task" is the task
+--   used to run any kind of "binary task" ("strand")
+type RequiredCoreTasks m = '[Arrow, ArrowChoice, HasKleisli m, ProvidesCaching]
 toFlow :: IsFlow binEff => binEff i o -> Flow i o
 pureFlow :: (i -> o) -> Flow i o
 ioFlow :: (i -> IO o) -> Flow i o
-dockerFlow :: DockerEffectConfig -> Flow DockerEffectInput Item
+dockerFlow :: DockerTaskConfig -> Flow DockerTaskInput Item
 putDir :: Flow (Path Abs Dir) Item
 getDir :: Flow Item (Path Abs Dir)
-instance Funflow.Flow.IsFlow Funflow.Effects.Simple.SimpleEffect
-instance Funflow.Flow.IsFlow Funflow.Effects.Docker.DockerEffect
-instance Funflow.Flow.IsFlow Funflow.Effects.Store.StoreEffect
+instance Funflow.Flow.IsFlow Funflow.Tasks.Simple.SimpleTask
+instance Funflow.Flow.IsFlow Funflow.Tasks.Docker.DockerTask
+instance Funflow.Flow.IsFlow Funflow.Tasks.Store.StoreTask
 
 
 -- | This module defines how to run your flows
