@@ -3,10 +3,10 @@
 {-# LANGUAGE InstanceSigs #-}
 
 -- | Run commands using Docker
-module Funflow.Effects.Docker
-  ( DockerEffectConfig (..),
-    DockerEffect (..),
-    DockerEffectInput (..),
+module Funflow.Tasks.Docker
+  ( DockerTaskConfig (..),
+    DockerTask (..),
+    DockerTaskInput (..),
     VolumeBinding (..),
     Arg (..),
   )
@@ -20,7 +20,7 @@ import Path (Abs, Dir, Path)
 import qualified Data.Text as T
 
 -- | Configure what task to run in Docker
-data DockerEffectConfig = DockerEffectConfig
+data DockerTaskConfig = DockerTaskConfig
   { -- | The name of the docker image
     image :: Text,
     -- | The command to run
@@ -33,15 +33,15 @@ data DockerEffectConfig = DockerEffectConfig
 data Arg
   = -- | Raw text argument
     Arg Text
-  | -- | A placeholder for an argument to be passed as runtime input to the effect (filled by @argsVals@)
+  | -- | A placeholder for an argument to be passed as runtime input to the task (filled by @argsVals@)
     Placeholder String
 
 -- | Allow to write fixed textual arguments directly as strings
 instance IsString Arg where
   fromString = Arg . T.pack
 
--- | Input to a Docker effect to finalize its configuration
-data DockerEffectInput = DockerEffectInput
+-- | Input to a Docker task to finalize its configuration
+data DockerTaskInput = DockerTaskInput
   { -- | Input items to mount on the container
     inputBindings :: [VolumeBinding],
     -- | A map representing how to fill the argument placeholders (placeholder label -> argument value)
@@ -51,6 +51,6 @@ data DockerEffectInput = DockerEffectInput
 -- | Represent how to bind a directory from cas-store (@CS.Item@) to a container internal file system
 data VolumeBinding = VolumeBinding {item :: CS.Item, mount :: Path Abs Dir}
 
--- Docker effects to perform external tasks
-data DockerEffect i o where
-  DockerEffect :: DockerEffectConfig -> DockerEffect DockerEffectInput CS.Item
+-- Docker tasks to perform external tasks
+data DockerTask i o where
+  DockerTask :: DockerTaskConfig -> DockerTask DockerTaskInput CS.Item

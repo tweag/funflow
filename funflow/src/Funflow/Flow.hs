@@ -11,7 +11,7 @@
 module Funflow.Flow
   ( Flow,
     RequiredStrands,
-    RequiredCoreEffects,
+    RequiredCoreTasks,
     toFlow,
     pureFlow,
     ioFlow,
@@ -26,22 +26,22 @@ import Control.Kernmantle.Caching (ProvidesCaching)
 import Control.Kernmantle.Rope (AnyRopeWith, HasKleisli, strand)
 import Control.Monad.IO.Class (MonadIO)
 import Data.CAS.ContentStore as CS
-import Funflow.Effects.Docker (DockerEffect (DockerEffect), DockerEffectConfig, DockerEffectInput)
-import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
-import Funflow.Effects.Store (StoreEffect (GetDir, PutDir))
+import Funflow.Tasks.Docker (DockerTask (DockerTask), DockerTaskConfig, DockerTaskInput)
+import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
+import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
 import Path (Abs, Dir, Path)
 
 -- | The constraints on the set of "strands"
---   These will be "interpreted" into "core effects" (which have contraints defined below).
+--   These will be "interpreted" into "core tasks" (which have contraints defined below).
 type RequiredStrands =
-  '[ '("simple", SimpleEffect),
-     '("store", StoreEffect),
-     '("docker", DockerEffect)
+  '[ '("simple", SimpleTask),
+     '("store", StoreTask),
+     '("docker", DockerTask)
    ]
 
--- | The class constraints on the "core effect".
---   The "core effect" is the effect used to run any kind of "binary effect" ("strand")
-type RequiredCoreEffects m =
+-- | The class constraints on the "core task".
+--   The "core task" is the task used to run any kind of "binary task" ("strand")
+type RequiredCoreTasks m =
   '[ -- Basic requirement
      Arrow,
      ArrowChoice,
@@ -53,13 +53,13 @@ type RequiredCoreEffects m =
 
 -- | Flow is the main type of Funflow.
 --   It is a task that takes an input value of type `input` and produces an output value of type `output`.
---   It can use any named effect (strand) that is defined in @RequiredStrands@.
+--   It can use any named task (strand) that is defined in @RequiredStrands@.
 type Flow input output =
   forall m.
   (MonadIO m) =>
   AnyRopeWith
     RequiredStrands
-    (RequiredCoreEffects m)
+    (RequiredCoreTasks m)
     input
     output
 
@@ -68,27 +68,27 @@ type Flow input output =
 --
 -- Directly make a flow using @IsFlow@'s @toFlow@
 
--- | Allows to register on which strand a binary effect should be
+-- | Allows to register on which strand a binary task should be
 class IsFlow binEff where
   toFlow :: binEff i o -> Flow i o
 
-instance IsFlow SimpleEffect where
+instance IsFlow SimpleTask where
   toFlow = strand #simple
 
-instance IsFlow DockerEffect where
+instance IsFlow DockerTask where
   toFlow = strand #docker
 
-instance IsFlow StoreEffect where
+instance IsFlow StoreTask where
   toFlow = strand #store
 
 pureFlow :: (i -> o) -> Flow i o
-pureFlow = toFlow . PureEffect
+pureFlow = toFlow . PureTask
 
 ioFlow :: (i -> IO o) -> Flow i o
-ioFlow = toFlow . IOEffect
+ioFlow = toFlow . IOTask
 
-dockerFlow :: DockerEffectConfig -> Flow DockerEffectInput CS.Item
-dockerFlow = toFlow . DockerEffect
+dockerFlow :: DockerTaskConfig -> Flow DockerTaskInput CS.Item
+dockerFlow = toFlow . DockerTask
 
 putDir :: Flow (Path Abs Dir) CS.Item
 putDir = toFlow PutDir

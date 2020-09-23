@@ -18,8 +18,8 @@ import Funflow
     putDir,
     runFlowWithConfig,
   )
-import Funflow.Effects.Docker (DockerEffectConfig (DockerEffectConfig), DockerEffectInput (DockerEffectInput), VolumeBinding (VolumeBinding))
-import qualified Funflow.Effects.Docker as DE
+import Funflow.Tasks.Docker (DockerTaskConfig (DockerTaskConfig), DockerTaskInput (DockerTaskInput), VolumeBinding (VolumeBinding))
+import qualified Funflow.Tasks.Docker as DE
 import Path (Abs, Dir, Rel, absdir, parseAbsDir, reldir, (</>))
 import System.Directory (getCurrentDirectory)
 
@@ -77,9 +77,9 @@ someStoreFlow = proc () -> do
 
 someDockerFlow :: Flow () CS.Item
 someDockerFlow = proc () -> do
-  dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerEffectInput {DE.inputBindings = [], DE.argsVals = mempty}
+  dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
 
 someDockerFlowWithInputs :: Flow () CS.Item
 someDockerFlowWithInputs = proc () -> do
-  item <- dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerEffectInput {DE.inputBindings = [], DE.argsVals = mempty}
-  dockerFlow (DockerEffectConfig {DE.image = "python", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerEffectInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}
+  item <- dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+  dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerTaskInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}

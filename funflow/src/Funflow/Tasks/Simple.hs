@@ -4,11 +4,11 @@
 {-# LANGUAGE InstanceSigs #-}
 
 -- | Run a pure function or an IO monadic continuation
-module Funflow.Effects.Simple
-  ( SimpleEffect (..),
+module Funflow.Tasks.Simple
+  ( SimpleTask (..),
   )
 where
 
-data SimpleEffect i o where
-  PureEffect :: (i -> o) -> SimpleEffect i o
-  IOEffect :: (i -> IO o) -> SimpleEffect i o
+data SimpleTask i o where
+  PureTask :: (i -> o) -> SimpleTask i o
+  IOTask :: (i -> IO o) -> SimpleTask i o

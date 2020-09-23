@@ -4,14 +4,14 @@
 {-# LANGUAGE InstanceSigs #-}
 
 -- | Run a pure function or an IO monadic continuation
-module Funflow.Effects.Store
-  ( StoreEffect (..),
+module Funflow.Tasks.Store
+  ( StoreTask (..),
   )
 where
 
 import Path (Abs, Dir, Path)
 import Data.CAS.ContentStore as CS
 
-data StoreEffect i o where
-  PutDir :: StoreEffect (Path Abs Dir) CS.Item
-  GetDir :: StoreEffect (CS.Item) (Path Abs Dir)
+data StoreTask i o where
+  PutDir :: StoreTask (Path Abs Dir) CS.Item
+  GetDir :: StoreTask (CS.Item) (Path Abs Dir)

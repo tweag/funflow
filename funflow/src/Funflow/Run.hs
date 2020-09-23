@@ -46,16 +46,16 @@ import Data.Either (isLeft)
 import qualified Data.Map.Lazy as Map
 import Data.String (fromString)
 import qualified Data.Text as T
-import Funflow.Effects.Docker
+import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
-    DockerEffect (DockerEffect),
-    DockerEffectConfig (DockerEffectConfig),
-    DockerEffectInput (DockerEffectInput),
+    DockerTask (DockerTask),
+    DockerTaskConfig (DockerTaskConfig),
+    DockerTaskInput (DockerTaskInput),
     VolumeBinding (VolumeBinding),
   )
-import qualified Funflow.Effects.Docker as DE
-import Funflow.Effects.Simple (SimpleEffect (IOEffect, PureEffect))
-import Funflow.Effects.Store (StoreEffect (GetDir, PutDir))
+import qualified Funflow.Tasks.Docker as DE
+import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
+import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
 import Funflow.Flow (Flow)
 import Katip
   ( ColorStrategy (ColorIfTerminal),
@@ -94,10 +94,10 @@ runFlowWithConfig config flow input =
    in -- Run with store to enable caching (with default path to store)
       CS.withStore storePath $ \store -> do
         flow
-          -- Weave effects
-          & weave' #docker (interpretDockerEffect store)
-          & weave' #store (interpretStoreEffect store)
-          & weave' #simple interpretSimpleEffect
+          -- Weave tasks
+          & weave' #docker (interpretDockerTask store)
+          & weave' #store (interpretStoreTask store)
+          & weave' #simple interpretSimpleTask
           -- Strip of empty list of strands (after all weaves)
           & untwine
           -- Define the caching
@@ -117,19 +117,19 @@ runFlow = runFlowWithConfig (RunFlowConfig {storePath = [absdir|/tmp/funflow/sto
 
 -- * Interpreters
 
--- ** @SimpleEffect@ interpreter
+-- ** @SimpleTask@ interpreter
 
--- | Interpret @SimpleEffect@
-interpretSimpleEffect :: (Arrow a, HasKleisliIO m a) => SimpleEffect i o -> a i o
-interpretSimpleEffect simpleEffect = case simpleEffect of
-  PureEffect f -> arr f
-  IOEffect f -> liftKleisliIO f
+-- | Interpret @SimpleTask@
+interpretSimpleTask :: (Arrow a, HasKleisliIO m a) => SimpleTask i o -> a i o
+interpretSimpleTask simpleTask = case simpleTask of
+  PureTask f -> arr f
+  IOTask f -> liftKleisliIO f
 
--- ** @StoreEffect@ interpreters
+-- ** @StoreTask@ interpreters
 
--- | Interpret @StoreEffect@
-interpretStoreEffect :: (Arrow a, HasKleisliIO m a, RC.Cacher m RC.NoCache) => CS.ContentStore -> StoreEffect i o -> a i o
-interpretStoreEffect store storeEffect = case storeEffect of
+-- | Interpret @StoreTask@
+interpretStoreTask :: (Arrow a, HasKleisliIO m a, RC.Cacher m RC.NoCache) => CS.ContentStore -> StoreTask i o -> a i o
+interpretStoreTask store storeTask = case storeTask of
   PutDir ->
     liftKleisliIO $ \dirPath ->
       let -- Use the DirectoryContent type
@@ -146,7 +146,7 @@ interpretStoreEffect store storeEffect = case storeEffect of
     -- Get path of item from store
     arr $ \item -> CS.itemPath store item
 
--- ** @DockerEffect@ interpreter
+-- ** @DockerTask@ interpreter
 
 -- | Run a task using external-executor, get a CS.Item
 runTask :: CS.ContentStore -> ExternalTask -> IO CS.Item
@@ -169,10 +169,10 @@ runTask store task = do
   CS.Complete completedItem <- CS.lookup store hash
   return completedItem
 
--- | Interpret docker effect
-interpretDockerEffect :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerEffect i o -> a i o
-interpretDockerEffect store (DockerEffect (DockerEffectConfig {DE.image, DE.command, DE.args})) =
-  liftKleisliIO $ \(DockerEffectInput {DE.inputBindings, DE.argsVals}) ->
+-- | Interpret docker task
+interpretDockerTask :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerTask i o -> a i o
+interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, DE.args})) =
+  liftKleisliIO $ \(DockerTaskInput {DE.inputBindings, DE.argsVals}) ->
     -- Check args placeholder fullfillment, right is value, left is unfullfilled label
     let argsFilled =
           [ ( case arg of

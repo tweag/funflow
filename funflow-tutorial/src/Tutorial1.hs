@@ -45,33 +45,33 @@ taking an integer as input, and producing an integer as its output.
 ## How to make flows
 
 In order to build flows, use the function `toFlow` defined in the module `Funflow.Flow` (also exported in the module `Funflow`).
-This function can turn an _effect_ into a `Flow`.
+This function can turn a _task_ into a `Flow`.
 
-But what is an effect?
-An effect is basically the representation of a computation.
-An effect is not per-se usable as a `Flow`: we have to _strand_ it to a flow manually using this `toFlow` function.
+But what is a task?
+A task is basically the representation of a computation.
+A task is not per-se usable as a `Flow`: we have to _strand_ it to a flow manually using this `toFlow` function.
 
-> We'll get to that notion of _strand_ later on, when extending our flow with custom effects.
+> We'll get to that notion of _strand_ later on, when extending our flow with custom tasks.
 
-The most basic exemple is the _PureEffect_.
-It represent a computation from a pure function, which has not "side effect" such as reading a file or running a command.
+The most basic exemple is the _PureTask_.
+It represent a computation from a pure function, which has not "side task" such as reading a file or running a command.
 
 For example, let us make a function that increments the input by 1.
 
 ```haskell
 flow :: Flow Int Int
-flow = toFlow . PureEffect $ (+1)
+flow = toFlow . PureTask $ (+1)
 ```
 
 #### Smart constructors
 
-All effects internally implemented in `funflow` can be created using _smart constructors_.
+All tasks internally implemented in `funflow` can be created using _smart constructors_.
 
 For instance instead of the previous
 
 ```haskell
 flow :: Flow Int Int
-flow = toFlow . PureEffect $ (+1)
+flow = toFlow . PureTask $ (+1)
 ```
 
 one can write
@@ -81,7 +81,7 @@ flow :: Flow Int Int
 flow = pureFlow (+1)
 ```
 
-this directly makes a flow: the effect is created and _stranded_ internally (we will talk about strands later on).
+this directly makes a flow: the task is created and _stranded_ internally (we will talk about strands later on).
 
 ### Execute a flow
 
@@ -108,6 +108,6 @@ runFlow flow (1 :: Int) :: IO Int
 
 As expected, it returned 2.
 
-### Available effects
+### Available tasks
 
-Available effects are defined in `Funflow.Effects`, and their smart constructors are defined in `Funflow.Flow`
+Available tasks are defined in `Funflow.Tasks`, and their smart constructors are defined in `Funflow.Flow`
