@@ -75,9 +75,14 @@ simple way to structure our pipeline is to divide it into three tasks/operations
 <li>Parse the input text and return a summary of the word frequencies in it</li>
 <li>Write out our results. For this example, we can just write them directly to the terminal.</li>
 </ol>
-<p>Remember that in Funflow both tasks and a pipeline/DAG are described in terms of the same
-type, a Flow. This is in contract to applications like Airflow, which separate out
-tasks and pipelines into Operator and DAG objects.</p>
+<p>Remember that in <code>funflow</code>, we create <code>flows</code> containing one or more <code>tasks</code> and combine them
+into a final, larger <code>Flow</code> DAG. This is different than how DAGs are constructed in other workflow
+frameworks like Apache Airflow, where the <em>tasks</em> are what get composed together. The advantage
+of making entire <code>Flow</code> DAGs composable is that you can share and re-use entire subsections of your workflow
+instead of only being able to re-use individual tasks.</p>
+<p>For example, say that you write a <code>flow</code> which contains some complex branching logic for reporting errors
+based on its input values (e.g. send a Slack message to the dev team if an upstream task reports an error).
+With <code>funflow</code>, you can simply re-use that <code>Flow</code> across all of your various workflows.</p>
 <pre class="haskell"><code>-- Individual task definitions (remember that each task is also a full &quot;Flow&quot;)
 readDocument :: Flow String T.Text
 readDocument = ioFlow T.readFile
