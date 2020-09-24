@@ -90,9 +90,15 @@ simple way to structure our pipeline is to divide it into three tasks/operations
 2. Parse the input text and return a summary of the word frequencies in it 
 3. Write out our results. For this example, we can just write them directly to the terminal.
 
-Remember that in Funflow both tasks and a pipeline/DAG are described in terms of the same 
-type, a Flow. This is in contract to applications like Airflow, which separate out 
-tasks and pipelines into Operator and DAG objects. 
+Remember that in `funflow`, we create `flows` containing one or more `tasks` and combine them 
+into a final, larger `Flow` DAG. This is different than how DAGs are constructed in other workflow 
+frameworks like Apache Airflow, where the _tasks_ are what get composed together. The advantage
+of making entire `Flow` DAGs composable is that you can share and re-use entire subsections of your workflow 
+instead of only being able to re-use individual tasks.
+
+For example, say that you write a `flow` which contains some complex branching logic for reporting errors
+based on its input values (e.g. send a Slack message to the dev team if an upstream task reports an error). 
+With `funflow`, you can simply re-use that `Flow` across all of your various workflows.
 
 ```haskell top
 -- Individual task definitions (remember that each task is also a full "Flow")

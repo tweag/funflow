@@ -29,6 +29,7 @@
       funflow-tutorial = {
         quick-reference = project.funflow-tutorial.components.exes.quick-reference;
         tutorial1 = project.funflow-tutorial.components.exes.tutorial1;
+        tutorial2 = project.funflow-tutorial.components.exes.tutorial2;
         wordcount = project.funflow-tutorial.components.exes.wordcount;
       };
 
@@ -56,6 +57,11 @@
   # Wrapper script for building tutorial html docs
   (self: super:
     { generate-funflow-tutorials = super.callPackage ./pkgs/tutorials.nix { }; }
+  )
+
+  # Script for building documentation index.html page
+  (self: super:
+    { generate-doc-index = super.callPackage ./pkgs/doc-index.nix { }; }
   )
 
   # Utility function for combining haddock docs into a single closure with 

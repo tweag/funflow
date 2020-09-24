@@ -5,29 +5,24 @@
 
 import Lib
 import Funflow
+import Funflow.Tasks.Simple (SimpleTask( PureTask, IOTask ))
 ```
 
 # First steps with `funflow`
 
 ## Introduction
 
-`funflow` is a library to programmatically author workflows.
+`funflow` is a Haskell library for defining and running _workflows_.
+A workflow specifies a pipeline of _tasks_ structured in a Direct Acyclic Graph (DAG).
+Workflows in `funflow` have the great property of being composable which means that  you can easily share and combine components across different workflows.
+It supports type checking, result caching, and other features that simplify setting up your machinery.
 
-Use `funflow` to write workflows as Direct Acyclic Graphs (DAG) of tasks.
+_Let's get started_
 
-Backed by the powerful abstractions allowed by the Haskell language, `funflow` workflows have the great property of being tasks themselves.
-This allows to define modular workflows that you can compose together.
-_Write less, do more!_
+## Anatomy of a Flow
 
-## From "workflows and tasks" to "flows"
-
-In `funflow`, there is no distinction between a workflow and a task.
-Indeed, we can compose tasks into bigger tasks, which would be called workflows.
-However, this workflow is nothing more than a task, which is then reusable to build bigger workflows.
-Because we can no longer make a distinction between a task and a workflow, we prefer to use the word _flow_.
-
-A flow is a task that takes an input and produces an output.
-This library provides a unique and simple type to define flows:
+In `funflow`, we refer to workflows as `flows`.
+A `Flow` takes an input and produces an  output, and `funflow` describes it with a unique and simple type:
 
 ```haskell
 flow :: Flow input output
@@ -40,54 +35,71 @@ For instance a flow working on numbers might have the following type signature:
 flow :: Flow Int Int
 ```
 
-taking an integer as input, and producing an integer as its output.
-
-## How to make flows
-
-In order to build flows, use the function `toFlow` defined in the module `Funflow.Flow` (also exported in the module `Funflow`).
-This function can turn a _task_ into a `Flow`.
-
-But what is a task?
-A task is basically the representation of a computation.
-A task is not per-se usable as a `Flow`: we have to _strand_ it to a flow manually using this `toFlow` function.
-
-> We'll get to that notion of _strand_ later on, when extending our flow with custom tasks.
-
-The most basic exemple is the _PureTask_.
-It represent a computation from a pure function, which has not "side task" such as reading a file or running a command.
-
-For example, let us make a function that increments the input by 1.
+It takes an integer as input and produces an integer as its output.
+A flow that doesn't take any input can be written as:
 
 ```haskell
-flow :: Flow Int Int
-flow = toFlow . PureTask $ (+1)
+flow :: Flow () Int
 ```
 
-#### Smart constructors
+Such a flow might request some user input or download some data.
 
-All tasks internally implemented in `funflow` can be created using _smart constructors_.
 
-For instance instead of the previous
+## Tasks
 
-```haskell
-flow :: Flow Int Int
-flow = toFlow . PureTask $ (+1)
-```
+A `Flow` is a DAG comprising one or more `Tasks` which describe __what__ you would like to execute. 
+`funflow` works with a wide range of task granularities.
+A `Task` can be a simple Haskell function, a database query, a command to run in a Docker container, or more. 
 
-one can write
+There are several different types of tasks in Funflow, each describing a specific type of computation. 
+Tasks are defined in the `Funflow.Tasks` subpackage.
+The most basic task, the datatype `PureTask`, represents  a pure Haskell function which has no _side effects_ such as reading a file or running a command.
+Other task datatypes include `IOTask`, which runs a Haskell function which can perform I/O (e.g. reading a file), and `DockerTask`, which runs a 
+[Docker](https://docs.docker.com/get-docker/) container.
+
+
+## How to create Flows
+
+The function `toFlow` is used to construct a `Flow`.
+It can be imported from the top level `Funflow` module and is defined in `Funflow.Flow`.
+It integrates a `Task` into a `Flow` which can then be composed with other flows into a larger, final `Flow` DAG.
+
+Here is a `Flow` that runs a `PureTask`, incrementing its input by 1.
 
 ```haskell top
+flow :: Flow Int Int
+flow = toFlow $ PureTask (+1)
+```
+
+In this example, `flow` is essentially a DAG with one node, `PureTask (+1)`. 
+Here is a flow that runs a simple IO task which prints its input.
+
+```
+flow :: Flow String ()
+flow = toFlow $ IOTask putStrLn
+```
+
+Single-task `Flows` like the ones above can also be created directly using their smart constructors.
+For instance, instead of the previous, one can write:
+
+```
 flow :: Flow Int Int
 flow = pureFlow (+1)
 ```
 
-this directly makes a flow: the task is created and _stranded_ internally (we will talk about strands later on).
+or
 
-### Execute a flow
+```
+flow :: Flow String ()
+flow = ioFlow putStrLn
+```
+
+Smart constuctors for other task types are defined in `Funflow.Flow`.
+
+## Execute a flow
 
 Everything needed to run flows is available in the module `Funflow.Run`.
-In order to run a flow, use the function `runFlow`.
-It is used as follow:
+The function `runFlow` is the main way to execute a flow:
 
 ```haskell
 runFlow flow input
@@ -99,8 +111,7 @@ where
 - `input` is the input, with the same type as the input type of `flow`
 
 It will return a result of type `IO output` where `output` is the output type of `flow`.
-
-Let's run our flow:
+Let's run our flow from earlier:
 
 ```haskell eval
 runFlow flow (1 :: Int) :: IO Int
@@ -108,6 +119,11 @@ runFlow flow (1 :: Int) :: IO Int
 
 As expected, it returned 2.
 
-### Available tasks
+Astute readers may have noticed that the output of runFlow is of type `IO output` and not simply `output`.
+This wrapping of `output` in `IO` happens because runFlow uses a context in which all possible Task types can be
+executed. Since runFlow supports IO and Docker tasks, both of which utilize I/O, the output of runFlow is also of type `IO`.
 
-Available tasks are defined in `Funflow.Tasks`, and their smart constructors are defined in `Funflow.Flow`
+## Next Steps
+
+With the basics out of the way, you should be ready to start writing your first `flows`. Check out the [wordcount flow tutorial](./wordcount.html)
+for a guided example.

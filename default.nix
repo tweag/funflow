@@ -1,7 +1,6 @@
 # This is the main project default.nix
 { system ? builtins.currentSystem
-, pkgs ? import ./nix/default.nix { inherit system; }
-}:
+, pkgs ? import ./nix/default.nix { inherit system; } }:
 let
   # These Haskell libraries will get bundled into the API documentation
   doc-libs = with pkgs; [
@@ -13,10 +12,10 @@ let
     external-executor
     docker-client
   ];
-in
-with pkgs; rec {
+in with pkgs; rec {
   # Libraries
-  inherit funflow funflow-tests cas-store cas-hashable cas-hashable-s3 external-executor docker-client docker-client-tests;
+  inherit funflow funflow-tests cas-store cas-hashable cas-hashable-s3
+    external-executor docker-client docker-client-tests;
 
   # Shell
   inherit funflow-shell;
@@ -27,6 +26,14 @@ with pkgs; rec {
   # Documentation
   api-docs = haddock-combine { hspkgs = doc-libs; };
   tutorial-docs = pkgs.generate-funflow-tutorials;
+
   # Combined API Docs + Tutorials
-  combined-docs = pkgs.symlinkJoin { name = "funflow-combined-docs"; paths = [ api-docs pkgs.generate-funflow-tutorials ]; };
+  # Note: the index links currently only work once you've deep copied the result's contents since
+  # the relative links will point to the index's store path and not the store path of the corresponding
+  # documents.
+  combined-docs = pkgs.symlinkJoin {
+    name = "funflow-combined-docs";
+    paths =
+      [ api-docs pkgs.generate-funflow-tutorials pkgs.generate-doc-index ];
+  };
 }
