@@ -17,13 +17,13 @@ Then in a main module:
 
 ```haskell
 import Funflow
-import Funflow.Effects.Docker
+import Funflow.Tasks.Docker
 
 -- Say "Hello world" in a docker container
-flow = dockerFlow $ DockerEffectConfig {image = "alpine", command = "echo", args = ["Hello world"]}
+flow = dockerFlow $ DockerTaskConfig {image = "alpine", command = "echo", args = ["Hello world"]}
 
 main :: IO ()
-main = runFlow flow (DockerEffectInput {DE.inputBindings = mempty, DE.argsVals = mempty}) >> return ()
+main = runFlow flow (DockerTaskInput {DE.inputBindings = mempty, DE.argsVals = mempty}) >> return ()
 ```
 
 This will start a docker container, print `"Hello world"` and exit.
