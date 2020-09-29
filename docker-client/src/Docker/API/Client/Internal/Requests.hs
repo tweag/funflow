@@ -6,25 +6,22 @@ module Docker.API.Client.Internal.Requests where
 
 import Conduit (filterC, mapC)
 import Control.Monad.Except
-import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.Resource (runResourceT)
 import Data.Aeson (eitherDecode, encode)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Conduit (ConduitT, runConduit, (.|))
+import Data.Conduit (runConduit, (.|))
 import Data.Conduit.Combinators (sinkFile, sinkNull)
 import qualified Data.Conduit.Tar as Tar
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Text as T
-import Docker.API.Client.Internal.Schemas (ContainerId, CreateContainer (..), CreateContainerResponse (..), HostConfig (..), WaitContainerResponse (..))
+import Docker.API.Client.Internal.Schemas (ContainerId, CreateContainer (..), CreateContainerResponse (..), WaitContainerResponse (..))
 import Docker.API.Client.Internal.Types (ClientErrorMonad, ContainerLogType (..), ContainerSpec (image), DockerClientError (..))
 import Docker.API.Client.Internal.Util (chownTarballContent, containerSpecToCreateContainer, createLogTypeFilter, parseMultiplexedDockerStream)
 import Network.HTTP.Client
-import Network.HTTP.Client.Internal (makeConnection)
 import qualified Network.HTTP.Conduit as HTTPC
 import Network.HTTP.Types.Header (hContentType)
 import Network.HTTP.Types.Status (Status, status200, status201, status204, statusCode, statusMessage)
-import System.IO (FilePath)
 import System.Posix.Types (GroupID, UserID)
 
 -- | Docker Engine API version. This value will prefix all docker api url paths.
@@ -41,8 +38,8 @@ formatRequestError status body =
     ++ " "
     ++ show body
 
--- | Analagous to the `docker run` command. Runs a container using the input HTTP connection manager and waits
--- until it exits. For more complex use cases you can also use the individual actions that comprise this function.
+-- | Similar to the `docker run` command. Runs a container in the background using the input HTTP connection manager, returning immediately.
+-- To wait for the container to exit use `awaitContainer`.
 -- Note that this currently always tries to pull the container's image.
 runContainer ::
   -- | The connection manager for the docker daemon. You can `Docker.API.Client.newDefaultDockerManager` to get a default
@@ -50,11 +47,20 @@ runContainer ::
   Manager ->
   ContainerSpec ->
   ClientErrorMonad ContainerId
-runContainer manager spec = do
+runContainer manager spec =
   let payload = containerSpecToCreateContainer spec
-  cid <- pullImage manager (image spec) >> submitCreateContainer manager payload >>= parseCreateContainerResult
-  startContainer manager cid >>= submitWaitContainer manager >>= parseWaitContainerResult >>= checkExitStatusCode
-  return cid
+   in pullImage manager (image spec) >> submitCreateContainer manager payload >>= parseCreateContainerResult >>= startContainer manager
+
+-- | Waits on a started container (e.g. via `runContainer`) until it exits, validating its exit code and returning an `DockerClientError` if
+-- the container exited with an error. This will work for both actively running containers and those which have already exited.
+awaitContainer ::
+  -- | The connection manager for the docker daemon. You can `Docker.API.Client.newDefaultDockerManager` to get a default
+  -- connection manager based on your operating system.
+  Manager ->
+  -- | The container id to await
+  ContainerId ->
+  ClientErrorMonad ()
+awaitContainer manager cid = submitWaitContainer manager cid >>= parseWaitContainerResult >>= checkExitStatusCode
 
 -- | Analagous to the `docker cp` command. Recursively copies contents at the specified path in the container to
 -- the provided output path on the host, setting file permissions to the specified user and group id.  Note that the

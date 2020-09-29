@@ -1,12 +1,15 @@
 {-# LANGUAGE Arrows #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 -- | This module defines how to run your flows
@@ -18,16 +21,6 @@ module Funflow.Run
 where
 
 import Control.Arrow (Arrow, arr)
-import Control.Exception (bracket)
-import Control.External
-  ( Env (EnvExplicit),
-    ExternalTask (..),
-    OutputCapture (StdOutCapture),
-    TaskDescription (..),
-    outParam,
-    uidParam,
-  )
-import Control.External.Executor (execute)
 import Control.Kernmantle.Caching (localStoreWithId)
 import Control.Kernmantle.Rope
   ( HasKleisliIO,
@@ -35,17 +28,20 @@ import Control.Kernmantle.Rope
     perform,
     runReader,
     untwine,
-    (&),
     weave',
+    (&),
   )
-import Control.Monad.IO.Class (liftIO)
-import Data.CAS.ContentHashable (DirectoryContent (DirectoryContent), contentHash)
+import Control.Monad.Except (runExceptT)
+import Data.CAS.ContentHashable (DirectoryContent (DirectoryContent))
 import qualified Data.CAS.ContentStore as CS
 import qualified Data.CAS.RemoteCache as RC
 import Data.Either (isLeft)
 import qualified Data.Map.Lazy as Map
-import Data.String (fromString)
+import Data.String (IsString (fromString))
 import qualified Data.Text as T
+import Docker.API.Client (ContainerSpec (cmd), OS (OS), awaitContainer, defaultContainerSpec, hostVolumes, newDefaultDockerManager, runContainer, saveContainerArchive, workingDir)
+import Funflow.Flow (Flow)
+import Funflow.Run.Orphans ()
 import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
     DockerTask (DockerTask),
@@ -56,22 +52,12 @@ import Funflow.Tasks.Docker
 import qualified Funflow.Tasks.Docker as DE
 import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
 import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
-import Funflow.Flow (Flow)
-import Katip
-  ( ColorStrategy (ColorIfTerminal),
-    Severity (InfoS),
-    Verbosity (V2),
-    closeScribes,
-    defaultScribeSettings,
-    initLogEnv,
-    mkHandleScribe,
-    permitItem,
-    registerScribe,
-    runKatipContextT,
-  )
-import Path (Abs, Dir, Path, absdir, toFilePath)
-import System.IO (stdout)
+import Path (Abs, Dir, Path, absdir, parseRelDir, toFilePath, (</>))
 import Path.IO (copyDirRecur)
+import System.Directory (removeDirectory)
+import System.Directory.Funflow (moveDirectoryContent)
+import System.Info (os)
+import System.PosixCompat.User (getEffectiveGroupID, getEffectiveUserID)
 
 -- * Flow execution
 
@@ -148,27 +134,6 @@ interpretStoreTask store storeTask = case storeTask of
 
 -- ** @DockerTask@ interpreter
 
--- | Run a task using external-executor, get a CS.Item
-runTask :: CS.ContentStore -> ExternalTask -> IO CS.Item
-runTask store task = do
-  -- Hash computation, then bundle it with the task
-  hash <- liftIO $ contentHash task
-  -- Katip machinery
-  handleScribe <- liftIO $ mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
-  let makeLogEnv = registerScribe "stdout" handleScribe defaultScribeSettings =<< initLogEnv "funflow" "executor"
-  _ <- bracket makeLogEnv closeScribes $ \logEnv -> do
-    let initialContext = ()
-    let initialNamespace = "funflow"
-    runKatipContextT logEnv initialContext initialNamespace $
-      execute store $
-        TaskDescription
-          { _tdOutput = hash,
-            _tdTask = task
-          }
-  -- Finish
-  CS.Complete completedItem <- CS.lookup store hash
-  return completedItem
-
 -- | Interpret docker task
 interpretDockerTask :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerTask i o -> a i o
 interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, DE.args})) =
@@ -193,27 +158,39 @@ interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, D
                 error $ "Missing arguments with labels: " ++ show unfullfilledLabels
           else do
             let argsFilledChecked = [argVal | (Right argVal) <- argsFilled]
-             in runTask store $
-                  ExternalTask
-                    { _etCommand = "docker",
-                      _etParams =
-                        [ "run",
-                          -- set the user in the container to the current user instead of root (prevent permission errors)
-                          "--user=" <> uidParam,
-                          -- set CWD in container
-                          "--workdir=/workdir"
-                        ]
-                          -- bind output (which is also the CWD in the container)
-                          ++ ["--volume=" <> outParam <> ":/workdir"]
-                          -- volumes to bind
-                          ++ [fromString $ "--volume=" <> (toFilePath $ CS.itemPath store item) <> ":/" <> (toFilePath mount) | VolumeBinding {DE.item, DE.mount} <- inputBindings]
-                          ++ [ -- docker image
-                               fromString . T.unpack $ image,
-                               -- command
-                               fromString . T.unpack $ command
-                             ]
-                          -- args
-                          ++ map (fromString . T.unpack) argsFilledChecked,
-                      _etEnv = EnvExplicit [],
-                      _etWriteToStdOut = StdOutCapture
+            manager <- newDefaultDockerManager (OS os)
+            uid <- getEffectiveUserID
+            gid <- getEffectiveGroupID
+            let -- @defaultWorkingDirName@ has been chosen arbitrarly, it is both where Docker container will execute things, but also the exported folder to the content store
+                defaultWorkingDirName = "workdir"
+                defaultContainerWorkingDirPath = "/" ++ defaultWorkingDirName
+                container =
+                  (defaultContainerSpec image)
+                    { workingDir = T.pack defaultContainerWorkingDirPath,
+                      cmd = [command] <> argsFilledChecked,
+                      -- ":ro" suffix on docker binding means "read-only", the mounted volumes from the content store will not be modified
+                      hostVolumes = map fromString [(toFilePath $ CS.itemPath store item) <> ":" <> (toFilePath mount) <> ":ro" | VolumeBinding {DE.item, DE.mount} <- inputBindings]
                     }
+            -- Run the docker container
+            runDockerResult <- runExceptT $ do
+              containerId <- runContainer manager container
+              awaitContainer manager containerId
+              return containerId
+            -- Process the result of the docker computation
+            case runDockerResult of
+              Left err -> error $ show err
+              Right containerId ->
+                let -- Define behaviors to pass to @CS.putInStore@
+                    handleError hash = error $ "Could not put in store item " ++ show hash
+                    copyDockerContainer itemPath _ = do
+                      copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath (toFilePath itemPath) containerId
+                      case copyResult of
+                        Left ex -> error $ show ex
+                        Right _ -> do
+                          -- Since docker will extract a TAR file of the container content, it creates a directory named after the requested directory's name
+                          -- In order to improve the user experience, funflow moves the content of said directory to the level of the CAS item directory
+                          itemWorkdir <- (itemPath </>) <$> (parseRelDir defaultWorkingDirName)
+                          moveDirectoryContent itemWorkdir itemPath
+                          -- After moving files and directories to item directory, remove the directory named after the working directory
+                          removeDirectory $ toFilePath itemWorkdir
+                 in CS.putInStore store RC.NoCache handleError copyDockerContainer (container, containerId, runDockerResult)

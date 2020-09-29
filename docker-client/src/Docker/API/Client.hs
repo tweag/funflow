@@ -14,6 +14,7 @@ module Docker.API.Client
     saveContainerLogs,
     ContainerLogType (..),
     pullImage,
+    awaitContainer,
   )
 where
 
@@ -23,7 +24,8 @@ import Docker.API.Client.Internal.Connection
     newUnixDomainSocketManager,
   )
 import Docker.API.Client.Internal.Requests
-  ( dockerAPIVersion,
+  ( awaitContainer,
+    dockerAPIVersion,
     pullImage,
     removeContainer,
     runContainer,

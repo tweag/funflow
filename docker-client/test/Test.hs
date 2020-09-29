@@ -5,7 +5,7 @@ import Data.Either (isLeft, isRight)
 import Data.List
 import Data.Ord
 import qualified Data.Text as T
-import Docker.API.Client (ContainerLogType (..), ContainerSpec (..), OS (..), defaultContainerSpec, newDefaultDockerManager, pullImage, removeContainer, runContainer, saveContainerArchive, saveContainerLogs)
+import Docker.API.Client (ContainerLogType (..), ContainerSpec (..), OS (..), awaitContainer, defaultContainerSpec, newDefaultDockerManager, pullImage, removeContainer, runContainer, saveContainerArchive, saveContainerLogs)
 import GHC.IO.Handle (Handle)
 import Network.HTTP.Client (Manager)
 import System.Directory (doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory)
@@ -93,31 +93,43 @@ dockerIntegrationTests managerIO =
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run container valid command" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand
+        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand >>= awaitContainer manager
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run container invalid command" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithFailingCommand
+        result <- runExceptT $ runContainer manager containerWithFailingCommand >>= awaitContainer manager
         assertBool "Running container succeeded when it should have actually failed" $ isLeft result,
       testCase "Run container with valid host bind volume" $ do
         manager <- managerIO
-        result <- withSystemTempFile "docker-client-bind" (\p h -> runExceptT $ runContainer manager $ containerWithValidHostBindVolume p h)
+        result <- withSystemTempFile "docker-client-bind" (\p h -> runExceptT $ runContainer manager (containerWithValidHostBindVolume p h) >>= awaitContainer manager)
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run and remove a container" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand >>= removeContainer manager False False
+        result <- runExceptT $ do
+          containerId <- runContainer manager containerWithSuccessfulCommand
+          awaitContainer manager containerId
+          removeContainer manager False False containerId
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run and remove a container forcefully" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand >>= removeContainer manager True False
+        result <- runExceptT $ do
+          containerId <- runContainer manager containerWithSuccessfulCommand
+          awaitContainer manager containerId
+          removeContainer manager True False containerId
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run and remove a container plus its volumes" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand >>= removeContainer manager False True
+        result <- runExceptT $ do
+          containerId <- runContainer manager containerWithSuccessfulCommand
+          awaitContainer manager containerId
+          removeContainer manager False True containerId
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run and remove a container plus its volumes forcefully" $ do
         manager <- managerIO
-        result <- runExceptT $ runContainer manager containerWithSuccessfulCommand >>= removeContainer manager True True
+        result <- runExceptT $ do
+          containerId <- runContainer manager containerWithSuccessfulCommand
+          awaitContainer manager containerId
+          removeContainer manager True True containerId
         assertBool ("Failed with error " ++ show result) $ isRight result,
       testCase "Run a container and extract a file from it" $ do
         manager <- managerIO
@@ -128,7 +140,10 @@ dockerIntegrationTests managerIO =
           withSystemTempDirectory
             "docker-client-cp-file"
             ( \p -> do
-                result <- runExceptT $ runContainer manager containerWithKnownFile >>= saveContainerArchive manager uid gid "/test-file.txt" p
+                result <- runExceptT $ do
+                  containerId <- runContainer manager containerWithKnownFile
+                  awaitContainer manager containerId
+                  saveContainerArchive manager uid gid "/test-file.txt" p containerId
                 case result of
                   Left e -> return (False, show e)
                   Right _ -> do
@@ -145,7 +160,10 @@ dockerIntegrationTests managerIO =
           withSystemTempDirectory
             "docker-client-cp-dir"
             ( \p -> do
-                result <- runExceptT $ runContainer manager containerWithKnownDirectory >>= saveContainerArchive manager uid gid "/test-dir" p
+                result <- runExceptT $ do
+                  containerId <- runContainer manager containerWithKnownDirectory
+                  awaitContainer manager containerId
+                  saveContainerArchive manager uid gid "/test-dir" p containerId
                 case result of
                   Left e -> return (False, show e)
                   Right _ -> do
@@ -162,7 +180,10 @@ dockerIntegrationTests managerIO =
             ( \p -> do
                 let expectedLines = 10
                 let logFile = p ++ "/stdout.txt"
-                result <- runExceptT $ runContainer manager containerWithLogOutputs >>= saveContainerLogs manager Stdout logFile
+                result <- runExceptT $ do
+                  containerId <- runContainer manager containerWithLogOutputs
+                  awaitContainer manager containerId
+                  saveContainerLogs manager Stdout logFile containerId
                 case result of
                   Left e -> return (False, show e)
                   Right _ -> do
@@ -178,7 +199,10 @@ dockerIntegrationTests managerIO =
             ( \p -> do
                 let expectedLines = 10
                 let logFile = p ++ "/stderr.txt"
-                result <- runExceptT $ runContainer manager containerWithLogOutputs >>= saveContainerLogs manager StdErr logFile
+                result <- runExceptT $ do
+                  containerId <- runContainer manager containerWithLogOutputs
+                  awaitContainer manager containerId
+                  saveContainerLogs manager StdErr logFile containerId
                 case result of
                   Left e -> return (False, show e)
                   Right _ -> do
@@ -194,7 +218,10 @@ dockerIntegrationTests managerIO =
             ( \p -> do
                 let expectedLines = 20
                 let logFile = p ++ "/both-logs.txt"
-                result <- runExceptT $ runContainer manager containerWithLogOutputs >>= saveContainerLogs manager Both logFile
+                result <- runExceptT $ do
+                  containerId <- runContainer manager containerWithLogOutputs
+                  awaitContainer manager containerId
+                  saveContainerLogs manager Both logFile containerId
                 case result of
                   Left e -> return (False, show e)
                   Right _ -> do

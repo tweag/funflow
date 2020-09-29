@@ -22,7 +22,7 @@ jobs:
         run: nix-build -A docker-client
       - name: Build docker-client test suite
         run: nix-build -A docker-client-tests -o docker-client-tests
-      - name: Run docker-client unit tests 
+      - name: Run docker-client unit tests
         run: ./docker-client-tests/bin/primary --pattern "unit"
       # Note: these tests take about 10s to run. If executing time
       # gets much longer we can rethink when we want to run these.
@@ -31,12 +31,15 @@ jobs:
       # funflow library with its tests
       - name: Build funflow library
         run: nix-build -A funflow
-      - name: Build funflow tests 
+      - name: Build funflow tests
         run: |
           echo Build tests
           TESTS_PATH=$(nix-build -A funflow-tests)
           echo Running tests
+          # Funflow tests have to be run in the `funflow` folder, like stack does, in order to have access to test assets
+          cd ./funflow
           $TESTS_PATH/bin/test-funflow
+          cd ..
       # Build documentation
       - name: Build docs and tutorials
         run: |

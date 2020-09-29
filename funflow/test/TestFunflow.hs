@@ -69,7 +69,7 @@ someStoreFlow = proc () -> do
   -- Prepare the test
   -- Note: the relative path is specific to running the test with Nix with `$(nix-build nix -A funflow.components.tests)/bin/test-funflow`
   --   which is the case in the CI
-  testDir <- ioFlow (\() -> return . flip (</>) [reldir|./funflow/test/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
+  testDir <- ioFlow (\() -> return . flip (</>) [reldir|./test/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
   -- The actual test
   item <- putDir -< testDir
   path <- getDir -< item
@@ -77,9 +77,9 @@ someStoreFlow = proc () -> do
 
 someDockerFlow :: Flow () CS.Item
 someDockerFlow = proc () -> do
-  dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+  dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
 
 someDockerFlowWithInputs :: Flow () CS.Item
 someDockerFlowWithInputs = proc () -> do
-  item <- dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
-  dockerFlow (DockerTaskConfig {DE.image = "python", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerTaskInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}
+  item <- dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+  dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerTaskInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}

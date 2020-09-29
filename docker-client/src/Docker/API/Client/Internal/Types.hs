@@ -1,9 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Docker.API.Client.Internal.Types where
 
 import Control.Monad.Except
 import qualified Data.Text as T
+import GHC.Generics (Generic)
 
 -- | Alias for the system type returned by System.Info.os
 newtype OS = OS String
@@ -22,7 +24,7 @@ data DockerClientError
     GetContainerLogsError String
   | -- | The docker engine API responded with an error when we attempted to pull an image
     ImagePullError String
-  deriving (Show)
+  deriving (Show, Generic)
 
 -- | Wrapper for composing operations which return an Either DockerClientError a
 type ClientErrorMonad a = ExceptT DockerClientError IO a
@@ -44,6 +46,7 @@ data ContainerSpec = ContainerSpec
     -- the format specied here: https://docs.docker.com/storage/bind-mounts/
     hostVolumes :: [T.Text]
   }
+  deriving (Show, Generic)
 
 -- | Constructs a simple default ContainerSpec for a docker image which uses the image's default
 -- values for all other aguments.
