@@ -1,0 +1,215 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">System.Directory.Funflow</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.Directory.Funflow.html#moveDirectoryContent"><span class="hs-identifier">moveDirectoryContent</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">filterM</span></span><span class="hs-special">)</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">catMaybes</span></span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">Path</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">Abs</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">Dir</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">Path</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">dirname</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">filename</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">parseRelDir</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">parseRelFile</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier">toFilePath</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-operator">(&lt;/&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Directory</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">doesDirectoryExist</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">doesFileExist</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">listDirectory</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">renamePath</span></span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- | Move all the directories and files from a source directory to a target directory</span><span>
+</span><span id="line-11"></span><span class="annot"><a href="System.Directory.Funflow.html#moveDirectoryContent"><span class="hs-identifier hs-type">moveDirectoryContent</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Path</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Abs</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-type">Dir</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span id="moveDirectoryContent"><span class="annot"><span class="annottext">moveDirectoryContent :: Path Abs Dir -&gt; Path Abs Dir -&gt; IO ()
+</span><a href="System.Directory.Funflow.html#moveDirectoryContent"><span class="hs-identifier hs-var hs-var">moveDirectoryContent</span></a></span></span><span> </span><span id="local-6989586621679241931"><span class="annot"><span class="annottext">sourceDirectory :: Path Abs Dir
+</span><a href="#local-6989586621679241931"><span class="hs-identifier hs-var">sourceDirectory</span></a></span></span><span> </span><span id="local-6989586621679241930"><span class="annot"><span class="annottext">targetDirectory :: Path Abs Dir
+</span><a href="#local-6989586621679241930"><span class="hs-identifier hs-var">targetDirectory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-keyword">do</span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-comment">-- List of directories inside</span><span>
+</span><span id="line-15"></span><span>    </span><span id="local-6989586621679241929"><span class="annot"><span class="annottext">[Path Abs Dir]
+</span><a href="#local-6989586621679241929"><span class="hs-identifier hs-var">dirPaths</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-16"></span><span>      </span><span class="hs-comment">-- Get the list of children elements of @directory@</span><span>
+</span><span id="line-17"></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; IO [FilePath]
+</span><span class="hs-identifier hs-var">listDirectory</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO [FilePath]) -&gt; FilePath -&gt; IO [FilePath]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241931"><span class="hs-identifier hs-var">sourceDirectory</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>        </span><span class="annot"><span class="annottext">IO [FilePath]
+-&gt; ([FilePath] -&gt; IO [Path Rel Dir]) -&gt; IO [Path Rel Dir]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-19"></span><span>        </span><span class="hs-comment">-- Tries to parse the elements given by @listDirectory@ to relative directory paths</span><span>
+</span><span id="line-20"></span><span>        </span><span class="hs-comment">-- and keep only successful entries</span><span>
+</span><span id="line-21"></span><span>        </span><span class="annot"><span class="annottext">[Path Rel Dir] -&gt; IO [Path Rel Dir]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">([Path Rel Dir] -&gt; IO [Path Rel Dir])
+-&gt; ([FilePath] -&gt; [Path Rel Dir])
+-&gt; [FilePath]
+-&gt; IO [Path Rel Dir]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Maybe (Path Rel Dir)] -&gt; [Path Rel Dir]
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span> </span><span class="annot"><span class="annottext">([Maybe (Path Rel Dir)] -&gt; [Path Rel Dir])
+-&gt; ([FilePath] -&gt; [Maybe (Path Rel Dir)])
+-&gt; [FilePath]
+-&gt; [Path Rel Dir]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Maybe (Path Rel Dir))
+-&gt; [FilePath] -&gt; [Maybe (Path Rel Dir)]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Maybe (Path Rel Dir)
+forall (m :: * -&gt; *). MonadThrow m =&gt; FilePath -&gt; m (Path Rel Dir)
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">parseRelDir</span></a></span><span>
+</span><span id="line-22"></span><span>        </span><span class="annot"><span class="annottext">IO [Path Rel Dir]
+-&gt; ([Path Rel Dir] -&gt; IO [Path Abs Dir]) -&gt; IO [Path Abs Dir]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-23"></span><span>        </span><span class="hs-comment">-- turn into absolute paths</span><span>
+</span><span id="line-24"></span><span>        </span><span class="annot"><span class="annottext">[Path Abs Dir] -&gt; IO [Path Abs Dir]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">([Path Abs Dir] -&gt; IO [Path Abs Dir])
+-&gt; ([Path Rel Dir] -&gt; [Path Abs Dir])
+-&gt; [Path Rel Dir]
+-&gt; IO [Path Abs Dir]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Path Rel Dir -&gt; Path Abs Dir) -&gt; [Path Rel Dir] -&gt; [Path Abs Dir]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241931"><span class="hs-identifier hs-var">sourceDirectory</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; Path Rel Dir -&gt; Path Abs Dir
+forall b t. Path b Dir -&gt; Path Rel t -&gt; Path b t
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>        </span><span class="annot"><span class="annottext">IO [Path Abs Dir]
+-&gt; ([Path Abs Dir] -&gt; IO [Path Abs Dir]) -&gt; IO [Path Abs Dir]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-26"></span><span>        </span><span class="hs-comment">-- keep only directories that exists</span><span>
+</span><span id="line-27"></span><span>        </span><span class="hs-comment">-- this also ensures that this list comprises directories only, see doc of @doesDirectoryExist@</span><span>
+</span><span id="line-28"></span><span>        </span><span class="annot"><span class="annottext">(Path Abs Dir -&gt; IO Bool) -&gt; [Path Abs Dir] -&gt; IO [Path Abs Dir]
+forall (m :: * -&gt; *) a.
+Applicative m =&gt;
+(a -&gt; m Bool) -&gt; [a] -&gt; m [a]
+</span><span class="hs-identifier hs-var">filterM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; IO Bool
+</span><span class="hs-identifier hs-var">doesDirectoryExist</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO Bool)
+-&gt; (Path Abs Dir -&gt; FilePath) -&gt; Path Abs Dir -&gt; IO Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-comment">-- List of files inside</span><span>
+</span><span id="line-31"></span><span>    </span><span id="local-6989586621679241927"><span class="annot"><span class="annottext">[Path Abs File]
+</span><a href="#local-6989586621679241927"><span class="hs-identifier hs-var">filePaths</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-32"></span><span>      </span><span class="hs-comment">-- Get the list of children elements of @sourceDirectory@</span><span>
+</span><span id="line-33"></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; IO [FilePath]
+</span><span class="hs-identifier hs-var">listDirectory</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO [FilePath]) -&gt; FilePath -&gt; IO [FilePath]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241931"><span class="hs-identifier hs-var">sourceDirectory</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>        </span><span class="annot"><span class="annottext">IO [FilePath]
+-&gt; ([FilePath] -&gt; IO [Path Rel File]) -&gt; IO [Path Rel File]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-comment">-- Tries to parse the elements given by @listDirectory@ to relative directory paths</span><span>
+</span><span id="line-36"></span><span>        </span><span class="hs-comment">-- and keep only successful entries</span><span>
+</span><span id="line-37"></span><span>        </span><span class="annot"><span class="annottext">[Path Rel File] -&gt; IO [Path Rel File]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">([Path Rel File] -&gt; IO [Path Rel File])
+-&gt; ([FilePath] -&gt; [Path Rel File])
+-&gt; [FilePath]
+-&gt; IO [Path Rel File]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Maybe (Path Rel File)] -&gt; [Path Rel File]
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span> </span><span class="annot"><span class="annottext">([Maybe (Path Rel File)] -&gt; [Path Rel File])
+-&gt; ([FilePath] -&gt; [Maybe (Path Rel File)])
+-&gt; [FilePath]
+-&gt; [Path Rel File]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Maybe (Path Rel File))
+-&gt; [FilePath] -&gt; [Maybe (Path Rel File)]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Maybe (Path Rel File)
+forall (m :: * -&gt; *). MonadThrow m =&gt; FilePath -&gt; m (Path Rel File)
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">parseRelFile</span></a></span><span>
+</span><span id="line-38"></span><span>        </span><span class="annot"><span class="annottext">IO [Path Rel File]
+-&gt; ([Path Rel File] -&gt; IO [Path Abs File]) -&gt; IO [Path Abs File]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-39"></span><span>        </span><span class="hs-comment">-- turn into absolute paths</span><span>
+</span><span id="line-40"></span><span>        </span><span class="annot"><span class="annottext">[Path Abs File] -&gt; IO [Path Abs File]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">([Path Abs File] -&gt; IO [Path Abs File])
+-&gt; ([Path Rel File] -&gt; [Path Abs File])
+-&gt; [Path Rel File]
+-&gt; IO [Path Abs File]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Path Rel File -&gt; Path Abs File)
+-&gt; [Path Rel File] -&gt; [Path Abs File]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241931"><span class="hs-identifier hs-var">sourceDirectory</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; Path Rel File -&gt; Path Abs File
+forall b t. Path b Dir -&gt; Path Rel t -&gt; Path b t
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>        </span><span class="annot"><span class="annottext">IO [Path Abs File]
+-&gt; ([Path Abs File] -&gt; IO [Path Abs File]) -&gt; IO [Path Abs File]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-42"></span><span>        </span><span class="hs-comment">-- keep only directories that exists</span><span>
+</span><span id="line-43"></span><span>        </span><span class="hs-comment">-- this also ensures that this list comprises files only, see doc of @doesFileExist@</span><span>
+</span><span id="line-44"></span><span>        </span><span class="annot"><span class="annottext">(Path Abs File -&gt; IO Bool) -&gt; [Path Abs File] -&gt; IO [Path Abs File]
+forall (m :: * -&gt; *) a.
+Applicative m =&gt;
+(a -&gt; m Bool) -&gt; [a] -&gt; m [a]
+</span><span class="hs-identifier hs-var">filterM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; IO Bool
+</span><span class="hs-identifier hs-var">doesFileExist</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO Bool)
+-&gt; (Path Abs File -&gt; FilePath) -&gt; Path Abs File -&gt; IO Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Path Abs File -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-comment">-- Move directories and files</span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><span class="annottext">((FilePath, FilePath) -&gt; IO ()) -&gt; [(FilePath, FilePath)] -&gt; IO ()
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Foldable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m ()
+</span><span class="hs-identifier hs-var">mapM_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(FilePath -&gt; FilePath -&gt; IO ()) -&gt; (FilePath, FilePath) -&gt; IO ()
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">renamePath</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs Dir -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241924"><span class="hs-identifier hs-var">dirPath</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">(Path Abs Dir -&gt; FilePath) -&gt; Path Abs Dir -&gt; FilePath
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241930"><span class="hs-identifier hs-var">targetDirectory</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; Path Rel Dir -&gt; Path Abs Dir
+forall b t. Path b Dir -&gt; Path Rel t -&gt; Path b t
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; Path Rel Dir
+forall b. Path b Dir -&gt; Path Rel Dir
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">dirname</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241924"><span class="hs-identifier hs-var">dirPath</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679241924"><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241924"><span class="hs-identifier hs-var">dirPath</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Path Abs Dir]
+</span><a href="#local-6989586621679241929"><span class="hs-identifier hs-var">dirPaths</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><span class="annottext">((FilePath, FilePath) -&gt; IO ()) -&gt; [(FilePath, FilePath)] -&gt; IO ()
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Foldable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m ()
+</span><span class="hs-identifier hs-var">mapM_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(FilePath -&gt; FilePath -&gt; IO ()) -&gt; (FilePath, FilePath) -&gt; IO ()
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">renamePath</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Path Abs File -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs File
+</span><a href="#local-6989586621679241923"><span class="hs-identifier hs-var">filePath</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Path Abs File -&gt; FilePath
+forall b t. Path b t -&gt; FilePath
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">toFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">(Path Abs File -&gt; FilePath) -&gt; Path Abs File -&gt; FilePath
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir
+</span><a href="#local-6989586621679241930"><span class="hs-identifier hs-var">targetDirectory</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs Dir -&gt; Path Rel File -&gt; Path Abs File
+forall b t. Path b Dir -&gt; Path Rel t -&gt; Path b t
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs File -&gt; Path Rel File
+forall b. Path b File -&gt; Path Rel File
+</span><a href="../file:///nix/store/kw76r49hxg3500k9rzqvp9r3la2srkcy-path-lib-path-0.7.1-haddock-doc/share/doc/path/html/src"><span class="hs-identifier hs-var">filename</span></a></span><span> </span><span class="annot"><span class="annottext">Path Abs File
+</span><a href="#local-6989586621679241923"><span class="hs-identifier hs-var">filePath</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679241923"><span class="annot"><span class="annottext">Path Abs File
+</span><a href="#local-6989586621679241923"><span class="hs-identifier hs-var">filePath</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Path Abs File]
+</span><a href="#local-6989586621679241927"><span class="hs-identifier hs-var">filePaths</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-comment">-- Finish</span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></pre></body></html>

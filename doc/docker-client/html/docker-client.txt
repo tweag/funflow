@@ -141,6 +141,9 @@ data DockerStreamType
 DockerStreamStdIn :: DockerStreamType
 DockerStreamStdOut :: DockerStreamType
 DockerStreamStdErr :: DockerStreamType
+instance GHC.Generics.Generic Docker.API.Client.Internal.Types.ContainerSpec
+instance GHC.Show.Show Docker.API.Client.Internal.Types.ContainerSpec
+instance GHC.Generics.Generic Docker.API.Client.Internal.Types.DockerClientError
 instance GHC.Show.Show Docker.API.Client.Internal.Types.DockerClientError
 
 
@@ -214,12 +217,19 @@ dockerAPIVersion :: String
 -- | Helper function which formats the response of a failed HTTP request
 formatRequestError :: Status -> ByteString -> String
 
--- | Analagous to the `docker run` command. Runs a container using the
---   input HTTP connection manager and waits until it exits. For more
---   complex use cases you can also use the individual actions that
---   comprise this function. Note that this currently always tries to pull
+-- | Similar to the `docker run` command. Runs a container in the
+--   background using the input HTTP connection manager, returning
+--   immediately. To wait for the container to exit use
+--   <a>awaitContainer</a>. Note that this currently always tries to pull
 --   the container's image.
 runContainer :: Manager -> ContainerSpec -> ClientErrorMonad ContainerId
+
+-- | Waits on a started container (e.g. via <a>runContainer</a>) until it
+--   exits, validating its exit code and returning an
+--   <a>DockerClientError</a> if the container exited with an error. This
+--   will work for both actively running containers and those which have
+--   already exited.
+awaitContainer :: Manager -> ContainerId -> ClientErrorMonad ()
 
 -- | Analagous to the `docker cp` command. Recursively copies contents at
 --   the specified path in the container to the provided output path on the
@@ -341,10 +351,10 @@ ContainerSpec :: Text -> [Text] -> Text -> Text -> [Text] -> [Text] -> Container
 --   uses the image's default values for all other aguments.
 defaultContainerSpec :: Text -> ContainerSpec
 
--- | Analagous to the `docker run` command. Runs a container using the
---   input HTTP connection manager and waits until it exits. For more
---   complex use cases you can also use the individual actions that
---   comprise this function. Note that this currently always tries to pull
+-- | Similar to the `docker run` command. Runs a container in the
+--   background using the input HTTP connection manager, returning
+--   immediately. To wait for the container to exit use
+--   <a>awaitContainer</a>. Note that this currently always tries to pull
 --   the container's image.
 runContainer :: Manager -> ContainerSpec -> ClientErrorMonad ContainerId
 
@@ -375,3 +385,10 @@ Both :: ContainerLogType
 --   command). This currently only supports public registries (e.g.
 --   DockerHub).
 pullImage :: Manager -> Text -> ClientErrorMonad ()
+
+-- | Waits on a started container (e.g. via <a>runContainer</a>) until it
+--   exits, validating its exit code and returning an
+--   <a>DockerClientError</a> if the container exited with an error. This
+--   will work for both actively running containers and those which have
+--   already exited.
+awaitContainer :: Manager -> ContainerId -> ClientErrorMonad ()
