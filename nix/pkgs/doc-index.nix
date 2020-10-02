@@ -28,10 +28,10 @@ let
     ## Contents
 
     1. Tutorials
-        1. [Getting Started](./tutorial/quick-reference.html)
-        2. [WordCount](./tutorial/tutorial1.html)
-        3. [Quick Reference](./tutorial/quick-reference.html)
-        4. [Advanced Tutorial](./tutorial/tutorial2.html)
+        1. [Getting Started](./tutorial/Tutorial1.html)
+        2. [WordCount](./tutorial/WordCount.html)
+        3. [Quick Reference](./tutorial/QuickReference.html)
+        4. [Advanced Tutorial](./tutorial/Tutorial2.html)
 
     2. [API Docs](./doc/index.html)
   '';

@@ -1,23 +1,32 @@
 # Wrapper script for calling tutorial executables and bundling their html outputs
 { runCommand
-, funflow-tutorial
+, funflow-tutorial-jupyter
 }:
 runCommand "generate-funflow-tutorial"
 {
   src = ../../funflow-tutorial;
-  buildInputs = [
-    funflow-tutorial.quick-reference
-    funflow-tutorial.tutorial1
-    funflow-tutorial.tutorial2
-    funflow-tutorial.wordcount
-  ];
-  # wordcount reads a "words.txt" file from the working directory
-  # Here, we take the example included with funflow-tutorial
-} ''
+  buildInputs = funflow-tutorial-jupyter.env.buildInputs;
+} (funflow-tutorial-jupyter.env.shellHook +
+  ''
+  set -e
+  export HOME=$TMP/tutorial-jupyter
+  mkdir $HOME
   mkdir -p $out/share/tutorial
-  cp $src/words.txt .
-  quick-reference > $out/share/tutorial/quick-reference.html
-  tutorial1 > $out/share/tutorial/tutorial1.html
-  tutorial2 > $out/share/tutorial/tutorial2.html
-  wordcount > $out/share/tutorial/wordcount.html
+  
+  # Run each notebook and grab its html output.
+  
+  # NOTE: This assumes that all notebooks are intended to be executed using the ihaskell kernel
+
+  # Notebooks in the base directory
+  for notebook in $src/notebooks/*.ipynb; do
+    echo "$notebook"
+    jupyter-nbconvert --ExecutePreprocessor.kernel_name='ihaskell_haskell'  --execute $notebook --output-dir "$out/share/tutorial"
+  done
+
+  # Notebooks in their own subdirectory
+  for notebook in $src/notebooks/**/*.ipynb; do
+    echo "$notebook"
+    jupyter-nbconvert --ExecutePreprocessor.kernel_name='ihaskell_haskell'  --execute $notebook --output-dir "$out/share/tutorial"
+  done
 ''
+)
