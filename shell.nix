@@ -29,9 +29,9 @@ pkgs.mkShell {
     ++
     (
       haskell {
-        inherit ghcide haskellLanguageServer;
-        ghcideVersionSelector = ghcidePkgs: ghcidePkgs.ghcide-ghc883;
-        haskellLanguageServerGhcVersion = "ghc883";
+        inherit haskellLanguageServer;
+        haskellLanguageServerGhcVersion = "ghc884";
+        ghcide = false; 
       }
     )
     # Python dev environment with packages
