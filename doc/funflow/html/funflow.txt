@@ -11,6 +11,7 @@
 module Funflow.Run.Orphans
 instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Docker.API.Client.Internal.Types.ContainerSpec
 instance Data.CAS.ContentHashable.ContentHashable GHC.Types.IO Docker.API.Client.Internal.Types.DockerClientError
+instance GHC.Exception.Type.Exception Docker.API.Client.Internal.Types.DockerClientError
 
 
 -- | Run commands using Docker
@@ -89,13 +90,30 @@ type RequiredStrands = '[ '("simple", SimpleTask), '("store", StoreTask), '("doc
 
 -- | The class constraints on the "core task". The "core task" is the task
 --   used to run any kind of "binary task" ("strand")
-type RequiredCoreTasks m = '[Arrow, ArrowChoice, HasKleisli m, ProvidesCaching]
+type RequiredCoreTasks m = '[Arrow, ArrowChoice, ThrowEffect SomeException, TryEffect SomeException, ThrowEffect StringException, TryEffect StringException, ThrowEffect DockerClientError, TryEffect DockerClientError, HasKleisli m, ProvidesCaching]
 toFlow :: IsFlow binEff => binEff i o -> Flow i o
+
+-- | Make a flow from a pure function
 pureFlow :: (i -> o) -> Flow i o
+
+-- | Make a flow from an IO monad
 ioFlow :: (i -> IO o) -> Flow i o
+
+-- | Make a flow from the configuration of a Docker task
 dockerFlow :: DockerTaskConfig -> Flow DockerTaskInput Item
-putDir :: Flow (Path Abs Dir) Item
-getDir :: Flow Item (Path Abs Dir)
+
+-- | Make a flow to put a directory into the content store
+putDirFlow :: Flow (Path Abs Dir) Item
+
+-- | Make a flow to get the absolute path of the directory storing the data
+--   of an item in the content store
+getDirFlow :: Flow Item (Path Abs Dir)
+
+-- | Make a flow that throws an exception with a message
+throwStringFlow :: Flow String ()
+
+-- | Return a result at the end of a flow
+returnFlow :: Flow a a
 instance Funflow.Flow.IsFlow Funflow.Tasks.Simple.SimpleTask
 instance Funflow.Flow.IsFlow Funflow.Tasks.Docker.DockerTask
 instance Funflow.Flow.IsFlow Funflow.Tasks.Store.StoreTask
@@ -132,3 +150,5 @@ module Funflow
 -- | Any rope whose core provides caching can run cached tasks. The task is
 --   identified by an explicit identifier
 caching :: forall (core :: Type -> Type -> Type) ident a b (r :: RopeRec) (mantle :: [Strand]). (Arrow core, ProvidesCaching core, ContentHashable IO ident, ContentHashable IO a, Store b) => ident -> Rope r mantle core a b -> Rope r mantle core a b
+tryE :: TryEffect ex eff => eff a b -> eff a (Either ex b)
+throwE :: ThrowEffect ex eff => eff (Either ex b) b
