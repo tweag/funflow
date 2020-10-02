@@ -21,6 +21,7 @@ module Funflow.Run
 where
 
 import Control.Arrow (Arrow, arr)
+import Control.Exception.Safe (throw, throwString)
 import Control.Kernmantle.Caching (localStoreWithId)
 import Control.Kernmantle.Rope
   ( HasKleisliIO,
@@ -52,6 +53,7 @@ import Funflow.Tasks.Docker
 import qualified Funflow.Tasks.Docker as DE
 import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
 import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
+import GHC.Stack (HasCallStack)
 import Path (Abs, Dir, Path, absdir, parseRelDir, toFilePath, (</>))
 import Path.IO (copyDirRecur)
 import System.Directory (removeDirectory)
@@ -122,7 +124,7 @@ interpretStoreTask store storeTask = case storeTask of
           -- this will give a hash through `ContentHashable` that takes into account the content of the directory
           directoryContent = DirectoryContent dirPath
           -- Handle errors
-          handleError hash = error $ "Could not put directory " <> show dirPath <> " in store item " <> show hash
+          handleError hash = throwString $ "Could not put directory " <> show dirPath <> " in store item " <> show hash
           -- Copy recursively a directory from a DirectoryContent type
           copy :: Path Abs Dir -> DirectoryContent -> IO ()
           copy destinationPath (DirectoryContent sourcePath) = copyDirRecur sourcePath destinationPath
@@ -135,7 +137,7 @@ interpretStoreTask store storeTask = case storeTask of
 -- ** @DockerTask@ interpreter
 
 -- | Interpret docker task
-interpretDockerTask :: (Arrow a, HasKleisliIO m a) => CS.ContentStore -> DockerTask i o -> a i o
+interpretDockerTask :: (Arrow a, HasKleisliIO m a, HasCallStack) => CS.ContentStore -> DockerTask i o -> a i o
 interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, DE.args})) =
   liftKleisliIO $ \(DockerTaskInput {DE.inputBindings, DE.argsVals}) ->
     -- Check args placeholder fullfillment, right is value, left is unfullfilled label
@@ -154,8 +156,7 @@ interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, D
         if any isLeft argsFilled
           then
             let unfullfilledLabels = [label | (Left label) <- argsFilled]
-             in -- TODO gracefully exit
-                error $ "Missing arguments with labels: " ++ show unfullfilledLabels
+             in throwString $ "Docker task failed with error: missing arguments with labels: " ++ show unfullfilledLabels
           else do
             let argsFilledChecked = [argVal | (Right argVal) <- argsFilled]
             manager <- newDefaultDockerManager (OS os)
@@ -178,14 +179,14 @@ interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, D
               return containerId
             -- Process the result of the docker computation
             case runDockerResult of
-              Left err -> error $ show err
+              Left ex -> throw ex
               Right containerId ->
                 let -- Define behaviors to pass to @CS.putInStore@
-                    handleError hash = error $ "Could not put in store item " ++ show hash
+                    handleError hash = throwString $ "Could not put in store item " ++ show hash
                     copyDockerContainer itemPath _ = do
                       copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath (toFilePath itemPath) containerId
                       case copyResult of
-                        Left ex -> error $ show ex
+                        Left ex -> throw ex
                         Right _ -> do
                           -- Since docker will extract a TAR file of the container content, it creates a directory named after the requested directory's name
                           -- In order to improve the user experience, funflow moves the content of said directory to the level of the CAS item directory

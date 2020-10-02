@@ -6,17 +6,20 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
+import Control.Exception.Safe (SomeException)
 import qualified Data.CAS.ContentStore as CS
+import Docker.API.Client (DockerClientError (ContainerCreationFailedError))
 import Funflow
   ( Flow,
     RunFlowConfig (..),
     caching,
     dockerFlow,
-    getDir,
+    getDirFlow,
     ioFlow,
     pureFlow,
-    putDir,
+    putDirFlow,
     runFlowWithConfig,
+    tryE,
   )
 import Funflow.Tasks.Docker (DockerTaskConfig (DockerTaskConfig), DockerTaskInput (DockerTaskInput), VolumeBinding (VolumeBinding))
 import qualified Funflow.Tasks.Docker as DE
@@ -38,6 +41,8 @@ main = do
   testFlow @() @CS.Item "a flow running a task in docker" someDockerFlow ()
   putStr "\n---------------------\n"
   testFlow @() @CS.Item "a flow running a task in docker, using the output of one as input of another" someDockerFlowWithInputs ()
+  putStr "\n---------------------\n"
+  testFlow @() @() "a flow running a task in docker which fails, but error is caught by the pipeline" someDockerFlowThatFails ()
   putStr "\n------  DONE   ------\n"
 
 testFlow :: forall i o. (Show i, Show o) => String -> Flow i o -> i -> IO ()
@@ -71,8 +76,8 @@ someStoreFlow = proc () -> do
   --   which is the case in the CI
   testDir <- ioFlow (\() -> return . flip (</>) [reldir|./test/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
   -- The actual test
-  item <- putDir -< testDir
-  path <- getDir -< item
+  item <- putDirFlow -< testDir
+  path <- getDirFlow -< item
   ioFlow $ (\(item, itemDirPath) -> putStrLn $ "Copied directory to item " <> show item <> " with path " <> show itemDirPath) -< (item, path)
 
 someDockerFlow :: Flow () CS.Item
@@ -83,3 +88,18 @@ someDockerFlowWithInputs :: Flow () CS.Item
 someDockerFlowWithInputs = proc () -> do
   item <- dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", "with open('test.py', 'w') as f: f.write('print(\\'Hello world\\')')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
   dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["/script/test.py"]}) -< DockerTaskInput {DE.inputBindings = [VolumeBinding {DE.item = item, DE.mount = [absdir|/script/|]}], DE.argsVals = mempty}
+
+someDockerFlowThatFails :: Flow () ()
+someDockerFlowThatFails =
+  let someFailingDockerFlow = dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "badCommand", DE.args = []})
+      -- A helper function for the test
+      isContainerCreationFailedError (ContainerCreationFailedError _) = True
+      isContainerCreationFailedError _ = False
+   in proc () -> do
+        result <- tryE @DockerClientError someFailingDockerFlow -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+        case result of
+          Left ex ->
+            if isContainerCreationFailedError ex
+              then ioFlow (\ex -> putStrLn $ "Exception caught: " ++ show ex) -< ex
+              else ioFlow $ const $ error "Wrong exception caught!" -< ()
+          Right _ -> ioFlow $ const $ error "Exception not caught!" -< ()
