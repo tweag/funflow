@@ -110,7 +110,9 @@ saveContainerArchive manager uid gid itemPath outPath cid = do
 pullImage ::
   -- | The connection manager for the docker daemon
   Manager ->
-  -- | The image of interest. May include an optional tag or digest field.
+  -- | The image of interest. May include an optional tag or digest field. Note that
+  -- in line with the Docker Engine API, this will pull **ALL** images in a repo if no tag
+  -- or digest is specified.
   T.Text ->
   ClientErrorMonad ()
 pullImage manager image = do

@@ -3,9 +3,11 @@
 import Control.Monad.Except (runExceptT)
 import Data.Either (isLeft, isRight)
 import Data.List
+import Data.Maybe
 import Data.Ord
 import qualified Data.Text as T
 import Docker.API.Client (ContainerLogType (..), ContainerSpec (..), OS (..), awaitContainer, defaultContainerSpec, newDefaultDockerManager, pullImage, removeContainer, runContainer, saveContainerArchive, saveContainerLogs)
+import Docker.API.Client.Images (tagImageIfMissing, updateImageDigest, updateImageName, updateImageTag)
 import GHC.IO.Handle (Handle)
 import Network.HTTP.Client (Manager)
 import System.Directory (doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory)
@@ -86,7 +88,7 @@ formatLineCountMessage actual expected = "Number of lines in output log file was
 dockerIntegrationTests :: IO Manager -> TestTree
 dockerIntegrationTests managerIO =
   testGroup
-    "Docker integration tests"
+    "docker integration tests"
     [ testCase "Pull a test image" $ do
         manager <- managerIO
         result <- runExceptT $ pullImage manager testImage
@@ -232,4 +234,21 @@ dockerIntegrationTests managerIO =
     ]
 
 unitTests :: TestTree
-unitTests = testGroup "Unit" []
+unitTests =
+  testGroup
+    "unit"
+    [ testCase "tagImageIfMissing - name only" $
+        tagImageIfMissing "python/python" @?= "python/python:latest",
+      testCase "tagImageIfMissing - with existing latest tag" $
+        tagImageIfMissing "python/python:latest" @?= "python/python:latest",
+      testCase "tagImageIfMissing - doesnt change other existing tags" $
+        tagImageIfMissing "python/python:3.7" @?= "python/python:3.7",
+      testCase "tagImageIfMissing - doesnt add if digest exists" $
+        tagImageIfMissing "python/python@sha256:12345" @?= "python/python@sha256:12345",
+      testCase "updateImageName" $
+        updateImageName "postgres@sha256:12345" "redis" @?= "redis@sha256:12345",
+      testCase "updateImageTag" $
+        updateImageTag "postgres:v1.0@sha256:12345" (Just "v2.0") @?= "postgres:v2.0@sha256:12345",
+      testCase "updateImageDigest" $
+        updateImageDigest "postgres:v1.0@sha256:12345" Nothing @?= "postgres:v1.0"
+    ]

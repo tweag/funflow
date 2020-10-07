@@ -6,6 +6,7 @@ module Docker.API.Client.Internal.Types where
 import Control.Monad.Except
 import qualified Data.Text as T
 import GHC.Generics (Generic)
+import Docker.API.Client.Images (tagImageIfMissing)
 
 -- | Alias for the system type returned by System.Info.os
 newtype OS = OS String
@@ -52,11 +53,12 @@ data ContainerSpec = ContainerSpec
 -- values for all other aguments.
 defaultContainerSpec ::
   -- | The container's Docker Image. May optionally include a tag or digest field (e.g. "python:3.6").
+  -- If neither a tag or digest is specified the image will default to the `latest` tag.
   T.Text ->
   ContainerSpec
 defaultContainerSpec img =
   ContainerSpec
-    { image = img,
+    { image = tagImageIfMissing img,
       cmd = [],
       user = "",
       workingDir = "",

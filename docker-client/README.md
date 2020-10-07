@@ -54,7 +54,11 @@ main = do
           { cmd = ["bash", "-c", "echo foo > /host/test.txt"],
             hostVolumes = ["/home/dorran/Desktop/test-bind:/host"]
           }
-  result <- runExceptT $ runContainer manager container
+  result <- runExceptT $ do 
+    containerId <- runContainer manager container
+    -- You can either start the container and let it run asynchronously, or 
+    -- wait for it to exit using awaitContainer:
+    awaitContainer manager containerId
   case result of
     Left err -> print err
     Right containerId -> print "Run succeeded! The container id was " ++ containerId
