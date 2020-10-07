@@ -25,15 +25,6 @@ in with pkgs; rec {
 
   # Documentation
   api-docs = haddock-combine { hspkgs = doc-libs; };
-  tutorial-docs = pkgs.generate-funflow-tutorials;
-
-  # Combined API Docs + Tutorials
-  # Note: the index links currently only work once you've deep copied the result's contents since
-  # the relative links will point to the index's store path and not the store path of the corresponding
-  # documents.
-  combined-docs = pkgs.symlinkJoin {
-    name = "funflow-combined-docs";
-    paths =
-      [ api-docs pkgs.generate-funflow-tutorials pkgs.generate-doc-index ];
-  };
+  doc-index = generate-doc-index;
+  inherit generate-funflow-tutorials;
 }

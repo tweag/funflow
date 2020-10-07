@@ -33,6 +33,8 @@ let
         3. [Error handling](./tutorial/error-handling.html)
         4. [Advanced Tutorial](./tutorial/tutorial2.html)
         5. [Hands-on: word count](./tutorial/wordcount.html)
+        5. [Hands-on: ML Pipeline with Docker and TensorFlow](./tutorial/TensorflowDocker.html)
+        
     2. [API Docs](./doc/index.html)
   '';
 in runCommand "generate-doc-index" {

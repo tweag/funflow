@@ -79,12 +79,12 @@
     { funflow-tutorial-jupyter = super.callPackage ./pkgs/jupyter.nix { }; }
   )
 
-  # Wrapper script for building tutorial html docs
+  # Script for building tutorial html docs
   (self: super:
-    { generate-funflow-tutorials = super.callPackage ./pkgs/tutorials.nix { }; }
+    { generate-funflow-tutorials = super.callPackage ./pkgs/tutorials.nix { nbconvert=self.python3Packages.nbconvert; }; }
   )
 
-  # Script for building documentation index.html page
+  # Documentation index.html page
   (self: super:
     { generate-doc-index = super.callPackage ./pkgs/doc-index.nix { }; }
   )

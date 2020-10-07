@@ -1,6 +1,7 @@
 {symlinkJoin,
 jupyterWith,
-projectHaskellPackages
+projectHaskellPackages,
+docker
 }:
 
 let 
@@ -10,6 +11,8 @@ tutorialHaskellDependencies = p: with p; [
     regex-posix
     text
     containers
+    JuicyPixels
+    ihaskell-juicypixels
 ];
 
 iHaskell = jupyterWith.kernels.iHaskellWith {
@@ -28,4 +31,5 @@ iHaskell = jupyterWith.kernels.iHaskellWith {
 
 in jupyterWith.jupyterlabWith {
     kernels = [ iHaskell ];
+    extraPackages = p: with p; [docker];
 }
