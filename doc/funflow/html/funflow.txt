@@ -76,13 +76,34 @@ data StoreTask i o
 [PutDir] :: StoreTask (Path Abs Dir) Item
 [GetDir] :: StoreTask Item (Path Abs Dir)
 
+module Funflow.Type.Family.List
+type Ø = '[]
+type (:<) = '(:)
+infixr 5 :<
+
+-- | Type-level singleton list.
+type Only a = '[a]
+type family Null (as :: [k]) :: Bool
+
+-- | Appends two type-level lists.
+type family (as :: [k]) ++ (bs :: [k]) :: [k]
+infixr 5 ++
+type family Concat (ls :: [[k]]) :: [k]
+
 module Funflow.Flow
 
 -- | Flow is the main type of Funflow. It is a task that takes an input
 --   value of type <tt>input</tt> and produces an output value of type
 --   <tt>output</tt>. It can use any named task (strand) that is defined in
 --   <tt>RequiredStrands</tt>.
-type Flow input output = forall m. (MonadIO m) => AnyRopeWith RequiredStrands (RequiredCoreTasks m) input output
+type Flow input output = ExtendedFlow '[] input output
+
+-- | Allows to add other strands on top of the existing strands used by
+--   funflow's <tt>Flow</tt> defined by <tt>RequiredStrands</tt>. Thoses
+--   additional strands should be weaved before passing the resulting loose
+--   rope to runFlow. See the advanced tutorial on extending funflow's
+--   <tt>Flow</tt>.
+type ExtendedFlow additionalStrands input output = forall m. (MonadIO m) => AnyRopeWith (additionalStrands ++ RequiredStrands) (RequiredCore m) input output
 
 -- | The constraints on the set of "strands" These will be "interpreted"
 --   into "core tasks" (which have contraints defined below).
@@ -90,7 +111,10 @@ type RequiredStrands = '[ '("simple", SimpleTask), '("store", StoreTask), '("doc
 
 -- | The class constraints on the "core task". The "core task" is the task
 --   used to run any kind of "binary task" ("strand")
-type RequiredCoreTasks m = '[Arrow, ArrowChoice, ThrowEffect SomeException, TryEffect SomeException, ThrowEffect StringException, TryEffect StringException, ThrowEffect DockerClientError, TryEffect DockerClientError, HasKleisli m, ProvidesCaching]
+type RequiredCore m = '[Arrow, ArrowChoice, ThrowEffect SomeException, TryEffect SomeException, ThrowEffect StringException, TryEffect StringException, ThrowEffect DockerClientError, TryEffect DockerClientError, HasKleisli m, ProvidesCaching]
+
+-- | Allows to register on which strand a binary task should be
+class IsFlow binEff
 toFlow :: IsFlow binEff => binEff i o -> Flow i o
 
 -- | Make a flow from a pure function
@@ -129,10 +153,10 @@ moveDirectoryContent :: Path Abs Dir -> Path Abs Dir -> IO ()
 module Funflow.Run
 
 -- | Run a flow with the default configuration
-runFlow :: Flow input output -> input -> IO output
+runFlow :: LooseRopeWith RequiredStrands (RequiredCore IO) input output -> input -> IO output
 
 -- | Run a flow
-runFlowWithConfig :: RunFlowConfig -> Flow input output -> input -> IO output
+runFlowWithConfig :: RunFlowConfig -> LooseRopeWith RequiredStrands (RequiredCore IO) input output -> input -> IO output
 
 -- | Flow execution configuration
 data RunFlowConfig

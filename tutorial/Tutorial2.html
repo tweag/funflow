@@ -13077,17 +13077,447 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="Developer-Guide-[WIP]">Developer Guide [WIP]<a class="anchor-link" href="#Developer-Guide-[WIP]">&#182;</a></h1><p>This tutorial aims to help prospective funflow developers get started with creating new tasks and functions 
-for executing those tasks (i.e. interpreters).</p>
-<h2 id="Defining-Tasks">Defining Tasks<a class="anchor-link" href="#Defining-Tasks">&#182;</a></h2><p>Tasks are defined in <code>Funflow.Tasks</code> and are simply just datatypes. For Tasks to be incorporated into a <code>Flow</code> DAG, they must specify an
-instance <code>IsFlow</code> for your new <code>Task</code> datatype. See <code>Funflow.Flow</code> for examples.</p>
-<p>TODO - Go into more detail and describe why <code>strand</code> is used in IsFlow</p>
-<h2 id="Compile,-Load,-and-Execution-Time">Compile, Load, and Execution Time<a class="anchor-link" href="#Compile,-Load,-and-Execution-Time">&#182;</a></h2><p>TODO</p>
-<h2 id="Tasks,-Effects-and-Interpretation">Tasks, Effects and Interpretation<a class="anchor-link" href="#Tasks,-Effects-and-Interpretation">&#182;</a></h2><p>TODO</p>
-<p>Funflow <code>Tasks</code> describe a specific type of computation which is then <em>interpreted</em> at load time. Another way to put it is that 
-<code>Tasks</code> can be seen as <em>computational effects</em>. This means that we can separately specify <strong>how</strong> a Task description is transformed 
-into executable code. Since <code>Tasks</code> are tagged by what they do, the <code>Flow</code> type can assemble all effects or constrain them to specific
-subsets at load time which is useful to achieve highly reproducible workflows.</p>
+<h1 id="Developer's-Guide">Developer's Guide<a class="anchor-link" href="#Developer's-Guide">&#182;</a></h1><p><code>funflow</code> provides a collection of tasks to run most pipelines.
+However, its strength is to allow extending this collection.</p>
+<p>This tutorial aims to help prospective <code>funflow</code> developers get started with creating new tasks to be used by other <code>funflow</code> users.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="1.-Creating-your-own-task">1. Creating your own task<a class="anchor-link" href="#1.-Creating-your-own-task">&#182;</a></h2><p>In this tutorial, we will create a task called <code>CustomTask</code> by defining its type.</p>
+<p>We will define our own flow type, and write the necessary functions to be able to run it.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Defining-the-new-task">Defining the new task<a class="anchor-link" href="#Defining-the-new-task">&#182;</a></h3><p>To define a task for our users, we first have to define a type that represents the task.</p>
+<blockquote><p>A task is represented by a GADT datatype of kind <code>* -&gt; * -&gt; *</code>.</p>
+</blockquote>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[1]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Required language extensions</span>
+<span class="cm">{-# LANGUAGE GADTs, StandaloneDeriving #-}</span>
+
+<span class="c1">-- Define the representation of a custom task with some String and Int parameters</span>
+<span class="kr">data</span> <span class="kt">CustomTask</span> <span class="n">i</span> <span class="n">o</span> <span class="kr">where</span>
+    <span class="kt">CustomTask</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">CustomTask</span> <span class="kt">String</span> <span class="kt">String</span>
+
+<span class="c1">-- Necessary in order to display it</span>
+<span class="kr">deriving</span> <span class="kr">instance</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">i</span><span class="p">,</span> <span class="kt">Show</span> <span class="n">o</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Show</span> <span class="p">(</span><span class="kt">CustomTask</span> <span class="n">i</span> <span class="n">o</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Here, we create a type <code>SomeCustomTask</code> of type constructor <code>SomeCustomTask i o</code> and a value constructor <code>SomeCustomTask</code> of type <code>String -&gt; Int -&gt; SomeCustomTask String String</code>.</p>
+<p><code>String -&gt; Int -&gt; SomeCustomTask String String</code> means thatby providing a <code>String</code> and an <code>Int</code>, the function will give a task that take a <code>String</code> as input and produce a <code>String</code> as output.</p>
+<p>A new task can be created by using the value constructor:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- An example of instanciation</span>
+<span class="kt">CustomTask</span> <span class="s">&quot;someText&quot;</span> <span class="mi">42</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>CustomTask &#34;someText&#34; 42</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>However, a value created as such cannot be used by itself to define flows: it lacks all the "properties" of flows.</p>
+<p>For a task to be usable in a flow, we need some more work.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="From-a-task-to-a-flow">From a task to a flow<a class="anchor-link" href="#From-a-task-to-a-flow">&#182;</a></h3><p>The <code>Flow</code> type is restricted to the set of tasks defined by <code>RequiredStrands</code> in <code>Funflow.Flow</code>.</p>
+<p>In order to manipulate a flow that can run our custom task, we need to create our own new type using <code>ExtendedFlow</code> from <code>Funflow.Flow</code>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE DataKinds, RankNTypes #-}</span>
+<span class="kr">import</span> <span class="nn">Funflow.Flow</span> <span class="p">(</span><span class="kt">ExtendedFlow</span><span class="p">)</span>
+
+<span class="kr">type</span> <span class="kt">MyFlow</span> <span class="n">input</span> <span class="n">output</span> <span class="ow">=</span> <span class="kt">ExtendedFlow</span> <span class="kt">&#39;[ &#39;(&quot;custom&quot;, CustomTask) ]</span> <span class="n">input</span> <span class="n">output</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<blockquote><p>The list and tuple writing preceeded by an apostrophe <code>'[ ... ]</code> and <code>'( ... )</code> are type-level lists and tuples.</p>
+<p>Basically, we define a type-level list of type-level tuples <code>(label, task type)</code> that associate a string label to a task type definition.</p>
+<p>In <code>kernmantle</code>, such a tuple is called a <em>strand</em>.</p>
+</blockquote>
+<p>Now that we have our own type of flow that uses our custom task, we can define how a value of our custom task should be <em>stranded</em>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE OverloadedLabels #-}</span>
+<span class="kr">import</span> <span class="nn">Control.Kernmantle.Rope</span> <span class="p">(</span><span class="nf">strand</span><span class="p">)</span>
+
+<span class="nf">someCustomFlow</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">MyFlow</span> <span class="kt">String</span> <span class="kt">String</span>
+<span class="nf">someCustomFlow</span> <span class="n">x</span> <span class="n">y</span> <span class="ow">=</span> <span class="n">strand</span> <span class="o">#</span><span class="n">custom</span> <span class="p">(</span><span class="kt">CustomTask</span> <span class="n">x</span> <span class="n">y</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>This function is called a <em>smart constructor</em>.
+It facilitates the creation of a flow for a user without having to think about strands.</p>
+<p>The <code>#custom</code> value is a Haskell label, and must match the string label associated to our task type in the flow type definition (here <code>"custom"</code>).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[5]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">myFlow</span> <span class="ow">::</span> <span class="kt">MyFlow</span> <span class="kt">String</span> <span class="kt">String</span>
+<span class="nf">myFlow</span> <span class="ow">=</span> <span class="n">someCustomFlow</span> <span class="s">&quot;woop!&quot;</span> <span class="mi">7</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Interpret-a-task">Interpret a task<a class="anchor-link" href="#Interpret-a-task">&#182;</a></h3><p>The strenght of <code>funflow</code> comes from its ability from distinguishing the representation of computations (tasks) from the actual implementation that they provoke.</p>
+<p>We have defined a task, which is a representation of a computation.
+We now need to implement said computation.</p>
+<p>In order to do that, we write what is called an <em>interpreter function</em>.</p>
+<p>An interpreter function is executed before running the flow.
+It takes a value of the task type that matches a given <em>strand</em> (identified by its label) and consumes it, in order to produce the representation of an actual computation.</p>
+<p>In our case, we could define that our custom task <code>CustomTask n x</code> appends <code>n</code> times the string <code>x</code> to the input (which is a <code>String</code>).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="kr">import</span> <span class="nn">Control.Arrow</span> <span class="p">(</span><span class="kt">Arrow</span><span class="p">,</span> <span class="nf">arr</span><span class="p">)</span>
+
+<span class="c1">-- Helper function that repeats a string n times</span>
+<span class="nf">duplicate</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">String</span>
+<span class="nf">duplicate</span> <span class="n">s</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">concat</span> <span class="p">(</span><span class="n">replicate</span> <span class="n">n</span> <span class="n">s</span><span class="p">)</span>
+
+<span class="c1">-- Our interpreter</span>
+<span class="nf">interpretCustomTask</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">Arrow</span> <span class="n">a</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">CustomTask</span> <span class="n">i</span> <span class="n">o</span> <span class="ow">-&gt;</span> <span class="n">a</span> <span class="n">i</span> <span class="n">o</span>
+<span class="nf">interpretCustomTask</span> <span class="n">customTask</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">customTask</span> <span class="kr">of</span>
+    <span class="kt">CustomTask</span> <span class="n">s</span> <span class="n">n</span> <span class="ow">-&gt;</span> <span class="n">arr</span> <span class="p">(</span><span class="nf">\</span><span class="n">input</span> <span class="ow">-&gt;</span> <span class="n">input</span> <span class="o">++</span> <span class="n">duplicate</span> <span class="n">s</span> <span class="n">n</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>What happens here is:</p>
+<ol>
+<li>We get the <code>customTask</code> of our type <code>CustomTask</code>.</li>
+<li>We differentiate the possible values.
+Here there is only one value constructor, but GADTs can hold multiple value constructors.</li>
+<li>Since our function is pure, we can simply wrap it inside of an <code>Arrow</code> using <code>arr</code>.</li>
+</ol>
+<p><code>\input -&gt; input ++ duplicate s n</code> is the actual function that will be executed when running the pipeline.</p>
+<blockquote><p>In funflow, pure computation should be wrapped in a <code>Arrow</code> while IO operations should wrapped in a <code>Kleisli IO</code>.</p>
+<p>Wrapping in an <code>Arrow</code> is done by using <code>arr</code>, while wrapping in a <code>Kleisli IO</code> is done by using <code>liftKleisliIO</code>.</p>
+</blockquote>
+<p><code>funflow</code>'s interpreter functions are defined in the <code>Funflow.Run</code> module and can serve as examples.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Run-your-custom-flow">Run your custom flow<a class="anchor-link" href="#Run-your-custom-flow">&#182;</a></h3><p>Now that we have defined a way to run our task, we might as well run our pipeline!</p>
+<p>When using only <code>funflow</code>'s task, there is a convenient function <code>runFlow</code> defined in <code>Funflow.Run</code>.
+This function consumes a value of type <code>Flow</code>, which can be constituted of <code>funflow</code>'s tasks only.</p>
+<p>The most simple way is to convert our custom flow type to the <code>funflow</code>'s flow type in order to use this function.</p>
+<blockquote><p>In <code>kernmantle</code>, intepreting a task with a function is called <em>weaving</em> a strand.</p>
+<p>There are multiple function available to weave strands (<code>weave</code>, <code>weave'</code>, <code>weave''</code>, <code>weaveK</code>).
+Almost always, the one you should be using is <code>weave'</code>.</p>
+</blockquote>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="kr">import</span> <span class="nn">Control.Kernmantle.Rope</span> <span class="p">((</span><span class="o">&amp;</span><span class="p">),</span> <span class="nf">weave&#39;</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Funflow.Flow</span> <span class="p">(</span><span class="kt">Flow</span><span class="p">)</span>
+
+<span class="nf">weaveMyFlow</span> <span class="n">myFlow</span> <span class="ow">=</span> <span class="n">myFlow</span> <span class="o">&amp;</span> <span class="n">weave&#39;</span> <span class="o">#</span><span class="n">custom</span> <span class="n">interpretCustomTask</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<blockquote><p><code>kernmantle</code>'s <code>&amp;</code> operator allows to weave in chain multiple strands:</p>
+<div class="highlight"><pre><span></span><span class="nf">weaveMyFlow</span> <span class="n">myFlow</span> <span class="ow">=</span> <span class="n">myFlow</span> <span class="o">&amp;</span> <span class="n">weave&#39;</span> <span class="o">#</span><span class="n">custom1</span> <span class="n">interpretCustomTask1</span> <span class="o">&amp;</span> <span class="n">weave&#39;</span> <span class="o">#</span><span class="n">custom2</span> <span class="n">interpretCustomTask2</span>
+</pre></div>
+</blockquote>
+<p>Now, we can run the resulting flow:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE FlexibleContexts, ScopedTypeVariables #-}</span>
+<span class="kr">import</span> <span class="nn">Control.Kernmantle.Rope</span> <span class="p">(</span><span class="kt">LooseRopeWith</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Funflow.Flow</span> <span class="p">(</span><span class="kt">RequiredStrands</span><span class="p">,</span> <span class="kt">RequiredCore</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Funflow.Run</span> <span class="p">(</span><span class="nf">runFlow</span><span class="p">)</span>
+
+<span class="nf">runMyFlow</span> <span class="ow">::</span> <span class="kt">MyFlow</span> <span class="n">i</span> <span class="n">o</span> <span class="ow">-&gt;</span> <span class="n">i</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">o</span>
+<span class="nf">runMyFlow</span> <span class="n">myFlow</span> <span class="n">input</span> <span class="ow">=</span> <span class="n">runFlow</span> <span class="p">(</span><span class="n">weaveMyFlow</span> <span class="n">myFlow</span><span class="p">)</span> <span class="n">input</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+<div class="output_html rendered_html output_subarea ">
+<style>/* Styles used for the Hoogle display in the pager */
+.hoogle-doc {
+display: block;
+padding-bottom: 1.3em;
+padding-left: 0.4em;
+}
+.hoogle-code {
+display: block;
+font-family: monospace;
+white-space: pre;
+}
+.hoogle-text {
+display: block;
+}
+.hoogle-name {
+color: green;
+font-weight: bold;
+}
+.hoogle-head {
+font-weight: bold;
+}
+.hoogle-sub {
+display: block;
+margin-left: 0.4em;
+}
+.hoogle-package {
+font-weight: bold;
+font-style: italic;
+}
+.hoogle-module {
+font-weight: bold;
+}
+.hoogle-class {
+font-weight: bold;
+}
+.get-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+display: block;
+white-space: pre-wrap;
+}
+.show-type {
+color: green;
+font-weight: bold;
+font-family: monospace;
+margin-left: 1em;
+}
+.mono {
+font-family: monospace;
+display: block;
+}
+.err-msg {
+color: red;
+font-style: italic;
+font-family: monospace;
+white-space: pre;
+display: block;
+}
+#unshowable {
+color: red;
+font-weight: bold;
+}
+.err-msg.in.collapse {
+padding-top: 0.7em;
+}
+.highlight-code {
+white-space: pre;
+font-family: monospace;
+}
+.suggestion-warning { 
+font-weight: bold;
+color: rgb(200, 130, 0);
+}
+.suggestion-error { 
+font-weight: bold;
+color: red;
+}
+.suggestion-name {
+font-weight: bold;
+}
+</style><div class="suggestion-name" style="clear:both;">Eta reduce</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">runMyFlow myFlow input = runFlow (weaveMyFlow myFlow) input</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell">runMyFlow myFlow = runFlow (weaveMyFlow myFlow)</div></div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[9]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">runMyFlow</span> <span class="n">myFlow</span> <span class="s">&quot;Kangaroo goes &quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>&#34;Kangaroo goes woop!woop!woop!woop!woop!woop!woop!&#34;</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<blockquote><p>We have to specify the type of the result <code>IO String</code> because of some issues with type inference when using GADTs.</p>
+</blockquote>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Going-further">Going further<a class="anchor-link" href="#Going-further">&#182;</a></h2><p>See more about <code>kernmantle</code> here: <a href="https://github.com/tweag/kernmantle">https://github.com/tweag/kernmantle</a></p>
 
 </div>
 </div>
