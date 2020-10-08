@@ -32,6 +32,7 @@ import Control.Kernmantle.Rope
     untwine,
     weave',
     (&),
+    type (~>),
   )
 import Control.Monad.Except (runExceptT)
 import Data.CAS.ContentHashable (DirectoryContent (DirectoryContent))
@@ -39,9 +40,22 @@ import qualified Data.CAS.ContentStore as CS
 import qualified Data.CAS.RemoteCache as RC
 import Data.Either (isLeft)
 import qualified Data.Map.Lazy as Map
+import Data.Set (fromList)
+import Data.Profunctor.Trans (Writer, runWriter, writing)
 import Data.String (IsString (fromString))
 import qualified Data.Text as T
-import Docker.API.Client (ContainerSpec (cmd), OS (OS), awaitContainer, defaultContainerSpec, hostVolumes, newDefaultDockerManager, runContainer, saveContainerArchive, workingDir)
+import Docker.API.Client
+  ( ContainerSpec (cmd),
+    OS (OS),
+    awaitContainer,
+    defaultContainerSpec,
+    hostVolumes,
+    pullImage,
+    newDefaultDockerManager,
+    runContainer,
+    saveContainerArchive,
+    workingDir,
+  )
 import Funflow.Flow (RequiredCore, RequiredStrands)
 import Funflow.Run.Orphans ()
 import Funflow.Tasks.Docker
@@ -54,6 +68,7 @@ import Funflow.Tasks.Docker
 import qualified Funflow.Tasks.Docker as DE
 import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
 import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
+import Network.HTTP.Client (Manager)
 import GHC.Stack (HasCallStack)
 import Path (Abs, Dir, Path, absdir, parseRelDir, toFilePath, (</>))
 import Path.IO (copyDirRecur)
@@ -82,18 +97,47 @@ runFlowWithConfig config flow input =
       defaultCachingId = Just 1
    in -- Run with store to enable caching (with default path to store)
       CS.withStore storePath $ \store -> do
-        flow
-          -- Weave tasks
-          & weave' #docker (interpretDockerTask store)
-          & weave' #store (interpretStoreTask store)
-          & weave' #simple interpretSimpleTask
-          -- Strip of empty list of strands (after all weaves)
-          & untwine
-          -- Define the caching
-          -- The `Just n` is a number that is used to compute caching hashes, changing it will recompute all
-          & runReader (localStoreWithId store $ defaultCachingId)
-          -- Finally, run
-          & perform input
+        -- Start the manager required for docker
+        manager <- newDefaultDockerManager (OS os)
+
+        let -- Weave all strands
+            weavedPipeline =
+              flow
+                -- Weave tasks
+                & weave' #docker (interpretDockerTask manager store)
+                & weave' #store (interpretStoreTask store)
+                & weave' #simple interpretSimpleTask
+                -- Strip of empty list of strands (after all weaves)
+                & untwine
+
+            -- Collect the list of docker images that will be used from the (Cayley Writer [String]) layer
+            (dockerImages :: [T.Text], weavePipeline') = runWriter weavedPipeline
+
+            -- Run the reader layer for caching
+            -- The `Just n` is a number that is used to compute caching hashes, changing it will recompute all
+            core = runReader (localStoreWithId store $ defaultCachingId) weavePipeline'
+
+        -- Pull docker images if there's any
+        if length dockerImages > 0
+          then do
+            putStrLn "Found docker images, pulling..."
+            let -- Remove duplicates by converting to a list
+                dockerImagesSet = fromList dockerImages
+                -- How we pull the docker image
+                handleDockerImage image = do
+                  putStrLn $ "Pulling docker image: " ++ T.unpack image
+                  pullResult <- runExceptT $ pullImage manager image
+                  case pullResult of
+                    Left ex ->
+                      throw ex
+                    Right _ ->
+                      -- No error, just continue
+                      mempty :: IO ()
+            mapM_ handleDockerImage dockerImagesSet
+          else mempty
+
+        -- At last, run the core
+        perform input core
 
 -- | Run a flow with the default configuration
 runFlow ::
@@ -138,61 +182,67 @@ interpretStoreTask store storeTask = case storeTask of
 -- ** @DockerTask@ interpreter
 
 -- | Interpret docker task
-interpretDockerTask :: (Arrow a, HasKleisliIO m a, HasCallStack) => CS.ContentStore -> DockerTask i o -> a i o
-interpretDockerTask store (DockerTask (DockerTaskConfig {DE.image, DE.command, DE.args})) =
-  liftKleisliIO $ \(DockerTaskInput {DE.inputBindings, DE.argsVals}) ->
-    -- Check args placeholder fullfillment, right is value, left is unfullfilled label
-    let argsFilled =
-          [ ( case arg of
-                Arg value -> Right value
-                Placeholder label ->
-                  let maybeVal = Map.lookup label argsVals
-                   in case maybeVal of
-                        Nothing -> Left label
-                        Just val -> Right val
-            )
-            | arg <- args
-          ]
-     in -- Error if one of the required arg label is not filled
-        if any isLeft argsFilled
-          then
-            let unfullfilledLabels = [label | (Left label) <- argsFilled]
-             in throwString $ "Docker task failed with error: missing arguments with labels: " ++ show unfullfilledLabels
-          else do
-            let argsFilledChecked = [argVal | (Right argVal) <- argsFilled]
-            manager <- newDefaultDockerManager (OS os)
-            uid <- getEffectiveUserID
-            gid <- getEffectiveGroupID
-            let -- @defaultWorkingDirName@ has been chosen arbitrarly, it is both where Docker container will execute things, but also the exported folder to the content store
-                defaultWorkingDirName = "workdir"
-                defaultContainerWorkingDirPath = "/" ++ defaultWorkingDirName
-                container =
-                  (defaultContainerSpec image)
-                    { workingDir = T.pack defaultContainerWorkingDirPath,
-                      cmd = [command] <> argsFilledChecked,
-                      -- ":ro" suffix on docker binding means "read-only", the mounted volumes from the content store will not be modified
-                      hostVolumes = map fromString [(toFilePath $ CS.itemPath store item) <> ":" <> (toFilePath mount) <> ":ro" | VolumeBinding {DE.item, DE.mount} <- inputBindings]
-                    }
-            -- Run the docker container
-            runDockerResult <- runExceptT $ do
-              containerId <- runContainer manager container
-              awaitContainer manager containerId
-              return containerId
-            -- Process the result of the docker computation
-            case runDockerResult of
-              Left ex -> throw ex
-              Right containerId ->
-                let -- Define behaviors to pass to @CS.putInStore@
-                    handleError hash = throwString $ "Could not put in store item " ++ show hash
-                    copyDockerContainer itemPath _ = do
-                      copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath (toFilePath itemPath) containerId
-                      case copyResult of
-                        Left ex -> throw ex
-                        Right _ -> do
-                          -- Since docker will extract a TAR file of the container content, it creates a directory named after the requested directory's name
-                          -- In order to improve the user experience, funflow moves the content of said directory to the level of the CAS item directory
-                          itemWorkdir <- (itemPath </>) <$> (parseRelDir defaultWorkingDirName)
-                          moveDirectoryContent itemWorkdir itemPath
-                          -- After moving files and directories to item directory, remove the directory named after the working directory
-                          removeDirectory $ toFilePath itemWorkdir
-                 in CS.putInStore store RC.NoCache handleError copyDockerContainer (container, containerId, runDockerResult)
+interpretDockerTask ::
+  (Arrow core, HasKleisliIO m core, HasCallStack) =>
+  Manager ->
+  CS.ContentStore ->
+  DockerTask i o ->
+  (Writer [T.Text] ~> core) i o
+interpretDockerTask manager store (DockerTask (DockerTaskConfig {DE.image, DE.command, DE.args})) =
+  -- Add the image to the list of docker images stored in the Cayley Writer [T.Text]
+  writing [image] $
+    liftKleisliIO $ \(DockerTaskInput {DE.inputBindings, DE.argsVals}) ->
+      -- Check args placeholder fullfillment, right is value, left is unfullfilled label
+      let argsFilled =
+            [ ( case arg of
+                  Arg value -> Right value
+                  Placeholder label ->
+                    let maybeVal = Map.lookup label argsVals
+                     in case maybeVal of
+                          Nothing -> Left label
+                          Just val -> Right val
+              )
+              | arg <- args
+            ]
+       in -- Error if one of the required arg label is not filled
+          if any isLeft argsFilled
+            then
+              let unfullfilledLabels = [label | (Left label) <- argsFilled]
+               in throwString $ "Docker task failed with error: missing arguments with labels: " ++ show unfullfilledLabels
+            else do
+              let argsFilledChecked = [argVal | (Right argVal) <- argsFilled]
+              uid <- getEffectiveUserID
+              gid <- getEffectiveGroupID
+              let -- @defaultWorkingDirName@ has been chosen arbitrarly, it is both where Docker container will execute things, but also the exported folder to the content store
+                  defaultWorkingDirName = "workdir"
+                  defaultContainerWorkingDirPath = "/" ++ defaultWorkingDirName
+                  container =
+                    (defaultContainerSpec image)
+                      { workingDir = T.pack defaultContainerWorkingDirPath,
+                        cmd = [command] <> argsFilledChecked,
+                        -- ":ro" suffix on docker binding means "read-only", the mounted volumes from the content store will not be modified
+                        hostVolumes = map fromString [(toFilePath $ CS.itemPath store item) <> ":" <> (toFilePath mount) <> ":ro" | VolumeBinding {DE.item, DE.mount} <- inputBindings]
+                      }
+              -- Run the docker container
+              runDockerResult <- runExceptT $ do
+                containerId <- runContainer manager container
+                awaitContainer manager containerId
+                return containerId
+              -- Process the result of the docker computation
+              case runDockerResult of
+                Left ex -> throw ex
+                Right containerId ->
+                  let -- Define behaviors to pass to @CS.putInStore@
+                      handleError hash = throwString $ "Could not put in store item " ++ show hash
+                      copyDockerContainer itemPath _ = do
+                        copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath (toFilePath itemPath) containerId
+                        case copyResult of
+                          Left ex -> throw ex
+                          Right _ -> do
+                            -- Since docker will extract a TAR file of the container content, it creates a directory named after the requested directory's name
+                            -- In order to improve the user experience, funflow moves the content of said directory to the level of the CAS item directory
+                            itemWorkdir <- (itemPath </>) <$> (parseRelDir defaultWorkingDirName)
+                            moveDirectoryContent itemWorkdir itemPath
+                            -- After moving files and directories to item directory, remove the directory named after the working directory
+                            removeDirectory $ toFilePath itemWorkdir
+                   in CS.putInStore store RC.NoCache handleError copyDockerContainer (container, containerId, runDockerResult)
