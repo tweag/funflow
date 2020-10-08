@@ -1,4 +1,4 @@
-{ nixpkgs ? ./nix/default.nix
+{ nixpkgs ? ./nix/nixpkgs.nix
 , ghcide ? false
 , haskellLanguageServer ? true
 , python-language-server ? true
@@ -60,5 +60,6 @@ pkgs.mkShell {
     ]
   ;
 
-  NIX_PATH = "nixpkgs=${nixpkgs}";
+  # TODO fix
+  # NIX_PATH = "nixpkgs=${nixpkgs}";
 }

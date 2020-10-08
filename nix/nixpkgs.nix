@@ -23,4 +23,4 @@ let
   # import nixpkgs with haskell.nix overlays and custom args
   pkgs = import nixpkgsSrc nixpkgsArgs;
 in
-pkgs
+  pkgs

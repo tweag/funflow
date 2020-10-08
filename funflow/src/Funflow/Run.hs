@@ -25,6 +25,7 @@ import Control.Exception.Safe (throw, throwString)
 import Control.Kernmantle.Caching (localStoreWithId)
 import Control.Kernmantle.Rope
   ( HasKleisliIO,
+    LooseRopeWith,
     liftKleisliIO,
     perform,
     runReader,
@@ -41,7 +42,7 @@ import qualified Data.Map.Lazy as Map
 import Data.String (IsString (fromString))
 import qualified Data.Text as T
 import Docker.API.Client (ContainerSpec (cmd), OS (OS), awaitContainer, defaultContainerSpec, hostVolumes, newDefaultDockerManager, runContainer, saveContainerArchive, workingDir)
-import Funflow.Flow (Flow)
+import Funflow.Flow (RequiredCore, RequiredStrands)
 import Funflow.Run.Orphans ()
 import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
@@ -71,7 +72,7 @@ runFlowWithConfig ::
   -- | The configuration of the flow
   RunFlowConfig ->
   -- | The flow to run
-  Flow input output ->
+  LooseRopeWith RequiredStrands (RequiredCore IO) input output ->
   -- | The input to evaluate the flow with
   input ->
   IO output
@@ -97,7 +98,7 @@ runFlowWithConfig config flow input =
 -- | Run a flow with the default configuration
 runFlow ::
   -- | The flow to run
-  Flow input output ->
+  LooseRopeWith RequiredStrands (RequiredCore IO) input output ->
   -- | The input to evaluate the flow with
   input ->
   IO output
