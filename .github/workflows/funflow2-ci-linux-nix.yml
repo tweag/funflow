@@ -42,21 +42,7 @@ jobs:
           cd ..
       # Build documentation
       - name: Build docs and tutorials
-        run: |
-          # 1. API Docs
-          nix-build -A api-docs -o funflow-docs
-          # Need to materialize API documentation symlinks here
-          # since the deploy stage below doesn't deep copy
-          mkdir -p funflow-docs-materialized/share
-          cp -rL ./funflow-docs/share/* ./funflow-docs-materialized/share
-
-          # 2. Documentation index
-          nix-build -A doc-index -o result
-          cp result/share/index.html ./funflow-docs-materialized/share
-          
-          # 3. Tutorials
-          nix-build -A generate-funflow-tutorials -o result
-          result/bin/generate-funflow-tutorial funflow-tutorial/notebooks ./funflow-docs-materialized/share/tutorial
+        run: funflow-pages/scripts/build.sh
       # Deploy documentation to a github page
       - name: Deploy docs
         # Push to GitHub Pages only on master
@@ -64,4 +50,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-          publish_dir: ./funflow-docs-materialized/share
+          publish_dir: ./funflow-pages/result/funflow2
