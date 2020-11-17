@@ -21,10 +21,12 @@ import Funflow
     runFlowWithConfig,
     tryE,
   )
-import Funflow.Tasks.Docker (DockerTaskConfig (DockerTaskConfig), DockerTaskInput (DockerTaskInput), VolumeBinding (VolumeBinding))
+import Funflow.Config (Configurable (ConfigFromEnv, ConfigFromFile, Literal))
+import Funflow.Tasks.Docker (Arg, DockerTaskConfig (DockerTaskConfig), DockerTaskInput (DockerTaskInput), VolumeBinding (VolumeBinding))
 import qualified Funflow.Tasks.Docker as DE
-import Path (Abs, Dir, Rel, absdir, parseAbsDir, reldir, (</>))
+import Path (Abs, Dir, Rel, absdir, parseAbsDir, reldir, relfile, (</>))
 import System.Directory (getCurrentDirectory)
+import System.Environment (setEnv)
 
 main :: IO ()
 main = do
@@ -40,6 +42,10 @@ main = do
   putStr "\n---------------------\n"
   testFlow @() @CS.Item "a flow running a task in docker" someDockerFlow ()
   putStr "\n---------------------\n"
+  testFlow @() @CS.Item "a flow running a task in docker using a configurable from a file" someDockerFlowWithFileConfig ()
+  putStr "\n---------------------\n"
+  testFlow @() @CS.Item "a flow running a task in docker using a configurable from an env var" someDockerFlowWithEnvConfig ()
+  putStr "\n---------------------\n"
   testFlow @() @CS.Item "a flow running a task in docker, using the output of one as input of another" someDockerFlowWithInputs ()
   putStr "\n---------------------\n"
   testFlow @() @() "a flow running a task in docker which fails, but error is caught by the pipeline" someDockerFlowThatFails ()
@@ -47,11 +53,14 @@ main = do
 
 testFlow :: forall i o. (Show i, Show o) => String -> Flow i o -> i -> IO ()
 testFlow label flow input = do
+  -- Set an environment variable for config tests
+  setEnv "FUNFLOW_TEST" "print('funflow is great!')"
   -- Get current working directory as Path Abs Dir
   cwd <- parseAbsDir =<< getCurrentDirectory
   let storeDirPath = cwd </> [reldir|./.tmp/store|]
+      configFilePath = cwd </> [relfile|./test/assets/flow.yaml|]
       runFlow :: Flow i o -> i -> IO o
-      runFlow = runFlowWithConfig (RunFlowConfig {storePath = storeDirPath})
+      runFlow = runFlowWithConfig (RunFlowConfig {configFile = Just configFilePath, storePath = storeDirPath})
   putStrLn $ "Testing " ++ label
   putStrLn $ "Store opened at " <> show storeDirPath
   result <- runFlow flow input
@@ -83,6 +92,14 @@ someStoreFlow = proc () -> do
 someDockerFlow :: Flow () CS.Item
 someDockerFlow = proc () -> do
   dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", "print('someDockerFlow worked')"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+
+someDockerFlowWithFileConfig :: Flow () CS.Item
+someDockerFlowWithFileConfig = proc () -> do
+  dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", DE.Arg $ ConfigFromFile "python.command"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
+
+someDockerFlowWithEnvConfig :: Flow () CS.Item
+someDockerFlowWithEnvConfig = proc () -> do
+  dockerFlow (DockerTaskConfig {DE.image = "python:latest", DE.command = "python", DE.args = ["-c", DE.Arg $ ConfigFromEnv "FUNFLOW_TEST"]}) -< DockerTaskInput {DE.inputBindings = [], DE.argsVals = mempty}
 
 someDockerFlowWithInputs :: Flow () CS.Item
 someDockerFlowWithInputs = proc () -> do
