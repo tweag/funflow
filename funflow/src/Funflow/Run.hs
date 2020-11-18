@@ -48,12 +48,14 @@ import Data.Set (fromList)
 import Data.String (IsString (fromString))
 import qualified Data.Text as T
 import Docker.API.Client
-  ( ContainerSpec (cmd),
+  ( ContainerLogType (..),
+    ContainerSpec (cmd),
     OS (OS),
     awaitContainer,
     defaultContainerSpec,
     hostVolumes,
     newDefaultDockerManager,
+    printContainerLogs,
     pullImage,
     runContainer,
     saveContainerArchive,
@@ -280,6 +282,7 @@ interpretDockerTask manager store (DockerTask (DockerTaskConfig {DE.image, DE.co
                             -- Run the docker container
                             runDockerResult <- runExceptT $ do
                               containerId <- runContainer manager container
+                              printContainerLogs manager Both containerId
                               awaitContainer manager containerId
                               return containerId
                             -- Process the result of the docker computation

@@ -11,7 +11,7 @@ import Data.Aeson (eitherDecode, encode)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Conduit (runConduit, (.|))
-import Data.Conduit.Combinators (sinkFile, sinkNull)
+import Data.Conduit.Combinators (sinkFile, sinkNull, stdout)
 import qualified Data.Conduit.Tar as Tar
 import Data.Conduit.Zlib (ungzip)
 import qualified Data.Text as T
@@ -175,6 +175,52 @@ saveContainerLogs manager logType outPath cid = do
         then do
           let isLogType = createLogTypeFilter logType
           runConduit $ body .| parseMultiplexedDockerStream .| filterC isLogType .| mapC snd .| sinkFile outPath
+          return Nothing
+        else return $ Just $ GetContainerLogsError $ formatRequestError status ""
+  case result of
+    Just e -> throwError e
+    Nothing -> return ()
+
+-- | Streams the logs from a docker container, printing them to stdout. Logs can include
+-- stdout, stderr, or both.
+printContainerLogs ::
+  -- | The connection manager for the docker daemon
+  Manager ->
+  -- | Which logs to fetch from the container
+  ContainerLogType ->
+  ContainerId ->
+  ClientErrorMonad ()
+printContainerLogs manager logType cid = do
+  let request =
+        setQueryString
+          [ ("follow", Just "true"),
+            ("stdout", Just stdout),
+            ("stderr", Just stderr),
+            ("timestamps", Just "true")
+          ]
+          $ defaultRequest
+            { method = "GET",
+              path = B.pack $ "/" ++ dockerAPIVersion ++ "/containers/" ++ cid ++ "/logs"
+            }
+        where
+          stderr = case logType of
+            Stdout -> "false"
+            _ -> "true"
+          stdout = case logType of
+            StdErr -> "false"
+            _ -> "true"
+  result <- liftIO $
+    runResourceT $ do
+      response <- HTTPC.http request manager
+      let body = HTTPC.responseBody response
+      let status = HTTPC.responseStatus response
+      -- Note: we're using a different approach than in the other http requests since the response
+      -- is wrapped in a ResourceT when using http-conduit, and we would have to implement
+      -- the conduit pipeline using ExceptT to make it compatible with that approach.
+      if status == status200
+        then do
+          let isLogType = createLogTypeFilter logType
+          runConduit $ body .| parseMultiplexedDockerStream .| filterC isLogType .| mapC snd .| stdout
           return Nothing
         else return $ Just $ GetContainerLogsError $ formatRequestError status ""
   case result of
