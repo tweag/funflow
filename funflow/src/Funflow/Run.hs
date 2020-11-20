@@ -1,8 +1,9 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -23,11 +24,11 @@ where
 import Control.Arrow (Arrow, arr)
 import Control.Exception.Safe (throw, throwString)
 import Control.Kernmantle.Caching (localStoreWithId)
+import Control.Kernmantle.Parallel (performP)
 import Control.Kernmantle.Rope
   ( HasKleisliIO,
     LooseRopeWith,
     liftKleisliIO,
-    perform,
     runReader,
     untwine,
     weave',
@@ -64,6 +65,7 @@ import Docker.API.Client
 import Funflow.Config (ConfigKeysBySource (..), Configurable (..), ExternalConfig (..), missing, readEnvs, readYamlFileConfig)
 import Funflow.Flow (RequiredCore, RequiredStrands)
 import Funflow.Run.Orphans ()
+import Funflow.Flow.Orphans ()
 import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
     DockerTask (DockerTask),
@@ -110,78 +112,80 @@ runFlowWithConfig config flow input =
       RunFlowConfig {storePath, configFile} = config
       defaultCachingId = Just 1
    in -- Run with store to enable caching (with default path to store)
-      CS.withStore storePath $ \store -> do
-        -- Start the manager required for docker
-        manager <- newDefaultDockerManager (OS os)
+      CS.withStore storePath $ \store ->
+        do
+          -- Start the manager required for docker
+          manager <- newDefaultDockerManager (OS os)
 
-        let -- Weave all strands
-            weavedPipeline =
-              flow
-                -- Weave tasks
-                & weave' #docker (interpretDockerTask manager store)
-                & weave' #store (interpretStoreTask store)
-                & weave' #simple interpretSimpleTask
-                -- Strip of empty list of strands (after all weaves)
-                & untwine
+          let -- Weave all strands
+              weavedPipeline =
+                flow
+                  -- Weave tasks
+                  & weave' #docker (interpretDockerTask manager store)
+                  & weave' #store (interpretStoreTask store)
+                  & weave' #simple interpretSimpleTask
+                  -- Strip of empty list of strands (after all weaves)
+                  & untwine
 
-            -- At this point, the pipeline core is still wrapped in a couple of reader/writer layers.
+              -- At this point, the pipeline core is still wrapped in a couple of reader/writer layers.
 
-            -- Extract all required external configs and docker images from DockerTasks
-            (dockerImages, pipelineWithDockerConfigWriter) = runWriter weavedPipeline
-            (dockerConfigs, pipelineWithDockerConfigReader) = runWriter pipelineWithDockerConfigWriter
+              -- Extract all required external configs and docker images from DockerTasks
+              (dockerImages, pipelineWithDockerConfigWriter) = runWriter weavedPipeline
+              (dockerConfigs, pipelineWithDockerConfigReader) = runWriter pipelineWithDockerConfigWriter
 
-            -- Finally, combine all config keys. You can plug in additional config keys from new task types here.
-            requiredConfigs = mconcat [dockerConfigs]
+              -- Finally, combine all config keys. You can plug in additional config keys from new task types here.
+              requiredConfigs = mconcat [dockerConfigs]
 
-        -- Run IO Actions to read config file, env vars, etc:
-        fileConfig <- case configFile of
-          Nothing -> return HashMap.empty
-          Just path -> readYamlFileConfig $ toFilePath path
-        envConfig <- readEnvs $ HashSet.toList $ envConfigKeys dockerConfigs
-        -- TODO: Support for configurations via a CLI.
-        let externalConfig = ExternalConfig {fileConfig = fileConfig, envConfig = envConfig, cliConfig = HashMap.empty}
-            missingConfigs = missing externalConfig requiredConfigs
+          -- Run IO Actions to read config file, env vars, etc:
+          fileConfig <- case configFile of
+            Nothing -> return HashMap.empty
+            Just path -> readYamlFileConfig $ toFilePath path
+          envConfig <- readEnvs $ HashSet.toList $ envConfigKeys dockerConfigs
+          -- TODO: Support for configurations via a CLI.
+          let externalConfig = ExternalConfig {fileConfig = fileConfig, envConfig = envConfig, cliConfig = HashMap.empty}
+              missingConfigs = missing externalConfig requiredConfigs
 
-        -- At load-time, ensure that all expected configurations could be found.
-        if not $ null missingConfigs
-          then throwString $ "Missing the following required config keys: " ++ show missingConfigs
-          else mempty :: IO ()
+          -- At load-time, ensure that all expected configurations could be found.
+          if not $ null missingConfigs
+            then throwString $ "Missing the following required config keys: " ++ show missingConfigs
+            else mempty :: IO ()
 
-        -- Now, we can pass in configuration values to tasks which depend on them
-        -- via a Reader layer.
-        let -- Run reader layer for DockerTask configs and write out a list of any configuration error messages.
-            (configErrors, weavePipeline') = runWriter $ runReader externalConfig pipelineWithDockerConfigReader
+          -- Now, we can pass in configuration values to tasks which depend on them
+          -- via a Reader layer.
+          let -- Run reader layer for DockerTask configs and write out a list of any configuration error messages.
+              (configErrors, weavePipeline') = runWriter $ runReader externalConfig pipelineWithDockerConfigReader
 
-        -- If there were any additional configuration errors during interpretation, raise an exception.
-        if not $ null configErrors
-          then throwString $ "Configuration failed with errors: " ++ show configErrors
-          else mempty :: IO ()
+          -- If there were any additional configuration errors during interpretation, raise an exception.
+          if not $ null configErrors
+            then throwString $ "Configuration failed with errors: " ++ show configErrors
+            else mempty :: IO ()
 
-        let -- Run the reader layer for caching
-            -- The `Just n` is a number that is used to compute caching hashes, changing it will recompute all
-            core = runReader (localStoreWithId store defaultCachingId) weavePipeline'
+          let -- Run the reader layer for caching
+              -- The `Just n` is a number that is used to compute caching hashes, changing it will recompute all
+              core = runReader (localStoreWithId store defaultCachingId) weavePipeline'
 
-        -- Pull docker images if there's any
-        if not $ null dockerImages
-          then do
-            putStrLn "Found docker images, pulling..."
-            let -- Remove duplicates by converting to a list
-                dockerImagesSet = fromList dockerImages
-                -- How we pull the docker image
-                handleDockerImage image = do
-                  putStrLn $ "Pulling docker image: " ++ T.unpack image
-                  pullResult <- runExceptT $ pullImage manager image
-                  case pullResult of
-                    Left ex ->
-                      throw ex
-                    Right _ ->
-                      -- No error, just continue
-                      mempty :: IO ()
-            mapM_ handleDockerImage dockerImagesSet
-          else mempty
+          -- Pull docker images if there's any
+          if not $ null dockerImages
+            then do
+              putStrLn "Found docker images, pulling..."
+              let -- Remove duplicates by converting to a list
+                  dockerImagesSet = fromList dockerImages
+                  -- How we pull the docker image
+                  handleDockerImage image = do
+                    putStrLn $ "Pulling docker image: " ++ T.unpack image
+                    pullResult <- runExceptT $ pullImage manager image
+                    case pullResult of
+                      Left ex ->
+                        throw ex
+                      Right _ ->
+                        -- No error, just continue
+                        mempty :: IO ()
+              mapM_ handleDockerImage dockerImagesSet
+            else mempty
 
-        -- At last, run the core
-        perform input core
+          -- At last, run the core. Parallel DAG branches (e.g. constructed with &&&)
+          -- will be executed in parallel threads.
+          performP input core
 
 -- | Run a flow with the default configuration
 runFlow ::

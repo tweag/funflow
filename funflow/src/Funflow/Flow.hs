@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -37,8 +37,8 @@ import Docker.API.Client (DockerClientError)
 import Funflow.Tasks.Docker (DockerTask (DockerTask), DockerTaskConfig, DockerTaskInput)
 import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
 import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
-import Path (Abs, Dir, Path)
 import Funflow.Type.Family.List (type (++))
+import Path (Abs, Dir, Path)
 
 -- | The constraints on the set of "strands"
 --   These will be "interpreted" into "core tasks" (which have contraints defined below).
