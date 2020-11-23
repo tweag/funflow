@@ -2,10 +2,13 @@
 
 module System.Directory.Funflow (moveDirectoryContent) where
 
+import Control.Exception (catch, throw)
 import Control.Monad (filterM)
 import Data.Maybe (catMaybes)
+import Foreign.C.Error (Errno (Errno), eXDEV)
+import GHC.IO.Exception (IOException (ioe_errno))
 import Path (Abs, Dir, Path, dirname, filename, parseRelDir, parseRelFile, toFilePath, (</>))
-import System.Directory (doesDirectoryExist, doesFileExist, listDirectory, renamePath)
+import System.Directory (copyFile, doesDirectoryExist, doesFileExist, listDirectory, removeFile, renamePath)
 
 -- | Move all the directories and files from a source directory to a target directory
 moveDirectoryContent :: Path Abs Dir -> Path Abs Dir -> IO ()
@@ -44,8 +47,17 @@ moveDirectoryContent sourceDirectory targetDirectory =
         filterM (doesFileExist . toFilePath)
 
     -- Move directories and files
-    mapM_ (uncurry renamePath) [(toFilePath dirPath, toFilePath $ targetDirectory </> dirname dirPath) | dirPath <- dirPaths]
-    mapM_ (uncurry renamePath) [(toFilePath filePath, toFilePath $ targetDirectory </> filename filePath) | filePath <- filePaths]
+    mapM_ (uncurry moveOrCopy) [(toFilePath dirPath, toFilePath $ targetDirectory </> dirname dirPath) | dirPath <- dirPaths]
+    mapM_ (uncurry moveOrCopy) [(toFilePath filePath, toFilePath $ targetDirectory </> filename filePath) | filePath <- filePaths]
 
     -- Finish
     return ()
+  where
+    -- Need to handle cases where the source directory is on a different disk than the destination directory since
+    -- rename will fail in these cases.
+    moveOrCopy srcFilePath destFilePath = renamePath srcFilePath destFilePath `catch` exdev srcFilePath destFilePath
+    -- Stolen from: https://github.com/mihaimaruseac/hindent/issues/170
+    exdev srcFilePath destFilePath e =
+      if ioe_errno e == Just ((\(Errno a) -> a) eXDEV)
+        then copyFile srcFilePath destFilePath >> removeFile srcFilePath
+        else throw e

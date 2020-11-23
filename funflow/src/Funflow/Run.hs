@@ -80,10 +80,11 @@ import Funflow.Tasks.Simple (SimpleTask (IOTask, PureTask))
 import Funflow.Tasks.Store (StoreTask (GetDir, PutDir))
 import GHC.Stack (HasCallStack)
 import Network.HTTP.Client (Manager)
-import Path (Abs, Dir, File, Path, absdir, parseRelDir, toFilePath, (</>))
+import Path (Abs, Dir, File, Path, absdir, parseAbsDir, parseRelDir, toFilePath, (</>))
 import Path.IO (copyDirRecur)
 import System.Directory (removeDirectory)
 import System.Directory.Funflow (moveDirectoryContent)
+import System.IO.Temp (withSystemTempDirectory)
 import System.Info (os)
 import System.PosixCompat.User (getEffectiveGroupID, getEffectiveUserID)
 
@@ -284,26 +285,31 @@ interpretDockerTask manager store (DockerTask (DockerTaskConfig {DE.image, DE.co
                                       hostVolumes = map fromString [(toFilePath $ CS.itemPath store item) <> ":" <> (toFilePath mount) <> ":ro" | VolumeBinding {DE.item, DE.mount} <- inputBindings]
                                     }
                             -- Run the docker container
-                            runDockerResult <- runExceptT $ do
-                              containerId <- runContainer manager container
-                              printContainerLogs manager Both containerId
-                              awaitContainer manager containerId
-                              return containerId
+                            runDockerResult <-
+                              runExceptT $ do
+                                containerId <- runContainer manager container
+                                printContainerLogs manager Both containerId
+                                awaitContainer manager containerId
+                                return containerId
+
                             -- Process the result of the docker computation
                             case runDockerResult of
                               Left ex -> throw ex
                               Right containerId ->
                                 let -- Define behaviors to pass to @CS.putInStore@
                                     handleError hash = throwString $ "Could not put in store item " ++ show hash
-                                    copyDockerContainer itemPath _ = do
-                                      copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath (toFilePath itemPath) containerId
+                                    copyDockerContainer tmpPath = do
+                                      -- Download the container's outputs
+                                      copyResult <- runExceptT $ saveContainerArchive manager uid gid defaultContainerWorkingDirPath tmpPath containerId
                                       case copyResult of
                                         Left ex -> throw ex
                                         Right _ -> do
+                                          absTmpPath <- parseAbsDir tmpPath
                                           -- Since docker will extract a TAR file of the container content, it creates a directory named after the requested directory's name
                                           -- In order to improve the user experience, funflow moves the content of said directory to the level of the CAS item directory
-                                          itemWorkdir <- (itemPath </>) <$> (parseRelDir defaultWorkingDirName)
-                                          moveDirectoryContent itemWorkdir itemPath
+                                          itemWorkdir <- (absTmpPath </>) <$> parseRelDir defaultWorkingDirName
+                                          moveDirectoryContent itemWorkdir absTmpPath
                                           -- After moving files and directories to item directory, remove the directory named after the working directory
                                           removeDirectory $ toFilePath itemWorkdir
-                                 in CS.putInStore store RC.NoCache handleError copyDockerContainer (container, containerId, runDockerResult)
+                                          CS.putInStore store RC.NoCache handleError (flip moveDirectoryContent) absTmpPath
+                                 in withSystemTempDirectory "funflow" copyDockerContainer
