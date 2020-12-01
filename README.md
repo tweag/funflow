@@ -19,6 +19,16 @@ https://tweag.github.io/funflow2/
 
 ### Installation
 
+#### Cookiecutter Template
+
+To get started with a simple project, you can use the cookiecutter template provided with this repo:
+
+```console
+cookiecutter git@github.com:tweag/funflow2.git --directory cookiecutter-funflow
+```
+
+#### Stack
+
 While funflow2 hasn't been plublished on Hackage yet, you can install it as a git dependency using the standard Haskell tooling (e.g. [Stack](https://docs.haskellstack.org/en/stable/yaml_configuration/#packages)). Note that you will
 also need to add a couple of extra dependencies to your `stack.yaml`. See the [example stack.yaml](./docs/example-user-stack.yaml) for a minimal example.
 
