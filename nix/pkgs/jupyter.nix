@@ -13,6 +13,7 @@ tutorialHaskellDependencies = p: with p; [
     containers
     JuicyPixels
     ihaskell-juicypixels
+    process
 ];
 
 iHaskell = jupyterWith.kernels.iHaskellWith {
