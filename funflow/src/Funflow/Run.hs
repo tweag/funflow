@@ -143,7 +143,7 @@ runFlowWithConfig config flow input =
             Just path -> readYamlFileConfig $ toFilePath path
           envConfig <- readEnvs $ HashSet.toList $ envConfigKeys dockerConfigs
           -- TODO: Support for configurations via a CLI.
-          let externalConfig = ExternalConfig {fileConfig = fileConfig, envConfig = envConfig, cliConfig = HashMap.empty}
+          let externalConfig = ExternalConfig {fileConfig = fileConfig, envConfig = envConfig}
               missingConfigs = missing externalConfig requiredConfigs
 
           -- At load-time, ensure that all expected configurations could be found.
@@ -255,7 +255,7 @@ interpretDockerTask manager store (DockerTask (DockerTaskConfig {DE.image, DE.co
                                 Arg configValue -> case configValue of
                                   Literal value -> Right value
                                   ConfigFromEnv k -> Left $ "interpretDockerTask encountered an unrendered externally configurable value at key: " ++ T.unpack k
-                                  ConfigFromCLI k -> Left $ "interpretDockerTask encountered an unrendered externally configurable value at key: " ++ T.unpack k
+                                  -- ConfigFromCLI k -> Left $ "interpretDockerTask encountered an unrendered externally configurable value at key: " ++ T.unpack k
                                   ConfigFromFile k -> Left $ "interpretDockerTask encountered an unrendered externally configurable value at key: " ++ T.unpack k
                                 Placeholder label ->
                                   let maybeVal = Map.lookup label argsVals
