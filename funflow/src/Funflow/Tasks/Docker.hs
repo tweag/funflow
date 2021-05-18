@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- | Run commands using Docker
 module Funflow.Tasks.Docker
@@ -15,7 +16,9 @@ module Funflow.Tasks.Docker
 where
 
 import Data.CAS.ContentStore as CS
-import Data.Map (Map)
+import Data.List (foldl')
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -61,11 +64,22 @@ data DockerTaskInput = DockerTaskInput
   { -- | Input items to mount on the container
     inputBindings :: [VolumeBinding],
     -- | A map representing how to fill the argument placeholders (placeholder label -> argument value)
-    argsVals :: Map String Text
+    argsVals :: Map.Map String Text
   }
+
+instance Semigroup DockerTaskInput where
+  DockerTaskInput{ inputBindings = vols1, argsVals = args1 } <> DockerTaskInput{ inputBindings = vols2, argsVals = args2} = 
+    let agg (seen, xs) x = if Set.member x seen then (seen, xs) else (Set.insert x seen, x:xs)
+        combVols = reverse . snd $ foldl' agg (Set.empty, []) (vols1 ++ vols2)
+        combArgs = args1 <> args2
+    in DockerTaskInput{inputBindings = combVols, argsVals = combArgs}
+
+instance Monoid DockerTaskInput where
+  mempty = DockerTaskInput{ inputBindings = [], argsVals = Map.empty }
 
 -- | Represent how to bind a directory from cas-store (@CS.Item@) to a container internal file system
 data VolumeBinding = VolumeBinding {item :: CS.Item, mount :: Path Abs Dir}
+  deriving (Eq, Ord)
 
 -- Docker tasks to perform external tasks
 data DockerTask i o where
