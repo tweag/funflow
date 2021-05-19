@@ -4,8 +4,8 @@
   # Main project libraries
   (self: super:
     let
-      # The `project` local is the project created using haskell.nix. 
-      # We extract funflow's libraries from it explicitly below in order to 
+      # The `project` local is the project created using haskell.nix.
+      # We extract funflow's libraries from it explicitly below in order to
       # add extra system dependencies, etc.
       project = super.haskell-nix.stackProject {
         buildInputs = [ super.git ];
@@ -24,7 +24,7 @@
       funflow-tests = project.funflow.components.tests.test-funflow.overrideAttrs (old:
         { buildInputs = old.buildInputs ++ [ super.docker ]; }
       );
-    
+      funflow-unit-tests = project.funflow.components.tests.unit-tests;
       # Shell with funflow's dependencies
       funflow-shell = project.shellFor ({
         exactDeps = true;
@@ -54,7 +54,7 @@
       {
         ihaskell.components.tests.hspec = super.projectHaskellPackages.ihaskell.components.tests.hspec.overrideAttrs
           (old:
-            { 
+            {
               preCheck = ''
                 export HOME=$TMPDIR/home
                 export PATH=$PWD/dist/build/ihaskell:$PATH
@@ -83,7 +83,7 @@
   (self: super:
     {
       # API documentation
-      api-docs = 
+      api-docs =
         let
           # List of packages to generate doc of
           doc-libs = with self; [
@@ -104,7 +104,7 @@
   )
 
 
-  # Utility function for combining haddock docs into a single closure with 
+  # Utility function for combining haddock docs into a single closure with
   # relative hyperlinks (so they work on GitHub pages)
   (self: super:
     { haddock-combine = super.callPackage ./pkgs/haddock-combine.nix { }; }
