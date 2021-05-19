@@ -58,7 +58,7 @@ testFlow label flow input = do
   -- Get current working directory as Path Abs Dir
   cwd <- parseAbsDir =<< getCurrentDirectory
   let storeDirPath = cwd </> [reldir|./.tmp/store|]
-      configFilePath = cwd </> [relfile|./test/assets/flow.yaml|]
+      configFilePath = cwd </> [relfile|./test/flows/assets/flow.yaml|]
       runFlow :: Flow i o -> i -> IO o
       runFlow = runFlowWithConfig (RunFlowConfig {configFile = Just configFilePath, storePath = storeDirPath})
   putStrLn $ "Testing " ++ label
@@ -83,7 +83,7 @@ someStoreFlow = proc () -> do
   -- Prepare the test
   -- Note: the relative path is specific to running the test with Nix with `$(nix-build nix -A funflow.components.tests)/bin/test-funflow`
   --   which is the case in the CI
-  testDir <- ioFlow (\() -> return . flip (</>) [reldir|./test/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
+  testDir <- ioFlow (\() -> return . flip (</>) [reldir|./test/flows/assets/storeFlowTest/|] =<< parseAbsDir =<< getCurrentDirectory) -< ()
   -- The actual test
   item <- putDirFlow -< testDir
   path <- getDirFlow -< item
