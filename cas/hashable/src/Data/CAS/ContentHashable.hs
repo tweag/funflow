@@ -22,7 +22,7 @@
 --   types. These instead use the path, file size and modification time to control
 --   the hash.
 module Data.CAS.ContentHashable
-  ( ContentHash,
+  ( ContentHash (..),
     toBytes,
     fromBytes,
     ContentHashable (..),
