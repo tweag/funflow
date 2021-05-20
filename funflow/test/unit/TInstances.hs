@@ -3,7 +3,7 @@
 
 module TInstances where
 
-import "cryptonite" Crypto.Hash (hash)
+import "cryptonite" Crypto.Hash
 import qualified Data.ByteString as BS
 import Data.Maybe (fromJust)
 import qualified Data.Text as Text
@@ -12,16 +12,15 @@ import Path (Abs, Dir, Path (..), parseAbsDir)
 import Test.QuickCheck
 
 import qualified Data.CAS.ContentStore as CS
-import Data.CAS.ContentHashable (ContentHash (..))
+import qualified Data.CAS.ContentHashable as CH
 import qualified Funflow.Tasks.Docker as DT
 import Funflow.Tasks.Docker (DockerTaskInput)
 
 import TUtils (maxSizeListOf)
 
 instance Arbitrary CS.Item where
-    arbitrary = CS.Item . ContentHash . hash <$> genBsForSHA256
-        where genBsForSHA256 = BS.pack <$> vectorOf 8 (arbitrary :: Gen Word8)
-
+    arbitrary = CS.Item . fromJust . CH.fromBytes <$> genBsForSHA256
+        where genBsForSHA256 = BS.pack <$> vectorOf (hashDigestSize SHA256) arbitrary
 
 instance Arbitrary (Path Abs Dir) where
     arbitrary = let pickChar = elements (['a'..'z'] ++ ['A'..'Z'] ++ ['-', '_'] ++ ['0'..'9'])
