@@ -113,7 +113,7 @@ module Data.CAS.ContentStore
 
     -- * Types
     ContentStore,
-    Item,
+    Item (..),
     Content (..),
     (^</>),
     Alias (..),

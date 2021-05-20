@@ -65,7 +65,7 @@ data DockerTaskInput = DockerTaskInput
     inputBindings :: [VolumeBinding],
     -- | A map representing how to fill the argument placeholders (placeholder label -> argument value)
     argsVals :: Map.Map String Text
-  }
+  } deriving (Eq, Show)
 
 instance Semigroup DockerTaskInput where
   DockerTaskInput{ inputBindings = vols1, argsVals = args1 } <> DockerTaskInput{ inputBindings = vols2, argsVals = args2} = 
@@ -79,7 +79,7 @@ instance Monoid DockerTaskInput where
 
 -- | Represent how to bind a directory from cas-store (@CS.Item@) to a container internal file system
 data VolumeBinding = VolumeBinding {item :: CS.Item, mount :: Path Abs Dir}
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 -- Docker tasks to perform external tasks
 data DockerTask i o where
