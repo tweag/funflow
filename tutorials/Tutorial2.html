@@ -13077,9 +13077,8 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="Developer's-Guide">Developer's Guide<a class="anchor-link" href="#Developer's-Guide">&#182;</a></h1><p><code>funflow</code> provides a collection of tasks to run most pipelines.
-However, its strength is to allow extending this collection.</p>
-<p>This tutorial aims to help prospective <code>funflow</code> developers get started with creating new tasks to be used by other <code>funflow</code> users.</p>
+<h1 id="Developer's-Guide">Developer's Guide<a class="anchor-link" href="#Developer's-Guide">&#182;</a></h1><p><code>funflow</code> provides a few task types (<code>SimpleTask</code>, <code>StoreTask</code>, and <code>DockerTask</code>) that will suffice for many pipelines, but the package facilitates creation of new task types as needed.</p>
+<p>This tutorial aims to help prospective <code>funflow</code> developers get started with task type creation.</p>
 
 </div>
 </div>
@@ -13087,8 +13086,7 @@ However, its strength is to allow extending this collection.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="1.-Creating-your-own-task">1. Creating your own task<a class="anchor-link" href="#1.-Creating-your-own-task">&#182;</a></h2><p>In this tutorial, we will create a task called <code>CustomTask</code> by defining its type.</p>
-<p>We will define our own flow type, and write the necessary functions to be able to run it.</p>
+<h2 id="1.-Creating-your-own-task">1. Creating your own task<a class="anchor-link" href="#1.-Creating-your-own-task">&#182;</a></h2><p>In this tutorial, we will create a task called <code>CustomTask</code> by defining its type. We will define our own flow type, and write the functions needed to to run it.</p>
 
 </div>
 </div>
@@ -13097,7 +13095,7 @@ However, its strength is to allow extending this collection.</p>
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="Defining-the-new-task">Defining the new task<a class="anchor-link" href="#Defining-the-new-task">&#182;</a></h3><p>To define a task for our users, we first have to define a type that represents the task.</p>
-<blockquote><p>A task is represented by a GADT datatype of kind <code>* -&gt; * -&gt; *</code>.</p>
+<blockquote><p>A task is represented by a generalized algebraic data type (GADT) of kind <code>* -&gt; * -&gt; *</code>.</p>
 </blockquote>
 
 </div>
@@ -13127,8 +13125,8 @@ However, its strength is to allow extending this collection.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Here, we create a type <code>SomeCustomTask</code> of type constructor <code>SomeCustomTask i o</code> and a value constructor <code>SomeCustomTask</code> of type <code>String -&gt; Int -&gt; SomeCustomTask String String</code>.</p>
-<p><code>String -&gt; Int -&gt; SomeCustomTask String String</code> means thatby providing a <code>String</code> and an <code>Int</code>, the function will give a task that take a <code>String</code> as input and produce a <code>String</code> as output.</p>
+<p>Here, we create a type <code>CustomTask</code> with type constructor <code>CustomTask i o</code>, and a value constructor <code>CustomTask</code> of type <code>String -&gt; Int -&gt; CustomTask String String</code>.</p>
+<p><code>String -&gt; Int -&gt; SomeCustomTask String String</code> means thatby providing a <code>String</code> and an <code>Int</code>, the function will give a task that takes a <code>String</code> as input and produces a <code>String</code> as output.</p>
 <p>A new task can be created by using the value constructor:</p>
 
 </div>
@@ -13139,7 +13137,7 @@ However, its strength is to allow extending this collection.</p>
 <div class="prompt input_prompt">In&nbsp;[2]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- An example of instanciation</span>
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- An example of instantiation</span>
 <span class="kt">CustomTask</span> <span class="s">&quot;someText&quot;</span> <span class="mi">42</span>
 </pre></div>
 
@@ -13171,8 +13169,7 @@ However, its strength is to allow extending this collection.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>However, a value created as such cannot be used by itself to define flows: it lacks all the "properties" of flows.</p>
-<p>For a task to be usable in a flow, we need some more work.</p>
+<p>However, a value created this way is a <em>task</em>, not a <em>flow</em>. To use this value in a flow, we need some more work.</p>
 
 </div>
 </div>
@@ -13180,8 +13177,9 @@ However, its strength is to allow extending this collection.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="From-a-task-to-a-flow">From a task to a flow<a class="anchor-link" href="#From-a-task-to-a-flow">&#182;</a></h3><p>The <code>Flow</code> type is restricted to the set of tasks defined by <code>RequiredStrands</code> in <code>Funflow.Flow</code>.</p>
-<p>In order to manipulate a flow that can run our custom task, we need to create our own new type using <code>ExtendedFlow</code> from <code>Funflow.Flow</code>:</p>
+<h3 id="From-a-task-to-a-flow">From a task to a flow<a class="anchor-link" href="#From-a-task-to-a-flow">&#182;</a></h3><p>The <code>Flow</code> type in fact comes from restricting the more general <code>ExtendedFlow</code> type, specifying a fixed collection of task types to support.
+These tasks types are those defined here in funflow: <code>SimpleTask</code>, <code>StoreTask</code>, and <code>DockerTask</code>, which are declared as <code>RequiredStrands</code> in <code>Funflow.Flow</code>.</p>
+<p>In other words, a pipeline/workflow typed specifically as <code>Flow</code> may comprise tasks of these three types (and only these three), capturing the notion that it's these types with which a <code>Flow</code> is compatible. In order to manipulate a flow that can run our <em>custom</em> task (i.e., a value of a new task type), we need to create our own new <em>flow</em> type using <code>ExtendedFlow</code>, which is also defined in <code>Funflow.Flow</code>:</p>
 
 </div>
 </div>
@@ -13205,11 +13203,11 @@ However, its strength is to allow extending this collection.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<blockquote><p>The list and tuple writing preceeded by an apostrophe <code>'[ ... ]</code> and <code>'( ... )</code> are type-level lists and tuples.</p>
-<p>Basically, we define a type-level list of type-level tuples <code>(label, task type)</code> that associate a string label to a task type definition.</p>
-<p>In <code>kernmantle</code>, such a tuple is called a <em>strand</em>.</p>
+<blockquote><p>Prefixing the leading bracket or parenthesis, i.e. <code>'[ ... ]</code> and <code>'( ... )</code>, denotes a <em>type-level</em> list or tuple, respectively. This syntax is supported by the <code>OverloadedLabels</code> extension and is used to distinguish between the ordinary <code>[]</code> and <code>()</code> are <em>data</em> constructors, building values rather than types.</p>
+<p>So with <code>'[ '("custom", CustomTask) ]</code>, we build a type-level list of type-level tuple, "labeling" our custom task type with a name.</p>
+<p>In <code>kernmantle</code>, such a tuple is called a <em>strand</em>, and the label facilitates disambiguation among different tasks with the same type.</p>
 </blockquote>
-<p>Now that we have our own type of flow that uses our custom task, we can define how a value of our custom task should be <em>stranded</em>:</p>
+<p>Now that we have our own type of flow that uses our custom task, we can define how a value of our custom task should be <em>stranded</em>, using <a href="https://github.com/tweag/kernmantle"><code>kernmantle</code></a>:</p>
 
 </div>
 </div>
@@ -13258,13 +13256,10 @@ It facilitates the creation of a flow for a user without having to think about s
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="Interpret-a-task">Interpret a task<a class="anchor-link" href="#Interpret-a-task">&#182;</a></h3><p>The strenght of <code>funflow</code> comes from its ability from distinguishing the representation of computations (tasks) from the actual implementation that they provoke.</p>
-<p>We have defined a task, which is a representation of a computation.
-We now need to implement said computation.</p>
-<p>In order to do that, we write what is called an <em>interpreter function</em>.</p>
-<p>An interpreter function is executed before running the flow.
-It takes a value of the task type that matches a given <em>strand</em> (identified by its label) and consumes it, in order to produce the representation of an actual computation.</p>
-<p>In our case, we could define that our custom task <code>CustomTask n x</code> appends <code>n</code> times the string <code>x</code> to the input (which is a <code>String</code>).</p>
+<h3 id="Interpret-a-task">Interpret a task<a class="anchor-link" href="#Interpret-a-task">&#182;</a></h3><p>A strength of <code>funflow</code> is separation of the <em>representation</em> of a computation (task) from <em>implementation</em> of that task. More concretely, once it's created a task value has fixed input and output types, but <strong>what it <em>does</em></strong> is not fixed. To specify that, we write an <em>interpreter function</em>.</p>
+<p>An interpreter function is executed <strong>before <em>running</em> the flow</strong>.
+It takes a value of the task type that matches a particular <em>strand</em> (identified by the strand's label) and produces an actual implementation of the task, in compliance with the task's fixed input and output types.</p>
+<p>In our case, we could define that our custom task <code>CustomTask n s</code> appends <code>n</code> times the string <code>s</code> to the input (which is a <code>String</code>):</p>
 
 </div>
 </div>
@@ -13297,15 +13292,15 @@ It takes a value of the task type that matches a given <em>strand</em> (identifi
 <p>What happens here is:</p>
 <ol>
 <li>We get the <code>customTask</code> of our type <code>CustomTask</code>.</li>
-<li>We differentiate the possible values.
-Here there is only one value constructor, but GADTs can hold multiple value constructors.</li>
+<li>We consider the possible values.
+As we've defined it, <code>CustomTask</code> has only one value constructor, but in general a GADT may have multiple value constructors.</li>
 <li>Since our function is pure, we can simply wrap it inside of an <code>Arrow</code> using <code>arr</code>.</li>
 </ol>
 <p><code>\input -&gt; input ++ duplicate s n</code> is the actual function that will be executed when running the pipeline.</p>
 <blockquote><p>In funflow, pure computation should be wrapped in a <code>Arrow</code> while IO operations should wrapped in a <code>Kleisli IO</code>.</p>
 <p>Wrapping in an <code>Arrow</code> is done by using <code>arr</code>, while wrapping in a <code>Kleisli IO</code> is done by using <code>liftKleisliIO</code>.</p>
 </blockquote>
-<p><code>funflow</code>'s interpreter functions are defined in the <code>Funflow.Run</code> module and can serve as examples.</p>
+<p><code>funflow</code>'s interpreter functions are defined in the <code>Funflow.Run</code> module and can serve as examples as you write your own interpreter functions.</p>
 
 </div>
 </div>
@@ -13314,12 +13309,10 @@ Here there is only one value constructor, but GADTs can hold multiple value cons
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h3 id="Run-your-custom-flow">Run your custom flow<a class="anchor-link" href="#Run-your-custom-flow">&#182;</a></h3><p>Now that we have defined a way to run our task, we might as well run our pipeline!</p>
-<p>When using only <code>funflow</code>'s task, there is a convenient function <code>runFlow</code> defined in <code>Funflow.Run</code>.
-This function consumes a value of type <code>Flow</code>, which can be constituted of <code>funflow</code>'s tasks only.</p>
-<p>The most simple way is to convert our custom flow type to the <code>funflow</code>'s flow type in order to use this function.</p>
+<p>To run a pipeline typed as <code>Flow</code>, funflow provides <code>runFlow</code>. Since we've built--in order to include our custom task type--a different type of pipeline (<code>MyFlow</code>), though, in order to leverage <code>runFlow</code> we first need an additional step. We will use the <code>weave'</code> function from <code>kernmantle</code>.</p>
 <blockquote><p>In <code>kernmantle</code>, intepreting a task with a function is called <em>weaving</em> a strand.</p>
 <p>There are multiple function available to weave strands (<code>weave</code>, <code>weave'</code>, <code>weave''</code>, <code>weaveK</code>).
-Almost always, the one you should be using is <code>weave'</code>.</p>
+Almost always, the one you want is <code>weave'</code>.</p>
 </blockquote>
 
 </div>
@@ -13344,7 +13337,7 @@ Almost always, the one you should be using is <code>weave'</code>.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<blockquote><p><code>kernmantle</code>'s <code>&amp;</code> operator allows to weave in chain multiple strands:</p>
+<blockquote><p><code>kernmantle</code>'s <code>&amp;</code> operator allows to weave in chain multiple strands, e.g.:</p>
 <div class="highlight"><pre><span></span><span class="nf">weaveMyFlow</span> <span class="n">myFlow</span> <span class="ow">=</span> <span class="n">myFlow</span> <span class="o">&amp;</span> <span class="n">weave&#39;</span> <span class="o">#</span><span class="n">custom1</span> <span class="n">interpretCustomTask1</span> <span class="o">&amp;</span> <span class="n">weave&#39;</span> <span class="o">#</span><span class="n">custom2</span> <span class="n">interpretCustomTask2</span>
 </pre></div>
 </blockquote>
