@@ -5,7 +5,7 @@
 - [Requirements](#requirements)
 - [Development environment](#development-environment)
   * [VS Code](#vs-code)
-  * [Establish Docker](#establish-docker)
+  * [Install and start Docker](#install-and-start-docker)
 - [Build with `stack`](#build-with-stack)
 - [CI](#ci)
   * [Updating the Nix build](#updating-the-nix-build)
@@ -46,7 +46,7 @@ Requirements:
 - [Haskell](https://marketplace.visualstudio.com/items?itemName=haskell.haskell)
   - HLS is provided by the development Nix shell
 
-### Establish Docker
+### Install and start Docker
 For tasks like running tests and executing some of the [tutorials](../funflow-tutorial), Docker should be up and running on your machine. Check out the official Docker website for more about [installation](https://docs.docker.com/engine/install/), and perhaps about the [Docker daemon](https://docs.docker.com/config/daemon/).
 
 ## Build with `stack`

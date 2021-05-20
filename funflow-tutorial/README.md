@@ -7,7 +7,7 @@ This folder holds the tutorials for `funflow`. They are written as a series of J
 - [About](#about)
 - [Setup from scratch](#setup-from-scratch)
   * [Snags and solutions](#snags-and-solutions)
-  * [Establish Docker](#establish-docker)
+  * [Install and start Docker](#install-and-start-docker)
 - [Development](#development)
 
 <!-- tocstop -->
@@ -22,7 +22,7 @@ the Jupyter Lab environment and IHaskell kernel defined in [shell.nix](./shell.n
 $ nix-shell
 $ jupyter lab
 ```
-
+Starting `nix-shell` may take a while if you're operating with a fresh Nix installation, but subsequent starts will be much faster.
 
 ## Setup from scratch
 Here are a few steps and tips to avoid snags as you get started. Note that step 3 onward applies generally, for subsequent use even after installation/setup. Essentially, this section clarifies what to do before [running a notebook](#run-nbs), and what those commands are doing.
@@ -42,9 +42,9 @@ Here are a few steps and tips to avoid snags as you get started. Note that step 
     apt-get install curl
     ```
 2. **Running a notebook**: If you hit a snag starting up and/or running a notebook, check that you've started `nix-shell` from the proper folder, namely the one with this doc.
-3. If, when executing a notebook (e.g., `CCompilation.ipynb`), you hit a network / HTTPRequest error, try [ensuring Docker's up and running](#establish-docker).
+3. If, when executing a notebook (e.g., `CCompilation.ipynb`), you hit a network / HTTPRequest error, try [ensuring Docker's up and running](#install-and-start-docker).
 
-### Establish Docker
+### Install and start Docker
 Some tutorials require that Docker is up and running on your machine. Check out the official Docker website for more about [installation](https://docs.docker.com/engine/install/), and perhaps about the [Docker daemon](https://docs.docker.com/config/daemon/).
 
 
