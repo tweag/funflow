@@ -47,13 +47,16 @@ prop_DockerTaskInputMonoidLeftIdentity = checkOneInput (\dti -> mempty <> dti ==
 prop_DockerTaskInputMonoidRightIdentity :: Property
 prop_DockerTaskInputMonoidRightIdentity = checkOneInput (\dti -> dti == dti <> mempty)
 
-{-prop_DockerTaskInputMonoidAssociativity :: DockerTaskInput -> DockerTaskInput -> DockerTaskInput -> Bool
-prop_DockerTaskInputMonoidAssociativity x y z = (x <> y) <> z == x <> (y <> z)
--}
+prop_DockerTaskInputMonoidAssociativity :: Property
+prop_DockerTaskInputMonoidAssociativity = QCM.monadicIO $ do
+    x <- buildDockerTaskInput
+    y <- buildDockerTaskInput
+    z <- buildDockerTaskInput
+    return ((x <> y) <> z == x <> (y <> z))
 
 main :: IO ()
 main = do
-    --quickCheck prop_DockerTaskInputMonoidAssociativity
     quickCheck prop_DockerTaskInputMonoidLeftIdentity
     quickCheck prop_DockerTaskInputMonoidRightIdentity
+    quickCheck prop_DockerTaskInputMonoidAssociativity
     putStrLn "done!"
