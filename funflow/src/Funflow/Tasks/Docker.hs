@@ -16,9 +16,7 @@ module Funflow.Tasks.Docker
 where
 
 import Data.CAS.ContentStore as CS
-import Data.List (foldl')
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
