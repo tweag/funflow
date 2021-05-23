@@ -2,17 +2,14 @@
 
 module TInstances where
 
-import Data.Maybe (fromJust)
 import qualified Data.Text as Text
-import Path (Abs, Dir, Path, parseAbsDir)
+import Path (Abs, Dir, Path)
 import Test.QuickCheck
-import TUtils (commonFolderChars)
+import TUtils (commonFolderChars, unsafeToAbsDir)
 
 instance Arbitrary (Path Abs Dir) where
-    arbitrary = let makeName k = vectorOf k (elements commonFolderChars)
-                    chars      = choose (1,10) >>= makeName
-                    genDir     =  ('/':) <$> chars
-                in fromJust . parseAbsDir <$> genDir
+    arbitrary = let chars = choose (1,10) >>= (\k -> vectorOf k (elements commonFolderChars))
+                in unsafeToAbsDir <$> chars
 
 instance Arbitrary Text.Text where
     arbitrary = Text.pack <$> arbitrary
