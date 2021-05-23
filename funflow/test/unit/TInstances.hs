@@ -6,11 +6,12 @@ import Data.Maybe (fromJust)
 import qualified Data.Text as Text
 import Path (Abs, Dir, Path, parseAbsDir)
 import Test.QuickCheck
+import TUtils (commonFolderChars)
 
 instance Arbitrary (Path Abs Dir) where
-    arbitrary = let pickChar = elements (['a'..'z'] ++ ['A'..'Z'] ++ ['-', '_'] ++ ['0'..'9'])
-                    chars    = choose (1,5) >>= (\k -> vectorOf k pickChar)
-                    genDir   =  ('/':) <$> chars
+    arbitrary = let makeName k = vectorOf k (elements commonFolderChars)
+                    chars      = choose (1,10) >>= makeName
+                    genDir     =  ('/':) <$> chars
                 in fromJust . parseAbsDir <$> genDir
 
 instance Arbitrary Text.Text where
