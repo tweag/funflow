@@ -73,16 +73,6 @@ myNoErr _ = error "uh-oh!"
 type Fixture = IO (Path Abs Dir, CS.ContentStore)
 
 fixture :: Fixture
-{-fixture = currTmp >>= (\p -> (\s -> (p,s)) <$> CS.open p)
-    where currAbs = toFilePath <$> (getCurrentDirectory >>= parseAbsDir)
-          currTmp = currAbs >>= (\d -> parseAbsDir (d ++ "tmp/store"))
--}
-{-fixture = parseAbsDir d >>= (\p -> (\s -> (p,s)) <$> CS.open p)
-    where d = "/home/vr/sandbox/" ++ "tmp/store"
--}
-{-fixture = d >>= parseAbsDir >>= (\p -> (\s -> (p,s)) <$> CS.open p)
-    where d = (++ "./tmp/store") . toFilePath <$> getCurrentDirectory >>= parseAbsDir
--}
 fixture = tmp >>= (\p -> (\s -> (p,s)) <$> CS.open p)
     where path = getCurrentDirectory >>= parseAbsDir >>= (\p -> parseAbsDir $ toFilePath p ++ ".tmp/store")
           tmp = path >>= createDirIfMissing True >>= (\_ -> path)
@@ -95,9 +85,6 @@ buildDockerTaskInput setup = do
     (tmp, store) <- QCM.run setup
     argsVals     <- QCM.pick arbitrary
     mountPaths   <- QCM.pick (listOf arbitrary)
-    rel2tmp      <- QCM.pick randomRel1
-    --target       <- QCM.run (parseAbsDir (toFilePath tmp ++ rel2tmp))
-    --item         <- QCM.run (makeItem store target)
     item         <- QCM.run (makeItem store tmp)
     return DT.DockerTaskInput{ 
         DT.inputBindings = [DT.VolumeBinding{ DT.item = item, DT.mount = p } | p <- mountPaths] , 
@@ -122,19 +109,15 @@ prop_DockerTaskInputMonoidAssociativity setup = QCM.monadicIO $ do
 
 monoidDockerTaskInputTests :: Fixture -> TestTree
 monoidDockerTaskInputTests setup = 
-    testProperties "Monoid DockerInputTask tests" [(n, p setup) | (n, p) <- tests]
-    where tests = [ ("left identity", prop_DockerTaskInputMonoidLeftIdentity), 
-                    ("right identity", prop_DockerTaskInputMonoidRightIdentity), 
-                    ("associativity", prop_DockerTaskInputMonoidAssociativity)
-                  ]
+    let makeProp x prop = withMaxSuccess x (prop setup)
+        specs = [ ("left identity", prop_DockerTaskInputMonoidLeftIdentity, 5), 
+                  ("right identity", prop_DockerTaskInputMonoidRightIdentity, 5), 
+                  ("associativity", prop_DockerTaskInputMonoidAssociativity, 2)
+                ]
+    in testProperties "Monoid DockerInputTask tests" [(n, makeProp x p) | (n, p, x) <- specs]
 
 main :: IO ()
 --main = let cleanup (tmpdir, store) = CS.close store >> removeDirectoryRecursive (toFilePath tmpdir)
 main = let cleanup (_, store) = CS.close store
            testCtx            = withResource fixture cleanup
        in defaultMain $ testGroup "Units" [testCtx monoidDockerTaskInputTests]
-       --do
-    {-quickCheck prop_DockerTaskInputMonoidLeftIdentity
-    quickCheck prop_DockerTaskInputMonoidRightIdentity
-    quickCheck prop_DockerTaskInputMonoidAssociativity-}
-    --putStrLn "done!"
