@@ -2,6 +2,7 @@
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- Funflow unit tests
 
@@ -55,12 +56,13 @@ prop_DockerTaskInputMonoidAssociativity = QCM.monadicIO $ do
 -}
 
 import qualified Data.CAS.ContentHashable as CH
-import Path (Abs, Dir, Path, parseAbsDir)
+import Path (Abs, Dir, Path, mkRelDir, parseAbsDir, toFilePath, (</>))
+import Path.IO (createDirIfMissing)
 import Test.Tasty
 import Test.Tasty.QuickCheck (testProperties)
 import qualified Data.CAS.RemoteCache as RC
-import System.Directory (getCurrentDirectory)
-import Path ((</>))
+import System.Directory (getCurrentDirectory, removeDirectoryRecursive)
+import TUtils (randomRel1)
 
 myNoOp :: Path Abs Dir -> CH.DirectoryContent -> IO ()
 myNoOp _ _ = return ()
@@ -68,60 +70,69 @@ myNoOp _ _ = return ()
 myNoErr :: CH.ContentHash -> IO ()
 myNoErr _ = error "uh-oh!"
 
-buildStore :: IO CS.ContentStore
-buildStore = do
-    --cwd <- getCurrentDirectory >>= parseAbsDir
-    cwd <- parseAbsDir "/home/vr/sandbox"
-    CS.open ( cwd </> [reldir|./tmp/store|] )
+type Fixture = IO (Path Abs Dir, CS.ContentStore)
+
+fixture :: Fixture
+{-fixture = currTmp >>= (\p -> (\s -> (p,s)) <$> CS.open p)
+    where currAbs = toFilePath <$> (getCurrentDirectory >>= parseAbsDir)
+          currTmp = currAbs >>= (\d -> parseAbsDir (d ++ "tmp/store"))
+-}
+{-fixture = parseAbsDir d >>= (\p -> (\s -> (p,s)) <$> CS.open p)
+    where d = "/home/vr/sandbox/" ++ "tmp/store"
+-}
+{-fixture = d >>= parseAbsDir >>= (\p -> (\s -> (p,s)) <$> CS.open p)
+    where d = (++ "./tmp/store") . toFilePath <$> getCurrentDirectory >>= parseAbsDir
+-}
+fixture = tmp >>= (\p -> (\s -> (p,s)) <$> CS.open p)
+    where path = getCurrentDirectory >>= parseAbsDir >>= (\p -> parseAbsDir $ toFilePath p ++ ".tmp/store")
+          tmp = path >>= createDirIfMissing True >>= (\_ -> path)
 
 makeItem :: CS.ContentStore -> Path Abs Dir -> IO CS.Item
 makeItem store p = CS.putInStore store RC.NoCache myNoErr myNoOp (CH.DirectoryContent p)
 
-buildDockerTaskInput :: IO CS.ContentStore -> QCM.PropertyM IO DT.DockerTaskInput
-buildDockerTaskInput getStore = do
-    store      <- QCM.run getStore
-    argsVals   <- QCM.pick arbitrary
-    mountPaths <- QCM.pick (listOf arbitrary)
-    dummyPath  <- QCM.pick arbitrary
-    item       <- QCM.run (makeItem store dummyPath)
+buildDockerTaskInput :: Fixture -> QCM.PropertyM IO DT.DockerTaskInput
+buildDockerTaskInput setup = do
+    (tmp, store) <- QCM.run setup
+    argsVals     <- QCM.pick arbitrary
+    mountPaths   <- QCM.pick (listOf arbitrary)
+    rel2tmp      <- QCM.pick randomRel1
+    --target       <- QCM.run (parseAbsDir (toFilePath tmp ++ rel2tmp))
+    --item         <- QCM.run (makeItem store target)
+    item         <- QCM.run (makeItem store tmp)
     return DT.DockerTaskInput{ 
         DT.inputBindings = [DT.VolumeBinding{ DT.item = item, DT.mount = p } | p <- mountPaths] , 
         DT.argsVals = argsVals
     }
 
-checkOneInput :: (DT.DockerTaskInput -> Bool) -> IO CS.ContentStore -> Property
-checkOneInput testPred getStore = QCM.monadicIO $ testPred <$> buildDockerTaskInput getStore
+checkOneInput :: (DT.DockerTaskInput -> Bool) -> Fixture -> Property
+checkOneInput testPred setup = QCM.monadicIO $ testPred <$> buildDockerTaskInput setup
 
-prop_DockerTaskInputMonoidLeftIdentity :: IO CS.ContentStore -> Property
+prop_DockerTaskInputMonoidLeftIdentity :: Fixture -> Property
 prop_DockerTaskInputMonoidLeftIdentity = checkOneInput (\dti -> mempty <> dti == dti)
 
-prop_DockerTaskInputMonoidRightIdentity :: IO CS.ContentStore -> Property
+prop_DockerTaskInputMonoidRightIdentity :: Fixture -> Property
 prop_DockerTaskInputMonoidRightIdentity = checkOneInput (\dti -> dti == dti <> mempty)
 
-prop_DockerTaskInputMonoidAssociativity :: IO CS.ContentStore -> Property
-prop_DockerTaskInputMonoidAssociativity getStore = QCM.monadicIO $ do
-    x <- buildDockerTaskInput getStore
-    y <- buildDockerTaskInput getStore
-    z <- buildDockerTaskInput getStore
+prop_DockerTaskInputMonoidAssociativity :: Fixture -> Property
+prop_DockerTaskInputMonoidAssociativity setup = QCM.monadicIO $ do
+    x <- buildDockerTaskInput setup
+    y <- buildDockerTaskInput setup
+    z <- buildDockerTaskInput setup
     return ((x <> y) <> z == x <> (y <> z))
 
-{-monoidDockerTaskInputTests :: IO CS.ContentStore -> TestTree
-monoidDockerTaskInputTests getStore = 
-    testGroup "Monoid DockerInputTask tests" [
-        do 
-    ]
--}
-
-monoidDockerTaskInputTests :: IO CS.ContentStore -> TestTree
-monoidDockerTaskInputTests getStore = 
-    testProperties "Monoid DockerInputTask tests" [(n, p getStore) | (n, p) <- tests]
+monoidDockerTaskInputTests :: Fixture -> TestTree
+monoidDockerTaskInputTests setup = 
+    testProperties "Monoid DockerInputTask tests" [(n, p setup) | (n, p) <- tests]
     where tests = [ ("left identity", prop_DockerTaskInputMonoidLeftIdentity), 
                     ("right identity", prop_DockerTaskInputMonoidRightIdentity), 
                     ("associativity", prop_DockerTaskInputMonoidAssociativity)
                   ]
 
 main :: IO ()
-main = defaultMain $ testGroup "Units" [withResource buildStore CS.close monoidDockerTaskInputTests]
+--main = let cleanup (tmpdir, store) = CS.close store >> removeDirectoryRecursive (toFilePath tmpdir)
+main = let cleanup (_, store) = CS.close store
+           testCtx            = withResource fixture cleanup
+       in defaultMain $ testGroup "Units" [testCtx monoidDockerTaskInputTests]
        --do
     {-quickCheck prop_DockerTaskInputMonoidLeftIdentity
     quickCheck prop_DockerTaskInputMonoidRightIdentity
