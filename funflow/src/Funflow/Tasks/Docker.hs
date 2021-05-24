@@ -69,10 +69,11 @@ data DockerTaskInput = DockerTaskInput
 
 instance Semigroup DockerTaskInput where
   DockerTaskInput{ inputBindings = vols1, argsVals = args1 } <> DockerTaskInput{ inputBindings = vols2, argsVals = args2} = 
-    let agg (seen, xs) x = if Set.member x seen then (seen, xs) else (Set.insert x seen, x:xs)
-        combVols = reverse . snd $ foldl' agg (Set.empty, []) (vols1 ++ vols2)
-        combArgs = args1 <> args2
-    in DockerTaskInput{inputBindings = combVols, argsVals = combArgs}
+    -- TODO: Better to error for duplicate mounts? This treats merge like normal map.
+    --       An advantage here is that we get "priority list"-like behavior like may be intuitive defining configs.
+    let agg (ms, vs) v = if Set.member (mount v) ms then (ms, vs) else (Set.insert (mount v) ms, v:vs)
+        combVols       = reverse . snd $ foldl' agg (Set.empty, []) (vols1 ++ vols2)
+    in DockerTaskInput{ inputBindings = combVols, argsVals = args1 <> args2 }
 
 instance Monoid DockerTaskInput where
   mempty = DockerTaskInput{ inputBindings = [], argsVals = Map.empty }
