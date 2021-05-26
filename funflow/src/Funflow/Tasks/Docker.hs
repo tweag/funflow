@@ -67,14 +67,20 @@ data DockerTaskInput = DockerTaskInput
     argsVals :: Map.Map String Text
   } deriving (Eq, Show)
 
+-- | Combine task inputs by combining the collections they contain.
+--
+-- This treats @inputBindings@ as a "priority list"-like structure in case of repeat occurrence 
+-- of the same mount path. Specifically, the item associated with a particular path will be the 
+-- first one, left-to-right, from the @inputBinding@s being combined. Analogous for @argsVals@, 
+-- in accordance with ordinary @Semigroup Map@.
 instance Semigroup DockerTaskInput where
   DockerTaskInput{ inputBindings = vols1, argsVals = args1 } <> DockerTaskInput{ inputBindings = vols2, argsVals = args2} = 
     -- TODO: Better to error for duplicate mounts? This treats merge like normal map.
-    --       An advantage here is that we get "priority list"-like behavior like may be intuitive defining configs.
     let agg (ms, vs) v = if Set.member (mount v) ms then (ms, vs) else (Set.insert (mount v) ms, v:vs)
         combVols       = reverse . snd $ foldl' agg (Set.empty, []) (vols1 ++ vols2)
     in DockerTaskInput{ inputBindings = combVols, argsVals = args1 <> args2 }
 
+-- | An empty task input is one with fields of empty collections.
 instance Monoid DockerTaskInput where
   mempty = DockerTaskInput{ inputBindings = [], argsVals = Map.empty }
 
