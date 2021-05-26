@@ -8,6 +8,8 @@
 
 import Control.Exception.Safe (SomeException)
 import qualified Data.CAS.ContentStore as CS
+import qualified Data.Map as Map
+import qualified Data.Text as Text
 import Docker.API.Client (DockerClientError (ContainerCreationFailedError))
 import Funflow
   ( Flow,
@@ -49,6 +51,8 @@ main = do
   testFlow @() @CS.Item "a flow running a task in docker, using the output of one as input of another" someDockerFlowWithInputs ()
   putStr "\n---------------------\n"
   testFlow @() @() "a flow running a task in docker which fails, but error is caught by the pipeline" someDockerFlowThatFails ()
+  putStr "\n---------------------\n"
+  testFlow @() @() "a flow with input keys not in config causes no problem" dockerFlowWithExtraInputKeys ()
   putStr "\n------  DONE   ------\n"
 
 testFlow :: forall i o. (Show i, Show o) => String -> Flow i o -> i -> IO ()
@@ -120,3 +124,15 @@ someDockerFlowThatFails =
               then ioFlow (\ex -> putStrLn $ "Exception caught: " ++ show ex) -< ex
               else ioFlow $ const $ error "Wrong exception caught!" -< ()
           Right _ -> ioFlow $ const $ error "Exception not caught!" -< ()
+
+dockerFlowWithExtraInputKeys :: Flow () ()
+dockerFlowWithExtraInputKeys = 
+  let usedArgs = [("a", "first"), ("b", "second")]
+      pars = map fst usedArgs
+      taskConf = DockerTaskConfig{ DE.image = "bash:latest", DE.command = "echo" , DE.args = map DE.Placeholder pars }
+      taskIn   = DockerTaskInput{ DE.inputBindings = [], DE.argsVals = Map.fromList ( ("extra_1", "oh!"):(usedArgs ++ [("extra_2", "no!")]) ) }
+  in proc () -> do
+    result <- tryE @SomeException (dockerFlow taskConf) -< taskIn
+    case result of
+      Left ex -> ioFlow (\err -> error ("Exception! " ++ show err)) -< ex
+      Right _ -> ioFlow $ const $ putStrLn "All good!" -< ()
