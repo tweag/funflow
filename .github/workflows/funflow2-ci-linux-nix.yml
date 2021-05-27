@@ -31,14 +31,17 @@ jobs:
       # funflow library with its tests
       - name: Build funflow library
         run: nix-build -A funflow
-      - name: Build funflow tests
+      - name: Test
         run: |
-          echo Build tests
-          TESTS_PATH=$(nix-build -A funflow-tests)
-          echo Running tests
-          # Funflow tests have to be run in the `funflow` folder, like stack does, in order to have access to test assets
+          echo "Building tests"
+          FLOW_TESTS_PATH=$(nix-build -A funflow-tests)
+          TESTS_PATH=$(nix-build -A funflow-unit-tests)
+          echo "Running main test suite"
+          $TESTS_PATH/bin/bin/unit-tests
+          echo "Running flow tests"
+          # Funflow flow tests have to be run in the `funflow` folder, like stack does, in order to have access to test assets
           cd ./funflow
-          $TESTS_PATH/bin/test-funflow
+          $FLOW_TESTS_PATH/bin/test-funflow
           cd ..
       # Build documentation
       - name: Build docs and tutorials
