@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- | Run commands using Docker
 module Funflow.Tasks.Docker
@@ -15,7 +16,9 @@ module Funflow.Tasks.Docker
 where
 
 import Data.CAS.ContentStore as CS
-import Data.Map (Map)
+import Data.List (foldl')
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -61,11 +64,28 @@ data DockerTaskInput = DockerTaskInput
   { -- | Input items to mount on the container
     inputBindings :: [VolumeBinding],
     -- | A map representing how to fill the argument placeholders (placeholder label -> argument value)
-    argsVals :: Map String Text
-  }
+    argsVals :: Map.Map String Text
+  } deriving (Eq, Show)
+
+-- | Combine task inputs by combining the collections they contain.
+--
+-- This treats @inputBindings@ as a "priority list"-like structure in case of repeat occurrence 
+-- of the same mount path. Specifically, the item associated with a particular path will be the 
+-- first one, left-to-right, from the @inputBinding@s being combined. Analogous for @argsVals@, 
+-- in accordance with ordinary @Semigroup Map@.
+instance Semigroup DockerTaskInput where
+  DockerTaskInput{ inputBindings = vols1, argsVals = args1 } <> DockerTaskInput{ inputBindings = vols2, argsVals = args2} = 
+    let agg (ms, vs) v = if Set.member (mount v) ms then (ms, vs) else (Set.insert (mount v) ms, v:vs)
+        combVols       = reverse . snd $ foldl' agg (Set.empty, []) (vols1 ++ vols2)
+    in DockerTaskInput{ inputBindings = combVols, argsVals = args1 <> args2 }
+
+-- | An empty task input is one with fields of empty collections.
+instance Monoid DockerTaskInput where
+  mempty = DockerTaskInput{ inputBindings = [], argsVals = Map.empty }
 
 -- | Represent how to bind a directory from cas-store (@CS.Item@) to a container internal file system
 data VolumeBinding = VolumeBinding {item :: CS.Item, mount :: Path Abs Dir}
+  deriving (Eq, Ord, Show)
 
 -- Docker tasks to perform external tasks
 data DockerTask i o where
