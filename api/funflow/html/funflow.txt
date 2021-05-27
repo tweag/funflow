@@ -13,10 +13,9 @@ type ConfigKey = Text
 type ConfigMap = Object
 type EnvConfigMap = HashMap Text String
 data ExternalConfig
-ExternalConfig :: ConfigMap -> EnvConfigMap -> ConfigMap -> ExternalConfig
+ExternalConfig :: ConfigMap -> EnvConfigMap -> ExternalConfig
 [fileConfig] :: ExternalConfig -> ConfigMap
 [envConfig] :: ExternalConfig -> EnvConfigMap
-[cliConfig] :: ExternalConfig -> ConfigMap
 
 -- | A value which is intended to be populated using an external source
 --   (e.g. a config file)
@@ -29,10 +28,6 @@ data Configurable a
 -- | Define a configurable which will be loaded from the specified
 --   environment variable
 [ConfigFromEnv] :: FromJSON a => ConfigKey -> Configurable a
-
--- | Define a configurable which will be loaded from the specified command
---   line option
-[ConfigFromCLI] :: FromJSON a => ConfigKey -> Configurable a
 
 -- | A literal value which does not need to be loaded from an external
 --   config source
@@ -47,10 +42,9 @@ getConfigKey :: Configurable a -> Maybe ConfigKey
 
 -- | Stores ConfigKey values by their declared sources.
 data ConfigKeysBySource
-ConfigKeysBySource :: HashSet Text -> HashSet Text -> HashSet Text -> ConfigKeysBySource
+ConfigKeysBySource :: HashSet Text -> HashSet Text -> ConfigKeysBySource
 [fileConfigKeys] :: ConfigKeysBySource -> HashSet Text
 [envConfigKeys] :: ConfigKeysBySource -> HashSet Text
-[cliConfigKeys] :: ConfigKeysBySource -> HashSet Text
 
 -- | Get the key of a <a>Configurable</a> as a <a>ConfigKeysBySource</a>.
 configKeyBySource :: Configurable a -> ConfigKeysBySource
