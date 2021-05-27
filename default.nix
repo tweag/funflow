@@ -4,7 +4,7 @@
 with pkgs; rec {
   # Libraries
   inherit funflow funflow-tests cas-store cas-hashable cas-hashable-s3
-    external-executor docker-client docker-client-tests;
+    external-executor docker-client docker-client-tests funflow-unit-tests;
 
   # Shell
   inherit funflow-shell;
