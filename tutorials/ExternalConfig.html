@@ -13078,8 +13078,8 @@ div#notebook {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h1 id="Configuration">Configuration<a class="anchor-link" href="#Configuration">&#182;</a></h1><p>Funflow provides support for configuring a <code>Flow</code> via a YAML config file or environment variables. Support for automatically generated CLI flags is also planned but as of the writing of this tutorial has not been implemented.</p>
-<p>If a Task you are using contains a <code>Configurable</code> field, you will need to specify the source for that configuration when you write your <code>Flow</code> via one of the <code>Literal</code>, <code>ConfigFromEnv</code>, or <code>ConfigFromFile</code> constructors. For example, the <code>Arg</code> field of the <code>DockerTask</code> supports configurable args. Let's take a look at a few examples.</p>
-<h2 id="Environment-Variables">Environment Variables<a class="anchor-link" href="#Environment-Variables">&#182;</a></h2>
+<p>If a Task you are using contains a <code>Configurable</code> argument, when you write your <code>Flow</code> you will need to specify the configuration via one of three constructors: <code>Literal</code>, <code>ConfigFromEnv</code>, or <code>ConfigFromFile</code>. For example, the <code>args :: [Arg]</code> field of the <code>DockerTask</code> supports configurable args. Let's look at a few examples; first, here are the main imports and extensions we'll use.</p>
+
 </div>
 </div>
 </div>
@@ -13088,22 +13088,53 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE FlexibleContexts #-}</span>
+<div class=" highlight hl-Haskell"><pre><span></span><span class="kt">:</span><span class="n">opt</span> <span class="n">no</span><span class="o">-</span><span class="n">lint</span>    <span class="c1">-- Hide unused pragma warnings.</span>
+
+<span class="cm">{-# LANGUAGE FlexibleContexts #-}</span>
 <span class="cm">{-# LANGUAGE GADTs #-}</span>
 <span class="c1">-- Note: Using OverloadedStrings with DockerTask since it will automatically</span>
 <span class="c1">-- make sure that any `Literal` strings we write are of type `Arg`</span>
 <span class="cm">{-# LANGUAGE OverloadedStrings #-}</span>
+<span class="cm">{-# LANGUAGE QuasiQuotes #-}</span>
+<span class="cm">{-# LANGUAGE RankNTypes #-}</span>
+
+<span class="kr">import</span> <span class="nn">Control.Exception.Safe</span> <span class="p">(</span><span class="kt">StringException</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">try</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Control.Monad.Catch</span> <span class="p">(</span><span class="nf">handleIf</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.Maybe</span> <span class="p">(</span><span class="nf">fromMaybe</span><span class="p">,</span> <span class="nf">isJust</span><span class="p">,</span> <span class="nf">isNothing</span><span class="p">)</span>
+
+<span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Map</span> <span class="k">as</span> <span class="n">Map</span>
+<span class="kr">import</span> <span class="nn">Path</span> <span class="p">(</span><span class="kt">Abs</span><span class="p">,</span> <span class="kt">Dir</span><span class="p">,</span> <span class="kt">File</span><span class="p">,</span> <span class="kt">Path</span><span class="p">,</span> <span class="nf">parseAbsDir</span><span class="p">,</span> <span class="nf">reldir</span><span class="p">,</span> <span class="nf">relfile</span><span class="p">,</span> <span class="nf">toFilePath</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;/&gt;</span><span class="p">))</span>
+<span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="nf">getCurrentDirectory</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">System.Environment</span> <span class="p">(</span><span class="nf">lookupEnv</span><span class="p">,</span> <span class="nf">setEnv</span><span class="p">,</span> <span class="nf">unsetEnv</span><span class="p">)</span>
 
 <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.CAS.ContentStore</span> <span class="k">as</span> <span class="n">CS</span>
 <span class="kr">import</span> <span class="nn">Funflow</span>
 <span class="kr">import</span> <span class="nn">Funflow.Tasks.Docker</span>
 <span class="kr">import</span> <span class="nn">Funflow.Config</span> <span class="p">(</span><span class="kt">Configurable</span> <span class="p">(</span><span class="kt">Literal</span><span class="p">,</span> <span class="kt">ConfigFromFile</span><span class="p">,</span> <span class="kt">ConfigFromEnv</span><span class="p">))</span>
+</pre></div>
 
-<span class="nf">flow1</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="o">$</span> 
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Environment-Variables">Environment Variables<a class="anchor-link" href="#Environment-Variables">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[2]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">flow1</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="o">$</span> 
     <span class="kt">DockerTaskConfig</span> <span class="p">{</span>
         <span class="n">image</span><span class="ow">=</span><span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span>
         <span class="n">command</span><span class="ow">=</span><span class="s">&quot;echo&quot;</span><span class="p">,</span>
-        <span class="n">args</span><span class="ow">=</span><span class="p">[</span><span class="s">&quot;this is a hard-coded literal value, the next value is: &quot;</span><span class="p">,</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;CONFIGURING_FLOWS&quot;</span><span class="p">]</span>
+        <span class="n">args</span><span class="ow">=</span><span class="p">[</span><span class="s">&quot;this is a hard-coded literal value, the next value is:&quot;</span><span class="p">,</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;CONFIGURING_FLOWS&quot;</span><span class="p">]</span>
     <span class="p">}</span>
 </pre></div>
 
@@ -13115,19 +13146,17 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we just need to set the <code>CONFIGURING_FLOWS</code> environment variable and run the task</p>
+<p>We've declared that our task will use two arguments: a literal value that will simply be <code>echo</code>ed back to us, and a value to be determined by an environment variables. Now we just need to set the <code>CONFIGURING_FLOWS</code> environment variable and run the task:</p>
 
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[2]:</div>
+<div class="prompt input_prompt">In&nbsp;[3]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-Haskell"><pre><span></span><span class="kr">import</span> <span class="nn">System.Environment</span> <span class="p">(</span><span class="nf">setEnv</span><span class="p">)</span>
-
-<span class="nf">setEnv</span> <span class="s">&quot;CONFIGURING_FLOWS&quot;</span> <span class="s">&quot;&#39;hello from an environment variable!&#39;&quot;</span>
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">setEnv</span> <span class="s">&quot;CONFIGURING_FLOWS&quot;</span> <span class="s">&quot;&#39;hello from an environment variable!&#39;&quot;</span>
 
 <span class="nf">runFlow</span> <span class="n">flow1</span> <span class="kt">DockerTaskInput</span> <span class="p">{</span><span class="n">inputBindings</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span> <span class="n">argsVals</span> <span class="ow">=</span> <span class="n">mempty</span><span class="p">}</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span><span class="p">)</span>
 </pre></div>
@@ -13150,7 +13179,7 @@ div#notebook {
 <div class="output_text output_subarea ">
 <pre>Found docker images, pulling...
 Pulling docker image: alpine:latest
-2021-05-27T14:09:57.302163668Z this is a hard-coded literal value, the next value is:  hello from an environment variable!
+2021-05-28T16:33:53.399796373Z this is a hard-coded literal value, the next value is: hello from an environment variable!
 Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#34;}</pre>
 </div>
 
@@ -13163,33 +13192,90 @@ Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b93
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="YAML-File">YAML File<a class="anchor-link" href="#YAML-File">&#182;</a></h2><p>For passing in configurations via a config file, use the <code>ConfigFromFile</code> constructor and pass a config file path to <code>runFlowWithConfig</code>:</p>
+<h2 id="YAML-File">YAML File<a class="anchor-link" href="#YAML-File">&#182;</a></h2><p>To configure a task via config file, use the <code>ConfigFromFile</code> constructor and pass a file path to <code>runFlowWithConfig</code>.</p>
 
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[3]:</div>
+<div class="prompt input_prompt">In&nbsp;[4]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE QuasiQuotes #-}</span>
-
-<span class="kr">import</span> <span class="nn">Path</span> <span class="p">(</span><span class="nf">reldir</span><span class="p">,</span> <span class="nf">relfile</span><span class="p">,</span> <span class="p">(</span><span class="o">&lt;/&gt;</span><span class="p">),</span> <span class="nf">parseAbsDir</span><span class="p">)</span>
-<span class="kr">import</span> <span class="nn">System.Directory</span> <span class="p">(</span><span class="nf">getCurrentDirectory</span><span class="p">)</span>
-      
-<span class="nf">flow2</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="o">$</span> 
-    <span class="kt">DockerTaskConfig</span> <span class="p">{</span>
-        <span class="n">image</span><span class="ow">=</span><span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span>
-        <span class="n">command</span><span class="ow">=</span><span class="s">&quot;echo&quot;</span><span class="p">,</span>
-        <span class="n">args</span><span class="ow">=</span><span class="p">[</span><span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromFile</span> <span class="s">&quot;ourMessage&quot;</span><span class="p">]</span>
-    <span class="p">}</span>
-<span class="kr">do</span>
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">getStoreAndConfig</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="p">(</span><span class="kt">Path</span> <span class="kt">Abs</span> <span class="kt">Dir</span><span class="p">,</span> <span class="kt">Path</span> <span class="kt">Abs</span> <span class="kt">File</span><span class="p">)</span>
+<span class="nf">getStoreAndConfig</span> <span class="ow">=</span> <span class="kr">do</span>
     <span class="n">cwd</span> <span class="ow">&lt;-</span> <span class="n">parseAbsDir</span> <span class="o">=&lt;&lt;</span> <span class="n">getCurrentDirectory</span>
     <span class="kr">let</span> <span class="n">storeDirPath</span> <span class="ow">=</span> <span class="n">cwd</span> <span class="o">&lt;/&gt;</span> <span class="p">[</span><span class="n">reldir</span><span class="o">|./.</span><span class="n">tmp</span><span class="o">/</span><span class="n">store</span><span class="o">|</span><span class="p">]</span>
         <span class="n">configFilePath</span> <span class="ow">=</span> <span class="n">cwd</span> <span class="o">&lt;/&gt;</span> <span class="p">[</span><span class="n">relfile</span><span class="o">|./</span><span class="n">flow</span><span class="o">.</span><span class="n">yaml</span><span class="o">|</span><span class="p">]</span>
-        <span class="n">flowConfig</span> <span class="ow">=</span> <span class="kt">RunFlowConfig</span> <span class="p">{</span><span class="n">configFile</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">configFilePath</span><span class="p">,</span> <span class="n">storePath</span> <span class="ow">=</span> <span class="n">storeDirPath</span><span class="p">}</span>
-    <span class="n">runFlowWithConfig</span> <span class="n">flowConfig</span> <span class="n">flow2</span> <span class="kt">DockerTaskInput</span> <span class="p">{</span><span class="n">inputBindings</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span> <span class="n">argsVals</span> <span class="ow">=</span> <span class="n">mempty</span><span class="p">}</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span>
+    <span class="n">return</span> <span class="p">(</span><span class="n">storeDirPath</span><span class="p">,</span> <span class="n">configFilePath</span><span class="p">)</span>
+    
+<span class="nf">getTempRunConf</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">RunFlowConfig</span>
+<span class="nf">getTempRunConf</span> <span class="ow">=</span> <span class="p">(</span><span class="nf">\</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">RunFlowConfig</span><span class="p">{</span> <span class="n">configFile</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">f</span><span class="p">,</span> <span class="n">storePath</span> <span class="ow">=</span> <span class="n">d</span> <span class="p">})</span> <span class="o">&lt;$&gt;</span> <span class="n">getStoreAndConfig</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[5]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Inspect the config file and create the related Arg.</span>
+<span class="nf">lines</span> <span class="o">&lt;$&gt;</span> <span class="p">((</span><span class="n">toFilePath</span> <span class="o">.</span> <span class="n">snd</span> <span class="o">&lt;$&gt;</span> <span class="n">getStoreAndConfig</span><span class="p">)</span> <span class="o">&gt;&gt;=</span> <span class="n">readFile</span><span class="p">)</span>
+<span class="nf">goodFileArg</span> <span class="ow">=</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromFile</span> <span class="s">&quot;ourMessage&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>[&#34;ourMessage: \&#34;Hello from the flow.yaml\&#34;&#34;,&#34;ourOtherValue: 42&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[6]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- helper to run flows for this section of the demo</span>
+<span class="nf">runWithEmptyInput</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Arg</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span>
+<span class="nf">runWithEmptyInput</span> <span class="n">confArgs</span> <span class="ow">=</span> 
+    <span class="kr">let</span> <span class="n">taskConf</span> <span class="ow">=</span> <span class="kt">DockerTaskConfig</span><span class="p">{</span> <span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;echo&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="n">confArgs</span> <span class="p">}</span>
+    <span class="kr">in</span> <span class="n">getTempRunConf</span> <span class="o">&gt;&gt;=</span> <span class="p">(</span><span class="nf">\</span><span class="n">runCfg</span> <span class="ow">-&gt;</span> <span class="n">runFlowWithConfig</span> <span class="n">runCfg</span> <span class="p">(</span><span class="n">dockerFlow</span> <span class="n">taskConf</span><span class="p">)</span> <span class="p">(</span><span class="n">mempty</span> <span class="ow">::</span> <span class="kt">DockerTaskInput</span><span class="p">)</span> <span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">runWithEmptyInput</span> <span class="p">[</span><span class="n">goodFileArg</span><span class="p">]</span>
 </pre></div>
 
     </div>
@@ -13210,7 +13296,7 @@ Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b93
 <div class="output_text output_subarea ">
 <pre>Found docker images, pulling...
 Pulling docker image: alpine:latest
-2021-05-27T14:09:58.492182449Z Hello from the flow.yaml
+2021-05-28T16:33:55.189793540Z Hello from the flow.yaml
 Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#34;}</pre>
 </div>
 
@@ -13219,6 +13305,768 @@ Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b93
 </div>
 </div>
 
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Mixing-Configurables">Mixing <code>Configurable</code>s<a class="anchor-link" href="#Mixing-Configurables">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>As noted, a <code>Configurable</code> argument may constructed one of three ways:</p>
+<ul>
+<li><code>Literal</code></li>
+<li><code>ConfigFromEnv</code></li>
+<li><code>ConfigFromFile</code></li>
+</ul>
+<p>Since each yields a <code>Configurable a</code> value, though, we may mix these when we provide the <code>args</code> list to a task configuration.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Mixing literal and file config</span>
+<span class="nf">runWithEmptyInput</span> <span class="p">[</span><span class="s">&quot;I&#39;m a literal&quot;</span><span class="p">,</span> <span class="n">goodFileArg</span><span class="p">]</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:33:56.309403809Z I&#39;m a literal Hello from the flow.yaml
+Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#34;}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[9]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">setEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span> <span class="s">&quot;I&#39;m from an env var!&quot;</span>
+<span class="nf">lookupEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Just &#34;I&#39;m from an env var!&#34;</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Mixing config file and env var.</span>
+<span class="nf">runWithEmptyInput</span> <span class="p">[</span><span class="n">goodFileArg</span><span class="p">,</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span><span class="p">]</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:33:57.897843906Z Hello from the flow.yaml I&#39;m from an env var!
+Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#34;}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>We can also mix <code>Placeholder</code>s with <code>Configurable</code>s:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[11]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">currArgs</span>  <span class="ow">=</span> <span class="p">[</span><span class="n">goodFileArg</span><span class="p">,</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span><span class="p">,</span> <span class="kt">Placeholder</span> <span class="s">&quot;par3&quot;</span><span class="p">]</span>
+<span class="nf">currInput</span> <span class="ow">=</span> <span class="kt">DockerTaskInput</span><span class="p">{</span> <span class="n">inputBindings</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span> <span class="n">argsVals</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[(</span><span class="s">&quot;par3&quot;</span><span class="p">,</span> <span class="s">&quot;hello-from-placeholder&quot;</span><span class="p">)]</span> <span class="p">}</span>
+<span class="nf">taskConf</span>  <span class="ow">=</span> <span class="kt">DockerTaskConfig</span><span class="p">{</span> <span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;echo&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="n">currArgs</span> <span class="p">}</span>
+<span class="nf">getTempRunConf</span> <span class="o">&gt;&gt;=</span> <span class="p">(</span><span class="nf">\</span><span class="n">runCfg</span> <span class="ow">-&gt;</span> <span class="n">runFlowWithConfig</span> <span class="n">runCfg</span> <span class="p">(</span><span class="n">dockerFlow</span> <span class="n">taskConf</span><span class="p">)</span> <span class="n">currInput</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:33:59.069172821Z Hello from the flow.yaml I&#39;m from an env var! hello-from-placeholder
+Item {itemHash = ContentHash &#34;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#34;}</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Safety-for-efficiency:-fail-fast-to-avoid-lost-compute-time-and-resources"><em>Safety for efficiency</em>: fail fast to avoid lost compute time and resources<a class="anchor-link" href="#Safety-for-efficiency:-fail-fast-to-avoid-lost-compute-time-and-resources">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Another key point is that <em>configuration precedes execution</em>. This means if a failure is inevitable due to an incomplete or illegal configuration, we can <em>fail early</em> by detecting that fact before we ever actually run anything. Here we set up simple examples to demonstrate, but imagine the time (and perhaps money!) that could be saved when failure would occur after a long-running computation.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Argument-configurability-as-a-prerequisite-for-execution">Argument configurability as a prerequisite for execution<a class="anchor-link" href="#Argument-configurability-as-a-prerequisite-for-execution">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>First, note that regardless of how an argument is constructed, execution requires a value for the argument (though for a <code>Literal</code> this is trivial.) To see this, we'll catch exceptions of type <code>StringException</code> since that's what should arise when a configuration is illegal or incomplete. Any other result will yield an alarming message. We thus define a helper:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- First, define a helper for running a simple echo command</span>
+<span class="kr">import</span> <span class="nn">Control.Exception</span> <span class="p">(</span><span class="kt">SomeException</span><span class="p">)</span>
+
+<span class="nf">runEcho1</span> <span class="ow">::</span> <span class="kt">Arg</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">RunFlowConfig</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">DockerTaskInput</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">runEcho1</span> <span class="n">arg</span> <span class="n">runConfOpt</span> <span class="n">taskInOpt</span> <span class="ow">=</span> 
+    <span class="kr">let</span> <span class="n">taskConf</span>  <span class="ow">=</span> <span class="kt">DockerTaskConfig</span><span class="p">{</span> <span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;echo&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="p">[</span><span class="n">arg</span><span class="p">]</span> <span class="p">}</span>
+        <span class="n">taskIn</span>    <span class="ow">=</span> <span class="n">fromMaybe</span> <span class="n">mempty</span> <span class="n">taskInOpt</span>
+        <span class="n">getStore</span>  <span class="ow">=</span> <span class="p">(</span><span class="o">&lt;/&gt;</span> <span class="p">[</span><span class="n">reldir</span><span class="o">|./.</span><span class="n">tmp</span><span class="o">/</span><span class="n">store</span><span class="o">|</span><span class="p">])</span> <span class="o">&lt;$&gt;</span> <span class="p">(</span><span class="n">getCurrentDirectory</span> <span class="o">&gt;&gt;=</span> <span class="n">parseAbsDir</span><span class="p">)</span>
+        <span class="n">mkRunConf</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">runConfOpt</span> <span class="kr">of</span> 
+            <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span> <span class="kt">RunFlowConfig</span><span class="p">{</span> <span class="n">configFile</span> <span class="ow">=</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="n">storePath</span> <span class="ow">=</span> <span class="n">s</span> <span class="p">})</span> <span class="o">&lt;$&gt;</span> <span class="n">getStore</span>
+            <span class="kt">Just</span> <span class="n">rc</span> <span class="ow">-&gt;</span> <span class="n">pure</span> <span class="n">rc</span>
+    <span class="kr">in</span> <span class="kr">do</span>
+        <span class="n">runCfg</span> <span class="ow">&lt;-</span> <span class="n">mkRunConf</span>
+        <span class="n">result</span> <span class="ow">&lt;-</span> <span class="n">try</span> <span class="o">$</span> <span class="p">(</span><span class="n">runFlowWithConfig</span> <span class="n">runCfg</span> <span class="p">(</span><span class="n">dockerFlow</span> <span class="n">taskConf</span><span class="p">)</span> <span class="n">taskIn</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span><span class="p">)</span>
+        <span class="kr">case</span> <span class="n">result</span> <span class="kr">of</span>
+            <span class="kt">Left</span> <span class="p">(</span><span class="kt">StringException</span> <span class="n">msg</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="s">&quot;Successfully caught exception: &quot;</span> <span class="o">++</span> <span class="n">msg</span><span class="p">)</span>
+            <span class="kt">Left</span> <span class="n">ex</span>                      <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="s">&quot;Unexpected error: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">ex</span><span class="p">)</span>
+            <span class="kt">Right</span> <span class="kr">_</span>                      <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Unintended success :/&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note that this works when the argument is a literal, and we're simply echoed whatever we provide, and we'll get an "unintended success" message:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">runEcho1</span> <span class="s">&quot;salut, funflow&quot;</span> <span class="kt">Nothing</span> <span class="kt">Nothing</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:34:00.396576078Z salut, funflow
+Unintended success :/</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>But if we set up an argument as a placeholder or as configurable by environment variable or configuration file, we will get an error when the argument can't be configured:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Set up env var config failure.</span>
+<span class="nf">isNothing</span> <span class="o">&lt;$&gt;</span> <span class="n">lookupEnv</span> <span class="s">&quot;MY_TMP_EV&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[15]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- failure from environment variable</span>
+<span class="nf">runEcho1</span> <span class="p">(</span><span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;MY_TMP_EV&quot;</span><span class="p">)</span> <span class="kt">Nothing</span> <span class="kt">Nothing</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Successfully caught exception: Missing the following required config keys: [&#34;MY_TMP_EV&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[16]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- failure from file configurable</span>
+<span class="kr">do</span>
+    <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">getStoreAndConfig</span>
+    <span class="n">readFile</span> <span class="p">(</span><span class="n">toFilePath</span> <span class="n">f</span><span class="p">)</span> <span class="o">&gt;&gt;=</span> <span class="n">print</span> <span class="o">.</span> <span class="n">lines</span>
+    <span class="n">runEcho1</span> <span class="p">(</span><span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromFile</span> <span class="s">&quot;MY_TMP_EV&quot;</span><span class="p">)</span> <span class="p">(</span><span class="kt">Just</span> <span class="kt">RunFlowConfig</span><span class="p">{</span> <span class="n">configFile</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="n">f</span><span class="p">,</span> <span class="n">storePath</span> <span class="ow">=</span> <span class="n">d</span> <span class="p">})</span> <span class="kt">Nothing</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>[&#34;ourMessage: \&#34;Hello from the flow.yaml\&#34;&#34;,&#34;ourOtherValue: 42&#34;]
+Successfully caught exception: Missing the following required config keys: [&#34;MY_TMP_EV&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[17]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- failure from placeholder</span>
+<span class="nf">runEcho1</span> <span class="p">(</span><span class="kt">Placeholder</span> <span class="s">&quot;WONT_BE_FILLED&quot;</span><span class="p">)</span> <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="kt">DockerTaskInput</span><span class="p">{</span> <span class="n">inputBindings</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span> <span class="n">argsVals</span> <span class="ow">=</span> <span class="n">mempty</span> <span class="p">})</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+Successfully caught exception: Docker task failed with configuration errors: [&#34;Unfilled label (WONT_BE_FILLED)&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>When the argument <em>can</em> be configured, though, as expected there's no issue:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- now the positive case, to show that the error catch is specific to an actual error and doesn&#39;t just occur generally</span>
+<span class="nf">runEcho1</span> <span class="p">(</span><span class="kt">Placeholder</span> <span class="s">&quot;WONT_BE_FILLED&quot;</span><span class="p">)</span> <span class="kt">Nothing</span> <span class="p">(</span><span class="kt">Just</span> <span class="kt">DockerTaskInput</span><span class="p">{</span> <span class="n">inputBindings</span> <span class="ow">=</span> <span class="kt">[]</span><span class="p">,</span> <span class="n">argsVals</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="n">fromList</span> <span class="p">[(</span><span class="s">&quot;WONT_BE_FILLED&quot;</span><span class="p">,</span> <span class="s">&quot;surprise!&quot;</span><span class="p">)]</span> <span class="p">})</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:34:02.737583803Z surprise!
+Unintended success :/</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="No-partial-execution:-argument-configurability-requirement-is-total."><em>No partial execution</em>: argument configurability requirement is total.<a class="anchor-link" href="#No-partial-execution:-argument-configurability-requirement-is-total.">&#182;</a></h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[19]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Set stage for config-time error.</span>
+<span class="nf">unsetEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span>
+<span class="nf">isNothing</span> <span class="o">&lt;$&gt;</span> <span class="n">lookupEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[20]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Trigger a config-time error.</span>
+<span class="kr">do</span>
+    <span class="n">res</span> <span class="ow">&lt;-</span> <span class="n">try</span> <span class="p">(</span><span class="n">runWithEmptyInput</span> <span class="p">[</span><span class="n">goodFileArg</span><span class="p">,</span> <span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;SECOND_GREETING&quot;</span><span class="p">])</span>
+    <span class="kr">case</span> <span class="n">res</span> <span class="kr">of</span> 
+        <span class="kt">Left</span> <span class="p">(</span><span class="kt">StringException</span> <span class="n">msg</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="s">&quot;Caught error: &quot;</span> <span class="o">++</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="kt">Right</span> <span class="kr">_</span> <span class="ow">-&gt;</span> <span class="ne">error</span> <span class="s">&quot;Unexpected success!&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Caught error: Missing the following required config keys: [&#34;SECOND_GREETING&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Note here that rather execution fails right away (in fact, as the flow is configuring the task, before any execution really begins).
+More specifically, rather first <code>echo</code>ing the value that our config file assigns to <code>"ourMessage"</code>, the flow catches the error before any action occurs (i.e., when the underlying task is configured, rather than as it's running).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Configuration-is-dynamic-and-prompted-by-a-run-attempt,-not-static-and-fixed-by-construction.">Configuration is dynamic and prompted by a run attempt, not static and fixed by construction.<a class="anchor-link" href="#Configuration-is-dynamic-and-prompted-by-a-run-attempt,-not-static-and-fixed-by-construction.">&#182;</a></h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Also important is that <em>configuration is dynamic</em>. Although task execution is decoupled from configuration, a new run triggers a fresh interpretation, which
+allows a flow's configuration to be reconsidered before it's run again.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[21]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- pretest</span>
+<span class="nf">unsetEnv</span> <span class="s">&quot;NOT_STATIC&quot;</span>
+<span class="nf">isNothing</span> <span class="o">&lt;$&gt;</span> <span class="n">lookupEnv</span> <span class="s">&quot;NOT_STATIC&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="kr">type</span> <span class="kt">DockFlow</span> <span class="ow">=</span> <span class="kt">Flow</span> <span class="kt">DockerTaskInput</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span>
+
+<span class="c1">-- First, a little helper to run flows for this demo</span>
+<span class="nf">runDynaDemo</span> <span class="ow">::</span> <span class="kt">DockFlow</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">runDynaDemo</span> <span class="n">currFlow</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">&lt;-</span> <span class="n">getStoreAndConfig</span>
+    <span class="n">result</span> <span class="ow">&lt;-</span> <span class="n">try</span> <span class="p">(</span> <span class="n">runFlowWithConfig</span> <span class="kt">RunFlowConfig</span><span class="p">{</span> <span class="n">configFile</span> <span class="ow">=</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="n">storePath</span> <span class="ow">=</span> <span class="n">s</span> <span class="p">}</span> <span class="n">currFlow</span> <span class="p">(</span><span class="n">mempty</span> <span class="ow">::</span> <span class="kt">DockerTaskInput</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span> <span class="p">)</span>
+    <span class="kr">case</span> <span class="n">result</span> <span class="kr">of</span>
+        <span class="kt">Left</span> <span class="p">(</span><span class="kt">StringException</span> <span class="n">msg</span> <span class="kr">_</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="p">(</span><span class="s">&quot;flow failed: &quot;</span> <span class="o">++</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="kt">Right</span> <span class="kr">_</span>                      <span class="ow">-&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;flow succeeded!&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[23]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="c1">-- Build the flow that will first fail, then succeed.</span>
+<span class="nf">dynaFlow</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="kt">DockerTaskConfig</span><span class="p">{</span> <span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;alpine:latest&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;echo&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">Arg</span> <span class="o">$</span> <span class="kt">ConfigFromEnv</span> <span class="s">&quot;NOT_STATIC&quot;</span><span class="p">]</span> <span class="p">}</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[24]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">runDynaDemo</span> <span class="n">dynaFlow</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>flow failed: Missing the following required config keys: [&#34;NOT_STATIC&#34;]</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[25]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">setEnv</span> <span class="s">&quot;NOT_STATIC&quot;</span> <span class="s">&quot;works now!&quot;</span>
+<span class="nf">isJust</span> <span class="o">&lt;$&gt;</span> <span class="n">lookupEnv</span> <span class="s">&quot;NOT_STATIC&quot;</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[26]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-Haskell"><pre><span></span><span class="nf">runDynaDemo</span> <span class="n">dynaFlow</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+
+<div class="output_area">
+
+    <div class="prompt"></div>
+
+
+
+
+<div class="output_text output_subarea ">
+<pre>Found docker images, pulling...
+Pulling docker image: alpine:latest
+2021-05-28T16:34:06.152924269Z works now!
+flow succeeded!</pre>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Besides its own practical value, this property strengthens the equivalence of functionality between files and environment variables with respect to filling configurables. Namely, each <code>runWithConfigFile</code> provides an opportunity for different configuration through <code>RunFlowConfig</code>, so it's natural for any configuration that's influenced by environment variables to be reconsidered on a per-run basis.</p>
+
+</div>
+</div>
 </div>
     </div>
   </div>
