@@ -260,7 +260,7 @@ interpretDockerTask manager store (DockerTask (DockerTaskConfig {DE.image, DE.co
                                 Placeholder label ->
                                   let maybeVal = Map.lookup label argsVals
                                    in case maybeVal of
-                                        Nothing -> Left $ "Unfilled label" ++ label
+                                        Nothing -> Left $ "Unfilled label (" ++ label ++ ")"
                                         Just val -> Right val
                             )
                             | arg <- argsRenderedWithConfig
