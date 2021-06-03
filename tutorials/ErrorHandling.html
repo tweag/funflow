@@ -13077,9 +13077,8 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="Handling-failures-in-pipelines-with-funflow">Handling failures in pipelines with funflow<a class="anchor-link" href="#Handling-failures-in-pipelines-with-funflow">&#182;</a></h1><p>A pipeline often comprises tasks that can fail.
-It is important to prevent such failures as early as possible, like funflow tries to do, but it does not forbid from preparing for it.</p>
-<p>In this tutorial, we will present how funflow allows to handle failure from tasks.</p>
+<h1 id="Handling-failures-in-pipelines-with-funflow">Handling failures in pipelines with funflow<a class="anchor-link" href="#Handling-failures-in-pipelines-with-funflow">&#182;</a></h1><p>Many pipelines are configurable, and different parameter sets may be nonsensical. Furthermore, differences in input data or the state of a network or other resources may lead to an less obvious state of error. This is to say that pipelines are somewhat inherently susceptible to encountering an exceptional condition.</p>
+<p>As such, funflow provides some facility, which we present in this tutorial, with which a pipeline may be programmed to handle errors gracefully.</p>
 
 </div>
 </div>
@@ -13087,7 +13086,7 @@ It is important to prevent such failures as early as possible, like funflow trie
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Requirements">Requirements<a class="anchor-link" href="#Requirements">&#182;</a></h2><p>This tutorial will use the following language extensions:</p>
+<h2 id="Requirements">Requirements<a class="anchor-link" href="#Requirements">&#182;</a></h2><p>This tutorial will use the following language extensions...</p>
 
 </div>
 </div>
@@ -13097,112 +13096,13 @@ It is important to prevent such failures as early as possible, like funflow trie
 <div class="prompt input_prompt">In&nbsp;[1]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-Haskell"><pre><span></span><span class="cm">{-# LANGUAGE Arrows #-}</span>
-<span class="cm">{-# LANGUAGE TypeApplications #-}</span>
-<span class="cm">{-# LANGUAGE OverloadedStrings #-}</span>
+<div class=" highlight hl-Haskell"><pre><span></span><span class="kt">:</span><span class="n">opt</span> <span class="n">no</span><span class="o">-</span><span class="n">lint</span>
+<span class="cm">{-# LANGUAGE Arrows #-}</span>               <span class="c1">-- pipeline flow syntax</span>
+<span class="cm">{-# LANGUAGE TypeApplications #-}</span>     <span class="c1">-- declaring exception types to handle</span>
+<span class="cm">{-# LANGUAGE OverloadedStrings #-}</span>    <span class="c1">-- polymorphic String typing</span>
 </pre></div>
 
     </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-
-<div class="output_html rendered_html output_subarea ">
-<style>/* Styles used for the Hoogle display in the pager */
-.hoogle-doc {
-display: block;
-padding-bottom: 1.3em;
-padding-left: 0.4em;
-}
-.hoogle-code {
-display: block;
-font-family: monospace;
-white-space: pre;
-}
-.hoogle-text {
-display: block;
-}
-.hoogle-name {
-color: green;
-font-weight: bold;
-}
-.hoogle-head {
-font-weight: bold;
-}
-.hoogle-sub {
-display: block;
-margin-left: 0.4em;
-}
-.hoogle-package {
-font-weight: bold;
-font-style: italic;
-}
-.hoogle-module {
-font-weight: bold;
-}
-.hoogle-class {
-font-weight: bold;
-}
-.get-type {
-color: green;
-font-weight: bold;
-font-family: monospace;
-display: block;
-white-space: pre-wrap;
-}
-.show-type {
-color: green;
-font-weight: bold;
-font-family: monospace;
-margin-left: 1em;
-}
-.mono {
-font-family: monospace;
-display: block;
-}
-.err-msg {
-color: red;
-font-style: italic;
-font-family: monospace;
-white-space: pre;
-display: block;
-}
-#unshowable {
-color: red;
-font-weight: bold;
-}
-.err-msg.in.collapse {
-padding-top: 0.7em;
-}
-.highlight-code {
-white-space: pre;
-font-family: monospace;
-}
-.suggestion-warning { 
-font-weight: bold;
-color: rgb(200, 130, 0);
-}
-.suggestion-error { 
-font-weight: bold;
-color: red;
-}
-.suggestion-name {
-font-weight: bold;
-}
-</style><div class="suggestion-name" style="clear:both;">Unused LANGUAGE pragma</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">{-# LANGUAGE Arrows #-}</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell"></div></div><div class="suggestion-name" style="clear:both;">Unused LANGUAGE pragma</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">{-# LANGUAGE TypeApplications #-}</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell"></div></div><div class="suggestion-name" style="clear:both;">Unused LANGUAGE pragma</div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Found:</div><div class="highlight-code" id="haskell">{-# LANGUAGE OverloadedStrings #-}</div></div><div class="suggestion-row" style="float: left;"><div class="suggestion-warning">Why Not:</div><div class="highlight-code" id="haskell"></div></div>
-</div>
-
-</div>
-
 </div>
 </div>
 
@@ -13210,7 +13110,7 @@ font-weight: bold;
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>and imports:</p>
+<p>...and imports...</p>
 
 </div>
 </div>
@@ -13234,7 +13134,7 @@ font-weight: bold;
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Handle-a-task-that-can-fail">Handle a task that can fail<a class="anchor-link" href="#Handle-a-task-that-can-fail">&#182;</a></h2><p>Let's imagine that we write a task that can fail, such as a Docker task:</p>
+<h2 id="Handle-a-task-that-can-fail">Handle a task that can fail<a class="anchor-link" href="#Handle-a-task-that-can-fail">&#182;</a></h2><p>Let's write a flow, based on a <code>DockerTask</code>, which will fail:</p>
 
 </div>
 </div>
@@ -13245,7 +13145,7 @@ font-weight: bold;
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-Haskell"><pre><span></span><span class="nf">someFlowThatFails</span> <span class="ow">::</span> <span class="kt">Flow</span> <span class="kt">DockerTaskInput</span> <span class="kt">CS</span><span class="o">.</span><span class="kt">Item</span>
-<span class="nf">someFlowThatFails</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="p">(</span><span class="kt">DockerTaskConfig</span> <span class="p">{</span><span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;badImageName&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;badCommand&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">Placeholder</span> <span class="s">&quot;missingArgument&quot;</span><span class="p">]})</span>
+<span class="nf">someFlowThatFails</span> <span class="ow">=</span> <span class="n">dockerFlow</span> <span class="kt">DockerTaskConfig</span><span class="p">{</span> <span class="n">image</span> <span class="ow">=</span> <span class="s">&quot;badImageName&quot;</span><span class="p">,</span> <span class="n">command</span> <span class="ow">=</span> <span class="s">&quot;badCommand&quot;</span><span class="p">,</span> <span class="n">args</span> <span class="ow">=</span> <span class="p">[</span><span class="kt">Placeholder</span> <span class="s">&quot;missingArgument&quot;</span><span class="p">]</span> <span class="p">}</span>
 </pre></div>
 
     </div>
@@ -13256,19 +13156,15 @@ font-weight: bold;
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>this flow can possibly fail for different reasons:</p>
+<p>As may be clear, this flow demonstrates several reasons a flow may fail:</p>
 <ul>
-<li>the image name does not exist or cannot be pulled</li>
+<li>the Docker image name does not exist or cannot be pulled</li>
+<li>improper argument configuration (e.g., a placeholder isn't filled)</li>
 <li>the command does not exist</li>
-<li>the command exists with an error code</li>
-<li>one of the placeholder arguments is not filled</li>
+<li>command execution fails</li>
 </ul>
-<blockquote><p>More about that in the API documentation of the Docker task.</p>
-</blockquote>
-<p>If we were to directly run this flow, the workflow would terminate as soon as an exception would be thrown.</p>
-<p>In order to handle the exception, we have to use funflow's <code>tryE</code> function.
-This function transforms a <code>Flow i o</code> that can throw an exception of type <code>ex</code> into a flow of type <code>Flow i (Either ex o)</code>.
-This means that the result of the flow is either the exception on the left or the result on the right.</p>
+<p>In fact, if we were to try to run this flow directly with <code>runFlow</code> or <code>runFlowWithConfig</code>, nothing in a container would ever be done. An attempt to fetch <code>"badImageName"</code> would fail, but execution of the above flow would actually never proceed to the fetch attempt. Instead, the flow would fail at <em>configuration time</em>, as the task was being "interpreted," since we've not defined how to fill the placeholder <code>"missingArgument"</code>.</p>
+<p>To prepare a flow for exception(s), we can use funflow's <code>tryE</code> function, which broadens the output type to accommodate potential for specific exception types. Specifically, <code>tryE</code> transforms a <code>Flow i o</code> that can throw an exception of type <code>ex</code> into a flow of type <code>Flow i (Either ex o)</code>. This means that the result of the flow is either the exception on the left or the result on the right. This transformation means that occurrence of some types of exception will <em>no longer be fatal</em>! Instead, the flow will be able to produce an exception of the declared type as a value, allowing downstream logic to process it and act accordingly.</p>
 
 </div>
 </div>
@@ -13297,11 +13193,10 @@ This means that the result of the flow is either the exception on the left or th
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>In this example, we run the docker task, but we wrap it with the <code>tryE</code> function in order to receive the exception if any is thrown.
-We can then decide on how the rest of the pipeline behaves after the task, even if it failed.
-We could for instance log the exception to a file or realise cleaning operations.</p>
-<p>Note that we had to specify which type of exception we were excepting to have when writing <code>(result :: Either SomeException CS.Item)</code>.
-This requires the <code>ScopedTypeVariables</code> extension.</p>
+<p>In this example, to catch <em>any</em> exception, we use <code>tryE</code> to wrap execution of the Docker task.
+We can then decide how the rest of the pipeline behaves, since we've catpured the result--exceptional or not--in a value of a broadened result type. We could, for instance, in case of an exception, write logging information to a file and/or run cleanup operations.</p>
+<p>Notice that we had to <strong>specify which type of exceptions</strong> will be handled: <code>tryE @SomeException...</code>. As such, <code>tryE</code> requires explicit specification regarding the extent of exception types the pipeline will handle; in turn, this feature requires the <a href="https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/type_applications.html"><code>TypeApplications</code> extension</a>.</p>
+<p>Also note that the several potential failure causes mentioned above are ordered chronologically by when each may be encountered during an run attempt. Because the first two--unknown image name and illegal configuration--occur during <em>task interpretation</em>, before actual execution begins, those error causes cannot be protected by <code>tryE</code>. They may be handled with ordinary machinery for exceptional control flow, though, e.g. using the <code>Control.Exception</code> API. In addition to more standard exceptions relating to things like filesystem permissions and network requests, funflow provides some custom error types around which you may wish to program a flow, particularly those in <code>Data.CAS.ContentStore</code>, <code>Data.CAS.RemoteCache</code>, and <code>Docker.API.Client</code>.</p>
 
 </div>
 </div>
@@ -13309,9 +13204,8 @@ This requires the <code>ScopedTypeVariables</code> extension.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Throwing-exceptions-in-a-workflow">Throwing exceptions in a workflow<a class="anchor-link" href="#Throwing-exceptions-in-a-workflow">&#182;</a></h2><p>The implementation of tasks will most often throw an exception whenever something has failed.
-However, sometimes, based on the result of a computation, you want to decide that a task has failed.</p>
-<p>In funflow, it is possible for you to throw an exception manually, using <code>throwStringFlow</code>:</p>
+<h2 id="Throwing-exceptions-in-a-workflow">Throwing exceptions in a workflow<a class="anchor-link" href="#Throwing-exceptions-in-a-workflow">&#182;</a></h2><p>A task will may fail on its own, when an exception arises. Sometimes, however, you may want to <em>decide</em> that a task has failed, based on the actual value of a computed result.</p>
+<p>In funflow, it is possible for you to throw an exception manually, using <code>throwStringFlow</code>...</p>
 
 </div>
 </div>
@@ -13339,7 +13233,7 @@ However, sometimes, based on the result of a computation, you want to decide tha
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>you can then handle the failure as previously demonstrated:</p>
+<p>...you can then handle the failure as previously demonstrated...</p>
 
 </div>
 </div>
