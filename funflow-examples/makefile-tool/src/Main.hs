@@ -46,7 +46,11 @@ import Path
     filename,
     fromAbsDir,
     fromAbsFile,
+    fromRelFile,
+    parent,
     parseRelFile,
+    parseAbsDir, 
+    parseAbsFile,
     reldir,
     relfile,
     toFilePath,
@@ -154,9 +158,13 @@ buildTarget storeRoot mkfile target@(MakeRule targetNm deps cmd) =
           let depTargetActions = mapM (buildTarget storeRoot mkfile) depRules
               grabSrcsActions = mapM (readFile . ("./" ++))
            in do
+                putStrLn ("needed targets: " ++ show neededTargets)
+                putStrLn ("needed sources: " ++ show neededSources)
+                putStrLn ("depRules: " ++ show depRules)
                 guard (target `Set.member` (allrules mkfile))
                 contentSrcFiles <- grabSrcsActions neededSources
                 depFiles <- depTargetActions
+                putStrLn ("depFiles: " ++ show depFiles)
                 let fullSrcFiles = Map.fromList $ zip neededSources contentSrcFiles
                     runCfg = runConfigWithoutFile storeRoot
                 compFile <- runFlowWithConfig runCfg (compileFile storeRoot) (targetNm, fullSrcFiles, depFiles, cmd)
@@ -174,22 +182,35 @@ findRules MakeFile {allrules = rules} ts = do
 -- | Compiles a C file in a docker container.
 compileFile :: Path Abs Dir -> Flow (TargetFile, Map.Map SourceFile String, [Content File], Command) (Content File)
 compileFile root =
-  ioFlow
+  let sandbox = "/sandbox"
+  in ioFlow
     ( \(tf, srcDeps, tarDeps, cmd) -> do
+        putStrLn ("Target: " ++ show tf)
+        putStrLn ("Command: " ++ cmd)
+        putStrLn ("srcDeps: " ++ show (Map.keysSet srcDeps))
+        CS.withStore root (\s -> do
+          let tarDepPaths = map (toFilePath . CS.contentPath s) tarDeps
+          putStrLn ("tarDeps: " ++ show tarDepPaths))
         srcsInStore <- write2StoreRaw root srcDeps
         let inputFilesInStore = srcsInStore ++ tarDeps
-        inputDir <- mergeFilesRaw root inputFilesInStore
-        let scriptSrc =
+        --inputDir <- mergeFilesRaw root (Just sandbox) inputFilesInStore
+        inputDir <- mergeFilesRaw root Nothing inputFilesInStore
+        let finalCmd = cmd ++ " -o " ++ tf
+            scriptSrc =
               "#!/usr/bin/env bash\n\
               \echo arg1: $1\n\
-              \cd $1 \n"
-                ++ cmd
-                ++ " -o /sandbox/"
-                ++ tf
+              \cp $1/*.* $PWD && echo 'done copying' \n\
+              \echo 'contents below:'\n\
+              \ls $PWD\n"
+                ++ finalCmd
+                ++ "\n"
+        putStrLn ("Final command: " ++ finalCmd)
         (compileItem, compileContent) <- writeExecStrRaw root (scriptSrc, [relfile|script.sh|])
         compilePath <- CS.withStore root (\s -> return (CS.contentPath s compileContent))
-        putStrLn ("Compile script: " ++ (toFilePath compilePath))
+        putStrLn ("Compile script: " ++ show compilePath)
         relpathCompiledFile <- parseRelFile tf
+        putStrLn ("relpathCompiledFile: " ++ show relpathCompiledFile)
+        inputMount <- parseAbsDir sandbox
         let runCfg = runConfigWithoutFile root
             depIt = CS.contentItem inputDir :: CS.Item
             gccCfg =
@@ -197,10 +218,11 @@ compileFile root =
                 { DE.image = "gcc:7.3.0",
                   DE.command = "/script/script.sh",
                   --DE.args = [DE.Arg . Literal . Text.pack . toFilePath $ CS.itemRelPath depIt]
-                  DE.args = ["/sandbox/"]
+                  DE.args = [DE.Arg . Literal $ Text.pack sandbox]
                 }
             scriptVol = DE.VolumeBinding {DE.item = compileItem, DE.mount = [absdir|/script/|]}
-            inputVol = DE.VolumeBinding {DE.item = depIt, DE.mount = [absdir|/sandbox/|]}
+            --inputVol = DE.VolumeBinding {DE.item = depIt, DE.mount = [absdir|/sandbox/|]}
+            inputVol = DE.VolumeBinding {DE.item = depIt, DE.mount = inputMount }
             taskIn = DE.DockerTaskInput {DE.inputBindings = [inputVol, scriptVol], DE.argsVals = mempty}
         (CS.:</> relpathCompiledFile) <$> runFlowWithConfig runCfg (dockerFlow gccCfg) taskIn
     )
@@ -208,13 +230,30 @@ compileFile root =
 -- Note: type SourceFile = String.
 -- Note: TargetFile is the name of the file.
 
-mergeFilesRaw :: Path Abs Dir -> [CS.Content File] -> IO (CS.Content Dir)
-mergeFilesRaw root fs = CS.withStore root (\s -> merge s fs)
+mergeFilesRaw :: Path Abs Dir -> Maybe String -> [CS.Content File] -> IO (CS.Content Dir)
+mergeFilesRaw root relFolderOpt fs = CS.withStore root (\s -> merge s fs)
   where
     merge store files =
-      let absFiles = map (CS.contentPath store) files
-          linkIn d = mapM_ (\f -> createLink (toFilePath f) (toFilePath $ d </> filename f))
-       in CS.All <$> CS.putInStore store RC.NoCache (\_ -> return (error "uh-oh!")) linkIn absFiles
+      let storeBased f = return $ CS.contentPath store f
+          pathBased fldr f = 
+            let grandparentPath = parent $ CS.contentPath store f
+                parentPath = toFilePath grandparentPath ++ fldr
+            in parseAbsFile $ parentPath ++ toFilePath (CS.contentFilename f)
+          getAbs Nothing = storeBased
+          getAbs (Just "") = storeBased
+          getAbs (Just ('/':folder)) = pathBased folder
+          getAbs (Just folder) = pathBased folder
+          --absFiles = map (CS.contentPath store) files
+          linkIn d = mapM_ (\f -> do
+            let realPath = toFilePath f
+                linkPath = toFilePath $ d </> filename f
+            putStrLn ("Real: " ++ realPath)
+            putStrLn ("Link: " ++ linkPath)
+            createLink realPath linkPath
+            )
+       in do
+         absFiles <- mapM (getAbs relFolderOpt) files :: IO [Path Abs File]
+         CS.All <$> CS.putInStore store RC.NoCache (\_ -> return (error "uh-oh!")) linkIn absFiles
 
 writeExecStrRaw :: Path Abs Dir -> (String, Path Rel File) -> IO (CS.Item, CS.Content File)
 writeExecStrRaw d = putInStoreAtRaw d (\p x -> writeFile (fromAbsFile p) x >> setFileMode (fromAbsFile p) accessModes)
