@@ -43,6 +43,10 @@
       docker-client-tests = project.docker-client.components.tests.primary.overrideAttrs (old:
         { buildInputs = old.buildInputs ++ [ super.docker ]; }
       );
+      # Also include kernmantle for references in the docs
+      kernmantle = project.kernmantle.components.library;
+      kernmantle-batteries = project.kernmantle-batteries.components.library;
+      kernmantle-caching = project.kernmantle-caching.components.library;
     }
   )
 
@@ -94,6 +98,9 @@
             cas-hashable-s3
             external-executor
             docker-client
+            kernmantle
+            kernmantle-batteries
+            kernmantle-caching
           ];
         in
           self.haddock-combine { hspkgs = doc-libs; };

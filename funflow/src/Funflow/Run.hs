@@ -64,8 +64,8 @@ import Docker.API.Client
   )
 import Funflow.Config (ConfigKeysBySource (..), Configurable (..), ExternalConfig (..), missing, readEnvs, readYamlFileConfig)
 import Funflow.Flow (RequiredCore, RequiredStrands)
-import Funflow.Run.Orphans ()
 import Funflow.Flow.Orphans ()
+import Funflow.Run.Orphans ()
 import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
     DockerTask (DockerTask),
@@ -98,8 +98,12 @@ data RunFlowConfig = RunFlowConfig
   }
 
 -- | Run a flow, parsing any required `Configurable` values from their respective sources.
--- Note that this method does NOT provide an implementation of parsing ConfigFromCLI
--- values at the moment.
+-- This flow executor includes interpreters for the following tasks:
+--
+--  * `SimpleTask`
+--  * `StoreTask`
+--  * `DockerTask` - The container is run with working directory '/workdir'. Files written to this directory
+--    are included in the tasks's `CS.Item` output.
 runFlowWithConfig ::
   -- | The configuration of the flow
   RunFlowConfig ->
