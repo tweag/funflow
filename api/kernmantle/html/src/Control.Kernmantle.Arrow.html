@@ -1,0 +1,1383 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE Arrows #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE BangPatterns #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE FunctionalDependencies #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- | Helper functions for Arrow effects</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Kernmantle.Arrow</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Category</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">uncons</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier">Data.Profunctor</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier">Data.Profunctor.Cayley</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.Trans.html"><span class="hs-identifier">Data.Profunctor.Trans</span></a></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier">Data.Profunctor.Traversing</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Ratio</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Kernmantle.Error.html"><span class="hs-identifier">Control.Kernmantle.Error</span></a></span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(.)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- | Map an arrow over a list using (***)</span><span>
+</span><span id="line-31"></span><span id="local-6989586621679110983"><span id="local-6989586621679110984"><span id="local-6989586621679110985"><span class="annot"><a href="Control.Kernmantle.Arrow.html#parMapA"><span class="hs-identifier hs-type">parMapA</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110985"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110985"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110984"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110983"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110985"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110984"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110983"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">]</span></span></span></span><span>
+</span><span id="line-32"></span><span id="parMapA"><span class="annot"><span class="annottext">parMapA :: a b c -&gt; a [b] [c]
+</span><a href="Control.Kernmantle.Arrow.html#parMapA"><span class="hs-identifier hs-var hs-var">parMapA</span></a></span></span><span> </span><span id="local-6989586621679110650"><span class="annot"><span class="annottext">f :: a b c
+</span><a href="#local-6989586621679110650"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">([b] -&gt; Either () (b, [b])) -&gt; a [b] (Either () (b, [b]))
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Either () (b, [b])
+-&gt; ((b, [b]) -&gt; Either () (b, [b]))
+-&gt; Maybe (b, [b])
+-&gt; Either () (b, [b])
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; Either () (b, [b])
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(b, [b]) -&gt; Either () (b, [b])
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">(Maybe (b, [b]) -&gt; Either () (b, [b]))
+-&gt; ([b] -&gt; Maybe (b, [b])) -&gt; [b] -&gt; Either () (b, [b])
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[b] -&gt; Maybe (b, [b])
+forall a. [a] -&gt; Maybe (a, [a])
+</span><span class="hs-identifier hs-var">uncons</span></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span>      </span><span class="annot"><span class="annottext">a [b] (Either () (b, [b]))
+-&gt; a (Either () (b, [b])) [c] -&gt; a [b] [c]
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(() -&gt; [c]) -&gt; a () [c]
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[c] -&gt; () -&gt; [c]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a () [c] -&gt; a (b, [b]) [c] -&gt; a (Either () (b, [b])) [c]
+forall (a :: * -&gt; * -&gt; *) b d c.
+ArrowChoice a =&gt;
+a b d -&gt; a c d -&gt; a (Either b c) d
+</span><span class="hs-operator hs-var">|||</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">a b c
+</span><a href="#local-6989586621679110650"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a b c -&gt; a [b] [c] -&gt; a (b, [b]) (c, [c])
+forall (a :: * -&gt; * -&gt; *) b c b' c'.
+Arrow a =&gt;
+a b c -&gt; a b' c' -&gt; a (b, b') (c, c')
+</span><span class="hs-operator hs-var">***</span></span><span> </span><span class="annot"><span class="annottext">a b c -&gt; a [b] [c]
+forall (a :: * -&gt; * -&gt; *) b c. ArrowChoice a =&gt; a b c -&gt; a [b] [c]
+</span><a href="Control.Kernmantle.Arrow.html#parMapA"><span class="hs-identifier hs-var">parMapA</span></a></span><span> </span><span class="annot"><span class="annottext">a b c
+</span><a href="#local-6989586621679110650"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a (b, [b]) (c, [c]) -&gt; a (c, [c]) [c] -&gt; a (b, [b]) [c]
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">((c, [c]) -&gt; [c]) -&gt; a (c, [c]) [c]
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(c -&gt; [c] -&gt; [c]) -&gt; (c, [c]) -&gt; [c]
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- | Map an arrow over a list using (&gt;&gt;&gt;) and 'first'</span><span>
+</span><span id="line-36"></span><span id="local-6989586621679110641"><span id="local-6989586621679110642"><span id="local-6989586621679110643"><span class="annot"><a href="Control.Kernmantle.Arrow.html#seqMapA"><span class="hs-identifier hs-type">seqMapA</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110643"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110643"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110642"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110641"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110643"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110642"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110641"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">]</span></span></span></span><span>
+</span><span id="line-37"></span><span id="seqMapA"><span class="annot"><span class="annottext">seqMapA :: a b c -&gt; a [b] [c]
+</span><a href="Control.Kernmantle.Arrow.html#seqMapA"><span class="hs-identifier hs-var hs-var">seqMapA</span></a></span></span><span> </span><span id="local-6989586621679110639"><span class="annot"><span class="annottext">f :: a b c
+</span><a href="#local-6989586621679110639"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">([b] -&gt; Either () (b, [b])) -&gt; a [b] (Either () (b, [b]))
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Either () (b, [b])
+-&gt; ((b, [b]) -&gt; Either () (b, [b]))
+-&gt; Maybe (b, [b])
+-&gt; Either () (b, [b])
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; Either () (b, [b])
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(b, [b]) -&gt; Either () (b, [b])
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">(Maybe (b, [b]) -&gt; Either () (b, [b]))
+-&gt; ([b] -&gt; Maybe (b, [b])) -&gt; [b] -&gt; Either () (b, [b])
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[b] -&gt; Maybe (b, [b])
+forall a. [a] -&gt; Maybe (a, [a])
+</span><span class="hs-identifier hs-var">uncons</span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>            </span><span class="annot"><span class="annottext">a [b] (Either () (b, [b]))
+-&gt; a (Either () (b, [b])) [c] -&gt; a [b] [c]
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(() -&gt; [c]) -&gt; a () [c]
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[c] -&gt; () -&gt; [c]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a () [c] -&gt; a (b, [b]) [c] -&gt; a (Either () (b, [b])) [c]
+forall (a :: * -&gt; * -&gt; *) b d c.
+ArrowChoice a =&gt;
+a b d -&gt; a c d -&gt; a (Either b c) d
+</span><span class="hs-operator hs-var">|||</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">a b c -&gt; a (b, [b]) (c, [b])
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (b, d) (c, d)
+</span><span class="hs-identifier hs-var">first</span></span><span> </span><span class="annot"><span class="annottext">a b c
+</span><a href="#local-6989586621679110639"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a (b, [b]) (c, [b]) -&gt; a (c, [b]) (c, [c]) -&gt; a (b, [b]) (c, [c])
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">a [b] [c] -&gt; a (c, [b]) (c, [c])
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (d, b) (d, c)
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a b c -&gt; a [b] [c]
+forall (a :: * -&gt; * -&gt; *) b c. ArrowChoice a =&gt; a b c -&gt; a [b] [c]
+</span><a href="Control.Kernmantle.Arrow.html#seqMapA"><span class="hs-identifier hs-var">seqMapA</span></a></span><span> </span><span class="annot"><span class="annottext">a b c
+</span><a href="#local-6989586621679110639"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>                                     </span><span class="annot"><span class="annottext">a (b, [b]) (c, [c]) -&gt; a (c, [c]) [c] -&gt; a (b, [b]) [c]
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">((c, [c]) -&gt; [c]) -&gt; a (c, [c]) [c]
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(c -&gt; [c] -&gt; [c]) -&gt; (c, [c]) -&gt; [c]
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | Repeats an arrow step in order to fold a list</span><span>
+</span><span id="line-42"></span><span id="local-6989586621679110962"><span id="local-6989586621679110963"><span id="local-6989586621679110964"><span class="annot"><a href="Control.Kernmantle.Arrow.html#foldlA"><span class="hs-identifier hs-type">foldlA</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110964"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110964"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110963"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679110962"><span class="hs-identifier hs-type">acc</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679110962"><span class="hs-identifier hs-type">acc</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110964"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110963"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679110962"><span class="hs-identifier hs-type">acc</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679110962"><span class="hs-identifier hs-type">acc</span></a></span></span></span></span><span>
+</span><span id="line-43"></span><span id="foldlA"><span class="annot"><span class="annottext">foldlA :: a (b, acc) acc -&gt; a ([b], acc) acc
+</span><a href="Control.Kernmantle.Arrow.html#foldlA"><span class="hs-identifier hs-var hs-var">foldlA</span></a></span></span><span> </span><span id="local-6989586621679110636"><span class="annot"><span class="annottext">f :: a (b, acc) acc
+</span><a href="#local-6989586621679110636"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">proc</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110635"><span class="annot"><span class="annottext">input :: [b]
+</span><a href="#local-6989586621679110635"><span class="hs-identifier hs-var">input</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679110634"><span class="annot"><span class="annottext">acc :: acc
+</span><a href="#local-6989586621679110634"><span class="hs-identifier hs-var">acc</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110635"><span class="hs-identifier hs-var">input</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a acc acc
+forall (a :: * -&gt; * -&gt; *) b. Arrow a =&gt; a b b
+</span><span class="hs-identifier hs-var">returnA</span></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="annot"><span class="annottext">acc
+</span><a href="#local-6989586621679110634"><span class="hs-identifier hs-var">acc</span></a></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679110632"><span class="annot"><span class="annottext">x :: b
+</span><a href="#local-6989586621679110632"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span id="local-6989586621679110631"><span class="annot"><span class="annottext">xs :: [b]
+</span><a href="#local-6989586621679110631"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-47"></span><span>      </span><span class="hs-glyph">!</span><span id="local-6989586621679110630"><span class="annot"><span class="annottext">acc
+</span><a href="#local-6989586621679110630"><span class="hs-identifier hs-var">acc'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">a (b, acc) acc
+</span><a href="#local-6989586621679110636"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679110632"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">acc
+</span><a href="#local-6989586621679110634"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>      </span><span class="annot"><span class="annottext">a (b, acc) acc -&gt; a ([b], acc) acc
+forall (a :: * -&gt; * -&gt; *) b acc.
+ArrowChoice a =&gt;
+a (b, acc) acc -&gt; a ([b], acc) acc
+</span><a href="Control.Kernmantle.Arrow.html#foldlA"><span class="hs-identifier hs-var">foldlA</span></a></span><span> </span><span class="annot"><span class="annottext">a (b, acc) acc
+</span><a href="#local-6989586621679110636"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110631"><span class="hs-identifier hs-var">xs</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">acc
+</span><a href="#local-6989586621679110630"><span class="hs-identifier hs-var">acc'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- | Filter a list given an arrow filter</span><span>
+</span><span id="line-51"></span><span id="local-6989586621679110958"><span id="local-6989586621679110959"><span class="annot"><a href="Control.Kernmantle.Arrow.html#filterA"><span class="hs-identifier hs-type">filterA</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110959"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110959"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110958"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110959"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110958"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679110958"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">]</span></span></span><span>
+</span><span id="line-52"></span><span id="filterA"><span class="annot"><span class="annottext">filterA :: a b Bool -&gt; a [b] [b]
+</span><a href="Control.Kernmantle.Arrow.html#filterA"><span class="hs-identifier hs-var hs-var">filterA</span></a></span></span><span> </span><span id="local-6989586621679110628"><span class="annot"><span class="annottext">f :: a b Bool
+</span><a href="#local-6989586621679110628"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">proc</span><span> </span><span id="local-6989586621679110627"><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110627"><span class="hs-identifier hs-var">xs</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110627"><span class="hs-identifier hs-var">xs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a [b] [b]
+forall (a :: * -&gt; * -&gt; *) b. Arrow a =&gt; a b b
+</span><span class="hs-identifier hs-var">returnA</span></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679110626"><span class="annot"><span class="annottext">y :: b
+</span><a href="#local-6989586621679110626"><span class="hs-identifier hs-var">y</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span id="local-6989586621679110625"><span class="annot"><span class="annottext">ys :: [b]
+</span><a href="#local-6989586621679110625"><span class="hs-identifier hs-var">ys</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-56"></span><span>      </span><span id="local-6989586621679110624"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110624"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">a b Bool
+</span><a href="#local-6989586621679110628"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679110626"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-57"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110624"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="hs-keyword">then</span><span>
+</span><span id="line-58"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a [b] [b] -&gt; a (b, [b]) (b, [b])
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (d, b) (d, c)
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a b Bool -&gt; a [b] [b]
+forall (a :: * -&gt; * -&gt; *) b. ArrowChoice a =&gt; a b Bool -&gt; a [b] [b]
+</span><a href="Control.Kernmantle.Arrow.html#filterA"><span class="hs-identifier hs-var">filterA</span></a></span><span> </span><span class="annot"><span class="annottext">a b Bool
+</span><a href="#local-6989586621679110628"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a (b, [b]) (b, [b]) -&gt; a (b, [b]) [b] -&gt; a (b, [b]) [b]
+forall k (cat :: k -&gt; k -&gt; *) (a :: k) (b :: k) (c :: k).
+Category cat =&gt;
+cat a b -&gt; cat b c -&gt; cat a c
+</span><span class="hs-operator hs-var">&gt;&gt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">((b, [b]) -&gt; [b]) -&gt; a (b, [b]) [b]
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; [b] -&gt; [b]) -&gt; (b, [b]) -&gt; [b]
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679110626"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110625"><span class="hs-identifier hs-var">ys</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>      </span><span class="hs-keyword">else</span><span>
+</span><span id="line-60"></span><span>        </span><span class="annot"><span class="annottext">a b Bool -&gt; a [b] [b]
+forall (a :: * -&gt; * -&gt; *) b. ArrowChoice a =&gt; a b Bool -&gt; a [b] [b]
+</span><a href="Control.Kernmantle.Arrow.html#filterA"><span class="hs-identifier hs-var">filterA</span></a></span><span> </span><span class="annot"><span class="annottext">a b Bool
+</span><a href="#local-6989586621679110628"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="annot"><span class="annottext">[b]
+</span><a href="#local-6989586621679110625"><span class="hs-identifier hs-var">ys</span></a></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- | If a 'TryEffect' is also an 'ArrowChoice', then we can implement catch</span><span>
+</span><span id="line-63"></span><span id="local-6989586621679110620"><span id="local-6989586621679110621"><span id="local-6989586621679110622"><span id="local-6989586621679110623"><span class="annot"><a href="Control.Kernmantle.Arrow.html#catchE"><span class="hs-identifier hs-type">catchE</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Error.html#TryEffect"><span class="hs-identifier hs-type">TryEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110623"><span class="hs-identifier hs-type">ex</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110622"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110622"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>       </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110622"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110621"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110620"><span class="hs-identifier hs-type">c</span></a></span><span>  </span><span class="hs-comment">-- ^ The effect to wrap</span><span>
+</span><span id="line-65"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110622"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110621"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679110623"><span class="hs-identifier hs-type">ex</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679110620"><span class="hs-identifier hs-type">c</span></a></span><span>  </span><span class="hs-comment">-- ^ What to do in case of exception</span><span>
+</span><span id="line-66"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110622"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110621"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110620"><span class="hs-identifier hs-type">c</span></a></span></span></span></span></span><span>
+</span><span id="line-67"></span><span id="catchE"><span class="annot"><span class="annottext">catchE :: eff e c -&gt; eff (e, ex) c -&gt; eff e c
+</span><a href="Control.Kernmantle.Arrow.html#catchE"><span class="hs-identifier hs-var hs-var">catchE</span></a></span></span><span> </span><span id="local-6989586621679110618"><span class="annot"><span class="annottext">a :: eff e c
+</span><a href="#local-6989586621679110618"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110617"><span class="annot"><span class="annottext">onExc :: eff (e, ex) c
+</span><a href="#local-6989586621679110617"><span class="hs-identifier hs-var">onExc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">proc</span><span> </span><span id="local-6989586621679110616"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679110616"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-68"></span><span>  </span><span id="local-6989586621679110615"><span class="annot"><span class="annottext">Either ex c
+</span><a href="#local-6989586621679110615"><span class="hs-identifier hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">eff e c -&gt; eff e (Either ex c)
+forall ex (eff :: * -&gt; * -&gt; *) a b.
+TryEffect ex eff =&gt;
+eff a b -&gt; eff a (Either ex b)
+</span><a href="Control.Kernmantle.Error.html#tryE"><span class="hs-identifier hs-var">tryE</span></a></span><span> </span><span class="annot"><span class="annottext">eff e c
+</span><a href="#local-6989586621679110618"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679110616"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either ex c
+</span><a href="#local-6989586621679110615"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-70"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679110613"><span class="annot"><span class="annottext">ex :: ex
+</span><a href="#local-6989586621679110613"><span class="hs-identifier hs-var">ex</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-71"></span><span>      </span><span class="annot"><span class="annottext">eff (e, ex) c
+</span><a href="#local-6989586621679110617"><span class="hs-identifier hs-var">onExc</span></a></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679110616"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ex
+</span><a href="#local-6989586621679110613"><span class="hs-identifier hs-var">ex</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679110612"><span class="annot"><span class="annottext">r :: c
+</span><a href="#local-6989586621679110612"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-73"></span><span>      </span><span class="annot"><span class="annottext">eff c c
+forall (a :: * -&gt; * -&gt; *) b. Arrow a =&gt; a b b
+</span><span class="hs-identifier hs-var">returnA</span></span><span> </span><span class="hs-glyph">-&lt;</span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621679110612"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- | A SplitId is a ratio of two positive numbers</span><span>
+</span><span id="line-76"></span><span id="local-6989586621679110610"><span id="local-6989586621679110611"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="SplitId"><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-var">SplitId</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SplitId"><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-var">SplitId</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ratio</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word</span></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. SplitId -&gt; Rep SplitId x)
+-&gt; (forall x. Rep SplitId x -&gt; SplitId) -&gt; Generic SplitId
+forall x. Rep SplitId x -&gt; SplitId
+forall x. SplitId -&gt; Rep SplitId x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SplitId x -&gt; SplitId
+$cfrom :: forall x. SplitId -&gt; Rep SplitId x
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110602"><span id="local-6989586621679110604"><span class="annot"><span class="annottext">SplitId -&gt; SplitId -&gt; Bool
+(SplitId -&gt; SplitId -&gt; Bool)
+-&gt; (SplitId -&gt; SplitId -&gt; Bool) -&gt; Eq SplitId
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SplitId -&gt; SplitId -&gt; Bool
+$c/= :: SplitId -&gt; SplitId -&gt; Bool
+== :: SplitId -&gt; SplitId -&gt; Bool
+$c== :: SplitId -&gt; SplitId -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110586"><span id="local-6989586621679110588"><span id="local-6989586621679110590"><span id="local-6989586621679110592"><span id="local-6989586621679110594"><span id="local-6989586621679110596"><span id="local-6989586621679110598"><span class="annot"><span class="annottext">Eq SplitId
+Eq SplitId =&gt;
+(SplitId -&gt; SplitId -&gt; Ordering)
+-&gt; (SplitId -&gt; SplitId -&gt; Bool)
+-&gt; (SplitId -&gt; SplitId -&gt; Bool)
+-&gt; (SplitId -&gt; SplitId -&gt; Bool)
+-&gt; (SplitId -&gt; SplitId -&gt; Bool)
+-&gt; (SplitId -&gt; SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId -&gt; SplitId)
+-&gt; Ord SplitId
+SplitId -&gt; SplitId -&gt; Bool
+SplitId -&gt; SplitId -&gt; Ordering
+SplitId -&gt; SplitId -&gt; SplitId
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: SplitId -&gt; SplitId -&gt; SplitId
+$cmin :: SplitId -&gt; SplitId -&gt; SplitId
+max :: SplitId -&gt; SplitId -&gt; SplitId
+$cmax :: SplitId -&gt; SplitId -&gt; SplitId
+&gt;= :: SplitId -&gt; SplitId -&gt; Bool
+$c&gt;= :: SplitId -&gt; SplitId -&gt; Bool
+&gt; :: SplitId -&gt; SplitId -&gt; Bool
+$c&gt; :: SplitId -&gt; SplitId -&gt; Bool
+&lt;= :: SplitId -&gt; SplitId -&gt; Bool
+$c&lt;= :: SplitId -&gt; SplitId -&gt; Bool
+&lt; :: SplitId -&gt; SplitId -&gt; Bool
+$c&lt; :: SplitId -&gt; SplitId -&gt; Bool
+compare :: SplitId -&gt; SplitId -&gt; Ordering
+$ccompare :: SplitId -&gt; SplitId -&gt; Ordering
+$cp1Ord :: Eq SplitId
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110571"><span id="local-6989586621679110573"><span id="local-6989586621679110575"><span id="local-6989586621679110577"><span id="local-6989586621679110579"><span id="local-6989586621679110581"><span id="local-6989586621679110583"><span class="annot"><span class="annottext">Integer -&gt; SplitId
+SplitId -&gt; SplitId
+SplitId -&gt; SplitId -&gt; SplitId
+(SplitId -&gt; SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId)
+-&gt; (SplitId -&gt; SplitId)
+-&gt; (Integer -&gt; SplitId)
+-&gt; Num SplitId
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+fromInteger :: Integer -&gt; SplitId
+$cfromInteger :: Integer -&gt; SplitId
+signum :: SplitId -&gt; SplitId
+$csignum :: SplitId -&gt; SplitId
+abs :: SplitId -&gt; SplitId
+$cabs :: SplitId -&gt; SplitId
+negate :: SplitId -&gt; SplitId
+$cnegate :: SplitId -&gt; SplitId
+* :: SplitId -&gt; SplitId -&gt; SplitId
+$c* :: SplitId -&gt; SplitId -&gt; SplitId
+- :: SplitId -&gt; SplitId -&gt; SplitId
+$c- :: SplitId -&gt; SplitId -&gt; SplitId
++ :: SplitId -&gt; SplitId -&gt; SplitId
+$c+ :: SplitId -&gt; SplitId -&gt; SplitId
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110565"><span id="local-6989586621679110568"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-80"></span><span>  </span><span id="local-6989586621679110563"><span class="annot"><span class="annottext">show :: SplitId -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span> </span><span id="local-6989586621679110561"><span class="annot"><span class="annottext">r :: Ratio Word
+</span><a href="#local-6989586621679110561"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Ratio Word
+</span><a href="#local-6989586621679110561"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Ratio Word -&gt; Ratio Word -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-string">&quot;1&quot;</span></span><span>
+</span><span id="line-81"></span><span>                   </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ratio Word -&gt; Word
+forall a. Ratio a -&gt; a
+</span><span class="hs-identifier hs-var">numerator</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word
+</span><a href="#local-6989586621679110561"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="hs-string">&quot;/&quot;</span></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="annottext">Word -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ratio Word -&gt; Word
+forall a. Ratio a -&gt; a
+</span><span class="hs-identifier hs-var">denominator</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word
+</span><a href="#local-6989586621679110561"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- | 'split' defines the Calkin-Wilf tree. Its guaranteed never to produce twice</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- the same result if we split repeatedly starting from 1.</span><span>
+</span><span id="line-85"></span><span id="local-6989586621679110742"><span id="local-6989586621679110743"><span id="local-6989586621679110744"><span id="local-6989586621679110745"><span class="annot"><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-type">split</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- Morally a lens, but we don't</span><span>
+</span><span id="line-86"></span><span>                                               </span><span class="hs-comment">-- depend on lens</span><span>
+</span><span id="line-87"></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110744"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110744"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110743"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110742"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110743"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110745"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110742"><span class="hs-identifier hs-type">c</span></a></span></span></span></span></span><span>
+</span><span id="line-88"></span><span id="split"><span class="annot"><span class="annottext">split :: (s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var hs-var">split</span></a></span></span><span> </span><span id="local-6989586621679110557"><span class="annot"><span class="annottext">get :: s -&gt; SplitId
+</span><a href="#local-6989586621679110557"><span class="hs-identifier hs-var">get</span></a></span></span><span> </span><span id="local-6989586621679110556"><span class="annot"><span class="annottext">set :: s -&gt; SplitId -&gt; s
+</span><a href="#local-6989586621679110556"><span class="hs-identifier hs-var">set</span></a></span></span><span> </span><span id="local-6989586621679110555"><span class="annot"><span class="annottext">f :: s -&gt; a
+</span><a href="#local-6989586621679110555"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679110554"><span class="annot"><span class="annottext">c :: a -&gt; b -&gt; c
+</span><a href="#local-6989586621679110554"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621679110553"><span class="annot"><span class="annottext">g :: s -&gt; b
+</span><a href="#local-6989586621679110553"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679110552"><span class="annot"><span class="annottext">s :: s
+</span><a href="#local-6989586621679110552"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">s -&gt; SplitId
+</span><a href="#local-6989586621679110557"><span class="hs-identifier hs-var">get</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679110552"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span> </span><span id="local-6989586621679110551"><span class="annot"><span class="annottext">r :: Ratio Word
+</span><a href="#local-6989586621679110551"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679110550"><span class="annot"><span class="annottext">a :: Word
+</span><a href="#local-6989586621679110550"><span class="hs-identifier hs-var hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ratio Word -&gt; Word
+forall a. Ratio a -&gt; a
+</span><span class="hs-identifier hs-var">numerator</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word
+</span><a href="#local-6989586621679110551"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-90"></span><span>                   </span><span id="local-6989586621679110549"><span class="annot"><span class="annottext">b :: Word
+</span><a href="#local-6989586621679110549"><span class="hs-identifier hs-var hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ratio Word -&gt; Word
+forall a. Ratio a -&gt; a
+</span><span class="hs-identifier hs-var">denominator</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word
+</span><a href="#local-6989586621679110551"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-91"></span><span>               </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679110555"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; SplitId -&gt; s
+</span><a href="#local-6989586621679110556"><span class="hs-identifier hs-var">set</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679110552"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">(SplitId -&gt; s) -&gt; SplitId -&gt; s
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-var">SplitId</span></a></span><span> </span><span class="annot"><span class="annottext">(Ratio Word -&gt; SplitId) -&gt; Ratio Word -&gt; SplitId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110550"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Word -&gt; Word -&gt; Ratio Word
+forall a. Integral a =&gt; a -&gt; a -&gt; Ratio a
+</span><span class="hs-operator hs-var">%</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110550"><span class="hs-identifier hs-var">a</span></a></span><span class="annot"><span class="annottext">Word -&gt; Word -&gt; Word
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110549"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a -&gt; b -&gt; c
+</span><a href="#local-6989586621679110554"><span class="hs-operator hs-var">`c`</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; b
+</span><a href="#local-6989586621679110553"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; SplitId -&gt; s
+</span><a href="#local-6989586621679110556"><span class="hs-identifier hs-var">set</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679110552"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">(SplitId -&gt; s) -&gt; SplitId -&gt; s
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ratio Word -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-var">SplitId</span></a></span><span> </span><span class="annot"><span class="annottext">(Ratio Word -&gt; SplitId) -&gt; Ratio Word -&gt; SplitId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110550"><span class="hs-identifier hs-var">a</span></a></span><span class="annot"><span class="annottext">Word -&gt; Word -&gt; Word
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110549"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word -&gt; Word -&gt; Ratio Word
+forall a. Integral a =&gt; a -&gt; a -&gt; Ratio a
+</span><span class="hs-operator hs-var">%</span></span><span> </span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679110549"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-pragma hs-type">split</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- | The identifiers reflect the structure of the pipeline that led to some</span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- task. They are 'split' at every use of (.), (***), (|||) or (&lt;+&gt;). This makes</span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- it so every task in the pipeline has a different identifier.</span><span>
+</span><span id="line-97"></span><span id="local-6989586621679110545"><span id="local-6989586621679110546"></span></span><span class="hs-keyword">data</span><span> </span><span id="ArrowIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-var">ArrowIdent</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ArrowIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-var">ArrowIdent</span></a></span></span><span>
+</span><span id="line-98"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="aidChoice"><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidChoice"><span class="hs-identifier hs-var hs-var">aidChoice</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span>
+</span><span id="line-99"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="aidPlus"><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPlus"><span class="hs-identifier hs-var hs-var">aidPlus</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="aidPar"><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPar"><span class="hs-identifier hs-var hs-var">aidPar</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="aidComp"><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidComp"><span class="hs-identifier hs-var hs-var">aidComp</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. ArrowIdent -&gt; Rep ArrowIdent x)
+-&gt; (forall x. Rep ArrowIdent x -&gt; ArrowIdent) -&gt; Generic ArrowIdent
+forall x. Rep ArrowIdent x -&gt; ArrowIdent
+forall x. ArrowIdent -&gt; Rep ArrowIdent x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep ArrowIdent x -&gt; ArrowIdent
+$cfrom :: forall x. ArrowIdent -&gt; Rep ArrowIdent x
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110534"><span id="local-6989586621679110536"><span class="annot"><span class="annottext">ArrowIdent -&gt; ArrowIdent -&gt; Bool
+(ArrowIdent -&gt; ArrowIdent -&gt; Bool)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; Bool) -&gt; Eq ArrowIdent
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c/= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+== :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c== :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110519"><span id="local-6989586621679110521"><span id="local-6989586621679110523"><span id="local-6989586621679110525"><span id="local-6989586621679110527"><span id="local-6989586621679110529"><span id="local-6989586621679110531"><span class="annot"><span class="annottext">Eq ArrowIdent
+Eq ArrowIdent =&gt;
+(ArrowIdent -&gt; ArrowIdent -&gt; Ordering)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; Bool)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; Bool)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; Bool)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; Bool)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent)
+-&gt; Ord ArrowIdent
+ArrowIdent -&gt; ArrowIdent -&gt; Bool
+ArrowIdent -&gt; ArrowIdent -&gt; Ordering
+ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent
+$cmin :: ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent
+max :: ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent
+$cmax :: ArrowIdent -&gt; ArrowIdent -&gt; ArrowIdent
+&gt;= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c&gt;= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+&gt; :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c&gt; :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+&lt;= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c&lt;= :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+&lt; :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+$c&lt; :: ArrowIdent -&gt; ArrowIdent -&gt; Bool
+compare :: ArrowIdent -&gt; ArrowIdent -&gt; Ordering
+$ccompare :: ArrowIdent -&gt; ArrowIdent -&gt; Ordering
+$cp1Ord :: Eq ArrowIdent
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110514"><span id="local-6989586621679110517"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-type">ArrowIdent</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-105"></span><span>  </span><span id="local-6989586621679110513"><span class="annot"><span class="annottext">show :: ArrowIdent -&gt; String
+</span><a href="#local-6989586621679110513"><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-type">ArrowIdent</span></a></span><span> </span><span id="local-6989586621679110512"><span class="annot"><span class="annottext">a :: SplitId
+</span><a href="#local-6989586621679110512"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110511"><span class="annot"><span class="annottext">b :: SplitId
+</span><a href="#local-6989586621679110511"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679110510"><span class="annot"><span class="annottext">c :: SplitId
+</span><a href="#local-6989586621679110510"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621679110509"><span class="annot"><span class="annottext">d :: SplitId
+</span><a href="#local-6989586621679110509"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-106"></span><span>    </span><span class="annot"><span class="annottext">SplitId -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110512"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="hs-string">&quot;:&quot;</span></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="annottext">SplitId -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110511"><span class="hs-identifier hs-var">b</span></a></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="hs-string">&quot;:&quot;</span></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="annottext">SplitId -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110510"><span class="hs-identifier hs-var">c</span></a></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="hs-string">&quot;:&quot;</span></span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span class="annot"><span class="annottext">SplitId -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110509"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- | An arrow transformer that can automatically determine an identifier from</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- its position in a pipeline. It is isomorphic to a @Reader ArrowIdent ~&gt; arr@, but</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- we need a different Arrow instance than what 'Cayley' provides.</span><span>
+</span><span id="line-111"></span><span class="hs-keyword">newtype</span><span> </span><span id="AutoIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span></span><span> </span><span id="local-6989586621679110751"><span class="annot"><a href="#local-6989586621679110751"><span class="hs-identifier hs-type">arr</span></a></span></span><span> </span><span id="local-6989586621679110750"><span class="annot"><a href="#local-6989586621679110750"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679110749"><span class="annot"><a href="#local-6989586621679110749"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AutoIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-type">ArrowIdent</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110751"><span class="hs-identifier hs-type">arr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110750"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110749"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679110498"><span id="local-6989586621679110500"><span id="local-6989586621679110502"><span id="local-6989586621679110504"><span id="local-6989586621679110506"><span class="annot"><span class="annottext">q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d
+(a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c
+(b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+(forall a b c d.
+ (a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d)
+-&gt; (forall a b c.
+    (a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c)
+-&gt; (forall b c a.
+    (b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c)
+-&gt; (forall a b c (q :: * -&gt; * -&gt; *).
+    Coercible c b =&gt;
+    q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c)
+-&gt; (forall a b c (q :: * -&gt; * -&gt; *).
+    Coercible b a =&gt;
+    AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c)
+-&gt; Profunctor (AutoIdent arr)
+forall a b c. (a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c
+forall b c a. (b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+forall a b c d.
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d
+forall a b c (q :: * -&gt; * -&gt; *).
+Coercible b a =&gt;
+AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c
+forall a b c (q :: * -&gt; * -&gt; *).
+Coercible c b =&gt;
+q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+forall (arr :: * -&gt; * -&gt; *) a b c.
+Profunctor arr =&gt;
+(a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c
+forall (arr :: * -&gt; * -&gt; *) b c a.
+Profunctor arr =&gt;
+(b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+forall (arr :: * -&gt; * -&gt; *) a b c d.
+Profunctor arr =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d
+forall (arr :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor arr, Coercible b a) =&gt;
+AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c
+forall (arr :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor arr, Coercible c b) =&gt;
+q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+forall (p :: * -&gt; * -&gt; *).
+(forall a b c d. (a -&gt; b) -&gt; (c -&gt; d) -&gt; p b c -&gt; p a d)
+-&gt; (forall a b c. (a -&gt; b) -&gt; p b c -&gt; p a c)
+-&gt; (forall b c a. (b -&gt; c) -&gt; p a b -&gt; p a c)
+-&gt; (forall a b c (q :: * -&gt; * -&gt; *).
+    Coercible c b =&gt;
+    q b c -&gt; p a b -&gt; p a c)
+-&gt; (forall a b c (q :: * -&gt; * -&gt; *).
+    Coercible b a =&gt;
+    p b c -&gt; q a b -&gt; p a c)
+-&gt; Profunctor p
+.# :: AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c
+$c.# :: forall (arr :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor arr, Coercible b a) =&gt;
+AutoIdent arr b c -&gt; q a b -&gt; AutoIdent arr a c
+#. :: q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+$c#. :: forall (arr :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor arr, Coercible c b) =&gt;
+q b c -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+rmap :: (b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+$crmap :: forall (arr :: * -&gt; * -&gt; *) b c a.
+Profunctor arr =&gt;
+(b -&gt; c) -&gt; AutoIdent arr a b -&gt; AutoIdent arr a c
+lmap :: (a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c
+$clmap :: forall (arr :: * -&gt; * -&gt; *) a b c.
+Profunctor arr =&gt;
+(a -&gt; b) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a c
+dimap :: (a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d
+$cdimap :: forall (arr :: * -&gt; * -&gt; *) a b c d.
+Profunctor arr =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; AutoIdent arr b c -&gt; AutoIdent arr a d
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Profunctor</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110492"><span id="local-6989586621679110494"><span class="annot"><span class="annottext">Profunctor (AutoIdent arr)
+Profunctor (AutoIdent arr) =&gt;
+(forall a b c. AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c))
+-&gt; (forall a b c. AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b))
+-&gt; Strong (AutoIdent arr)
+AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c)
+AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b)
+forall a b c. AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c)
+forall a b c. AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b)
+forall (arr :: * -&gt; * -&gt; *).
+Strong arr =&gt;
+Profunctor (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) a b c.
+Strong arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c)
+forall (arr :: * -&gt; * -&gt; *) a b c.
+Strong arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b)
+forall (p :: * -&gt; * -&gt; *).
+Profunctor p =&gt;
+(forall a b c. p a b -&gt; p (a, c) (b, c))
+-&gt; (forall a b c. p a b -&gt; p (c, a) (c, b)) -&gt; Strong p
+second' :: AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b)
+$csecond' :: forall (arr :: * -&gt; * -&gt; *) a b c.
+Strong arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (c, a) (c, b)
+first' :: AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c)
+$cfirst' :: forall (arr :: * -&gt; * -&gt; *) a b c.
+Strong arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (a, c) (b, c)
+$cp1Strong :: forall (arr :: * -&gt; * -&gt; *).
+Strong arr =&gt;
+Profunctor (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Strong</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110486"><span id="local-6989586621679110488"><span class="annot"><span class="annottext">Profunctor (AutoIdent arr)
+Profunctor (AutoIdent arr) =&gt;
+(forall a d b. AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b)
+-&gt; (forall d a b. AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b)
+-&gt; Costrong (AutoIdent arr)
+AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b
+AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b
+forall d a b. AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b
+forall a d b. AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b
+forall (arr :: * -&gt; * -&gt; *).
+Costrong arr =&gt;
+Profunctor (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) d a b.
+Costrong arr =&gt;
+AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b
+forall (arr :: * -&gt; * -&gt; *) a d b.
+Costrong arr =&gt;
+AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b
+forall (p :: * -&gt; * -&gt; *).
+Profunctor p =&gt;
+(forall a d b. p (a, d) (b, d) -&gt; p a b)
+-&gt; (forall d a b. p (d, a) (d, b) -&gt; p a b) -&gt; Costrong p
+unsecond :: AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b
+$cunsecond :: forall (arr :: * -&gt; * -&gt; *) d a b.
+Costrong arr =&gt;
+AutoIdent arr (d, a) (d, b) -&gt; AutoIdent arr a b
+unfirst :: AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b
+$cunfirst :: forall (arr :: * -&gt; * -&gt; *) a d b.
+Costrong arr =&gt;
+AutoIdent arr (a, d) (b, d) -&gt; AutoIdent arr a b
+$cp1Costrong :: forall (arr :: * -&gt; * -&gt; *).
+Costrong arr =&gt;
+Profunctor (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Costrong</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110480"><span id="local-6989586621679110482"><span class="annot"><span class="annottext">Profunctor (AutoIdent arr)
+Profunctor (AutoIdent arr) =&gt;
+(forall a b c.
+ AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c))
+-&gt; (forall a b c.
+    AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b))
+-&gt; Choice (AutoIdent arr)
+AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c)
+AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b)
+forall a b c.
+AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c)
+forall a b c.
+AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b)
+forall (arr :: * -&gt; * -&gt; *).
+Choice arr =&gt;
+Profunctor (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) a b c.
+Choice arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c)
+forall (arr :: * -&gt; * -&gt; *) a b c.
+Choice arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b)
+forall (p :: * -&gt; * -&gt; *).
+Profunctor p =&gt;
+(forall a b c. p a b -&gt; p (Either a c) (Either b c))
+-&gt; (forall a b c. p a b -&gt; p (Either c a) (Either c b)) -&gt; Choice p
+right' :: AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b)
+$cright' :: forall (arr :: * -&gt; * -&gt; *) a b c.
+Choice arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (Either c a) (Either c b)
+left' :: AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c)
+$cleft' :: forall (arr :: * -&gt; * -&gt; *) a b c.
+Choice arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (Either a c) (Either b c)
+$cp1Choice :: forall (arr :: * -&gt; * -&gt; *).
+Choice arr =&gt;
+Profunctor (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Choice</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110474"><span id="local-6989586621679110476"><span class="annot"><span class="annottext">Profunctor (AutoIdent arr)
+Profunctor (AutoIdent arr) =&gt;
+(forall a d b.
+ AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b)
+-&gt; (forall d a b.
+    AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b)
+-&gt; Cochoice (AutoIdent arr)
+AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b
+AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b
+forall d a b.
+AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b
+forall a d b.
+AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b
+forall (arr :: * -&gt; * -&gt; *).
+Cochoice arr =&gt;
+Profunctor (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) d a b.
+Cochoice arr =&gt;
+AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b
+forall (arr :: * -&gt; * -&gt; *) a d b.
+Cochoice arr =&gt;
+AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b
+forall (p :: * -&gt; * -&gt; *).
+Profunctor p =&gt;
+(forall a d b. p (Either a d) (Either b d) -&gt; p a b)
+-&gt; (forall d a b. p (Either d a) (Either d b) -&gt; p a b)
+-&gt; Cochoice p
+unright :: AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b
+$cunright :: forall (arr :: * -&gt; * -&gt; *) d a b.
+Cochoice arr =&gt;
+AutoIdent arr (Either d a) (Either d b) -&gt; AutoIdent arr a b
+unleft :: AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b
+$cunleft :: forall (arr :: * -&gt; * -&gt; *) a d b.
+Cochoice arr =&gt;
+AutoIdent arr (Either a d) (Either b d) -&gt; AutoIdent arr a b
+$cp1Cochoice :: forall (arr :: * -&gt; * -&gt; *).
+Cochoice arr =&gt;
+Profunctor (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Cochoice</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110470"><span class="annot"><span class="annottext">Profunctor (AutoIdent arr)
+Profunctor (AutoIdent arr) =&gt;
+(forall a b x.
+ AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b))
+-&gt; Closed (AutoIdent arr)
+AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b)
+forall a b x. AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b)
+forall (arr :: * -&gt; * -&gt; *).
+Closed arr =&gt;
+Profunctor (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) a b x.
+Closed arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b)
+forall (p :: * -&gt; * -&gt; *).
+Profunctor p =&gt;
+(forall a b x. p a b -&gt; p (x -&gt; a) (x -&gt; b)) -&gt; Closed p
+closed :: AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b)
+$cclosed :: forall (arr :: * -&gt; * -&gt; *) a b x.
+Closed arr =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (x -&gt; a) (x -&gt; b)
+$cp1Closed :: forall (arr :: * -&gt; * -&gt; *).
+Closed arr =&gt;
+Profunctor (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">Closed</span></a></span></span><span>
+</span><span id="line-113"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110463"><span id="local-6989586621679110465"><span class="annot"><span class="annottext">Choice (AutoIdent arr)
+Strong (AutoIdent arr)
+(Choice (AutoIdent arr), Strong (AutoIdent arr)) =&gt;
+(forall (f :: * -&gt; *) a b.
+ Traversable f =&gt;
+ AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b))
+-&gt; (forall a b s t.
+    (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+    -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t)
+-&gt; Traversing (AutoIdent arr)
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall a b s t.
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall (f :: * -&gt; *) a b.
+Traversable f =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+forall (arr :: * -&gt; * -&gt; *).
+Traversing arr =&gt;
+Choice (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *).
+Traversing arr =&gt;
+Strong (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) a b s t.
+Traversing arr =&gt;
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall (arr :: * -&gt; * -&gt; *) (f :: * -&gt; *) a b.
+(Traversing arr, Traversable f) =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+forall (p :: * -&gt; * -&gt; *).
+(Choice p, Strong p) =&gt;
+(forall (f :: * -&gt; *) a b. Traversable f =&gt; p a b -&gt; p (f a) (f b))
+-&gt; (forall a b s t.
+    (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+    -&gt; p a b -&gt; p s t)
+-&gt; Traversing p
+wander :: (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+$cwander :: forall (arr :: * -&gt; * -&gt; *) a b s t.
+Traversing arr =&gt;
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+traverse' :: AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+$ctraverse' :: forall (arr :: * -&gt; * -&gt; *) (f :: * -&gt; *) a b.
+(Traversing arr, Traversable f) =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+$cp2Traversing :: forall (arr :: * -&gt; * -&gt; *).
+Traversing arr =&gt;
+Strong (AutoIdent arr)
+$cp1Traversing :: forall (arr :: * -&gt; * -&gt; *).
+Traversing arr =&gt;
+Choice (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversing</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110456"><span id="local-6989586621679110458"><span class="annot"><span class="annottext">Traversing (AutoIdent arr)
+Closed (AutoIdent arr)
+(Traversing (AutoIdent arr), Closed (AutoIdent arr)) =&gt;
+(forall (f :: * -&gt; *) a b.
+ Functor f =&gt;
+ AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b))
+-&gt; (forall a b s t.
+    ((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t)
+-&gt; Mapping (AutoIdent arr)
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall a b s t.
+((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall (f :: * -&gt; *) a b.
+Functor f =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+forall (arr :: * -&gt; * -&gt; *).
+Mapping arr =&gt;
+Traversing (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *). Mapping arr =&gt; Closed (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) a b s t.
+Mapping arr =&gt;
+((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+forall (arr :: * -&gt; * -&gt; *) (f :: * -&gt; *) a b.
+(Mapping arr, Functor f) =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+forall (p :: * -&gt; * -&gt; *).
+(Traversing p, Closed p) =&gt;
+(forall (f :: * -&gt; *) a b. Functor f =&gt; p a b -&gt; p (f a) (f b))
+-&gt; (forall a b s t. ((a -&gt; b) -&gt; s -&gt; t) -&gt; p a b -&gt; p s t)
+-&gt; Mapping p
+roam :: ((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+$croam :: forall (arr :: * -&gt; * -&gt; *) a b s t.
+Mapping arr =&gt;
+((a -&gt; b) -&gt; s -&gt; t) -&gt; AutoIdent arr a b -&gt; AutoIdent arr s t
+map' :: AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+$cmap' :: forall (arr :: * -&gt; * -&gt; *) (f :: * -&gt; *) a b.
+(Mapping arr, Functor f) =&gt;
+AutoIdent arr a b -&gt; AutoIdent arr (f a) (f b)
+$cp2Mapping :: forall (arr :: * -&gt; * -&gt; *). Mapping arr =&gt; Closed (AutoIdent arr)
+$cp1Mapping :: forall (arr :: * -&gt; * -&gt; *).
+Mapping arr =&gt;
+Traversing (AutoIdent arr)
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Mapping</span></a></span></span></span><span>
+</span><span id="line-114"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110452"><span class="annot"><span class="annottext">Arrow (AutoIdent arr)
+AutoIdent arr b c
+Arrow (AutoIdent arr) =&gt;
+(forall b c. AutoIdent arr b c) -&gt; ArrowZero (AutoIdent arr)
+forall b c. AutoIdent arr b c
+forall (a :: * -&gt; * -&gt; *).
+Arrow a =&gt;
+(forall b c. a b c) -&gt; ArrowZero a
+forall (arr :: * -&gt; * -&gt; *). ArrowZero arr =&gt; Arrow (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) b c. ArrowZero arr =&gt; AutoIdent arr b c
+zeroArrow :: AutoIdent arr b c
+$czeroArrow :: forall (arr :: * -&gt; * -&gt; *) b c. ArrowZero arr =&gt; AutoIdent arr b c
+$cp1ArrowZero :: forall (arr :: * -&gt; * -&gt; *). ArrowZero arr =&gt; Arrow (AutoIdent arr)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ArrowZero</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110448"><span class="annot"><span class="annottext">Arrow (AutoIdent arr)
+Arrow (AutoIdent arr) =&gt;
+(forall b d c. AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c)
+-&gt; ArrowLoop (AutoIdent arr)
+AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c
+forall b d c. AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c
+forall (arr :: * -&gt; * -&gt; *). ArrowLoop arr =&gt; Arrow (AutoIdent arr)
+forall (arr :: * -&gt; * -&gt; *) b d c.
+ArrowLoop arr =&gt;
+AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c
+forall (a :: * -&gt; * -&gt; *).
+Arrow a =&gt;
+(forall b d c. a (b, d) (c, d) -&gt; a b c) -&gt; ArrowLoop a
+loop :: AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c
+$cloop :: forall (arr :: * -&gt; * -&gt; *) b d c.
+ArrowLoop arr =&gt;
+AutoIdent arr (b, d) (c, d) -&gt; AutoIdent arr b c
+$cp1ArrowLoop :: forall (arr :: * -&gt; * -&gt; *). ArrowLoop arr =&gt; Arrow (AutoIdent arr)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ArrowLoop</span></span></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-type">Cayley</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-type">ArrowIdent</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679110751"><span class="hs-identifier hs-type">arr</span></a></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span id="local-6989586621679110755"><span id="local-6989586621679110756"><span id="local-6989586621679110757"><span class="annot"><a href="Control.Kernmantle.Arrow.html#runAutoIdent%27"><span class="hs-identifier hs-type">runAutoIdent'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#SplitId"><span class="hs-identifier hs-type">SplitId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110757"><span class="hs-identifier hs-type">arr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110756"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110755"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110757"><span class="hs-identifier hs-type">arr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110756"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110755"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-118"></span><span id="runAutoIdent%27"><span class="annot"><span class="annottext">runAutoIdent' :: SplitId -&gt; AutoIdent arr a b -&gt; arr a b
+</span><a href="Control.Kernmantle.Arrow.html#runAutoIdent%27"><span class="hs-identifier hs-var hs-var">runAutoIdent'</span></a></span></span><span> </span><span id="local-6989586621679110445"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110445"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110444"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; arr a b
+</span><a href="#local-6989586621679110444"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; arr a b
+</span><a href="#local-6989586621679110444"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; arr a b) -&gt; ArrowIdent -&gt; arr a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">SplitId -&gt; SplitId -&gt; SplitId -&gt; SplitId -&gt; ArrowIdent
+</span><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-var">ArrowIdent</span></a></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110445"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110445"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110445"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110445"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span id="local-6989586621679110441"><span id="local-6989586621679110442"><span id="local-6989586621679110443"><span class="annot"><a href="Control.Kernmantle.Arrow.html#runAutoIdent"><span class="hs-identifier hs-type">runAutoIdent</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110443"><span class="hs-identifier hs-type">arr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110442"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110441"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110443"><span class="hs-identifier hs-type">arr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110442"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110441"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-121"></span><span id="runAutoIdent"><span class="annot"><span class="annottext">runAutoIdent :: AutoIdent arr a b -&gt; arr a b
+</span><a href="Control.Kernmantle.Arrow.html#runAutoIdent"><span class="hs-identifier hs-var hs-var">runAutoIdent</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SplitId -&gt; AutoIdent arr a b -&gt; arr a b
+forall (arr :: * -&gt; * -&gt; *) a b.
+SplitId -&gt; AutoIdent arr a b -&gt; arr a b
+</span><a href="Control.Kernmantle.Arrow.html#runAutoIdent%27"><span class="hs-identifier hs-var">runAutoIdent'</span></a></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span id="local-6989586621679110439"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Category</span></span><span> </span><span class="annot"><a href="#local-6989586621679110439"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Category</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110439"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>  </span><span id="local-6989586621679110435"><span class="annot"><span class="annottext">id :: AutoIdent eff a a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">id</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff a a) -&gt; AutoIdent eff a a
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff a a) -&gt; AutoIdent eff a a)
+-&gt; (ArrowIdent -&gt; eff a a) -&gt; AutoIdent eff a a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff a a -&gt; ArrowIdent -&gt; eff a a
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">eff a a
+forall k (cat :: k -&gt; k -&gt; *) (a :: k). Category cat =&gt; cat a a
+</span><span class="hs-identifier hs-var">id</span></span><span>
+</span><span id="line-125"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110433"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110433"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679110432"><span class="annot"><span class="annottext">. :: AutoIdent eff b c -&gt; AutoIdent eff a b -&gt; AutoIdent eff a c
+</span><a href="#local-6989586621679110432"><span class="hs-operator hs-var hs-var hs-var hs-var">.</span></a></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110431"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110431"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff a c) -&gt; AutoIdent eff a c
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff a c) -&gt; AutoIdent eff a c)
+-&gt; (ArrowIdent -&gt; eff a c) -&gt; AutoIdent eff a c
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; (eff b c -&gt; eff a b -&gt; eff a c)
+-&gt; (ArrowIdent -&gt; eff a b)
+-&gt; ArrowIdent
+-&gt; eff a c
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidComp"><span class="hs-identifier hs-var hs-var">aidComp</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110430"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110430"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110429"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110429"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110430"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidComp :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidComp"><span class="hs-identifier hs-var">aidComp</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110429"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110433"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff a b -&gt; eff a c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">(.)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110431"><span class="hs-identifier hs-var">a</span></a></span></span><span>
+</span><span id="line-127"></span><span id="local-6989586621679110428"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679110428"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Arrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110428"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>  </span><span id="local-6989586621679110420"><span class="annot"><span class="annottext">arr :: (b -&gt; c) -&gt; AutoIdent eff b c
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">arr</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff b c) -&gt; AutoIdent eff b c
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff b c) -&gt; AutoIdent eff b c)
+-&gt; ((b -&gt; c) -&gt; ArrowIdent -&gt; eff b c)
+-&gt; (b -&gt; c)
+-&gt; AutoIdent eff b c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; ArrowIdent -&gt; eff b c
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(eff b c -&gt; ArrowIdent -&gt; eff b c)
+-&gt; ((b -&gt; c) -&gt; eff b c) -&gt; (b -&gt; c) -&gt; ArrowIdent -&gt; eff b c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(b -&gt; c) -&gt; eff b c
+forall (a :: * -&gt; * -&gt; *) b c. Arrow a =&gt; (b -&gt; c) -&gt; a b c
+</span><span class="hs-identifier hs-var">arr</span></span><span>
+</span><span id="line-129"></span><span>  </span><span id="local-6989586621679110419"><span class="annot"><span class="annottext">first :: AutoIdent eff b c -&gt; AutoIdent eff (b, d) (c, d)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">first</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110418"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110418"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (b, d) (c, d)) -&gt; AutoIdent eff (b, d) (c, d)
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (b, d) (c, d)) -&gt; AutoIdent eff (b, d) (c, d))
+-&gt; (ArrowIdent -&gt; eff (b, d) (c, d)) -&gt; AutoIdent eff (b, d) (c, d)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff (b, d) (c, d)
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (b, d) (c, d)
+</span><span class="hs-identifier hs-var">first</span></span><span> </span><span class="annot"><span class="annottext">(eff b c -&gt; eff (b, d) (c, d))
+-&gt; (ArrowIdent -&gt; eff b c) -&gt; ArrowIdent -&gt; eff (b, d) (c, d)
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110418"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-130"></span><span>  </span><span id="local-6989586621679110417"><span class="annot"><span class="annottext">second :: AutoIdent eff b c -&gt; AutoIdent eff (d, b) (d, c)
+</span><a href="#local-6989586621679110417"><span class="hs-identifier hs-var hs-var hs-var hs-var">second</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110416"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110416"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (d, b) (d, c)) -&gt; AutoIdent eff (d, b) (d, c)
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (d, b) (d, c)) -&gt; AutoIdent eff (d, b) (d, c))
+-&gt; (ArrowIdent -&gt; eff (d, b) (d, c)) -&gt; AutoIdent eff (d, b) (d, c)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff (d, b) (d, c)
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (d, b) (d, c)
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="annot"><span class="annottext">(eff b c -&gt; eff (d, b) (d, c))
+-&gt; (ArrowIdent -&gt; eff b c) -&gt; ArrowIdent -&gt; eff (d, b) (d, c)
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110416"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-131"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110415"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110415"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110414"><span class="annot"><span class="annottext">*** :: AutoIdent eff b c
+-&gt; AutoIdent eff b' c' -&gt; AutoIdent eff (b, b') (c, c')
+</span><a href="#local-6989586621679110414"><span class="hs-operator hs-var hs-var hs-var hs-var">***</span></a></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110413"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff b' c'
+</span><a href="#local-6989586621679110413"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (b, b') (c, c'))
+-&gt; AutoIdent eff (b, b') (c, c')
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (b, b') (c, c'))
+ -&gt; AutoIdent eff (b, b') (c, c'))
+-&gt; (ArrowIdent -&gt; eff (b, b') (c, c'))
+-&gt; AutoIdent eff (b, b') (c, c')
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; (eff b c -&gt; eff b' c' -&gt; eff (b, b') (c, c'))
+-&gt; (ArrowIdent -&gt; eff b' c')
+-&gt; ArrowIdent
+-&gt; eff (b, b') (c, c')
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPar"><span class="hs-identifier hs-var hs-var">aidPar</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110412"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110412"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110411"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110411"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110412"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidPar :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPar"><span class="hs-identifier hs-var">aidPar</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110411"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110415"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff b' c' -&gt; eff (b, b') (c, c')
+forall (a :: * -&gt; * -&gt; *) b c b' c'.
+Arrow a =&gt;
+a b c -&gt; a b' c' -&gt; a (b, b') (c, c')
+</span><span class="hs-operator hs-var">(***)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b' c'
+</span><a href="#local-6989586621679110413"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-133"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110410"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110410"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110409"><span class="annot"><span class="annottext">&amp;&amp;&amp; :: AutoIdent eff b c -&gt; AutoIdent eff b c' -&gt; AutoIdent eff b (c, c')
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&amp;&amp;&amp;</span></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110407"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff b c'
+</span><a href="#local-6989586621679110407"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff b (c, c')) -&gt; AutoIdent eff b (c, c')
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff b (c, c')) -&gt; AutoIdent eff b (c, c'))
+-&gt; (ArrowIdent -&gt; eff b (c, c')) -&gt; AutoIdent eff b (c, c')
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; (eff b c -&gt; eff b c' -&gt; eff b (c, c'))
+-&gt; (ArrowIdent -&gt; eff b c')
+-&gt; ArrowIdent
+-&gt; eff b (c, c')
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPar"><span class="hs-identifier hs-var hs-var">aidPar</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110406"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110406"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110405"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110405"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110406"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidPar :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPar"><span class="hs-identifier hs-var">aidPar</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110405"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110410"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff b c' -&gt; eff b (c, c')
+forall (a :: * -&gt; * -&gt; *) b c c'.
+Arrow a =&gt;
+a b c -&gt; a b c' -&gt; a b (c, c')
+</span><span class="hs-operator hs-var">(&amp;&amp;&amp;)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c'
+</span><a href="#local-6989586621679110407"><span class="hs-identifier hs-var">b</span></a></span></span><span>
+</span><span id="line-135"></span><span id="local-6989586621679110404"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ArrowPlus</span></span><span> </span><span class="annot"><a href="#local-6989586621679110404"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowPlus</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110404"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-136"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110400"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110400"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110399"><span class="annot"><span class="annottext">&lt;+&gt; :: AutoIdent eff b c -&gt; AutoIdent eff b c -&gt; AutoIdent eff b c
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;+&gt;</span></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110397"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110397"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff b c) -&gt; AutoIdent eff b c
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff b c) -&gt; AutoIdent eff b c)
+-&gt; (ArrowIdent -&gt; eff b c) -&gt; AutoIdent eff b c
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; (eff b c -&gt; eff b c -&gt; eff b c)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; ArrowIdent
+-&gt; eff b c
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPlus"><span class="hs-identifier hs-var hs-var">aidPlus</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110396"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110396"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110395"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110395"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110396"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidPlus :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidPlus"><span class="hs-identifier hs-var">aidPlus</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110395"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110400"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff b c -&gt; eff b c
+forall (a :: * -&gt; * -&gt; *) b c.
+ArrowPlus a =&gt;
+a b c -&gt; a b c -&gt; a b c
+</span><span class="hs-operator hs-var">(&lt;+&gt;)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110397"><span class="hs-identifier hs-var">b</span></a></span></span><span>
+</span><span id="line-138"></span><span id="local-6989586621679110394"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="annot"><a href="#local-6989586621679110394"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ArrowChoice</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110394"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-139"></span><span>  </span><span id="local-6989586621679110387"><span class="annot"><span class="annottext">left :: AutoIdent eff b c -&gt; AutoIdent eff (Either b d) (Either c d)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">left</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110385"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110385"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (Either b d) (Either c d))
+-&gt; AutoIdent eff (Either b d) (Either c d)
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (Either b d) (Either c d))
+ -&gt; AutoIdent eff (Either b d) (Either c d))
+-&gt; (ArrowIdent -&gt; eff (Either b d) (Either c d))
+-&gt; AutoIdent eff (Either b d) (Either c d)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff (Either b d) (Either c d)
+forall (a :: * -&gt; * -&gt; *) b c d.
+ArrowChoice a =&gt;
+a b c -&gt; a (Either b d) (Either c d)
+</span><span class="hs-identifier hs-var">left</span></span><span> </span><span class="annot"><span class="annottext">(eff b c -&gt; eff (Either b d) (Either c d))
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; ArrowIdent
+-&gt; eff (Either b d) (Either c d)
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110385"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-140"></span><span>  </span><span id="local-6989586621679110384"><span class="annot"><span class="annottext">right :: AutoIdent eff b c -&gt; AutoIdent eff (Either d b) (Either d c)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">right</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110382"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110382"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (Either d b) (Either d c))
+-&gt; AutoIdent eff (Either d b) (Either d c)
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (Either d b) (Either d c))
+ -&gt; AutoIdent eff (Either d b) (Either d c))
+-&gt; (ArrowIdent -&gt; eff (Either d b) (Either d c))
+-&gt; AutoIdent eff (Either d b) (Either d c)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff (Either d b) (Either d c)
+forall (a :: * -&gt; * -&gt; *) b c d.
+ArrowChoice a =&gt;
+a b c -&gt; a (Either d b) (Either d c)
+</span><span class="hs-identifier hs-var">right</span></span><span> </span><span class="annot"><span class="annottext">(eff b c -&gt; eff (Either d b) (Either d c))
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; ArrowIdent
+-&gt; eff (Either d b) (Either d c)
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110382"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-141"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110381"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff b d
+</span><a href="#local-6989586621679110381"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110380"><span class="annot"><span class="annottext">||| :: AutoIdent eff b d
+-&gt; AutoIdent eff c d -&gt; AutoIdent eff (Either b c) d
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">|||</span></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110379"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff c d
+</span><a href="#local-6989586621679110379"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (Either b c) d) -&gt; AutoIdent eff (Either b c) d
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (Either b c) d)
+ -&gt; AutoIdent eff (Either b c) d)
+-&gt; (ArrowIdent -&gt; eff (Either b c) d)
+-&gt; AutoIdent eff (Either b c) d
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b d)
+-&gt; (eff b d -&gt; eff c d -&gt; eff (Either b c) d)
+-&gt; (ArrowIdent -&gt; eff c d)
+-&gt; ArrowIdent
+-&gt; eff (Either b c) d
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidChoice"><span class="hs-identifier hs-var hs-var">aidChoice</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110378"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110378"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110377"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110378"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidChoice :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidChoice"><span class="hs-identifier hs-var">aidChoice</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b d
+</span><a href="#local-6989586621679110381"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">eff b d -&gt; eff c d -&gt; eff (Either b c) d
+forall (a :: * -&gt; * -&gt; *) b d c.
+ArrowChoice a =&gt;
+a b d -&gt; a c d -&gt; a (Either b c) d
+</span><span class="hs-operator hs-var">(|||)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff c d
+</span><a href="#local-6989586621679110379"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-143"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110376"><span class="annot"><span class="annottext">a :: ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110376"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679110375"><span class="annot"><span class="annottext">+++ :: AutoIdent eff b c
+-&gt; AutoIdent eff b' c' -&gt; AutoIdent eff (Either b b') (Either c c')
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">+++</span></span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110373"><span class="annot"><span class="annottext">b :: ArrowIdent -&gt; eff b' c'
+</span><a href="#local-6989586621679110373"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff (Either b b') (Either c c'))
+-&gt; AutoIdent eff (Either b b') (Either c c')
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff (Either b b') (Either c c'))
+ -&gt; AutoIdent eff (Either b b') (Either c c'))
+-&gt; (ArrowIdent -&gt; eff (Either b b') (Either c c'))
+-&gt; AutoIdent eff (Either b b') (Either c c')
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; SplitId)
+-&gt; (ArrowIdent -&gt; SplitId -&gt; ArrowIdent)
+-&gt; (ArrowIdent -&gt; eff b c)
+-&gt; (eff b c -&gt; eff b' c' -&gt; eff (Either b b') (Either c c'))
+-&gt; (ArrowIdent -&gt; eff b' c')
+-&gt; ArrowIdent
+-&gt; eff (Either b b') (Either c c')
+forall s a b c.
+(s -&gt; SplitId)
+-&gt; (s -&gt; SplitId -&gt; s)
+-&gt; (s -&gt; a)
+-&gt; (a -&gt; b -&gt; c)
+-&gt; (s -&gt; b)
+-&gt; s
+-&gt; c
+</span><a href="Control.Kernmantle.Arrow.html#split"><span class="hs-identifier hs-var">split</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidChoice"><span class="hs-identifier hs-var hs-var">aidChoice</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110372"><span class="annot"><span class="annottext">ai :: ArrowIdent
+</span><a href="#local-6989586621679110372"><span class="hs-identifier hs-var">ai</span></a></span></span><span> </span><span id="local-6989586621679110371"><span class="annot"><span class="annottext">i :: SplitId
+</span><a href="#local-6989586621679110371"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ArrowIdent
+</span><a href="#local-6989586621679110372"><span class="hs-identifier hs-var">ai</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">aidChoice :: SplitId
+</span><a href="Control.Kernmantle.Arrow.html#aidChoice"><span class="hs-identifier hs-var">aidChoice</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">SplitId
+</span><a href="#local-6989586621679110371"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-144"></span><span>    </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b c
+</span><a href="#local-6989586621679110376"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">eff b c -&gt; eff b' c' -&gt; eff (Either b b') (Either c c')
+forall (a :: * -&gt; * -&gt; *) b c b' c'.
+ArrowChoice a =&gt;
+a b c -&gt; a b' c' -&gt; a (Either b b') (Either c c')
+</span><span class="hs-operator hs-var">(+++)</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff b' c'
+</span><a href="#local-6989586621679110373"><span class="hs-identifier hs-var">b</span></a></span></span><span>
+</span><span id="line-145"></span><span>
+</span><span id="line-146"></span><span id="local-6989586621679110369"><span id="local-6989586621679110370"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Trans.html#SieveTrans"><span class="hs-identifier hs-type">SieveTrans</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110370"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110369"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Trans.html#SieveTrans"><span class="hs-identifier hs-type">SieveTrans</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110370"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110369"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-147"></span><span>  </span><span id="local-6989586621679110365"><span class="annot"><span class="annottext">liftSieve :: (a -&gt; f b) -&gt; AutoIdent eff a b
+</span><a href="Data.Profunctor.Trans.html#liftSieve"><span class="hs-identifier hs-var hs-var hs-var hs-var">liftSieve</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff a b) -&gt; AutoIdent eff a b
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff a b) -&gt; AutoIdent eff a b)
+-&gt; ((a -&gt; f b) -&gt; ArrowIdent -&gt; eff a b)
+-&gt; (a -&gt; f b)
+-&gt; AutoIdent eff a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">eff a b -&gt; ArrowIdent -&gt; eff a b
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(eff a b -&gt; ArrowIdent -&gt; eff a b)
+-&gt; ((a -&gt; f b) -&gt; eff a b) -&gt; (a -&gt; f b) -&gt; ArrowIdent -&gt; eff a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; eff a b
+forall (f :: * -&gt; *) (cat :: * -&gt; * -&gt; *) a b.
+SieveTrans f cat =&gt;
+(a -&gt; f b) -&gt; cat a b
+</span><a href="Data.Profunctor.Trans.html#liftSieve"><span class="hs-identifier hs-var">liftSieve</span></a></span><span>
+</span><span id="line-148"></span><span>  </span><span id="local-6989586621679110363"><span class="annot"><span class="annottext">mapSieve :: ((a -&gt; f b) -&gt; a' -&gt; f b')
+-&gt; AutoIdent eff a b -&gt; AutoIdent eff a' b'
+</span><a href="Data.Profunctor.Trans.html#mapSieve"><span class="hs-identifier hs-var hs-var hs-var hs-var">mapSieve</span></a></span></span><span> </span><span id="local-6989586621679110361"><span class="annot"><span class="annottext">f :: (a -&gt; f b) -&gt; a' -&gt; f b'
+</span><a href="#local-6989586621679110361"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span id="local-6989586621679110360"><span class="annot"><span class="annottext">af :: ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110360"><span class="hs-identifier hs-var">af</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff a' b') -&gt; AutoIdent eff a' b'
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">((ArrowIdent -&gt; eff a' b') -&gt; AutoIdent eff a' b')
+-&gt; (ArrowIdent -&gt; eff a' b') -&gt; AutoIdent eff a' b'
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">((a -&gt; f b) -&gt; a' -&gt; f b') -&gt; eff a b -&gt; eff a' b'
+forall (f :: * -&gt; *) (cat :: * -&gt; * -&gt; *) a b a' b'.
+SieveTrans f cat =&gt;
+((a -&gt; f b) -&gt; a' -&gt; f b') -&gt; cat a b -&gt; cat a' b'
+</span><a href="Data.Profunctor.Trans.html#mapSieve"><span class="hs-identifier hs-var">mapSieve</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; a' -&gt; f b'
+</span><a href="#local-6989586621679110361"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(eff a b -&gt; eff a' b')
+-&gt; (ArrowIdent -&gt; eff a b) -&gt; ArrowIdent -&gt; eff a' b'
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110360"><span class="hs-identifier hs-var">af</span></a></span></span></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span class="hs-comment">-- | All effects that internally feature some AutoIdent</span><span>
+</span><span id="line-151"></span><span class="hs-keyword">class</span><span> </span><span id="HasAutoIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#HasAutoIdent"><span class="hs-identifier hs-var">HasAutoIdent</span></a></span></span><span> </span><span id="local-6989586621679110670"><span class="annot"><a href="#local-6989586621679110670"><span class="hs-identifier hs-type">wrappedEff</span></a></span></span><span> </span><span id="local-6989586621679110669"><span class="annot"><a href="#local-6989586621679110669"><span class="hs-identifier hs-type">eff</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><a href="#local-6989586621679110669"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110670"><span class="hs-identifier hs-type">wrappedEff</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-152"></span><span>  </span><span id="local-6989586621679110672"><span id="local-6989586621679110673"><span id="liftAutoIdent"><span class="annot"><a href="Control.Kernmantle.Arrow.html#liftAutoIdent"><span class="hs-identifier hs-type">liftAutoIdent</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#ArrowIdent"><span class="hs-identifier hs-type">ArrowIdent</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110670"><span class="hs-identifier hs-type">wrappedEff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110673"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110672"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110669"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110673"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110672"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span id="local-6989586621679110358"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#HasAutoIdent"><span class="hs-identifier hs-type">HasAutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110358"><span class="hs-identifier hs-type">eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-type">AutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110358"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-155"></span><span>  </span><span id="local-6989586621679110355"><span class="annot"><span class="annottext">liftAutoIdent :: (ArrowIdent -&gt; eff a b) -&gt; AutoIdent eff a b
+</span><a href="#local-6989586621679110355"><span class="hs-identifier hs-var hs-var hs-var hs-var">liftAutoIdent</span></a></span></span><span> </span><span id="local-6989586621679110354"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110354"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ArrowIdent -&gt; eff a b) -&gt; AutoIdent eff a b
+forall (arr :: * -&gt; * -&gt; *) a b.
+(ArrowIdent -&gt; arr a b) -&gt; AutoIdent arr a b
+</span><a href="Control.Kernmantle.Arrow.html#AutoIdent"><span class="hs-identifier hs-var">AutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; eff a b
+</span><a href="#local-6989586621679110354"><span class="hs-identifier hs-var">f</span></a></span></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span id="local-6989586621679110351"><span id="local-6989586621679110352"><span id="local-6989586621679110353"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Arrow.html#HasAutoIdent"><span class="hs-identifier hs-type">HasAutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110353"><span class="hs-identifier hs-type">ai</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110352"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679110351"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-158"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html#HasAutoIdent"><span class="hs-identifier hs-type">HasAutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110353"><span class="hs-identifier hs-type">ai</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-type">Cayley</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110351"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110352"><span class="hs-identifier hs-type">eff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-159"></span><span>  </span><span id="local-6989586621679110349"><span class="annot"><span class="annottext">liftAutoIdent :: (ArrowIdent -&gt; ai a b) -&gt; Cayley f eff a b
+</span><a href="#local-6989586621679110349"><span class="hs-identifier hs-var hs-var hs-var hs-var">liftAutoIdent</span></a></span></span><span> </span><span id="local-6989586621679110348"><span class="annot"><span class="annottext">f :: ArrowIdent -&gt; ai a b
+</span><a href="#local-6989586621679110348"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (eff a b) -&gt; Cayley f eff a b
+forall (f :: * -&gt; *) (p :: * -&gt; * -&gt; *) a b.
+f (p a b) -&gt; Cayley f p a b
+</span><a href="../file:///nix/store/axlhgfqgj0fssczi1alpim9qdhipljrs-profunctors-lib-profunctors-5.5.2-haddock-doc/share/doc/profunctors/html/src"><span class="hs-identifier hs-var">Cayley</span></a></span><span> </span><span class="annot"><span class="annottext">(f (eff a b) -&gt; Cayley f eff a b)
+-&gt; f (eff a b) -&gt; Cayley f eff a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">eff a b -&gt; f (eff a b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ArrowIdent -&gt; ai a b) -&gt; eff a b
+forall (wrappedEff :: * -&gt; * -&gt; *) (eff :: * -&gt; * -&gt; *) a b.
+HasAutoIdent wrappedEff eff =&gt;
+(ArrowIdent -&gt; wrappedEff a b) -&gt; eff a b
+</span><a href="Control.Kernmantle.Arrow.html#liftAutoIdent"><span class="hs-identifier hs-var">liftAutoIdent</span></a></span><span> </span><span class="annot"><span class="annottext">ArrowIdent -&gt; ai a b
+</span><a href="#local-6989586621679110348"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="hs-comment">--  -- | Permits an arrow to recursively call itself without changing its identifier</span><span>
+</span><span id="line-162"></span><span class="hs-comment">-- fixIdent :: (HasAutoIdent ai eff)</span><span>
+</span><span id="line-163"></span><span class="hs-comment">--          =&gt; (eff a b -&gt; eff a b) -&gt; eff a b</span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- fixIdent f = liftAutoIdent $ \aid -&gt;</span><span>
+</span><span id="line-165"></span><span class="hs-comment">--   let run = case f (AutoIdent $ \_ -&gt; run) of AutoIdent f' -&gt; f' aid</span><span>
+</span><span id="line-166"></span><span class="hs-comment">--   in run</span><span>
+</span><span id="line-167"></span></pre></body></html>
