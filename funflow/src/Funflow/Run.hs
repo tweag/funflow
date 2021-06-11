@@ -176,7 +176,8 @@ runFlowWithConfig config flow input =
                     putStrLn $ "Pulling docker image: " ++ T.unpack image
                     pullResult <- runExceptT $ pullImage manager image
                     case pullResult of
-                      Left ex ->
+                      Left ex -> do
+                        putStrLn "Error pulling docker image; is Internet connected? Is Docker running?"
                         throw ex
                       Right _ ->
                         -- No error, just continue
