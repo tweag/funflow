@@ -91,6 +91,8 @@ also to demonstrate a few features of `funflow`. In particular, you may keep an 
 out for:
 
  * use of `Arrows` as related syntax, closely tied with the `Flow` type
+ * use of each of the three "smart constructors" for building a `Flow`
  * recursive calls to the target building function: larger flows may be built up recursively
  * "joining" a collection of "atomic" flows into a single flow that accepts a collection and outputs a collection (`flowJoin`)
- * use of each of the three "smart constructors" for building a `Flow`
+ * single execution of the "joined" flow (in particular, a single pull of the relevant Docker image)
+
