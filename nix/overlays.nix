@@ -31,6 +31,7 @@
         STACK_IN_NIX_SHELL = true;
         buildInputs = [ super.docker ];
       });
+      makefile-tool = project.funflow-examples.components.exes.makefile-tool;
 
       # Other libraries defined in this repo
       cas-store = project.cas-store.components.library;
