@@ -11,6 +11,7 @@ module Main where
 
 import Control.Arrow
 import Control.Exception (SomeException (..))
+import Control.Kernmantle.Caching (caching)
 import Control.Kernmantle.Error (tryE)
 import Control.Monad (guard)
 import qualified Data.ByteString as BS
@@ -68,22 +69,21 @@ main = do
           defGoalRule = defaultGoal mfile
           runCfg = getRunConfigWithoutFile contentStore
       putStrLn ("Attempting build:\n" ++ show defGoalRule)
-      result <- runFlowWithConfig runCfg (tryE @SomeException (buildTarget contentStore mfile defGoalRule)) () :: IO (Either SomeException (Content File))
+      result <- runFlowWithConfig runCfg (tryE @SomeException (buildTarget contentStore mfile defGoalRule)) () :: IO (Either SomeException (Path Abs File))
       putStrLn "Build attempt complete"
       case result of
         Left ex -> putStrLn $ "\n\nFailed, target failed:\n\n" ++ (show ex)
         Right execFile -> do
           -- Build succeeded; write executable to target location and set exec bit.
           let outpath = fromAbsDir cwd ++ "/" ++ mkRuleTarNm defGoalRule
-          readByteString contentStore execFile >>= BS.writeFile outpath
+          BS.readFile (fromAbsFile execFile) >>= BS.writeFile outpath
           setFileMode outpath accessModes -- chmod +x
           putStrLn "\n\nSuccess, target executable made."
-
 
 -- | Building A Target
 --------------------------------------------------------------------------------
 -- Note: assuming the makefile is valid at this point!
-buildTarget :: Path Abs Dir -> MakeFile -> MakeRule -> Flow () (Content File)
+buildTarget :: Path Abs Dir -> MakeFile -> MakeRule -> Flow () (Path Abs File)
 buildTarget storeRoot mkfile target@(MakeRule targetNm deps cmd) = let
    srcfiles = sourceFiles mkfile
    -- What must be built is the collection of non-source dependencies.
@@ -105,12 +105,12 @@ buildTarget storeRoot mkfile target@(MakeRule targetNm deps cmd) = let
        depFiles <- flowJoin [Id{ unId = buildTarget storeRoot mkfile r } | r <- depRules] -< (replicate (length depRules) ())
        let fullSrcFiles = Map.fromList $ zip neededSources contentSrcFiles
        -- Compile the target of the current rule.
-       compFile <- (compileFile storeRoot) -< (targetNm, fullSrcFiles, depFiles, cmd)
+       compFile <- caching targetNm (compileFile storeRoot) -< (targetNm, fullSrcFiles, depFiles, cmd)
        returnA -< compFile
 
 
 -- | Compiles a C file in a docker container.
-compileFile :: Path Abs Dir -> Flow (TargetFile, Map.Map SourceFile String, [Content File], Command) (Content File)
+compileFile :: Path Abs Dir -> Flow (TargetFile, Map.Map SourceFile String, [Path Abs File], Command) (Path Abs File)
 compileFile root = proc (tf, srcDeps, tarDeps, cmd) -> do
   relpathCompiledFile <- (ioFlow parseRelFile) -< tf
   srcsInStore <- write2Store root -< srcDeps
@@ -127,7 +127,8 @@ compileFile root = proc (tf, srcDeps, tarDeps, cmd) -> do
   inMnt <- ioFlow parseAbsDir -< "/sandbox"
   taskIn <- pureFlow buildTaskInput -< (inputDir, compItem, inMnt)
   resDir <- dockerFlow dockConf -< taskIn
-  returnA -< resDir CS.:</> relpathCompiledFile
+  resFile <- ioFlow (\c -> CS.withStore root (\s -> return (CS.contentPath s c))) -< (resDir CS.:</> relpathCompiledFile)
+  returnA -< resFile
     where dockConf = DE.DockerTaskConfig{ DE.image = "gcc:7.3.0", DE.command = "/script/script.sh", DE.args = ["/sandbox"] }
           buildTaskInput (indir, compItem, mnt) = DE.DockerTaskInput{
             DE.inputBindings = [
@@ -168,14 +169,13 @@ flowJoin ff@(f:fs) = proc aa@(a:as) -> do
 -------------------------------------------------------------------------------
 
 -- For each of a collection of files, create a link in the store root.
-mergeFilesRaw :: Path Abs Dir -> [Content File] -> IO (Content Dir)
+mergeFilesRaw :: Path Abs Dir -> [Path Abs File] -> IO (Content Dir)
 mergeFilesRaw root fs = CS.withStore root (\s -> merge s fs)
-    where merge store files = let absFiles = map (CS.contentPath store) files
-                                  linkIn d = mapM_ ( \f -> createLink (toFilePath f) (toFilePath $ d </> filename f) )
-                              in CS.All <$> CS.putInStore store RC.NoCache (\_ -> return (error "uh-oh!")) linkIn absFiles
+    where merge store files = let linkIn d = mapM_ ( \f -> createLink (toFilePath f) (toFilePath $ d </> filename f) )
+                              in CS.All <$> CS.putInStore store RC.NoCache (\_ -> return (error "uh-oh!")) linkIn files
 
 -- Flow version of linking a collection of files into the store root
-mergeFiles :: Path Abs Dir -> Flow [Content File] (Content Dir)
+mergeFiles :: Path Abs Dir -> Flow [Path Abs File] (Content Dir)
 mergeFiles root = ioFlow (mergeFilesRaw root)
 
 -- Write to a file at given relpath, in the store at the given root.
@@ -192,10 +192,6 @@ findRules MakeFile{ allrules = rules } targets = do
   where
     ruleTarNmSet = Set.map mkRuleTarNm rules
     tfileSet = Set.fromList targets
-
--- Read bytestring from given file in store rooted at given path.
-readByteString :: Path Abs Dir -> Content File -> IO BS.ByteString
-readByteString store f = CS.withStore store (\s -> BS.readFile . fromAbsFile $ CS.contentPath s f)
 
 
 -------------------------------------------------------------------------------
@@ -217,13 +213,14 @@ putInStoreAt root put (a, p) =
     )
 
 -- Write each content to file with associated name, within store rooted at given path.
-write2Store :: Path Abs Dir -> Flow (Map.Map FileName FileContent) [Content File]
+write2Store :: Path Abs Dir -> Flow (Map.Map FileName FileContent) [Path Abs File]
 write2Store root =
   let ioFixSrcFileData (x,y) = (\y' -> (y,y')) <$> parseRelFile x
   in ioFlow (\files -> mapM (\x -> do
     y <- ioFixSrcFileData x
     (_, z) <- putInStoreAt root (writeFile . fromAbsFile) y
-    return z
+    fp <- CS.withStore root (\s -> return (CS.contentPath s z))
+    return fp
   ) (Map.toList files) )
 
 
