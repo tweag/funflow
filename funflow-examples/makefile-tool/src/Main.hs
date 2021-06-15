@@ -11,7 +11,6 @@ module Main where
 
 import Control.Arrow
 import Control.Exception (SomeException (..))
-import Control.Kernmantle.Caching (caching)
 import Control.Kernmantle.Error (tryE)
 import Control.Monad (guard)
 import qualified Data.ByteString as BS
@@ -25,6 +24,7 @@ import Data.Typeable (Typeable)
 import Funflow
   ( Flow,
     RunFlowConfig (..),
+    caching,
     dockerFlow,
     ioFlow,
     pureFlow,
