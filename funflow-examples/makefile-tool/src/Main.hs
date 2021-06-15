@@ -127,7 +127,7 @@ compileFile root = proc (tf, srcDeps, tarDeps, cmd) -> do
   inMnt <- ioFlow parseAbsDir -< "/sandbox"
   taskIn <- pureFlow buildTaskInput -< (inputDir, compItem, inMnt)
   resDir <- dockerFlow dockConf -< taskIn
-  resFile <- ioFlow (\c -> CS.withStore root (\s -> return (CS.contentPath s c))) -< (resDir CS.:</> relpathCompiledFile)
+  resFile <- ioFlow (ioContentPath root) -< (resDir CS.:</> relpathCompiledFile)
   returnA -< resFile
     where dockConf = DE.DockerTaskConfig{ DE.image = "gcc:7.3.0", DE.command = "/script/script.sh", DE.args = ["/sandbox"] }
           buildTaskInput (indir, compItem, mnt) = DE.DockerTaskInput{
@@ -219,9 +219,13 @@ write2Store root =
   in ioFlow (\files -> mapM (\x -> do
     y <- ioFixSrcFileData x
     (_, z) <- putInStoreAt root (writeFile . fromAbsFile) y
-    fp <- CS.withStore root (\s -> return (CS.contentPath s z))
+    fp <- ioContentPath root z
     return fp
   ) (Map.toList files) )
+
+-- Get the path to content in the store.
+ioContentPath :: Path Abs Dir -> Content t -> IO (Path Abs t)
+ioContentPath root x = CS.withStore root (\s -> return (CS.contentPath s x))
 
 
 -------------------------------------------------------------------------------
