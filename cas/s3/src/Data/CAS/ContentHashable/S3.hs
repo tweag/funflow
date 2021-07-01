@@ -1,9 +1,9 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Hashing of S3 objects
 --
@@ -12,16 +12,18 @@
 module Data.CAS.ContentHashable.S3 where
 
 import qualified Aws
-import qualified Aws.S3                          as S3
-import           Control.Monad                   ((>=>))
-import           Control.Monad.Trans.Resource    (runResourceT)
-import           Data.Aeson
-import           Data.CAS.ContentHashable
-import           Data.Constraint
-import           Data.Reflection
-import           GHC.Generics                    (Generic)
-import           Network.HTTP.Conduit            (newManager,
-                                                  tlsManagerSettings)
+import qualified Aws.S3 as S3
+import Control.Monad ((>=>))
+import Control.Monad.Trans.Resource (runResourceT)
+import Data.Aeson
+import Data.CAS.ContentHashable
+import Data.Constraint
+import Data.Reflection
+import GHC.Generics (Generic)
+import Network.HTTP.Conduit
+  ( newManager,
+    tlsManagerSettings,
+  )
 
 -- | Reference to an object in an S3 bucket
 --
@@ -31,21 +33,25 @@ import           Network.HTTP.Conduit            (newManager,
 --   - S3.Object (alias for Text)
 --   - S3.ObjectInfo
 data ObjectInBucket obj = ObjectInBucket
-  { _oibBucket :: S3.Bucket
-  , _oibObject :: obj
-  } deriving (Show, Generic)
+  { _oibBucket :: S3.Bucket,
+    _oibObject :: obj
+  }
+  deriving (Show, Generic)
 
 -- | A lens to _oibBucket
 oibBucket :: Functor f => (S3.Bucket -> f S3.Bucket) -> ObjectInBucket obj -> f (ObjectInBucket obj)
 oibBucket f oib = rebuild <$> f (_oibBucket oib)
-  where rebuild b = oib{_oibBucket=b}
+  where
+    rebuild b = oib {_oibBucket = b}
 
 -- | A lens to _oibObject
 oibObject :: Functor f => (a -> f b) -> ObjectInBucket a -> f (ObjectInBucket b)
 oibObject f oib = rebuild <$> f (_oibObject oib)
-  where rebuild o = oib{_oibObject=o}
+  where
+    rebuild o = oib {_oibObject = o}
 
 instance FromJSON (ObjectInBucket S3.Object)
+
 instance ToJSON (ObjectInBucket S3.Object)
 
 class ObjectReference a where
@@ -72,28 +78,33 @@ instance ObjectReference S3.ObjectInfo where
 --   We incorporate the bucket and name into this to give extra guarantees on
 --   uniqueness, but we may be better abolishing this to deduplicate files
 --   stored in multiple places.
-instance (Given Aws.Configuration)
-  => ContentHashable IO (ObjectInBucket S3.Object) where
-  contentHashUpdate ctx a = let
-      s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
-    in do
-      {- Set up a ResourceT region with an available HTTP manager. -}
-      mgr <- newManager tlsManagerSettings
+instance
+  (Given Aws.Configuration) =>
+  ContentHashable IO (ObjectInBucket S3.Object)
+  where
+  contentHashUpdate ctx a =
+    let s3cfg = Aws.defServiceConfig :: S3.S3Configuration Aws.NormalQuery
+     in do
+          {- Set up a ResourceT region with an available HTTP manager. -}
+          mgr <- newManager tlsManagerSettings
 
-      {- Create a request object with S3.getObject and run the request with pureAws. -}
-      S3.GetObjectResponse { S3.gorMetadata = md } <- runResourceT $
-        Aws.pureAws given s3cfg mgr $
-          S3.getObject (_oibBucket a) (_oibObject a)
+          {- Create a request object with S3.getObject and run the request with pureAws. -}
+          S3.GetObjectResponse {S3.gorMetadata = md} <-
+            runResourceT $
+              Aws.pureAws given s3cfg mgr $
+                S3.getObject (_oibBucket a) (_oibObject a)
 
-      flip contentHashUpdate (_oibBucket a)
-        >=> flip contentHashUpdate (_oibObject a)
-        >=> flip contentHashUpdate (S3.omETag md)
-          $ ctx
+          flip contentHashUpdate (_oibBucket a)
+            >=> flip contentHashUpdate (_oibObject a)
+            >=> flip contentHashUpdate (S3.omETag md)
+            $ ctx
 
 -- | Reified instance of the implication to allow us to use this as a
 --   constraint.
-instance (Given Aws.Configuration)
-         :=> ContentHashable IO (ObjectInBucket S3.Object) where
+instance
+  (Given Aws.Configuration)
+    :=> ContentHashable IO (ObjectInBucket S3.Object)
+  where
   ins = Sub Dict
 
 -- | When we already have `ObjectInfo` (because we have, for example, queried
@@ -104,10 +115,12 @@ instance Monad m => ContentHashable m (ObjectInBucket S3.ObjectInfo) where
     flip contentHashUpdate (_oibBucket a)
       >=> flip contentHashUpdate (S3.objectKey $ _oibObject a)
       >=> flip contentHashUpdate (S3.objectETag $ _oibObject a)
-        $ ctx
+      $ ctx
 
 -- | Reified instance of the implication to allow us to use this as a
 --   constraint.
-instance (Given Aws.Configuration)
-         :=> ContentHashable IO (ObjectInBucket S3.ObjectInfo) where
+instance
+  (Given Aws.Configuration)
+    :=> ContentHashable IO (ObjectInBucket S3.ObjectInfo)
+  where
   ins = Sub Dict

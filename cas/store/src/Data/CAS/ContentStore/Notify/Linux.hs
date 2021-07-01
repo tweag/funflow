@@ -1,24 +1,24 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Implementation of filesystem watching functionality for linux based on
 --   inotify.
 module Data.CAS.ContentStore.Notify.Linux
-  ( Notifier
-  , initNotifier
-  , killNotifier
+  ( Notifier,
+    initNotifier,
+    killNotifier,
+    Watch,
+    addDirWatch,
+    removeDirWatch,
+  )
+where
 
-  , Watch
-  , addDirWatch
-  , removeDirWatch
-  ) where
-
-import           Control.Exception.Safe (catch)
+import Control.Exception.Safe (catch)
 #if MIN_VERSION_hinotify(0,3,10)
 import qualified Data.ByteString.Char8 as BS
 #endif
-import           System.INotify
+import System.INotify
 
 type Notifier = INotify
 
@@ -38,6 +38,7 @@ addDirWatch inotify dir f = addWatch inotify mask dir' $ \case
   _ -> return ()
   where
     mask = [Attrib, MoveSelf, DeleteSelf, OnlyDir]
+
 #if MIN_VERSION_hinotify(0,3,10)
     dir' = BS.pack dir
 #else
@@ -57,4 +58,4 @@ removeDirWatch w =
   -- Note, that this may change when adding different event handlers,
   -- that remove the watch under different conditions.
   removeWatch w
-    `catch` \(_::IOError) -> return ()
+    `catch` \(_ :: IOError) -> return ()
