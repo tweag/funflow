@@ -1,7 +1,6 @@
 { nixpkgs ? ./nix/nixpkgs.nix
 , ghcide ? false
 , haskellLanguageServer ? true
-, python-language-server ? true
 }:
 let
   pkgs = import nixpkgs { };
@@ -23,43 +22,23 @@ pkgs.mkShell {
   buildInputs = with devShellsInputs;
     # Common packages (e.g. tmate, git, ...)
     (common { })
-    # Vim
-    ++ (vim { languageClient = true; languageClientOptions = { inherit ghcide haskellLanguageServer python-language-server; }; })
     # Standard Haskell dev environment
     ++
     (
       haskell {
         inherit haskellLanguageServer;
         haskellLanguageServerGhcVersion = "ghc884";
-        ghcide = false; 
-      }
-    )
-    # Python dev environment with packages
-    ++
-    (
-      python {
-        withPackages =
-          pp:
-          [
-            # Needs fixing
-            # pp.pytorchWithoutCuda
-            # pp.torchvision
-          ]
-        ;
+        ghcide = false;
       }
     )
     # Custom
     ++
     [
       pkgs.cabal-install
-      pkgs.haskell.packages.ghc883.inliterate
       pkgs.docker
       pkgs.zlib
       pkgs.git
       pkgs.cabal-install
     ]
   ;
-
-  # TODO fix
-  # NIX_PATH = "nixpkgs=${nixpkgs}";
 }

@@ -37,7 +37,6 @@
       cas-store = project.cas-store.components.library;
       cas-hashable = project.cas-hashable.components.library;
       cas-hashable-s3 = project.cas-hashable-s3.components.library;
-      external-executor = project.external-executor.components.library;
       docker-client = project.docker-client.components.library.overrideAttrs (old:
         { buildInputs = old.buildInputs ++ [ super.docker ]; }
       );
@@ -97,7 +96,6 @@
             cas-store
             cas-hashable
             cas-hashable-s3
-            external-executor
             docker-client
             kernmantle
             kernmantle-batteries
