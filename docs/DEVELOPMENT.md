@@ -21,18 +21,18 @@
   Once you have installed `cachix`, configure it to use this project's cache:
 
   ```bash
-  cachix use tweag-funflow
+  cachix use funflow
   ```
 
 ## Development environment
 
-A `shell-dev.nix` file is available to provide with the minimum environment to develop and build the library.
+A `shell.nix` file is available to provide with the minimum environment to develop and build the library.
 
 ```bash
-nix-shell shell-dev.nix
+nix-shell shell.nix
 ```
 
-A `shell.nix` file is available to provide the suitable environment to build the project, which is the environment in which `stack` makes its builds.
+A `shell-stack.nix` file is available to provide the suitable environment to build the project, which is the environment in which `stack` makes its builds.
 
 A `hie.yaml` file is available at the root of the project to use Haskell Language Server.
 HLS can be used with VS Code/vim/emacs to improve the development experience.
@@ -69,12 +69,6 @@ stack test funflow
 
 Funflow uses a Nix build based on [[https://github.com/input-output-hk/haskell.nix][haskell.nix]] for CI.
 
-If you make changes to the dependencies through modifying the `stack.yaml` or individual `.cabal` files, then you will need to regenerate the nix configuration by calling:
-
-```bash
-./nix/regenerate.sh
-```
-
 If you make major changes, such as updating the stackage resolver, you may need to move to a newer version of nixpkgs and the haskell.nix tooling:
 
 ```bash
@@ -87,17 +81,17 @@ If you make major changes, such as updating the stackage resolver, you may need 
 Build the library:
 
 ```bash
-nix-build nix -A funflow.components.library
+nix-build nix -A funflow
 ```
 
 Run the tests:
 
 ```bash
-$(nix-build nix -A funflow.components.tests)/bin/test-funflow
+(cd funflow && "$(nix-build ../nix -A funflow-tests)/bin/test-funflow")
 ```
 
-Build the docs to a `result-docs` folder:
+Build the API docs to a `result-api-docs` folder:
 
 ```bash
-nix-build -o result-docs nix/docs
+nix-build -o result-api-docs api-docs
 ```
