@@ -1,7 +1,7 @@
 # {{cookiecutter.project_name}}
 
-Welcome to your funflow2 project! This project was created using the funflow2 cookiecutter template and is
-intended to be used alongside the [Haskell Tool Stack (stack)](https://docs.haskellstack.org/en/stable/README/#how-to-install). 
+Welcome to your funflow project! This project was created using the funflow cookiecutter template and is
+intended to be used alongside the [Haskell Tool Stack (stack)](https://docs.haskellstack.org/en/stable/README/#how-to-install).
 
 You may also get started with a development environment (including `stack`) using Nix. Simply install Nix then run the `nix-shell` command in this directory.
 
@@ -16,7 +16,7 @@ $ stack build
 then
 
 ```console
-$ stack run 
+$ stack run
 
     "Mean of [1.0,2.0,3.0,4.0,5.0] is: 3.0"
 ```

@@ -4,7 +4,7 @@ set -e
 
 # Set paths
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-out="$SCRIPT_DIR"/../result/funflow2
+out="$SCRIPT_DIR"/../result/funflow
 
 srcPagesIndex="$SCRIPT_DIR"/../src
 srcFunflowTutorials="$SCRIPT_DIR"/../../funflow-tutorial

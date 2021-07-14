@@ -21,7 +21,7 @@
   Once you have installed `cachix`, configure it to use this project's cache:
 
   ```bash
-  cachix use tweag-funflow2
+  cachix use tweag-funflow
   ```
 
 ## Development environment

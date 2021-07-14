@@ -1,5 +1,5 @@
 -- | Composable computational workflows.
---   See https://github.com/tweag/funflow2
+--   See https://github.com/tweag/funflow
 --
 --   This module re-exports other modules for conveniency.
 module Funflow
