@@ -1,31 +1,43 @@
 # Documentation of The `makefile-tool`
 
+<!-- toc -->
+
+- [Introduction](#introduction)
+- [Specification](#specification)
+  * [Using the included example](#using-the-included-example)
+  * [Writing the `Makefile`](#writing-the-makefile)
+  * [Guarantees](#guarantees)
+- [What to look for](#what-to-look-for)
+
+<!-- tocstop -->
+
 ## Introduction
 
-Building a C project is a well known workflow. We have several steps of 
-compiling object files, some of which depend on each other and then, finally 
-compiling the executable we want.
+Building a C project is a well known workflow: source files are compiled to 
+object files, and eventually object files are linked to produce a specific 
+target.
 
 Here, we provide a simple tool similar to 
 [GNU's Make](https://www.gnu.org/software/make/).
-
 Our executable, the `makefile-tool`, takes a `Makefile`-like file
-and 
-
+and...
 1. creates a workflow for that particular build, and,
 2. runs that workflow to either produce the desired executable or 
-   fails gently in doing so.
+   fail gently.
 
 
 ## Specification
 
-### Building
-
+### Using the included example
+From repo root:
 ```bash
-$ stack build makefile-tool
+$ nix-build -A makefile-tool
+$ cd funflow-examples/makefile-tool/test
+$ ../../../result/bin/makefile-tool
+$ ./hello
 ```
 
-### Usage
+### Writing the `Makefile`
 
 The MakeFile should have filename `Makefile` 
 and look like this:
@@ -59,18 +71,12 @@ More precisely, the `Makefile` should follow these rules:
        **the output file is not named, i.e., there is no `-o` argument**.
 
 To build the C project, put all the source files 
-and the `Makefile` in the  same directory and 
-simply run the makefile-tool:
-
-```bash
-$ ls
-Makefile sourcefile1.c sourcefile2.c ...
-$ stack exec makefile-tool
-```
+and the `Makefile` in the same directory and 
+simply run the `makefile-tool`. See the [example](#example)
 
 ### Guarantees
 
-We build in a way such that
+We build in a way such that...
 
  * we catch bad or non-existant makefiles
  * on successive runs, we don't re-make 
@@ -78,16 +84,15 @@ We build in a way such that
  * we fail gracefully and indicate the target 
    that can't be built.
 
-### Example
 
-```bash
-$ cd .../funflow/funflow-exmaples/makefile-tool/test
-$ stack exec makefile-tool
-$ ls
-factorial.cpp  functions.h  hello  hello.cpp  main.cpp  Makefile  makefiletest
-$ ./hello
-Hello World!
-The factorial of 5 is 120
-```
+## What to look for
+This example is chosen not only for likely familiarity and utility to many, but 
+also to demonstrate a few features of `funflow`. In particular, you may keep an eye 
+out for:
 
-  
+ * use of `Arrows` as related syntax, closely tied with the `Flow` type
+ * use of each of the three "smart constructors" for building a `Flow`
+ * recursive calls to the target building function: larger flows may be built up recursively
+ * "joining" a collection of "atomic" flows into a single flow that accepts a collection and outputs a collection (`flowJoin`)
+ * single execution of the "joined" flow (in particular, a single pull of the relevant Docker image)
+

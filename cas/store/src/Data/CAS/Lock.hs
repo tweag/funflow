@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE QuasiQuotes         #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Thread and process write lock.
@@ -10,31 +10,32 @@
 --
 -- Only ever have one 'Lock' object per lock file per process!
 module Data.CAS.Lock
-  ( Lock
-  , openLock
-  , closeLock
-  , withLock
-  ) where
+  ( Lock,
+    openLock,
+    closeLock,
+    withLock,
+  )
+where
 
-import           Control.Concurrent          (threadDelay)
-import           Control.Exception.Safe
-import           Control.Monad               (unless)
-import           Network.HostName            (getHostName)
-import           Path
-import           Path.IO
-import           System.Posix.Files
-import           System.Posix.IO
-import           System.Posix.Process
-import           System.Random
-import           UnliftIO                    (MonadUnliftIO, withRunInIO)
-import           UnliftIO.MVar
+import Control.Concurrent (threadDelay)
+import Control.Exception.Safe
+import Control.Monad (unless)
+import Network.HostName (getHostName)
+import Path
+import Path.IO
+import System.Posix.Files
+import System.Posix.IO
+import System.Posix.Process
+import System.Random
+import UnliftIO (MonadUnliftIO, withRunInIO)
+import UnliftIO.MVar
 
 -- | Thread and process write lock.
 --
 -- Only ever have one 'Lock' object per lock file per process!
 data Lock = Lock
-  { lockMVar :: MVar ()
-  , lockDir  :: Path Abs Dir
+  { lockMVar :: MVar (),
+    lockDir :: Path Abs Dir
   }
 
 -- | Open the lock file and create a lock object.
@@ -46,10 +47,11 @@ openLock :: Path Abs Dir -> IO Lock
 openLock dir = do
   mvar <- newMVar ()
   createDirIfMissing True dir
-  return $! Lock
-    { lockMVar = mvar
-    , lockDir = dir
-    }
+  return
+    $! Lock
+      { lockMVar = mvar,
+        lockDir = dir
+      }
 
 -- | Close the lock file.
 --
@@ -103,7 +105,7 @@ acquireDirLock dir = do
   r <- try $ createLink (fromAbsFile path) (fromAbsFile $ dir </> lockFileName)
   case r of
     Right () -> return ()
-    Left (_::IOError) -> do
+    Left (_ :: IOError) -> do
       count <- linkCount <$> getFileStatus (fromAbsFile path)
       unless (count == 2) $ do
         delay <- randomRIO (50000, 100000)

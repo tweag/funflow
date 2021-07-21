@@ -1,15 +1,15 @@
-{-# LANGUAGE DefaultSignatures     #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MagicHash             #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
-{-# LANGUAGE UnboxedTuples         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 -- | 'ContentHashable' provides a hashing function suitable for use in the
 --   Funflow content store.
@@ -22,106 +22,117 @@
 --   types. These instead use the path, file size and modification time to control
 --   the hash.
 module Data.CAS.ContentHashable
-  ( ContentHash
-  , toBytes
-  , fromBytes
-  , ContentHashable (..)
-  , contentHashUpdate_binaryFile
-  , contentHashUpdate_byteArray#
-  , contentHashUpdate_fingerprint
-  , contentHashUpdate_primitive
-  , contentHashUpdate_storable
+  ( ContentHash,
+    toBytes,
+    fromBytes,
+    ContentHashable (..),
+    contentHashUpdate_binaryFile,
+    contentHashUpdate_byteArray#,
+    contentHashUpdate_fingerprint,
+    contentHashUpdate_primitive,
+    contentHashUpdate_storable,
+    FileContent (..),
+    DirectoryContent (..),
+    ExternallyAssuredFile (..),
+    ExternallyAssuredDirectory (..),
+    encodeHash,
+    decodeHash,
+    hashToPath,
+    pathToHash,
+    SHA256,
+    Context,
+    Digest,
+  )
+where
 
-  , FileContent (..)
-  , DirectoryContent (..)
-
-  , ExternallyAssuredFile(..)
-  , ExternallyAssuredDirectory(..)
-
-  , encodeHash
-  , decodeHash
-  , hashToPath
-  , pathToHash
-
-  , SHA256
-  , Context
-  , Digest
-  ) where
-
-
-import           Control.Exception.Safe           (catchJust)
-import           Control.Monad                    (foldM, (>=>))
-import           Control.Monad.IO.Class           (MonadIO, liftIO)
-import           Crypto.Hash                      (Context, Digest, SHA256,
-                                                   digestFromByteString,
-                                                   hashFinalize, hashInit,
-                                                   hashUpdate)
-import qualified Data.Aeson                       as Aeson
-import qualified Data.Aeson.Types                 as Aeson
-import           Data.Bits                        (shiftL)
-import           Data.ByteArray                   (Bytes, MemView (MemView),
-                                                   allocAndFreeze, convert)
-import           Data.ByteArray.Encoding          (Base (Base16),
-                                                   convertFromBase,
-                                                   convertToBase)
-import qualified Data.ByteString                  as BS
-import           Data.ByteString.Builder.Extra    (defaultChunkSize)
-import qualified Data.ByteString.Char8            as C8
-import qualified Data.ByteString.Lazy             as BSL
-import           Data.Foldable                    (foldlM)
+import Control.Exception.Safe (catchJust)
+import Control.Monad (foldM, (>=>))
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Crypto.Hash
+  ( Context,
+    Digest,
+    SHA256,
+    digestFromByteString,
+    hashFinalize,
+    hashInit,
+    hashUpdate,
+  )
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Types as Aeson
+import Data.Bits (shiftL)
+import Data.ByteArray
+  ( Bytes,
+    MemView (MemView),
+    allocAndFreeze,
+    convert,
+  )
+import Data.ByteArray.Encoding
+  ( Base (Base16),
+    convertFromBase,
+    convertToBase,
+  )
+import qualified Data.ByteString as BS
+import Data.ByteString.Builder.Extra (defaultChunkSize)
+import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Lazy as BSL
+import Data.Foldable (foldlM)
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.HashSet as HashSet
 import qualified Data.Hashable
-import qualified Data.HashMap.Lazy                as HashMap
-import qualified Data.HashSet                     as HashSet
-import           Data.Int
-import           Data.List                        (sort)
-import           Data.List.NonEmpty               (NonEmpty)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as Map
-import           Data.Ratio
-import           Data.Scientific
-import qualified Data.Text                        as T
-import qualified Data.Text.Array                  as TA
-import qualified Data.Text.Encoding               as TE
-import qualified Data.Text.Internal               as T
-import qualified Data.Text.Lazy                   as TL
-import           Data.Time.Clock                  (UTCTime)
-import           Data.Time.Clock.POSIX            (utcTimeToPOSIXSeconds)
-import           Data.Typeable
-import qualified Data.Vector                      as V
-import qualified Data.Vector.Storable             as VS
-import qualified Data.Vector.Unboxed              as VU
-import           Data.Word
-import           Foreign.Marshal.Utils            (with)
-import           Foreign.Ptr                      (castPtr)
-import           Foreign.Storable                 (Storable, sizeOf)
-import           GHC.Fingerprint
-import           GHC.Generics
-import           GHC.Integer.GMP.Internals        (BigNat (..), Integer (..))
-import           GHC.Natural                      (Natural (..))
-import           GHC.Prim                         (ByteArray#,
-                                                   copyByteArrayToAddr#,
-                                                   sizeofByteArray#)
-import           GHC.Ptr                          (Ptr (Ptr))
-import           GHC.Types                        (IO (IO), Int (I#), Word (W#))
+import Data.Int
+import Data.List (sort)
+import Data.List.NonEmpty (NonEmpty)
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Ratio
+import Data.Scientific
+import qualified Data.Text as T
+import qualified Data.Text.Array as TA
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Internal as T
+import qualified Data.Text.Lazy as TL
+import Data.Time.Clock (UTCTime)
+import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.Typeable
+import qualified Data.Vector as V
+import qualified Data.Vector.Storable as VS
+import qualified Data.Vector.Unboxed as VU
+import Data.Word
+import Foreign.Marshal.Utils (with)
+import Foreign.Ptr (castPtr)
+import Foreign.Storable (Storable, sizeOf)
+import GHC.Fingerprint
+import GHC.Generics
+import GHC.Integer.GMP.Internals (BigNat (..), Integer (..))
+import GHC.Natural (Natural (..))
+import GHC.Prim
+  ( ByteArray#,
+    copyByteArrayToAddr#,
+    sizeofByteArray#,
+  )
+import GHC.Ptr (Ptr (Ptr))
+import GHC.Types (IO (IO), Int (I#), Word (W#))
 import qualified Path
-import qualified Path.Internal
 import qualified Path.IO
-import           System.IO                        (IOMode (ReadMode),
-                                                   withBinaryFile)
-import           System.IO.Error                  (isPermissionError)
-import           System.IO.Unsafe                 (unsafePerformIO)
-import           System.Posix.Files               (fileSize, getFileStatus)
+import qualified Path.Internal
+import System.IO
+  ( IOMode (ReadMode),
+    withBinaryFile,
+  )
+import System.IO.Error (isPermissionError)
+import System.IO.Unsafe (unsafePerformIO)
+import System.Posix.Files (fileSize, getFileStatus)
 
-
-newtype ContentHash = ContentHash { unContentHash :: Digest SHA256 }
+newtype ContentHash = ContentHash {unContentHash :: Digest SHA256}
   deriving (Eq, Ord, Generic)
 
 instance Aeson.FromJSON ContentHash where
   parseJSON (Aeson.String s)
     | Just h <- decodeHash (TE.encodeUtf8 s) = pure h
     | otherwise = fail "Invalid hash encoding"
-  parseJSON invalid
-    = Aeson.typeMismatch "ContentHash" invalid
+  parseJSON invalid =
+    Aeson.typeMismatch "ContentHash" invalid
+
 instance Aeson.ToJSON ContentHash where
   toJSON = Aeson.String . TE.decodeUtf8 . encodeHash
 
@@ -129,11 +140,13 @@ instance Data.Hashable.Hashable ContentHash where
   hashWithSalt s = Data.Hashable.hashWithSalt s . encodeHash
 
 instance Show ContentHash where
-  showsPrec d h = showParen (d > app_prec)
-    $ showString "ContentHash \""
-    . (showString $ C8.unpack $ encodeHash h)
-    . showString "\""
-    where app_prec = 10
+  showsPrec d h =
+    showParen (d > app_prec) $
+      showString "ContentHash \""
+        . (showString $ C8.unpack $ encodeHash h)
+        . showString "\""
+    where
+      app_prec = 10
 
 toBytes :: ContentHash -> BS.ByteString
 toBytes = convert . unContentHash
@@ -153,18 +166,18 @@ encodeHash = convertToBase hashEncoding . toBytes
 -- prop> decodeHash (encodeHash x) = Just x
 decodeHash :: BS.ByteString -> Maybe ContentHash
 decodeHash bs = case convertFromBase hashEncoding bs of
-  Left _  -> Nothing
+  Left _ -> Nothing
   Right x -> fromBytes x
 
 -- | File path appropriate encoding of a hash
 hashToPath :: ContentHash -> Path.Path Path.Rel Path.Dir
 hashToPath h =
   case Path.parseRelDir $ C8.unpack $ encodeHash h of
-    Nothing -> error
-      "[ContentHashable.hashToPath] \
-      \Failed to convert hash to directory name"
+    Nothing ->
+      error
+        "[ContentHashable.hashToPath] \
+        \Failed to convert hash to directory name"
     Just dir -> dir
-
 
 -- | Inverse of 'hashToPath' if given a valid input.
 --
@@ -172,18 +185,18 @@ hashToPath h =
 pathToHash :: FilePath -> Maybe ContentHash
 pathToHash = decodeHash . C8.pack
 
-
 class Monad m => ContentHashable m a where
-
   -- | Update a hash context based on the given value.
   --
   -- See 'Crypto.Hash.hashUpdate'.
   --
   -- XXX: Consider swapping the arguments.
   contentHashUpdate :: Context SHA256 -> a -> m (Context SHA256)
-
-  default contentHashUpdate :: (Generic a, GContentHashable m (Rep a))
-    => Context SHA256 -> a -> m (Context SHA256)
+  default contentHashUpdate ::
+    (Generic a, GContentHashable m (Rep a)) =>
+    Context SHA256 ->
+    a ->
+    m (Context SHA256)
   contentHashUpdate ctx a = gContentHashUpdate ctx (from a)
 
   -- | Generate hash of the given value.
@@ -191,7 +204,6 @@ class Monad m => ContentHashable m a where
   -- See 'Crypto.Hash.hash'.
   contentHash :: a -> m ContentHash
   contentHash x = ContentHash . hashFinalize <$> contentHashUpdate hashInit x
-
 
 -- | Update hash context based on binary in memory representation due to 'Foreign.Storable.Storable'.
 --
@@ -217,11 +229,10 @@ contentHashUpdate_binaryFile :: Context SHA256 -> FilePath -> IO (Context SHA256
 contentHashUpdate_binaryFile ctx0 fp = withBinaryFile fp ReadMode $ \h ->
   let go ctx = do
         chunk <- BS.hGetSome h defaultChunkSize
-        if BS.null chunk then
-          pure ctx
-        else
-          go $! hashUpdate ctx chunk
-  in go ctx0
+        if BS.null chunk
+          then pure ctx
+          else go $! hashUpdate ctx chunk
+   in go ctx0
 
 -- | Update hash context based on 'GHC.Prim.ByteArray#'
 -- by copying into a newly allocated 'Data.ByteArray.Bytes'
@@ -239,10 +250,10 @@ contentHashUpdate_byteArray# ba (I# off) (I# len) ctx = hashUpdate ctx $
 -- | Update hash context based on the contents of a strict 'Data.Text.Text'.
 contentHashUpdate_text :: Context SHA256 -> T.Text -> Context SHA256
 contentHashUpdate_text ctx (T.Text arr off_ len_) =
-    contentHashUpdate_byteArray# (TA.aBA arr) off len ctx
-    where
-      off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
-      len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
+  contentHashUpdate_byteArray# (TA.aBA arr) off len ctx
+  where
+    off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
+    len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
 
 instance Monad m => ContentHashable m Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
@@ -252,133 +263,178 @@ instance Monad m => ContentHashable m Bool where contentHashUpdate = contentHash
 instance Monad m => ContentHashable m Char where contentHashUpdate = contentHashUpdate_primitive
 
 instance Monad m => ContentHashable m Int where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Int8 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Int16 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Int32 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Int64 where contentHashUpdate = contentHashUpdate_primitive
 
 instance Monad m => ContentHashable m Word where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Word8 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Word16 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Word32 where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Word64 where contentHashUpdate = contentHashUpdate_primitive
 
 instance Monad m => ContentHashable m Float where contentHashUpdate = contentHashUpdate_primitive
+
 instance Monad m => ContentHashable m Double where contentHashUpdate = contentHashUpdate_primitive
 
 instance (ContentHashable m n, Typeable n) => ContentHashable m (Ratio n) where
   contentHashUpdate ctx x =
     flip contentHashUpdate_fingerprint x
-    >=> flip contentHashUpdate (numerator x)
-    >=> flip contentHashUpdate (denominator x)
-    $ ctx
+      >=> flip contentHashUpdate (numerator x)
+      >=> flip contentHashUpdate (denominator x)
+      $ ctx
 
 instance Monad m => ContentHashable m Scientific where
   contentHashUpdate ctx x =
     flip contentHashUpdate_fingerprint x
-    >=> flip contentHashUpdate (toRational x)
-    $ ctx
+      >=> flip contentHashUpdate (toRational x)
+      $ ctx
 
 instance Monad m => ContentHashable m Integer where
-  contentHashUpdate ctx n = ($ ctx) $
-    flip contentHashUpdate_fingerprint n >=> case n of
-      S# i ->
-        pure . flip hashUpdate (C8.pack "S") -- tag constructur
-        >=> flip contentHashUpdate_storable (I# i) -- hash field
-      Jp# (BN# ba) ->
-        pure . flip hashUpdate (C8.pack "L") -- tag constructur
-        >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
-      Jn# (BN# ba) ->
-        pure . flip hashUpdate (C8.pack "N") -- tag constructur
-        >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
+  contentHashUpdate ctx n =
+    ($ ctx) $
+      flip contentHashUpdate_fingerprint n >=> case n of
+        S# i ->
+          pure . flip hashUpdate (C8.pack "S") -- tag constructur
+            >=> flip contentHashUpdate_storable (I# i) -- hash field
+        Jp# (BN# ba) ->
+          pure . flip hashUpdate (C8.pack "L") -- tag constructur
+            >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
+        Jn# (BN# ba) ->
+          pure . flip hashUpdate (C8.pack "N") -- tag constructur
+            >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
 
 instance Monad m => ContentHashable m Natural where
-  contentHashUpdate ctx n = ($ ctx) $
-    flip contentHashUpdate_fingerprint n >=> case n of
-      NatS# w ->
-        pure . flip hashUpdate (C8.pack "S") -- tag constructur
-        >=> flip contentHashUpdate_storable (W# w) -- hash field
-      NatJ# (BN# ba) ->
-        pure . flip hashUpdate (C8.pack "L") -- tag constructur
-        >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
+  contentHashUpdate ctx n =
+    ($ ctx) $
+      flip contentHashUpdate_fingerprint n >=> case n of
+        NatS# w ->
+          pure . flip hashUpdate (C8.pack "S") -- tag constructur
+            >=> flip contentHashUpdate_storable (W# w) -- hash field
+        NatJ# (BN# ba) ->
+          pure . flip hashUpdate (C8.pack "L") -- tag constructur
+            >=> pure . contentHashUpdate_byteArray# ba 0 (I# (sizeofByteArray# ba)) -- hash field
 
 instance Monad m => ContentHashable m BS.ByteString where
   contentHashUpdate ctx s =
     flip contentHashUpdate_fingerprint s
-    >=> pure . flip hashUpdate s $ ctx
+      >=> pure . flip hashUpdate s
+      $ ctx
 
 instance Monad m => ContentHashable m BSL.ByteString where
   contentHashUpdate ctx s =
     flip contentHashUpdate_fingerprint s
-    >=> pure . flip (BSL.foldlChunks hashUpdate) s $ ctx
+      >=> pure . flip (BSL.foldlChunks hashUpdate) s
+      $ ctx
 
 instance Monad m => ContentHashable m T.Text where
   contentHashUpdate ctx s =
     flip contentHashUpdate_fingerprint s
-    >=> pure . flip contentHashUpdate_text s $ ctx
+      >=> pure . flip contentHashUpdate_text s
+      $ ctx
 
 instance Monad m => ContentHashable m TL.Text where
   contentHashUpdate ctx s =
     flip contentHashUpdate_fingerprint s
-    >=> pure . flip (TL.foldlChunks contentHashUpdate_text) s $ ctx
+      >=> pure . flip (TL.foldlChunks contentHashUpdate_text) s
+      $ ctx
 
-instance (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v)
-  => ContentHashable m (Map k v) where
+instance
+  (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v) =>
+  ContentHashable m (Map k v)
+  where
   contentHashUpdate ctx m =
     flip contentHashUpdate_fingerprint m
-    >=> flip contentHashUpdate (Map.toList m) $ ctx
+      >=> flip contentHashUpdate (Map.toList m)
+      $ ctx
 
-instance (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v)
-  => ContentHashable m (HashMap.HashMap k v) where
+instance
+  (Typeable k, Typeable v, ContentHashable m k, ContentHashable m v) =>
+  ContentHashable m (HashMap.HashMap k v)
+  where
   contentHashUpdate ctx m =
     flip contentHashUpdate_fingerprint m
-    -- XXX: The order of the list is unspecified.
-    >=> flip contentHashUpdate (HashMap.toList m) $ ctx
+      -- XXX: The order of the list is unspecified.
+      >=> flip contentHashUpdate (HashMap.toList m)
+      $ ctx
 
-instance (Typeable v, ContentHashable m v)
-  => ContentHashable m (HashSet.HashSet v) where
+instance
+  (Typeable v, ContentHashable m v) =>
+  ContentHashable m (HashSet.HashSet v)
+  where
   contentHashUpdate ctx s =
     flip contentHashUpdate_fingerprint s
-    -- XXX: The order of the list is unspecified.
-    >=> flip contentHashUpdate (HashSet.toList s) $ ctx
+      -- XXX: The order of the list is unspecified.
+      >=> flip contentHashUpdate (HashSet.toList s)
+      $ ctx
 
-instance (Typeable a, ContentHashable m a)
-  => ContentHashable m [a] where
+instance
+  (Typeable a, ContentHashable m a) =>
+  ContentHashable m [a]
+  where
   contentHashUpdate ctx l =
     flip contentHashUpdate_fingerprint l
-    >=> flip (foldM contentHashUpdate) l $ ctx
+      >=> flip (foldM contentHashUpdate) l
+      $ ctx
 
-instance (Typeable a, ContentHashable m a)
-  => ContentHashable m (NonEmpty a) where
+instance
+  (Typeable a, ContentHashable m a) =>
+  ContentHashable m (NonEmpty a)
+  where
   contentHashUpdate ctx l =
     flip contentHashUpdate_fingerprint l
-    >=> flip (foldlM contentHashUpdate) l $ ctx
+      >=> flip (foldlM contentHashUpdate) l
+      $ ctx
 
-instance (Typeable a, ContentHashable m a)
-  => ContentHashable m (V.Vector a) where
+instance
+  (Typeable a, ContentHashable m a) =>
+  ContentHashable m (V.Vector a)
+  where
   contentHashUpdate ctx v =
     flip contentHashUpdate_fingerprint v
-    >=> flip (V.foldM' contentHashUpdate) v $ ctx
+      >=> flip (V.foldM' contentHashUpdate) v
+      $ ctx
 
 -- TODO: Rewrite using MemView
-instance (Typeable a, Storable a, ContentHashable m a)
-  => ContentHashable m (VS.Vector a) where
+instance
+  (Typeable a, Storable a, ContentHashable m a) =>
+  ContentHashable m (VS.Vector a)
+  where
   contentHashUpdate ctx v =
     flip contentHashUpdate_fingerprint v
-    >=> flip (VS.foldM' contentHashUpdate) v $ ctx
+      >=> flip (VS.foldM' contentHashUpdate) v
+      $ ctx
 
-instance (Typeable a, VU.Unbox a, ContentHashable m a)
-  => ContentHashable m (VU.Vector a) where
+instance
+  (Typeable a, VU.Unbox a, ContentHashable m a) =>
+  ContentHashable m (VU.Vector a)
+  where
   contentHashUpdate ctx v =
     flip contentHashUpdate_fingerprint v
-    >=> flip (VU.foldM' contentHashUpdate) v $ ctx
+      >=> flip (VU.foldM' contentHashUpdate) v
+      $ ctx
 
 instance Monad m => ContentHashable m ()
+
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (a, b)
+
 instance (ContentHashable m a, ContentHashable m b, ContentHashable m c) => ContentHashable m (a, b, c)
+
 instance (ContentHashable m a, ContentHashable m b, ContentHashable m c, ContentHashable m d) => ContentHashable m (a, b, c, d)
+
 instance (ContentHashable m a, ContentHashable m b, ContentHashable m c, ContentHashable m d, ContentHashable m e) => ContentHashable m (a, b, c, d, e)
+
 instance (Monad m, ContentHashable m a, ContentHashable m b, ContentHashable m c, ContentHashable m d, ContentHashable m e, ContentHashable m f) => ContentHashable m (a, b, c, d, e, f)
+
 instance (Monad m, ContentHashable m a, ContentHashable m b, ContentHashable m c, ContentHashable m d, ContentHashable m e, ContentHashable m f, ContentHashable m g) => ContentHashable m (a, b, c, d, e, f, g)
 
 instance ContentHashable m a => ContentHashable m (Maybe a)
@@ -386,7 +442,6 @@ instance ContentHashable m a => ContentHashable m (Maybe a)
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (Either a b)
 
 instance Monad m => ContentHashable m Aeson.Value
-
 
 class Monad m => GContentHashable m f where
   gContentHashUpdate :: Context SHA256 -> f a -> m (Context SHA256)
@@ -402,7 +457,8 @@ instance ContentHashable m c => GContentHashable m (K1 i c) where
 
 instance (Constructor c, GContentHashable m f) => GContentHashable m (C1 c f) where
   gContentHashUpdate ctx0 x = gContentHashUpdate nameCtx (unM1 x)
-    where nameCtx = hashUpdate ctx0 $ C8.pack (conName x)
+    where
+      nameCtx = hashUpdate ctx0 $ C8.pack (conName x)
 
 instance (Datatype d, GContentHashable m f) => GContentHashable m (D1 d f) where
   gContentHashUpdate ctx0 x = gContentHashUpdate packageCtx (unM1 x)
@@ -425,13 +481,11 @@ instance (GContentHashable m a, GContentHashable m b) => GContentHashable m (a :
 -- instance GContentHashable (a :.: b) where
 --   gContentHashUpdate ctx x = _ (unComp1 x)
 
-
 instance (Monad m, Typeable b, Typeable t) => ContentHashable m (Path.Path b t) where
   contentHashUpdate ctx p@(Path.Internal.Path fp) =
     flip contentHashUpdate_fingerprint p
-    >=> flip contentHashUpdate fp
-    $ ctx
-
+      >=> flip contentHashUpdate fp
+      $ ctx
 
 -- | Path to a regular file
 --
@@ -440,7 +494,6 @@ instance (Monad m, Typeable b, Typeable t) => ContentHashable m (Path.Path b t) 
 newtype FileContent = FileContent (Path.Path Path.Abs Path.File)
 
 instance ContentHashable IO FileContent where
-
   contentHashUpdate ctx (FileContent fp) = do
     exec <- Path.IO.executable <$> Path.IO.getPermissions fp
     ctx' <- if exec then contentHashUpdate ctx () else pure ctx
@@ -454,7 +507,6 @@ instance ContentHashable IO FileContent where
 newtype DirectoryContent = DirectoryContent (Path.Path Path.Abs Path.Dir)
 
 instance MonadIO m => ContentHashable m DirectoryContent where
-
   contentHashUpdate ctx0 (DirectoryContent dir0) = liftIO $ do
     (dirs, files) <- Path.IO.listDir dir0
     ctx' <- foldM hashFile ctx0 (sort files)
@@ -463,19 +515,19 @@ instance MonadIO m => ContentHashable m DirectoryContent where
       hashFile ctx fp =
         -- XXX: Do we need to treat symbolic links specially?
         flip contentHashUpdate (Path.filename fp)
-        >=> flip contentHashUpdate (FileContent fp)
-        $ ctx
+          >=> flip contentHashUpdate (FileContent fp)
+          $ ctx
       hashDir ctx dir =
         flip contentHashUpdate (Path.dirname dir)
-        >=> flip contentHashUpdate (DirectoryContent dir)
-        $ ctx
+          >=> flip contentHashUpdate (DirectoryContent dir)
+          $ ctx
 
 instance Monad m => ContentHashable m UTCTime where
-  contentHashUpdate ctx utcTime = let
-      secondsSinceEpoch = fromEnum . utcTimeToPOSIXSeconds $ utcTime
-    in flip contentHashUpdate_fingerprint utcTime
-       >=> flip contentHashUpdate secondsSinceEpoch
-         $ ctx
+  contentHashUpdate ctx utcTime =
+    let secondsSinceEpoch = fromEnum . utcTimeToPOSIXSeconds $ utcTime
+     in flip contentHashUpdate_fingerprint utcTime
+          >=> flip contentHashUpdate secondsSinceEpoch
+          $ ctx
 
 -- | Path to a file to be treated as _externally assured_.
 --
@@ -493,6 +545,7 @@ newtype ExternallyAssuredFile = ExternallyAssuredFile (Path.Path Path.Abs Path.F
   deriving (Generic, Show)
 
 instance Aeson.FromJSON ExternallyAssuredFile
+
 instance Aeson.ToJSON ExternallyAssuredFile
 
 instance ContentHashable IO ExternallyAssuredFile where
@@ -502,8 +555,7 @@ instance ContentHashable IO ExternallyAssuredFile where
     flip contentHashUpdate fp
       >=> flip contentHashUpdate modTime
       >=> flip contentHashUpdate_storable fSize
-        $ ctx
-
+      $ ctx
 
 -- | Path to a directory to be treated as _externally assured_.
 --
@@ -522,6 +574,7 @@ newtype ExternallyAssuredDirectory = ExternallyAssuredDirectory (Path.Path Path.
   deriving (Generic, Show)
 
 instance Aeson.FromJSON ExternallyAssuredDirectory
+
 instance Aeson.ToJSON ExternallyAssuredDirectory
 
 instance ContentHashable IO ExternallyAssuredDirectory where
@@ -533,9 +586,11 @@ instance ContentHashable IO ExternallyAssuredDirectory where
     ctx' <- foldM hashFile ctx0 (sort files)
     foldM hashDir ctx' (sort dirs)
     where
-      hashFile ctx fp = contentHashUpdate ctx (ExternallyAssuredFile fp)
-        `catchPermissionError` \_ -> contentHashUpdate ctx fp
-      hashDir ctx dir = contentHashUpdate ctx (ExternallyAssuredDirectory dir)
-        `catchPermissionError` \_ -> contentHashUpdate ctx dir
+      hashFile ctx fp =
+        contentHashUpdate ctx (ExternallyAssuredFile fp)
+          `catchPermissionError` \_ -> contentHashUpdate ctx fp
+      hashDir ctx dir =
+        contentHashUpdate ctx (ExternallyAssuredDirectory dir)
+          `catchPermissionError` \_ -> contentHashUpdate ctx dir
       catchPermissionError = catchJust $ \e ->
         if isPermissionError e then Just e else Nothing

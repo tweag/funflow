@@ -1,0 +1,56 @@
+name: funflow CI (Linux, Nix)
+
+on: [push]
+
+jobs:
+  build:
+    name: funflow [build >> tests >> doc]
+    runs-on: ubuntu-latest
+    steps:
+      # Setup
+      - uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v12
+        # with:
+        #   skip_adding_nixpkgs_channel: true
+      - uses: cachix/cachix-action@v10
+        with:
+          name: funflow
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      # Builds
+      # docker-client library with its tests
+      - name: Build docker-client library
+        run: nix-build -A docker-client
+      - name: Build docker-client test suite
+        run: nix-build -A docker-client-tests -o docker-client-tests
+      - name: Run docker-client unit tests
+        run: ./docker-client-tests/bin/primary --pattern "unit"
+      # Note: these tests take about 10s to run. If executing time
+      # gets much longer we can rethink when we want to run these.
+      - name: Run docker-client <--> docker integration tests
+        run: ./docker-client-tests/bin/primary --pattern "integration"
+      # funflow library with its tests
+      - name: Build funflow library
+        run: nix-build -A funflow
+      - name: Test
+        run: |
+          echo "Building tests"
+          FLOW_TESTS_PATH=$(nix-build -A funflow-tests)
+          TESTS_PATH=$(nix-build -A funflow-unit-tests)
+          echo "Running main test suite"
+          $TESTS_PATH/bin/unit-tests
+          echo "Running flow tests"
+          # Funflow flow tests have to be run in the `funflow` folder, like stack does, in order to have access to test assets
+          cd ./funflow
+          $FLOW_TESTS_PATH/bin/test-funflow
+          cd ..
+      # Build documentation
+      - name: Build docs and tutorials
+        run: funflow-pages/scripts/build.sh
+      # Deploy documentation to a github page
+      - name: Deploy docs
+        # Push to GitHub Pages only on master
+        if: github.ref == 'refs/heads/master'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+          publish_dir: ./funflow-pages/result/funflow
