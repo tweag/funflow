@@ -35,7 +35,7 @@ While funflow hasn't been plublished on Hackage yet, you can install it as a git
 dependency using the standard Haskell tooling (e.g.
 [Stack](https://docs.haskellstack.org/en/stable/yaml_configuration/#packages)).
 Note that you will also need to add a couple of extra dependencies to your
-`stack.yaml`. See the [example stack.yaml](./docs/example-user-stack.yaml) for a
+`stack.yaml`. See the [example stack.yaml](./cookiecutter-funflow/{{cookiecutter.project_name}}/stack.yaml) for a
 minimal example.
 
 ### Tutorials
