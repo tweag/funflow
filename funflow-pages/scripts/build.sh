@@ -18,6 +18,9 @@ cp -r "$srcPagesIndex"/* "$out"/
 mkdir -p "$out"/api
 cp -r "$(nix-build -A api-docs)"/share/doc/* "$out"/api/
 chmod -R +rwx "$out"/api/
+# Add extra symlink for header "Contents" links
+mkdir -p "$out"/api/share/doc/
+ln -s "$out"/api/index.html "$out"/api/share/doc/doc-index.html
 
 # Make tutorials
 mkdir -p /tmp/funflow/store
