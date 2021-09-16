@@ -67,7 +67,7 @@ stack test funflow
 
 ### Updating the Nix build
 
-Funflow uses a Nix build based on [[https://github.com/input-output-hk/haskell.nix][haskell.nix]] for CI.
+Funflow uses a Nix build based on [haskell.nix](https://github.com/input-output-hk/haskell.nix) for CI.
 
 If you make major changes, such as updating the stackage resolver, you may need to move to a newer version of nixpkgs and the haskell.nix tooling:
 
