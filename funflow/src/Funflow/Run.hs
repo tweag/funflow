@@ -64,7 +64,6 @@ import Docker.API.Client
   )
 import Funflow.Config (ConfigKeysBySource (..), Configurable (..), ExternalConfig (..), missing, readEnvs, readYamlFileConfig)
 import Funflow.Flow (RequiredCore, RequiredStrands)
-import Funflow.Flow.Orphans ()
 import Funflow.Run.Orphans ()
 import Funflow.Tasks.Docker
   ( Arg (Arg, Placeholder),
