@@ -63,7 +63,7 @@ caching' :: (ProvidesPosCaching core, ContentHashable IO a, Show a, Store b) => 
 
 -- | A <a>StoreWithId</a> with no remote caching
 localStoreWithId :: ContentStore -> Maybe Int -> LocalStoreWithId
-instance (Control.Monad.IO.Class.MonadIO m, Control.Monad.IO.Unlift.MonadUnliftIO m, Control.Monad.Catch.MonadMask m, Data.CAS.RemoteCache.Cacher m remoteCacher) => Control.Kernmantle.Caching.ProvidesCaching (Data.Profunctor.Trans.Reader (Control.Kernmantle.Caching.StoreWithId remoteCacher) Data.Profunctor.Trans.~> Control.Arrow.Kleisli m)
+instance (Control.Monad.IO.Class.MonadIO m, Control.Monad.IO.Unlift.MonadUnliftIO m, Control.Monad.Catch.MonadMask m, Data.CAS.RemoteCache.Cacher m remoteCacher, Data.Profunctor.Trans.HasKleisli m eff) => Control.Kernmantle.Caching.ProvidesCaching (Data.Profunctor.Trans.Reader (Control.Kernmantle.Caching.StoreWithId remoteCacher) Data.Profunctor.Trans.~> eff)
 instance (GHC.Base.Functor f, Control.Kernmantle.Caching.ProvidesPosCaching eff) => Control.Kernmantle.Caching.ProvidesPosCaching (f Data.Profunctor.Trans.~> eff)
 instance (Control.Arrow.Arrow eff, Control.Kernmantle.Caching.ProvidesPosCaching eff) => Control.Kernmantle.Caching.ProvidesPosCaching (Data.Profunctor.Trans.Writer Control.Kernmantle.Caching.CachingContext Data.Profunctor.Trans.~> eff)
 instance (Control.Arrow.Arrow eff, Control.Kernmantle.Caching.ProvidesCaching eff) => Control.Kernmantle.Caching.ProvidesPosCaching (Control.Kernmantle.Arrow.AutoIdent eff)
