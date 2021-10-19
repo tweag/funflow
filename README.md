@@ -1,9 +1,23 @@
-# funflow
+# Funflow
 
 Compose and run computational workflows.
 
 > Looking for the previous major version of funflow? It can be found
 > [here](https://github.com/tweag/funflow/tree/funflow1).
+
+<!-- toc -->
+
+- [Introduction](#introduction)
+- [Getting started](#getting-started)
+    - [Installation](#installation)
+        - [Cookiecutter Template](#cookiecutter-template)
+        - [Cabal](#cabal)
+        - [Stack](#stack)
+    - [Tutorials](#tutorials)
+- [Documentation](#documentation)
+- [Developement](#developement)
+
+<!-- tocstop -->
 
 ## Introduction
 
@@ -11,7 +25,7 @@ Compose and run computational workflows.
 [kernmantle](https://github.com/tweag/kernmantle/) under the hood to model
 workflows using binary effects.
 
-Funflow allows you to compose tasks into *reusable* workflows and helps
+`funflow` allows you to compose tasks into *reusable* workflows and helps
 promote reproducibility by employing a content-addressed store.
 
 https://tweag.github.io/funflow/
@@ -22,16 +36,19 @@ https://tweag.github.io/funflow/
 
 #### Cookiecutter Template
 
-To get started with a simple project, you can use the cookiecutter template
+To get started with a simple project, you can use the [cookiecutter](https://github.com/cookiecutter/cookiecutter) template
 provided with this repo:
 
 ```console
 cookiecutter git@github.com:tweag/funflow.git --directory cookiecutter-funflow
 ```
 
+#### Cabal
+`funflow` is available on [Hackage](https://hackage.haskell.org/package/funflow), follow the usual Cabal procedure to add it as dependency.
+
 #### Stack
 
-While funflow hasn't been plublished on Hackage yet, you can install it as a git
+While `funflow` hasn't been plublished on Stackage yet, you can install it as a Git
 dependency using the standard Haskell tooling (e.g.
 [Stack](https://docs.haskellstack.org/en/stable/yaml_configuration/#packages)).
 Note that you will also need to add a couple of extra dependencies to your
@@ -40,7 +57,7 @@ minimal example.
 
 ### Tutorials
 
-Check out the tutorials on the funflow website to get started:
+Check out the tutorials on the `funflow` website to get started:
 https://tweag.github.io/funflow/tutorials/.
 
 You can run the tutorial notebooks using the nix shell provided in the

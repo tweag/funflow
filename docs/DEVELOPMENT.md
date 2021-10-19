@@ -27,15 +27,17 @@
 ## Development environment
 
 A `shell.nix` file is available to provide with the minimum environment to develop and build the library.
+All your `stack` commands should be executed within this Nix shell.
 
 ```bash
-nix-shell shell.nix
+nix-shell
 ```
 
-A `shell-stack.nix` file is available to provide the suitable environment to build the project, which is the environment in which `stack` makes its builds.
+A `shell-stack.nix` file is available to provide the suitable environment to build the project to `stack` (defined in [stack.yaml](stack.yaml)).
+As a user, you should not directly use this Nix shell file.
 
 A `hie.yaml` file is available at the root of the project to use Haskell Language Server.
-HLS can be used with VS Code/vim/emacs to improve the development experience.
+HLS can be used with VS Code/Vim/Emacs to improve the development experience.
 
 ### VS Code
 
@@ -47,7 +49,7 @@ Requirements:
   - HLS is provided by the development Nix shell
 
 ### Install and start Docker
-For tasks like running tests and executing some of the [tutorials](../funflow-tutorial), Docker should be up and running on your machine. Check out the official Docker website for more about [installation](https://docs.docker.com/engine/install/), and perhaps about the [Docker daemon](https://docs.docker.com/config/daemon/).
+For tasks like running tests and executing some of the [tutorials](../funflow-tutorial), Docker should be up and running on your machine. Check out the official Docker website for more information about [installation](https://docs.docker.com/engine/install/), and perhaps about the [Docker daemon](https://docs.docker.com/config/daemon/).
 
 ## Build with `stack`
 
@@ -69,7 +71,7 @@ stack test funflow
 
 Funflow uses a Nix build based on [haskell.nix](https://github.com/input-output-hk/haskell.nix) for CI.
 
-If you make major changes, such as updating the stackage resolver, you may need to move to a newer version of nixpkgs and the haskell.nix tooling:
+If you make major changes, such as updating the stackage resolver, you may need to move to a newer version of nixpkgs and the `haskell.nix` tooling:
 
 ```bash
 ./nix/update-nixpkgs.sh
