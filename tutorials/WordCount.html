@@ -13101,6 +13101,7 @@ regex matching (<code>Text.Regex.Posix</code>), and more.</p>
 <span class="cm">{-# LANGUAGE OverloadedStrings #-}</span>
 
 <span class="kr">import</span> <span class="nn">Data.List</span> <span class="p">(</span><span class="nf">sortBy</span><span class="p">)</span>
+<span class="kr">import</span> <span class="nn">Data.Map</span> <span class="p">(</span><span class="kt">Map</span><span class="p">)</span>
 <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Map</span> <span class="k">as</span> <span class="n">Map</span>
 <span class="kr">import</span> <span class="nn">Data.Ord</span> <span class="p">(</span><span class="nf">comparing</span><span class="p">)</span>
 <span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Data.Text.IO</span> <span class="k">as</span> <span class="n">T</span>
@@ -13136,12 +13137,10 @@ functions which will take care of parsing input text and counting words.</p>
 <span class="c1">-- | Counts members in a list of text. Also works for lazy lists (e.g. data from readFile)</span>
 <span class="nf">countWords</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">T</span><span class="o">.</span><span class="kt">Text</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">TextCount</span><span class="p">]</span>
 <span class="nf">countWords</span> <span class="n">ws</span> <span class="ow">=</span> <span class="kr">let</span>
-    <span class="n">tally</span> <span class="ow">::</span> <span class="kt">Map</span><span class="o">.</span><span class="kt">Map</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="ow">-&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="kt">Map</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="kt">Int</span>
-    <span class="n">tally</span> <span class="n">m</span> <span class="n">k</span> <span class="ow">=</span> <span class="kr">if</span> <span class="kt">Map</span><span class="o">.</span><span class="n">member</span> <span class="n">k</span> <span class="n">m</span> 
-                <span class="kr">then</span> <span class="kt">Map</span><span class="o">.</span><span class="n">adjust</span> <span class="p">(</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="n">k</span> <span class="n">m</span>
-                <span class="kr">else</span> <span class="kt">Map</span><span class="o">.</span><span class="n">insert</span> <span class="n">k</span> <span class="mi">1</span> <span class="n">m</span>
+    <span class="n">tally</span> <span class="ow">::</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="ow">-&gt;</span> <span class="kt">Map</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Map</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="kt">Int</span>
+    <span class="n">tally</span> <span class="n">k</span> <span class="ow">=</span> <span class="kt">Map</span><span class="o">.</span><span class="n">insertWith</span> <span class="p">(</span><span class="o">+</span><span class="p">)</span> <span class="n">k</span> <span class="mi">1</span>
     <span class="kr">in</span> 
-        <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="o">$</span> <span class="n">foldl</span> <span class="n">tally</span> <span class="kt">Map</span><span class="o">.</span><span class="n">empty</span> <span class="n">ws</span>
+        <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="o">$</span> <span class="n">foldr</span> <span class="n">tally</span> <span class="kt">Map</span><span class="o">.</span><span class="n">empty</span> <span class="n">ws</span>
 
 <span class="c1">-- | Removes punctuation marks from a text</span>
 <span class="nf">removePunctuation</span> <span class="ow">::</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="ow">-&gt;</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span>
@@ -13155,7 +13154,7 @@ functions which will take care of parsing input text and counting words.</p>
 <span class="nf">filterWords</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">T</span><span class="o">.</span><span class="kt">Text</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">T</span><span class="o">.</span><span class="kt">Text</span><span class="p">]</span>
 <span class="nf">filterWords</span> <span class="ow">=</span> 
     <span class="kr">let</span> 
-        <span class="n">wordsRegex</span> <span class="ow">=</span> <span class="s">&quot;[A-Za-z</span><span class="se">\&#39;</span><span class="s">]+&quot;</span> <span class="ow">::</span> <span class="kt">String</span>
+        <span class="n">wordsRegex</span> <span class="ow">=</span> <span class="s">&quot;^[A-Za-z-]+$&quot;</span> <span class="ow">::</span> <span class="kt">String</span>
       <span class="kr">in</span> <span class="n">filter</span> <span class="o">$</span> <span class="p">(</span><span class="o">=~</span> <span class="n">wordsRegex</span><span class="p">)</span> <span class="o">.</span> <span class="kt">T</span><span class="o">.</span><span class="n">unpack</span>
 
 <span class="c1">-- | Sorts a list of word counts in descending order</span>
@@ -13208,7 +13207,7 @@ With <code>funflow</code>, you can simply re-use that error-reporting <code>Flow
 <span class="nf">readDocument</span> <span class="ow">=</span> <span class="n">ioFlow</span> <span class="kt">T</span><span class="o">.</span><span class="n">readFile</span>
 
 <span class="nf">countWordsAndSummarize</span> <span class="ow">::</span> <span class="kt">Flow</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span>
-<span class="nf">countWordsAndSummarize</span> <span class="ow">=</span> <span class="n">pureFlow</span> <span class="o">$</span> <span class="p">(</span><span class="kt">T</span><span class="o">.</span><span class="n">unlines</span> <span class="o">.</span> <span class="n">formatCounts</span> <span class="o">.</span> <span class="n">countWordsSortedDesc</span> <span class="o">.</span> <span class="n">filterWords</span><span class="o">.</span> <span class="kt">T</span><span class="o">.</span><span class="n">words</span> <span class="o">.</span> <span class="n">removePunctuation</span><span class="p">)</span>
+<span class="nf">countWordsAndSummarize</span> <span class="ow">=</span> <span class="n">pureFlow</span> <span class="o">$</span> <span class="p">(</span><span class="kt">T</span><span class="o">.</span><span class="n">unlines</span> <span class="o">.</span> <span class="n">formatCounts</span> <span class="o">.</span> <span class="n">countWordsSortedDesc</span> <span class="o">.</span> <span class="n">filterWords</span> <span class="o">.</span> <span class="kt">T</span><span class="o">.</span><span class="n">words</span> <span class="o">.</span> <span class="n">removePunctuation</span><span class="p">)</span>
 
 <span class="nf">writeResult</span> <span class="ow">::</span> <span class="kt">Flow</span> <span class="p">(</span><span class="kt">String</span><span class="p">,</span> <span class="kt">T</span><span class="o">.</span><span class="kt">Text</span><span class="p">)</span> <span class="nb">()</span>
 <span class="nf">writeResult</span> <span class="ow">=</span> <span class="kr">let</span>
@@ -13269,18 +13268,22 @@ With <code>funflow</code>, you can simply re-use that error-reporting <code>Flow
 <pre>Normally we would write the result to a file with T.writeFile, but for this example we can instead print the output:
 a: 3
 and: 3
+it: 3
 try: 3
 words: 3
 Lets: 2
 This: 2
 count: 2
 give: 2
-it: 2
 or: 2
 pipeline: 2
+should: 2
 FILE: 1
 WordCounths: 1
+accept: 1
 basic: 1
+but: 1
+complex-words: 1
 contains: 1
 haskell: 1
 like: 1
@@ -13291,7 +13294,6 @@ numbers: 1
 of: 1
 only: 1
 punctuation: 1
-should: 1
 the: 1
 to: 1
 using: 1</pre>
