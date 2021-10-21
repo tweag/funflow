@@ -1,44 +1,11 @@
-{ nixpkgs ? ./nix/nixpkgs.nix
-, ghcide ? false
-, haskellLanguageServer ? true
-}:
-let
-  pkgs = import nixpkgs { };
+# TODO Materialization
 
-  # Fetch from GitHub
-  devShellsInputs =
-    import
-      (builtins.fetchGit {
-        url = "git@github.com:tweag/nix-dev-shells.git";
-        name = "nix-dev-shell";
-        rev = "9dbca810bc4dd243fc5a62bd0eef81898798e286";
-      })
-      # Use your own version of nixpkgs
-      { inherit pkgs; }
-  ;
-
-in
-pkgs.mkShell {
-  buildInputs = with devShellsInputs;
-    # Common packages (e.g. tmate, git, ...)
-    (common { })
-    # Standard Haskell dev environment
-    ++
-    (
-      haskell {
-        inherit haskellLanguageServer;
-        haskellLanguageServerGhcVersion = "ghc884";
-        ghcide = false;
-      }
-    )
-    # Custom
-    ++
-    [
-      pkgs.cabal-install
-      pkgs.docker
-      pkgs.zlib
-      pkgs.git
-      pkgs.cabal-install
-    ]
-  ;
+let pkgs = import ./nix/pkgs.nix;
+in (import ./default.nix).shellFor {
+  exactDeps = true;
+  buildInputs = [ pkgs.stack pkgs.ormolu pkgs.niv pkgs.git pkgs.docker pkgs.zlib ];
+  tools = {
+    # Current default is 1.2.0.0 but we live on the edge
+    haskell-language-server = "1.4.0.0";
+  };
 }

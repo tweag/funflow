@@ -63,6 +63,11 @@ Run tests:
 stack test funflow
 ```
 
+Get a Haskell REPL (so-called "ghci" or GHC Interactive):
+```bash
+stack repl funflow
+```
+
 ## CI
 
 ### Updating the Nix build

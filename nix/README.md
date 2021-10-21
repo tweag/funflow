@@ -1,6 +1,24 @@
-# nix/
+# Updating `haskell.nix` version
+```console
+niv update haskellNix
+```
 
-This directory contains the nixpkgs definition for this project. To import the nixpkgs used by funflow, import the [default.nix](./default.nix) from this directory.
-To access funflow's nix attributes, use the repo-level [default.nix](../default.nix).
+# Building with Nix (e.g. for CI)
+## Build Funflow library
+```console
+nix-build -A funflow.components.library
+```
+## Build unit tests
+```console
+nix-build -A funflow.components.tests.unit-tests
+```
 
-This project uses [haskell.nix](https://github.com/input-output-hk/haskell.nix) and its `stackProject` function to build all of its Haskell libraries.
+## Explore all build targets
+### Other funflow targets
+```console
+nix-build -A funflow.components.<tab>
+```
+### Other targets (e.g. kernmantle or cas-hashable)
+```console
+nix-build -A <tab>
+```

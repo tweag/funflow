@@ -18,6 +18,7 @@ extra-deps:
       - kernmantle
       - batteries
       - caching
+    # nix-sha256: 0nwllsfwjs1isy7qqmsva8hgc7qc5dp3623j313kp1rkibycjxgr
   # We use iHaskell for the tutorials
   - github: gibiansky/IHaskell
     commit: 0ff0145c03f6665cfed426f900c9a7561c821c4f
@@ -34,12 +35,20 @@ extra-deps:
       - ihaskell-display/ihaskell-juicypixels
       - ihaskell-display/ihaskell-magic
       - ihaskell-display/ihaskell-widgets
+    # nix-sha256: 1gbac428jplssry166dvr0srcm2s306xrzfjbk7m66m5mjrrd57a
   # We also provide hvega for plotting
   - github: DougBurke/hvega
     commit: 8348642a9bd9e05b2966f29ef114e673fe26a37c
     subdirs:
       - ihaskell-hvega
+    # nix-sha256: 01sd0276gbvbkhkdcsq9xw6wsn7kn9b745wkfyjhyknz5gfy72nb
 
+# shell.nix integration
 nix:
-  enable: true
-  shell-file: shell-stack.nix
+  # This one may seem surprising!
+  # We don't want Stack to try to be smart about Nix integration because it gets things wrong with `haskell.nix`.
+  # See https://github.com/input-output-hk/haskell.nix/issues/689
+  enable: false
+# Prevent Stack from being "smart" and instead directly use the "system" GHC (i.e. the one provided by the Nix shell)
+install-ghc: false
+system-ghc: true

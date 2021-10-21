@@ -1,17 +1,9 @@
-# This is the main project default.nix
-{ system ? builtins.currentSystem
-, pkgs ? import ./nix/default.nix { inherit system; } }:
-with pkgs; rec {
-  # Libraries
-  inherit funflow funflow-tests cas-store cas-hashable cas-hashable-s3
-    docker-client docker-client-tests funflow-unit-tests;
-
-  # Shell
-  inherit funflow-shell;
-
-  # Other executables
-  inherit makefile-tool;
-
-  # Documentation
-  inherit api-docs generate-funflow-tutorials;
+# Copied and adapted from https://input-output-hk.github.io/haskell.nix/tutorials/getting-started/#scaffolding
+let pkgs = import ./nix/pkgs.nix;
+in pkgs.haskell-nix.project {
+  # 'cleanGit' cleans a source directory based on the files known by git
+  src = pkgs.haskell-nix.haskellLib.cleanGit {
+    name = "funflow-project";
+    src = ./.;
+  };
 }
