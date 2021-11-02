@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Types where
@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 type Set = Set.Set
 
 -- | Data Definitions
+
 --------------------------------------------------------------------------------
 
 -- | Name of source file
@@ -22,11 +23,13 @@ type BuildFile = String
 type Command = String
 
 data MakeFile where
-  MakeFile :: { sourceFiles :: Set SourceFile
-              , defaultGoal :: MakeRule
-              , allrules :: Set MakeRule
-              } -> MakeFile
-  deriving Show
+  MakeFile ::
+    { sourceFiles :: Set SourceFile,
+      defaultGoal :: MakeRule,
+      allrules :: Set MakeRule
+    } ->
+    MakeFile
+  deriving (Show)
 
 data MakeRule where
   MakeRule :: TargetFile -> Set BuildFile -> Command -> MakeRule
@@ -36,6 +39,7 @@ data MakeRule where
 newtype MFError = MFError String
 
 -- | Accessors
+
 --------------------------------------------------------------------------------
 mkRuleTarNm :: MakeRule -> String
 mkRuleTarNm (MakeRule tf _ _) = tf

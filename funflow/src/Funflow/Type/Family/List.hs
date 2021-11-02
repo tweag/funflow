@@ -11,8 +11,8 @@ module Funflow.Type.Family.List where
 type Ø = '[]
 
 type (:<) = '(:)
-infixr 5 :<
 
+infixr 5 :<
 
 -- | Type-level singleton list.
 type Only a = '[a]

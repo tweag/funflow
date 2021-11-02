@@ -126,13 +126,13 @@ someDockerFlowThatFails =
           Right _ -> ioFlow $ const $ error "Exception not caught!" -< ()
 
 dockerFlowWithExtraInputKeys :: Flow () ()
-dockerFlowWithExtraInputKeys = 
+dockerFlowWithExtraInputKeys =
   let usedArgs = [("a", "first"), ("b", "second")]
       pars = map fst usedArgs
-      taskConf = DockerTaskConfig{ DE.image = "bash:latest", DE.command = "echo" , DE.args = map DE.Placeholder pars }
-      taskIn   = DockerTaskInput{ DE.inputBindings = [], DE.argsVals = Map.fromList ( ("extra_1", "oh!"):(usedArgs ++ [("extra_2", "no!")]) ) }
-  in proc () -> do
-    result <- tryE @SomeException (dockerFlow taskConf) -< taskIn
-    case result of
-      Left ex -> ioFlow (\err -> error ("Exception! " ++ show err)) -< ex
-      Right _ -> ioFlow $ const $ putStrLn "All good!" -< ()
+      taskConf = DockerTaskConfig {DE.image = "bash:latest", DE.command = "echo", DE.args = map DE.Placeholder pars}
+      taskIn = DockerTaskInput {DE.inputBindings = [], DE.argsVals = Map.fromList (("extra_1", "oh!") : (usedArgs ++ [("extra_2", "no!")]))}
+   in proc () -> do
+        result <- tryE @SomeException (dockerFlow taskConf) -< taskIn
+        case result of
+          Left ex -> ioFlow (\err -> error ("Exception! " ++ show err)) -< ex
+          Right _ -> ioFlow $ const $ putStrLn "All good!" -< ()

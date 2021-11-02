@@ -1,46 +1,54 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Parse ( getValidMakeFile
-             , parsecMakeFile
-             , parseMakeFile
-             , regularParse
-             , testMakeFileParse
-             )
+module Parse
+  ( getValidMakeFile,
+    parsecMakeFile,
+    parseMakeFile,
+    regularParse,
+    testMakeFileParse,
+  )
 where
 
-import           Control.Applicative    (many, (<|>))
+import Control.Applicative (many, (<|>))
 import Control.Exception (SomeException)
 import Control.Exception.Safe (try)
-import           Control.Monad          (guard, void)
-import           Data.List              (nub)
-import qualified Data.Set               as Set
+import Control.Monad (guard, void)
+import Data.List (nub)
+import qualified Data.Set as Set
 import System.Directory (getCurrentDirectory)
-import           Text.Parsec            (ParseError, parse)
-import           Text.Parsec.Char       (char, letter, newline, noneOf, oneOf,
-                                         string)
-import           Text.Parsec.Combinator (many1)
-import           Text.Parsec.String     (Parser)
-
+import Text.Parsec (ParseError, parse)
+import Text.Parsec.Char
+  ( char,
+    letter,
+    newline,
+    noneOf,
+    oneOf,
+    string,
+  )
+import Text.Parsec.Combinator (many1)
+import Text.Parsec.String (Parser)
 -- Internal Imports
-import           Types
+import Types
 
 -- | Top level code
+
 --------------------------------------------------------------------
 parseMakeFile :: String -> Either ParseError MakeFile
 parseMakeFile = regularParse parsecMakeFile
 
-
 -- | Parsec Stuff
+
 --------------------------------------------------------------------
 parsecMakeFile :: Parser MakeFile
 parsecMakeFile = do
   srcFiles <- parsecSrcFiles
-  (drule:rules) :: [MakeRule] <- many1 $ wspaceWrap parsecRule
-  return $ MakeFile
-    { sourceFiles = srcFiles
-    , defaultGoal = drule
-    , allrules = Set.fromList (drule:rules)
-    }
+  (drule : rules) :: [MakeRule] <- many1 $ wspaceWrap parsecRule
+  return $
+    MakeFile
+      { sourceFiles = srcFiles,
+        defaultGoal = drule,
+        allrules = Set.fromList (drule : rules)
+      }
 
 parsecSrcFiles :: Parser (Set.Set SourceFile)
 parsecSrcFiles = do
@@ -79,8 +87,8 @@ wspaceWrap p = do
 -- Taken from the parsec tutorial:
 whitespace :: Parser ()
 whitespace = void $ many $ oneOf " \n\t"
---------------------------------------------------------------------
 
+--------------------------------------------------------------------
 
 -- | Extract valid makefile at given path, else @$PWD/Makefile@
 --   Result is either a @Left@-wrapped error message or a @Right@-wrapped result.
@@ -115,6 +123,7 @@ dirOrCwd Nothing = getCurrentDirectory
 dirOrCwd (Just d) = return d
 
 -- | Strictly testing
+
 --------------------------------------------------------------------------------
 testMakeFileParse :: Maybe FilePath -> IO ()
 testMakeFileParse optDir = do

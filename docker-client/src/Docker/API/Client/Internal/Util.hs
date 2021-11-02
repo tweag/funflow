@@ -1,11 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | 'Util' contains various utility functions used throughout Docker.API.Client's internals.
 module Docker.API.Client.Internal.Util where
 
-import Data.Binary.Get (getWord32be, getWord8, runGet)
 import Control.Monad.IO.Class (MonadIO)
+import Data.Binary.Get (getWord32be, getWord8, runGet)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Conduit (ConduitT, await, yield)

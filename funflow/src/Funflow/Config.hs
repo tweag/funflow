@@ -44,7 +44,6 @@ data Configurable a where
   ConfigFromFile :: FromJSON a => ConfigKey -> Configurable a
   -- | Define a configurable which will be loaded from the specified environment variable
   ConfigFromEnv :: FromJSON a => ConfigKey -> Configurable a
-
   -- Dorran: Disabling this for now until we implement CLI support
   -- -- | Define a configurable which will be loaded from the specified command line option
   -- ConfigFromCLI :: FromJSON a => ConfigKey -> Configurable a
@@ -137,7 +136,6 @@ configKeyBySource conf = case conf of
         envConfigKeys = HashSet.fromList [k]
         -- cliConfigKeys = HashSet.empty
       }
-
   -- ConfigFromCLI k ->
   --   ConfigKeysBySource
   --     { fileConfigKeys = HashSet.empty,
@@ -152,8 +150,8 @@ missing :: ExternalConfig -> ConfigKeysBySource -> [ConfigKey]
 missing conf ids =
   let missingFileConfs = filter (not . (flip HashMap.member $ fileConfig conf)) $ HashSet.toList $ fileConfigKeys ids
       missingEnvConfs = filter (not . (flip HashMap.member $ envConfig conf)) $ HashSet.toList $ envConfigKeys ids
-      -- missingCLIConfs = filter (not . (flip HashMap.member $ cliConfig conf)) $ HashSet.toList $ cliConfigKeys ids
-   in missingFileConfs ++ missingEnvConfs -- ++ missingCLIConfs
+   in -- missingCLIConfs = filter (not . (flip HashMap.member $ cliConfig conf)) $ HashSet.toList $ cliConfigKeys ids
+      missingFileConfs ++ missingEnvConfs -- ++ missingCLIConfs
 
 ---------------------------------------------------------------------
 -- IO actions which return configs

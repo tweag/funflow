@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Functions for sending HTTP requests to the Docker Engine API
 module Docker.API.Client.Internal.Requests where
