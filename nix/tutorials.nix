@@ -1,29 +1,23 @@
 # Script for running tutorial notebooks and converting them to html.
-{ funflow-tutorial-jupyter
-, writeScriptBin
-, stdenv
-, nbconvert
-, bash
-}:
-let 
+{ funflow-tutorial-jupyter, writeScriptBin, stdenv, nbconvert, bash }:
+let
   tutorial-notebooks = stdenv.mkDerivation {
     name = "funflow-tutorial-notebooks";
-    src = builtins.filterSource (path: type: 
-      (type != "directory" || baseNameOf path != ".ipynb_checkpoints")
-      ) ../../funflow-tutorial;
+    src = builtins.filterSource (path: type:
+      (type != "directory" || baseNameOf path != ".ipynb_checkpoints"))
+      ../../funflow-tutorial;
     installPhase = ''
       mkdir $out
-      cp -r $src/notebooks $out 
+      cp -r $src/notebooks $out
     '';
   };
-in writeScriptBin "generate-funflow-tutorial"
-  ''
+in writeScriptBin "generate-funflow-tutorial" ''
   #!${bash}/bin/bash
   set -e
   set -x
   # Run each notebook and grab its html output.
   [[  "$#" -eq 2 ]] || ( echo "Usage: $0 <path/to/notebooks> <output/directory>" && exit 1)
-  
+
   ${funflow-tutorial-jupyter.env.shellHook}
 
   mkdir -p "$2"
@@ -36,7 +30,10 @@ in writeScriptBin "generate-funflow-tutorial"
     ${nbconvert}/bin/jupyter-nbconvert \
       --ExecutePreprocessor.kernel_name='ihaskell_haskell' \
       --ExecutePreprocessor.timeout=600 \
-      --execute $notebook --output-dir "$2"
+      --ExecutePreprocessor.allow_errors=False \
+      --execute $notebook \
+      --output-dir "$2" \
+      --to=html
   done
 
   # Notebooks in their own subdirectory
@@ -45,7 +42,9 @@ in writeScriptBin "generate-funflow-tutorial"
     ${nbconvert}/bin/jupyter-nbconvert \
       --ExecutePreprocessor.kernel_name='ihaskell_haskell' \
       --ExecutePreprocessor.timeout=600 \
-      --execute $notebook --output-dir "$2"
+      --ExecutePreprocessor.allow_errors=False \
+      --execute $notebook \
+      --output-dir "$2" \
+      --to=html
   done
 ''
-

@@ -1,0 +1,75 @@
+name: cas-store
+version: 1.1.0
+synopsis: A content-addressed storage
+description: A content-addressed storage supporting a remote caching. The API mainly consists of the cacheKleisliIO function which takes a (a -> m b) function and runs it only if the store doesn't already contain a result for it. Part of the funflow ecosystem.
+license: MIT
+license-file: LICENSE
+maintainer: Matthias Meschede <matthias.meschede@tweag.io>
+github: tweag/funflow
+category: Control
+author: Tom Nielsen, Nicholas Clarke, Andreas Herrmann
+
+ghc-options: -Wall
+
+dependencies:
+  - base >= 4.9 && < 5
+  - aeson
+  - async
+  - bytestring
+  - cas-hashable
+  - containers
+  - cryptonite
+  - directory
+  - filepath
+  - hashable
+  - hostname
+  - lens
+  - path
+  - path-io
+  - random
+  - safe-exceptions
+  - sqlite-simple
+  - store
+  - tar
+  - text
+  - unix
+  - unliftio
+
+
+extra-source-files: changelog.md
+
+library:
+  source-dirs: src
+  other-modules: Data.CAS.ContentStore.Notify
+  when:
+    - condition: os(linux)
+      then:
+        cpp-options: -DOS_Linux
+        other-modules: Data.CAS.ContentStore.Notify.Linux
+        dependencies: hinotify
+      else:
+        when:
+          - condition: os(darwin) || os(freebsd)
+            cpp-options: -DOS_BSD
+            other-modules: Data.CAS.ContentStore.Notify.BSD
+            dependencies: kqueue
+
+tests:
+  unit-tests:
+    main: Test.hs
+    source-dirs: test
+    ghc-options:
+      - -Wall
+      - -threaded
+    dependencies:
+      - base
+      - async
+      - cas-hashable
+      - cas-store
+      - containers
+      - path
+      - path-io
+      - safe-exceptions
+      - tasty
+      - tasty-hunit
+      - unix

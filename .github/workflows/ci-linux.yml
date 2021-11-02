@@ -8,47 +8,42 @@ jobs:
   build:
     name: funflow [build >> tests >> doc]
     runs-on: ubuntu-latest
+
     steps:
       # Setup
       - uses: actions/checkout@v2
+
       - uses: cachix/install-nix-action@v12
-        # with:
-        #   skip_adding_nixpkgs_channel: true
+
       - uses: cachix/cachix-action@v10
         with:
           name: funflow
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
-      # Builds
-      # docker-client library with its tests
-      - name: Build docker-client library
-        run: nix-build -A docker-client
-      - name: Build docker-client test suite
-        run: nix-build -A docker-client-tests -o docker-client-tests
-      - name: Run docker-client unit tests
-        run: ./docker-client-tests/bin/primary --pattern "unit"
-      # Note: these tests take about 10s to run. If executing time
-      # gets much longer we can rethink when we want to run these.
-      - name: Run docker-client <--> docker integration tests
-        run: ./docker-client-tests/bin/primary --pattern "integration"
-      # funflow library with its tests
-      - name: Build funflow library
-        run: nix-build -A funflow
+
+      - uses: actions/cache@v2.1.3
+        name: Cache ~/.stack
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-stack
+
+      - name: Install dependencies
+        run: |
+          nix-shell --run "stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies"
+
+      - name: Build
+        run: |
+          nix-shell --run "stack build --test --bench --no-run-tests --no-run-benchmarks"
+
       - name: Test
         run: |
-          echo "Building tests"
-          FLOW_TESTS_PATH=$(nix-build -A funflow-tests)
-          TESTS_PATH=$(nix-build -A funflow-unit-tests)
-          echo "Running main test suite"
-          $TESTS_PATH/bin/unit-tests
-          echo "Running flow tests"
-          # Funflow flow tests have to be run in the `funflow` folder, like stack does, in order to have access to test assets
-          cd ./funflow
-          $FLOW_TESTS_PATH/bin/test-funflow
-          cd ..
+          nix-shell --run "stack test"
+
       # Build documentation
       - name: Build docs and tutorials
-        run: funflow-pages/scripts/build.sh
-      # Deploy documentation to a github page
+        run: |
+          nix-shell --run "funflow-pages/scripts/build.sh"
+
+      # Deploy documentation to a Github page
       - name: Deploy docs
         # Push to GitHub Pages only on master
         if: github.ref == 'refs/heads/master'

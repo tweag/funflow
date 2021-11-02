@@ -26,7 +26,7 @@ import Funflow
 import Funflow.Config (Configurable (ConfigFromEnv, ConfigFromFile, Literal))
 import Funflow.Tasks.Docker (Arg, DockerTaskConfig (DockerTaskConfig), DockerTaskInput (DockerTaskInput), VolumeBinding (VolumeBinding))
 import qualified Funflow.Tasks.Docker as DE
-import Path (Abs, Dir, Rel, absdir, parseAbsDir, reldir, relfile, (</>))
+import Path (Abs, Dir, File, Rel, absdir, parseAbsDir, reldir, relfile, (</>))
 import System.Directory (getCurrentDirectory)
 import System.Environment (setEnv)
 

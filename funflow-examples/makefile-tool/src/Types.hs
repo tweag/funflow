@@ -10,10 +10,16 @@ type Set = Set.Set
 -- | Data Definitions
 --------------------------------------------------------------------------------
 
-type SourceFile = String     -- | Name of source file
-type TargetFile = String     -- | Name of target file
-type BuildFile  = String     -- | Either source xor target
-type Command    = String
+-- | Name of source file
+type SourceFile = String
+
+-- | Name of target file
+type TargetFile = String
+
+-- | Either source xor target
+type BuildFile = String
+
+type Command = String
 
 data MakeFile where
   MakeFile :: { sourceFiles :: Set SourceFile
