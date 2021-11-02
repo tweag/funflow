@@ -7,7 +7,7 @@ import Test.QuickCheck
 
 -- typical folder name characters
 commonFolderChars :: [Char]
-commonFolderChars = ['a'..'z'] ++ ['A'..'Z'] ++ ['-', '_'] ++ ['0'..'9']
+commonFolderChars = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['-', '_'] ++ ['0' .. '9']
 
 -- random String, typically for relative path
 randomRel1 :: Gen String
@@ -19,4 +19,4 @@ uniqueGen = fmap (Set.toList . Set.fromList)
 
 -- Make a String into an absolute path
 unsafeToAbsDir :: String -> Path Abs Dir
-unsafeToAbsDir = fromJust . parseAbsDir . ('/':)
+unsafeToAbsDir = fromJust . parseAbsDir . ('/' :)

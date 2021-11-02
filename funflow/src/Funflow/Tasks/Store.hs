@@ -9,8 +9,8 @@ module Funflow.Tasks.Store
   )
 where
 
-import Path (Abs, Dir, Path)
 import Data.CAS.ContentStore as CS
+import Path (Abs, Dir, Path)
 
 data StoreTask i o where
   PutDir :: StoreTask (Path Abs Dir) CS.Item

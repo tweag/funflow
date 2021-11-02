@@ -9,8 +9,8 @@ module Docker.API.Client.Images
   )
 where
 
-import qualified Data.Text as T
 import Data.Maybe
+import qualified Data.Text as T
 
 -- | (name, tag, digest)
 type ImageParts = (T.Text, Maybe T.Text, Maybe T.Text)

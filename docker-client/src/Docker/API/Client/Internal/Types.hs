@@ -5,8 +5,8 @@ module Docker.API.Client.Internal.Types where
 
 import Control.Monad.Except
 import qualified Data.Text as T
-import GHC.Generics (Generic)
 import Docker.API.Client.Images (tagImageIfMissing)
+import GHC.Generics (Generic)
 
 -- | Alias for the system type returned by System.Info.os
 newtype OS = OS String
