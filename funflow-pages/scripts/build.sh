@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # exit when any command fails
 set -e
 
@@ -14,9 +15,10 @@ mkdir -p "$out"
 # Docs index page
 cp -r "$srcPagesIndex"/* "$out"/
 
-# Copy API
+# Build and copy Haddock
 mkdir -p "$out"/api
-cp -r "$(nix-build -A api-docs)"/share/doc/* "$out"/api/
+stack haddock
+cp -r "$(stack path --local-doc-root)" "$out"/api/
 chmod -R +rwx "$out"/api/
 # Add extra symlink for header "Contents" links
 mkdir -p "$out"/api/share/doc/
@@ -24,4 +26,4 @@ ln -s "$out"/api/index.html "$out"/api/share/doc/doc-index.html
 
 # Make tutorials
 mkdir -p /tmp/funflow/store
-"$(nix-build -A generate-funflow-tutorials)"/bin/generate-funflow-tutorial "$srcFunflowTutorials"/notebooks "$out"/tutorials
+"$(nix-build nix/pkgs.nix -A generate-funflow-tutorials)"/bin/generate-funflow-tutorial "$srcFunflowTutorials"/notebooks "$out"/tutorials

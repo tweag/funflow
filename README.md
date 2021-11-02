@@ -1,4 +1,4 @@
-# funflow
+# Funflow
 
 Compose and run computational workflows.
 
@@ -7,7 +7,7 @@ Compose and run computational workflows.
 
 ## Introduction
 
-`funflow` is a Haskell library to write workflows programatically, using
+`funflow` is a Haskell library to write workflows programmatically, using
 [kernmantle](https://github.com/tweag/kernmantle/) under the hood to model
 workflows using binary effects.
 
@@ -31,12 +31,11 @@ cookiecutter git@github.com:tweag/funflow.git --directory cookiecutter-funflow
 
 #### Stack
 
-While funflow hasn't been plublished on Hackage yet, you can install it as a git
+While Funflow 2 hasn't been plublished on Hackage yet, you can install it as a git
 dependency using the standard Haskell tooling (e.g.
 [Stack](https://docs.haskellstack.org/en/stable/yaml_configuration/#packages)).
-Note that you will also need to add a couple of extra dependencies to your
-`stack.yaml`. See the [example stack.yaml](./cookiecutter-funflow/{{cookiecutter.project_name}}/stack.yaml) for a
-minimal example.
+Note that you will also need to add a couple of extra dependencies to your `stack.yaml`.
+See the [example stack.yaml](./cookiecutter-funflow/{{cookiecutter.project_name}}/stack.yaml) for a minimal example.
 
 ### Tutorials
 
