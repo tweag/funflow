@@ -1,0 +1,562 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TupleSections #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Module      :  Text.URI.Lens</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Copyright   :  &#169; 2017&#8211;present Mark Karpov</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  BSD 3 clause</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Maintainer  :  Mark Karpov &lt;markkarpov92@gmail.com&gt;</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Lenses for working with the 'URI' data type and its internals.</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Text.URI.Lens</span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#uriScheme"><span class="hs-identifier">uriScheme</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uriAuthority"><span class="hs-identifier">uriAuthority</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uriPath"><span class="hs-identifier">uriPath</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#isPathAbsolute"><span class="hs-identifier">isPathAbsolute</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uriTrailingSlash"><span class="hs-identifier">uriTrailingSlash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uriQuery"><span class="hs-identifier">uriQuery</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uriFragment"><span class="hs-identifier">uriFragment</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#authUserInfo"><span class="hs-identifier">authUserInfo</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#authHost"><span class="hs-identifier">authHost</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#authPort"><span class="hs-identifier">authPort</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uiUsername"><span class="hs-identifier">uiUsername</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#uiPassword"><span class="hs-identifier">uiPassword</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#_QueryFlag"><span class="hs-identifier">_QueryFlag</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#_QueryParam"><span class="hs-identifier">_QueryParam</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#queryFlag"><span class="hs-identifier">queryFlag</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#queryParam"><span class="hs-identifier">queryParam</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>    </span><span class="annot"><a href="Text.URI.Lens.html#unRText"><span class="hs-identifier">unRText</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">liftA2</span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">find</span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Contravariant</span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.List.NonEmpty</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NE</span></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">isJust</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor</span></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Text.URI.Types.html"><span class="hs-identifier">Text.URI.Types</span></a></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier">Authority</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-46"></span><span>    </span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier">QueryParam</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier">RText</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><a href="Text.URI.Types.html#RTextLabel"><span class="hs-identifier">RTextLabel</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-49"></span><span>    </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier">URI</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier">UserInfo</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Text.URI.Types.html"><span class="hs-identifier">Text.URI.Types</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">URI</span></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- | 'URI' scheme lens.</span><span>
+</span><span id="line-55"></span><span class="annot"><a href="Text.URI.Lens.html#uriScheme"><span class="hs-identifier hs-type">uriScheme</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Scheme"><span class="hs-identifier hs-type">Scheme</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span id="uriScheme"><span class="annot"><span class="annottext">uriScheme :: (Maybe (RText 'Scheme) -&gt; f (Maybe (RText 'Scheme)))
+-&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriScheme"><span class="hs-identifier hs-var hs-var">uriScheme</span></a></span></span><span> </span><span id="local-6989586621679154760"><span class="annot"><span class="annottext">Maybe (RText 'Scheme) -&gt; f (Maybe (RText 'Scheme))
+</span><a href="#local-6989586621679154760"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154759"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154759"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154758"><span class="annot"><span class="annottext">Maybe (RText 'Scheme)
+</span><a href="#local-6989586621679154758"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154759"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriScheme :: Maybe (RText 'Scheme)
+</span><a href="Text.URI.Types.html#uriScheme"><span class="hs-identifier hs-var">URI.uriScheme</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Scheme)
+</span><a href="#local-6989586621679154758"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe (RText 'Scheme) -&gt; URI)
+-&gt; f (Maybe (RText 'Scheme)) -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Scheme) -&gt; f (Maybe (RText 'Scheme))
+</span><a href="#local-6989586621679154760"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">URI -&gt; Maybe (RText 'Scheme)
+</span><a href="Text.URI.Types.html#uriScheme"><span class="hs-identifier hs-var hs-var">URI.uriScheme</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154759"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- | 'URI' authority lens.</span><span>
+</span><span id="line-59"></span><span class="hs-comment">--</span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- __Note__: before version /0.1.0.0/ this lens allowed to focus on @'Maybe'</span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- 'URI.Authority'@.</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Text.URI.Lens.html#uriAuthority"><span class="hs-identifier hs-type">uriAuthority</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">URI.Authority</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span id="uriAuthority"><span class="annot"><span class="annottext">uriAuthority :: (Either Bool Authority -&gt; f (Either Bool Authority))
+-&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriAuthority"><span class="hs-identifier hs-var hs-var">uriAuthority</span></a></span></span><span> </span><span id="local-6989586621679154755"><span class="annot"><span class="annottext">Either Bool Authority -&gt; f (Either Bool Authority)
+</span><a href="#local-6989586621679154755"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154754"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154754"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154753"><span class="annot"><span class="annottext">Either Bool Authority
+</span><a href="#local-6989586621679154753"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154754"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriAuthority :: Either Bool Authority
+</span><a href="Text.URI.Types.html#uriAuthority"><span class="hs-identifier hs-var">URI.uriAuthority</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Either Bool Authority
+</span><a href="#local-6989586621679154753"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Either Bool Authority -&gt; URI)
+-&gt; f (Either Bool Authority) -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Either Bool Authority -&gt; f (Either Bool Authority)
+</span><a href="#local-6989586621679154755"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">URI -&gt; Either Bool Authority
+</span><a href="Text.URI.Types.html#uriAuthority"><span class="hs-identifier hs-var hs-var">URI.uriAuthority</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154754"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- | 'URI' path lens.</span><span>
+</span><span id="line-66"></span><span class="annot"><a href="Text.URI.Lens.html#uriPath"><span class="hs-identifier hs-type">uriPath</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#PathPiece"><span class="hs-identifier hs-type">PathPiece</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-67"></span><span id="uriPath"><span class="annot"><span class="annottext">uriPath :: ([RText 'PathPiece] -&gt; f [RText 'PathPiece]) -&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriPath"><span class="hs-identifier hs-var hs-var">uriPath</span></a></span></span><span> </span><span id="local-6989586621679154751"><span class="annot"><span class="annottext">[RText 'PathPiece] -&gt; f [RText 'PathPiece]
+</span><a href="#local-6989586621679154751"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154750"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154750"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154749"><span class="annot"><span class="annottext">[RText 'PathPiece]
+</span><a href="#local-6989586621679154749"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154750"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriPath :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="Text.URI.Types.html#uriPath"><span class="hs-identifier hs-var">URI.uriPath</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679154747"><span class="hs-identifier hs-var">ts</span></a></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(NonEmpty (RText 'PathPiece)
+ -&gt; (Bool, NonEmpty (RText 'PathPiece)))
+-&gt; Maybe (NonEmpty (RText 'PathPiece))
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece] -&gt; Maybe (NonEmpty (RText 'PathPiece))
+forall a. [a] -&gt; Maybe (NonEmpty a)
+</span><span class="hs-identifier hs-var">NE.nonEmpty</span></span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece]
+</span><a href="#local-6989586621679154749"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([RText 'PathPiece] -&gt; URI) -&gt; f [RText 'PathPiece] -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece] -&gt; f [RText 'PathPiece]
+</span><a href="#local-6989586621679154751"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece]
+</span><a href="#local-6989586621679154745"><span class="hs-identifier hs-var">ps</span></a></span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-69"></span><span>    </span><span id="local-6989586621679154747"><span class="annot"><span class="annottext">ts :: Bool
+</span><a href="#local-6989586621679154747"><span class="hs-identifier hs-var hs-var">ts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+-&gt; ((Bool, NonEmpty (RText 'PathPiece)) -&gt; Bool)
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+-&gt; Bool
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">(Bool, NonEmpty (RText 'PathPiece)) -&gt; Bool
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154743"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621679154745"><span class="annot"><span class="annottext">ps :: [RText 'PathPiece]
+</span><a href="#local-6989586621679154745"><span class="hs-identifier hs-var hs-var">ps</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece]
+-&gt; ((Bool, NonEmpty (RText 'PathPiece)) -&gt; [RText 'PathPiece])
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+-&gt; [RText 'PathPiece]
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NonEmpty (RText 'PathPiece) -&gt; [RText 'PathPiece]
+forall a. NonEmpty a -&gt; [a]
+</span><span class="hs-identifier hs-var">NE.toList</span></span><span> </span><span class="annot"><span class="annottext">(NonEmpty (RText 'PathPiece) -&gt; [RText 'PathPiece])
+-&gt; ((Bool, NonEmpty (RText 'PathPiece))
+    -&gt; NonEmpty (RText 'PathPiece))
+-&gt; (Bool, NonEmpty (RText 'PathPiece))
+-&gt; [RText 'PathPiece]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Bool, NonEmpty (RText 'PathPiece)) -&gt; NonEmpty (RText 'PathPiece)
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154743"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621679154743"><span class="annot"><span class="annottext">path :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154743"><span class="hs-identifier hs-var hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">URI -&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="Text.URI.Types.html#uriPath"><span class="hs-identifier hs-var hs-var">URI.uriPath</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154750"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | A getter that can tell if path component of a 'URI' is absolute.</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- @since 0.1.0.0</span><span>
+</span><span id="line-76"></span><span class="annot"><a href="Text.URI.Lens.html#isPathAbsolute"><span class="hs-identifier hs-type">isPathAbsolute</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Getter"><span class="hs-identifier hs-type">Getter</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-77"></span><span id="isPathAbsolute"><span class="annot"><span class="annottext">isPathAbsolute :: (Bool -&gt; f Bool) -&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#isPathAbsolute"><span class="hs-identifier hs-var hs-var">isPathAbsolute</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(URI -&gt; Bool) -&gt; (Bool -&gt; f Bool) -&gt; URI -&gt; f URI
+forall (p :: * -&gt; * -&gt; *) (f :: * -&gt; *) s a.
+(Profunctor p, Contravariant f) =&gt;
+(s -&gt; a) -&gt; p a (f a) -&gt; p s (f s)
+</span><a href="Text.URI.Lens.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">URI -&gt; Bool
+</span><a href="Text.URI.Types.html#isPathAbsolute"><span class="hs-identifier hs-var">URI.isPathAbsolute</span></a></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | A 0-1 traversal allowing to view and manipulate trailing slash.</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- @since 0.2.0.0</span><span>
+</span><span id="line-82"></span><span class="annot"><a href="Text.URI.Lens.html#uriTrailingSlash"><span class="hs-identifier hs-type">uriTrailingSlash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Traversal%27"><span class="hs-identifier hs-type">Traversal'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-83"></span><span id="uriTrailingSlash"><span class="annot"><span class="annottext">uriTrailingSlash :: (Bool -&gt; f Bool) -&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriTrailingSlash"><span class="hs-identifier hs-var hs-var">uriTrailingSlash</span></a></span></span><span> </span><span id="local-6989586621679154738"><span class="annot"><span class="annottext">Bool -&gt; f Bool
+</span><a href="#local-6989586621679154738"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154737"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154737"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154736"><span class="annot"><span class="annottext">Maybe Bool
+</span><a href="#local-6989586621679154736"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154737"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriPath :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="Text.URI.Types.html#uriPath"><span class="hs-identifier hs-var">URI.uriPath</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool
+ -&gt; NonEmpty (RText 'PathPiece)
+ -&gt; (Bool, NonEmpty (RText 'PathPiece)))
+-&gt; Maybe Bool
+-&gt; Maybe (NonEmpty (RText 'PathPiece))
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe Bool
+</span><a href="#local-6989586621679154736"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154735"><span class="hs-identifier hs-var">ps</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe Bool -&gt; URI) -&gt; f (Maybe Bool) -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; f Bool) -&gt; Maybe Bool -&gt; f (Maybe Bool)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; f Bool
+</span><a href="#local-6989586621679154738"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Bool
+</span><a href="#local-6989586621679154733"><span class="hs-identifier hs-var">ts</span></a></span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>    </span><span id="local-6989586621679154733"><span class="annot"><span class="annottext">ts :: Maybe Bool
+</span><a href="#local-6989586621679154733"><span class="hs-identifier hs-var hs-var">ts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, NonEmpty (RText 'PathPiece)) -&gt; Bool
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">((Bool, NonEmpty (RText 'PathPiece)) -&gt; Bool)
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece)) -&gt; Maybe Bool
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154732"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-87"></span><span>    </span><span id="local-6989586621679154735"><span class="annot"><span class="annottext">ps :: Maybe (NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154735"><span class="hs-identifier hs-var hs-var">ps</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, NonEmpty (RText 'PathPiece)) -&gt; NonEmpty (RText 'PathPiece)
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span> </span><span class="annot"><span class="annottext">((Bool, NonEmpty (RText 'PathPiece))
+ -&gt; NonEmpty (RText 'PathPiece))
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+-&gt; Maybe (NonEmpty (RText 'PathPiece))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154732"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679154732"><span class="annot"><span class="annottext">path :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679154732"><span class="hs-identifier hs-var hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">URI -&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="Text.URI.Types.html#uriPath"><span class="hs-identifier hs-var hs-var">URI.uriPath</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154737"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- | 'URI' query params lens.</span><span>
+</span><span id="line-91"></span><span class="annot"><a href="Text.URI.Lens.html#uriQuery"><span class="hs-identifier hs-type">uriQuery</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">URI.QueryParam</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-92"></span><span id="uriQuery"><span class="annot"><span class="annottext">uriQuery :: ([QueryParam] -&gt; f [QueryParam]) -&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriQuery"><span class="hs-identifier hs-var hs-var">uriQuery</span></a></span></span><span> </span><span id="local-6989586621679154731"><span class="annot"><span class="annottext">[QueryParam] -&gt; f [QueryParam]
+</span><a href="#local-6989586621679154731"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154730"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154730"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154729"><span class="annot"><span class="annottext">[QueryParam]
+</span><a href="#local-6989586621679154729"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154730"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriQuery :: [QueryParam]
+</span><a href="Text.URI.Types.html#uriQuery"><span class="hs-identifier hs-var">URI.uriQuery</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[QueryParam]
+</span><a href="#local-6989586621679154729"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([QueryParam] -&gt; URI) -&gt; f [QueryParam] -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">[QueryParam] -&gt; f [QueryParam]
+</span><a href="#local-6989586621679154731"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">URI -&gt; [QueryParam]
+</span><a href="Text.URI.Types.html#uriQuery"><span class="hs-identifier hs-var hs-var">URI.uriQuery</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154730"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- | 'URI' fragment lens.</span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Text.URI.Lens.html#uriFragment"><span class="hs-identifier hs-type">uriFragment</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Fragment"><span class="hs-identifier hs-type">Fragment</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span id="uriFragment"><span class="annot"><span class="annottext">uriFragment :: (Maybe (RText 'Fragment) -&gt; f (Maybe (RText 'Fragment)))
+-&gt; URI -&gt; f URI
+</span><a href="Text.URI.Lens.html#uriFragment"><span class="hs-identifier hs-var hs-var">uriFragment</span></a></span></span><span> </span><span id="local-6989586621679154727"><span class="annot"><span class="annottext">Maybe (RText 'Fragment) -&gt; f (Maybe (RText 'Fragment))
+</span><a href="#local-6989586621679154727"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154726"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154726"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154725"><span class="annot"><span class="annottext">Maybe (RText 'Fragment)
+</span><a href="#local-6989586621679154725"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154726"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uriFragment :: Maybe (RText 'Fragment)
+</span><a href="Text.URI.Types.html#uriFragment"><span class="hs-identifier hs-var">URI.uriFragment</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Fragment)
+</span><a href="#local-6989586621679154725"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe (RText 'Fragment) -&gt; URI)
+-&gt; f (Maybe (RText 'Fragment)) -&gt; f URI
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Fragment) -&gt; f (Maybe (RText 'Fragment))
+</span><a href="#local-6989586621679154727"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">URI -&gt; Maybe (RText 'Fragment)
+</span><a href="Text.URI.Types.html#uriFragment"><span class="hs-identifier hs-var hs-var">URI.uriFragment</span></a></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679154726"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- | 'Authority' user info lens.</span><span>
+</span><span id="line-99"></span><span class="annot"><a href="Text.URI.Lens.html#authUserInfo"><span class="hs-identifier hs-type">authUserInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">Authority</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier hs-type">URI.UserInfo</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-100"></span><span id="authUserInfo"><span class="annot"><span class="annottext">authUserInfo :: (Maybe UserInfo -&gt; f (Maybe UserInfo)) -&gt; Authority -&gt; f Authority
+</span><a href="Text.URI.Lens.html#authUserInfo"><span class="hs-identifier hs-var hs-var">authUserInfo</span></a></span></span><span> </span><span id="local-6989586621679154723"><span class="annot"><span class="annottext">Maybe UserInfo -&gt; f (Maybe UserInfo)
+</span><a href="#local-6989586621679154723"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154722"><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154722"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154721"><span class="annot"><span class="annottext">Maybe UserInfo
+</span><a href="#local-6989586621679154721"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154722"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">authUserInfo :: Maybe UserInfo
+</span><a href="Text.URI.Types.html#authUserInfo"><span class="hs-identifier hs-var">URI.authUserInfo</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe UserInfo
+</span><a href="#local-6989586621679154721"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe UserInfo -&gt; Authority) -&gt; f (Maybe UserInfo) -&gt; f Authority
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe UserInfo -&gt; f (Maybe UserInfo)
+</span><a href="#local-6989586621679154723"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Authority -&gt; Maybe UserInfo
+</span><a href="Text.URI.Types.html#authUserInfo"><span class="hs-identifier hs-var hs-var">URI.authUserInfo</span></a></span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154722"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- | 'Authority' host lens.</span><span>
+</span><span id="line-103"></span><span class="annot"><a href="Text.URI.Lens.html#authHost"><span class="hs-identifier hs-type">authHost</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">Authority</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Host"><span class="hs-identifier hs-type">Host</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span id="authHost"><span class="annot"><span class="annottext">authHost :: (RText 'Host -&gt; f (RText 'Host)) -&gt; Authority -&gt; f Authority
+</span><a href="Text.URI.Lens.html#authHost"><span class="hs-identifier hs-var hs-var">authHost</span></a></span></span><span> </span><span id="local-6989586621679154719"><span class="annot"><span class="annottext">RText 'Host -&gt; f (RText 'Host)
+</span><a href="#local-6989586621679154719"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154718"><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154718"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154717"><span class="annot"><span class="annottext">RText 'Host
+</span><a href="#local-6989586621679154717"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154718"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">authHost :: RText 'Host
+</span><a href="Text.URI.Types.html#authHost"><span class="hs-identifier hs-var">URI.authHost</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RText 'Host
+</span><a href="#local-6989586621679154717"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(RText 'Host -&gt; Authority) -&gt; f (RText 'Host) -&gt; f Authority
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">RText 'Host -&gt; f (RText 'Host)
+</span><a href="#local-6989586621679154719"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Authority -&gt; RText 'Host
+</span><a href="Text.URI.Types.html#authHost"><span class="hs-identifier hs-var hs-var">URI.authHost</span></a></span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154718"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- | 'Authority' port lens.</span><span>
+</span><span id="line-107"></span><span class="annot"><a href="Text.URI.Lens.html#authPort"><span class="hs-identifier hs-type">authPort</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">Authority</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word</span></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span id="authPort"><span class="annot"><span class="annottext">authPort :: (Maybe Word -&gt; f (Maybe Word)) -&gt; Authority -&gt; f Authority
+</span><a href="Text.URI.Lens.html#authPort"><span class="hs-identifier hs-var hs-var">authPort</span></a></span></span><span> </span><span id="local-6989586621679154715"><span class="annot"><span class="annottext">Maybe Word -&gt; f (Maybe Word)
+</span><a href="#local-6989586621679154715"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154714"><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154714"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154713"><span class="annot"><span class="annottext">Maybe Word
+</span><a href="#local-6989586621679154713"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154714"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">authPort :: Maybe Word
+</span><a href="Text.URI.Types.html#authPort"><span class="hs-identifier hs-var">URI.authPort</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Word
+</span><a href="#local-6989586621679154713"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe Word -&gt; Authority) -&gt; f (Maybe Word) -&gt; f Authority
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Word -&gt; f (Maybe Word)
+</span><a href="#local-6989586621679154715"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Authority -&gt; Maybe Word
+</span><a href="Text.URI.Types.html#authPort"><span class="hs-identifier hs-var hs-var">URI.authPort</span></a></span><span> </span><span class="annot"><span class="annottext">Authority
+</span><a href="#local-6989586621679154714"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- | 'UserInfo' username lens.</span><span>
+</span><span id="line-111"></span><span class="annot"><a href="Text.URI.Lens.html#uiUsername"><span class="hs-identifier hs-type">uiUsername</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier hs-type">UserInfo</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Username"><span class="hs-identifier hs-type">Username</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span id="uiUsername"><span class="annot"><span class="annottext">uiUsername :: (RText 'Username -&gt; f (RText 'Username)) -&gt; UserInfo -&gt; f UserInfo
+</span><a href="Text.URI.Lens.html#uiUsername"><span class="hs-identifier hs-var hs-var">uiUsername</span></a></span></span><span> </span><span id="local-6989586621679154711"><span class="annot"><span class="annottext">RText 'Username -&gt; f (RText 'Username)
+</span><a href="#local-6989586621679154711"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154710"><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154710"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154709"><span class="annot"><span class="annottext">RText 'Username
+</span><a href="#local-6989586621679154709"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154710"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uiUsername :: RText 'Username
+</span><a href="Text.URI.Types.html#uiUsername"><span class="hs-identifier hs-var">URI.uiUsername</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RText 'Username
+</span><a href="#local-6989586621679154709"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(RText 'Username -&gt; UserInfo) -&gt; f (RText 'Username) -&gt; f UserInfo
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">RText 'Username -&gt; f (RText 'Username)
+</span><a href="#local-6989586621679154711"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserInfo -&gt; RText 'Username
+</span><a href="Text.URI.Types.html#uiUsername"><span class="hs-identifier hs-var hs-var">URI.uiUsername</span></a></span><span> </span><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154710"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | 'UserInfo' password lens.</span><span>
+</span><span id="line-115"></span><span class="annot"><a href="Text.URI.Lens.html#uiPassword"><span class="hs-identifier hs-type">uiPassword</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-type">Lens'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier hs-type">UserInfo</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Password"><span class="hs-identifier hs-type">Password</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span id="uiPassword"><span class="annot"><span class="annottext">uiPassword :: (Maybe (RText 'Password) -&gt; f (Maybe (RText 'Password)))
+-&gt; UserInfo -&gt; f UserInfo
+</span><a href="Text.URI.Lens.html#uiPassword"><span class="hs-identifier hs-var hs-var">uiPassword</span></a></span></span><span> </span><span id="local-6989586621679154707"><span class="annot"><span class="annottext">Maybe (RText 'Password) -&gt; f (Maybe (RText 'Password))
+</span><a href="#local-6989586621679154707"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679154706"><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154706"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154705"><span class="annot"><span class="annottext">Maybe (RText 'Password)
+</span><a href="#local-6989586621679154705"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154706"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">uiPassword :: Maybe (RText 'Password)
+</span><a href="Text.URI.Types.html#uiPassword"><span class="hs-identifier hs-var">URI.uiPassword</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Password)
+</span><a href="#local-6989586621679154705"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe (RText 'Password) -&gt; UserInfo)
+-&gt; f (Maybe (RText 'Password)) -&gt; f UserInfo
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'Password) -&gt; f (Maybe (RText 'Password))
+</span><a href="#local-6989586621679154707"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserInfo -&gt; Maybe (RText 'Password)
+</span><a href="Text.URI.Types.html#uiPassword"><span class="hs-identifier hs-var hs-var">URI.uiPassword</span></a></span><span> </span><span class="annot"><span class="annottext">UserInfo
+</span><a href="#local-6989586621679154706"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- | 'QueryParam' prism for query flags.</span><span>
+</span><span id="line-119"></span><span class="annot"><a href="Text.URI.Lens.html#_QueryFlag"><span class="hs-identifier hs-type">_QueryFlag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Prism%27"><span class="hs-identifier hs-type">Prism'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">URI.QueryParam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryKey"><span class="hs-identifier hs-type">QueryKey</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span id="_QueryFlag"><span class="annot"><span class="annottext">_QueryFlag :: p (RText 'QueryKey) (f (RText 'QueryKey))
+-&gt; p QueryParam (f QueryParam)
+</span><a href="Text.URI.Lens.html#_QueryFlag"><span class="hs-identifier hs-var hs-var">_QueryFlag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(RText 'QueryKey -&gt; QueryParam)
+-&gt; (QueryParam -&gt; Maybe (RText 'QueryKey))
+-&gt; Prism QueryParam QueryParam (RText 'QueryKey) (RText 'QueryKey)
+forall b s a. (b -&gt; s) -&gt; (s -&gt; Maybe a) -&gt; Prism s s a b
+</span><a href="Text.URI.Lens.html#prism%27"><span class="hs-identifier hs-var">prism'</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; QueryParam
+</span><a href="Text.URI.Types.html#QueryFlag"><span class="hs-identifier hs-var">QueryFlag</span></a></span><span> </span><span class="annot"><span class="annottext">((QueryParam -&gt; Maybe (RText 'QueryKey))
+ -&gt; Prism QueryParam QueryParam (RText 'QueryKey) (RText 'QueryKey))
+-&gt; (QueryParam -&gt; Maybe (RText 'QueryKey))
+-&gt; Prism QueryParam QueryParam (RText 'QueryKey) (RText 'QueryKey)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-121"></span><span>  </span><span class="annot"><a href="Text.URI.Types.html#QueryFlag"><span class="hs-identifier hs-type">QueryFlag</span></a></span><span> </span><span id="local-6989586621679154700"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154700"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; Maybe (RText 'QueryKey)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154700"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-122"></span><span>  </span><span class="annot"><span class="annottext">QueryParam
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'QueryKey)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span class="hs-comment">-- | 'QueryParam' prism for query parameters.</span><span>
+</span><span id="line-125"></span><span class="annot"><a href="Text.URI.Lens.html#_QueryParam"><span class="hs-identifier hs-type">_QueryParam</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Prism%27"><span class="hs-identifier hs-type">Prism'</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">QueryParam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryKey"><span class="hs-identifier hs-type">QueryKey</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryValue"><span class="hs-identifier hs-type">QueryValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span id="_QueryParam"><span class="annot"><span class="annottext">_QueryParam :: p (RText 'QueryKey, RText 'QueryValue)
+  (f (RText 'QueryKey, RText 'QueryValue))
+-&gt; p QueryParam (f QueryParam)
+</span><a href="Text.URI.Lens.html#_QueryParam"><span class="hs-identifier hs-var hs-var">_QueryParam</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((RText 'QueryKey, RText 'QueryValue) -&gt; QueryParam)
+-&gt; (QueryParam -&gt; Maybe (RText 'QueryKey, RText 'QueryValue))
+-&gt; Prism
+     QueryParam
+     QueryParam
+     (RText 'QueryKey, RText 'QueryValue)
+     (RText 'QueryKey, RText 'QueryValue)
+forall b s a. (b -&gt; s) -&gt; (s -&gt; Maybe a) -&gt; Prism s s a b
+</span><a href="Text.URI.Lens.html#prism%27"><span class="hs-identifier hs-var">prism'</span></a></span><span> </span><span class="annot"><span class="annottext">(RText 'QueryKey, RText 'QueryValue) -&gt; QueryParam
+</span><a href="#local-6989586621679154699"><span class="hs-identifier hs-var">construct</span></a></span><span> </span><span class="annot"><span class="annottext">QueryParam -&gt; Maybe (RText 'QueryKey, RText 'QueryValue)
+</span><a href="#local-6989586621679154698"><span class="hs-identifier hs-var">pick</span></a></span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>    </span><span id="local-6989586621679154699"><span class="annot"><span class="annottext">construct :: (RText 'QueryKey, RText 'QueryValue) -&gt; QueryParam
+</span><a href="#local-6989586621679154699"><span class="hs-identifier hs-var hs-var">construct</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679154697"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154697"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679154696"><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154696"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; RText 'QueryValue -&gt; QueryParam
+</span><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-var">QueryParam</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154697"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154696"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-129"></span><span>    </span><span id="local-6989586621679154698"><span class="annot"><span class="annottext">pick :: QueryParam -&gt; Maybe (RText 'QueryKey, RText 'QueryValue)
+</span><a href="#local-6989586621679154698"><span class="hs-identifier hs-var hs-var">pick</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-130"></span><span>      </span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">QueryParam</span></a></span><span> </span><span id="local-6989586621679154694"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154694"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679154693"><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154693"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(RText 'QueryKey, RText 'QueryValue)
+-&gt; Maybe (RText 'QueryKey, RText 'QueryValue)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154694"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154693"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>      </span><span class="annot"><span class="annottext">QueryParam
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'QueryKey, RText 'QueryValue)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- | Check if the given query key is present in the collection of query</span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- parameters.</span><span>
+</span><span id="line-135"></span><span class="annot"><a href="Text.URI.Lens.html#queryFlag"><span class="hs-identifier hs-type">queryFlag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryKey"><span class="hs-identifier hs-type">QueryKey</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Getter"><span class="hs-identifier hs-type">Getter</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">URI.QueryParam</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-136"></span><span id="queryFlag"><span class="annot"><span class="annottext">queryFlag :: RText 'QueryKey -&gt; Getter [QueryParam] Bool
+</span><a href="Text.URI.Lens.html#queryFlag"><span class="hs-identifier hs-var hs-var">queryFlag</span></a></span></span><span> </span><span id="local-6989586621679154692"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154692"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">([QueryParam] -&gt; Bool)
+-&gt; (Bool -&gt; f Bool) -&gt; [QueryParam] -&gt; f [QueryParam]
+forall (p :: * -&gt; * -&gt; *) (f :: * -&gt; *) s a.
+(Profunctor p, Contravariant f) =&gt;
+(s -&gt; a) -&gt; p a (f a) -&gt; p s (f s)
+</span><a href="Text.URI.Lens.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe QueryParam -&gt; Bool
+forall a. Maybe a -&gt; Bool
+</span><span class="hs-identifier hs-var">isJust</span></span><span> </span><span class="annot"><span class="annottext">(Maybe QueryParam -&gt; Bool)
+-&gt; ([QueryParam] -&gt; Maybe QueryParam) -&gt; [QueryParam] -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(QueryParam -&gt; Bool) -&gt; [QueryParam] -&gt; Maybe QueryParam
+forall (t :: * -&gt; *) a. Foldable t =&gt; (a -&gt; Bool) -&gt; t a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">find</span></span><span> </span><span class="annot"><span class="annottext">QueryParam -&gt; Bool
+</span><a href="#local-6989586621679154691"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-138"></span><span>    </span><span id="local-6989586621679154691"><span class="annot"><span class="annottext">g :: QueryParam -&gt; Bool
+</span><a href="#local-6989586621679154691"><span class="hs-identifier hs-var hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#QueryFlag"><span class="hs-identifier hs-type">QueryFlag</span></a></span><span> </span><span id="local-6989586621679154690"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154690"><span class="hs-identifier hs-var">k'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154690"><span class="hs-identifier hs-var">k'</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; RText 'QueryKey -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154692"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-139"></span><span>    </span><span class="annot"><a href="#local-6989586621679154691"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">QueryParam
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-140"></span><span>
+</span><span id="line-141"></span><span class="hs-comment">-- | Manipulate a query parameter by its key. Note that since there may be</span><span>
+</span><span id="line-142"></span><span class="hs-comment">-- several query parameters with the same key this is a traversal that can</span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- return\/modify several items at once.</span><span>
+</span><span id="line-144"></span><span class="annot"><a href="Text.URI.Lens.html#queryParam"><span class="hs-identifier hs-type">queryParam</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryKey"><span class="hs-identifier hs-type">QueryKey</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Traversal%27"><span class="hs-identifier hs-type">Traversal'</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">URI.QueryParam</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#QueryValue"><span class="hs-identifier hs-type">QueryValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span id="queryParam"><span class="annot"><span class="annottext">queryParam :: RText 'QueryKey -&gt; Traversal' [QueryParam] (RText 'QueryValue)
+</span><a href="Text.URI.Lens.html#queryParam"><span class="hs-identifier hs-var hs-var">queryParam</span></a></span></span><span> </span><span id="local-6989586621679154689"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154689"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679154688"><span class="annot"><span class="annottext">RText 'QueryValue -&gt; f (RText 'QueryValue)
+</span><a href="#local-6989586621679154688"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(QueryParam -&gt; f QueryParam) -&gt; [QueryParam] -&gt; f [QueryParam]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="annot"><span class="annottext">QueryParam -&gt; f QueryParam
+</span><a href="#local-6989586621679154687"><span class="hs-identifier hs-var">g</span></a></span><span>
+</span><span id="line-146"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-147"></span><span>    </span><span id="local-6989586621679154687"><span class="annot"><span class="annottext">g :: QueryParam -&gt; f QueryParam
+</span><a href="#local-6989586621679154687"><span class="hs-identifier hs-var hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679154686"><span class="annot"><span class="annottext">p :: QueryParam
+</span><a href="#local-6989586621679154686"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">QueryParam</span></a></span><span> </span><span id="local-6989586621679154685"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154685"><span class="hs-identifier hs-var">k'</span></a></span></span><span> </span><span id="local-6989586621679154684"><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154684"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-148"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154689"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; RText 'QueryKey -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154685"><span class="hs-identifier hs-var">k'</span></a></span><span>
+</span><span id="line-149"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; RText 'QueryValue -&gt; QueryParam
+</span><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-var">QueryParam</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679154685"><span class="hs-identifier hs-var">k'</span></a></span><span> </span><span class="annot"><span class="annottext">(RText 'QueryValue -&gt; QueryParam)
+-&gt; f (RText 'QueryValue) -&gt; f QueryParam
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">RText 'QueryValue -&gt; f (RText 'QueryValue)
+</span><a href="#local-6989586621679154688"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679154684"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-150"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">QueryParam -&gt; f QueryParam
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">QueryParam
+</span><a href="#local-6989586621679154686"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-151"></span><span>    </span><span class="annot"><a href="#local-6989586621679154687"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span id="local-6989586621679154683"><span class="annot"><span class="annottext">QueryParam
+</span><a href="#local-6989586621679154683"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">QueryParam -&gt; f QueryParam
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">QueryParam
+</span><a href="#local-6989586621679154683"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span class="hs-comment">-- | A getter that can project 'Text' from refined text values.</span><span>
+</span><span id="line-154"></span><span id="local-6989586621679154682"><span class="annot"><a href="Text.URI.Lens.html#unRText"><span class="hs-identifier hs-type">unRText</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Getter"><span class="hs-identifier hs-type">Getter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154682"><span class="hs-identifier hs-type">l</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span></span><span>
+</span><span id="line-155"></span><span id="unRText"><span class="annot"><span class="annottext">unRText :: (Text -&gt; f Text) -&gt; RText l -&gt; f (RText l)
+</span><a href="Text.URI.Lens.html#unRText"><span class="hs-identifier hs-var hs-var">unRText</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(RText l -&gt; Text) -&gt; (Text -&gt; f Text) -&gt; RText l -&gt; f (RText l)
+forall (p :: * -&gt; * -&gt; *) (f :: * -&gt; *) s a.
+(Profunctor p, Contravariant f) =&gt;
+(s -&gt; a) -&gt; p a (f a) -&gt; p s (f s)
+</span><a href="Text.URI.Lens.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">RText l -&gt; Text
+forall (l :: RTextLabel). RText l -&gt; Text
+</span><a href="Text.URI.Types.html#unRText"><span class="hs-identifier hs-var">URI.unRText</span></a></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-158"></span><span class="hs-comment">-- Helpers</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-keyword">type</span><span> </span><span id="Lens%27"><span class="annot"><a href="Text.URI.Lens.html#Lens%27"><span class="hs-identifier hs-var">Lens'</span></a></span></span><span> </span><span id="local-6989586621679154680"><span class="annot"><a href="#local-6989586621679154680"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679154679"><span class="annot"><a href="#local-6989586621679154679"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-161"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679154678"><span class="annot"><a href="#local-6989586621679154678"><span class="hs-identifier hs-type">f</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679154678"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154679"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154678"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154679"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154680"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154678"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154680"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span class="hs-keyword">type</span><span> </span><span id="Traversal%27"><span class="annot"><a href="Text.URI.Lens.html#Traversal%27"><span class="hs-identifier hs-var">Traversal'</span></a></span></span><span> </span><span id="local-6989586621679154677"><span class="annot"><a href="#local-6989586621679154677"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679154676"><span class="annot"><a href="#local-6989586621679154676"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-164"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679154675"><span class="annot"><a href="#local-6989586621679154675"><span class="hs-identifier hs-type">f</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679154675"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154676"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154675"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154676"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154677"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154675"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154677"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-165"></span><span>
+</span><span id="line-166"></span><span class="hs-keyword">type</span><span> </span><span id="Getter"><span class="annot"><a href="Text.URI.Lens.html#Getter"><span class="hs-identifier hs-var">Getter</span></a></span></span><span> </span><span id="local-6989586621679154674"><span class="annot"><a href="#local-6989586621679154674"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679154673"><span class="annot"><a href="#local-6989586621679154673"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-167"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679154672"><span class="annot"><a href="#local-6989586621679154672"><span class="hs-identifier hs-type">f</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="annot"><a href="#local-6989586621679154672"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679154672"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154673"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154672"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154673"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154674"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154672"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154674"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span class="hs-keyword">type</span><span> </span><span id="Prism"><span class="annot"><a href="Text.URI.Lens.html#Prism"><span class="hs-identifier hs-var">Prism</span></a></span></span><span> </span><span id="local-6989586621679154671"><span class="annot"><a href="#local-6989586621679154671"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679154670"><span class="annot"><a href="#local-6989586621679154670"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span id="local-6989586621679154669"><span class="annot"><a href="#local-6989586621679154669"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679154668"><span class="annot"><a href="#local-6989586621679154668"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-170"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679154667"><span class="annot"><a href="#local-6989586621679154667"><span class="hs-identifier hs-type">p</span></a></span></span><span> </span><span id="local-6989586621679154666"><span class="annot"><a href="#local-6989586621679154666"><span class="hs-identifier hs-type">f</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Choice</span></span><span> </span><span class="annot"><a href="#local-6989586621679154667"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679154666"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154667"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154669"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154666"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154668"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154667"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154671"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154666"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154670"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-171"></span><span>
+</span><span id="line-172"></span><span class="hs-keyword">type</span><span> </span><span id="Prism%27"><span class="annot"><a href="Text.URI.Lens.html#Prism%27"><span class="hs-identifier hs-var">Prism'</span></a></span></span><span> </span><span id="local-6989586621679154665"><span class="annot"><a href="#local-6989586621679154665"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679154664"><span class="annot"><a href="#local-6989586621679154664"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Prism"><span class="hs-identifier hs-type">Prism</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154665"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154665"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154664"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154664"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- | Build a 'Prism'.</span><span>
+</span><span id="line-175"></span><span id="local-6989586621679154791"><span id="local-6989586621679154792"><span id="local-6989586621679154793"><span id="local-6989586621679154794"><span class="annot"><a href="Text.URI.Lens.html#prism"><span class="hs-identifier hs-type">prism</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154794"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154793"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154792"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="#local-6989586621679154793"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154791"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Prism"><span class="hs-identifier hs-type">Prism</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154792"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154793"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154791"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154794"><span class="hs-identifier hs-type">b</span></a></span></span></span></span></span><span>
+</span><span id="line-176"></span><span id="prism"><span class="annot"><span class="annottext">prism :: (b -&gt; t) -&gt; (s -&gt; Either t a) -&gt; Prism s t a b
+</span><a href="Text.URI.Lens.html#prism"><span class="hs-identifier hs-var hs-var">prism</span></a></span></span><span> </span><span id="local-6989586621679154662"><span class="annot"><span class="annottext">b -&gt; t
+</span><a href="#local-6989586621679154662"><span class="hs-identifier hs-var">bt</span></a></span></span><span> </span><span id="local-6989586621679154661"><span class="annot"><span class="annottext">s -&gt; Either t a
+</span><a href="#local-6989586621679154661"><span class="hs-identifier hs-var">seta</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; Either t a)
+-&gt; (Either t (f b) -&gt; f t)
+-&gt; p (Either t a) (Either t (f b))
+-&gt; p s (f t)
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Profunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p b c -&gt; p a d
+</span><span class="hs-identifier hs-var">dimap</span></span><span> </span><span class="annot"><span class="annottext">s -&gt; Either t a
+</span><a href="#local-6989586621679154661"><span class="hs-identifier hs-var">seta</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(t -&gt; f t) -&gt; (f b -&gt; f t) -&gt; Either t (f b) -&gt; f t
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="annot"><span class="annottext">t -&gt; f t
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; t) -&gt; f b -&gt; f t
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; t
+</span><a href="#local-6989586621679154662"><span class="hs-identifier hs-var">bt</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(p (Either t a) (Either t (f b)) -&gt; p s (f t))
+-&gt; (p a (f b) -&gt; p (Either t a) (Either t (f b)))
+-&gt; p a (f b)
+-&gt; p s (f t)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">p a (f b) -&gt; p (Either t a) (Either t (f b))
+forall (p :: * -&gt; * -&gt; *) a b c.
+Choice p =&gt;
+p a b -&gt; p (Either c a) (Either c b)
+</span><span class="hs-identifier hs-var">right'</span></span><span>
+</span><span id="line-177"></span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- | Another way to build a 'Prism'.</span><span>
+</span><span id="line-179"></span><span id="local-6989586621679154842"><span id="local-6989586621679154843"><span id="local-6989586621679154844"><span class="annot"><a href="Text.URI.Lens.html#prism%27"><span class="hs-identifier hs-type">prism'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154844"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154843"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154843"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679154842"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.URI.Lens.html#Prism"><span class="hs-identifier hs-type">Prism</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154843"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154843"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154842"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154844"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-180"></span><span id="prism%27"><span class="annot"><span class="annottext">prism' :: (b -&gt; s) -&gt; (s -&gt; Maybe a) -&gt; Prism s s a b
+</span><a href="Text.URI.Lens.html#prism%27"><span class="hs-identifier hs-var hs-var">prism'</span></a></span></span><span> </span><span id="local-6989586621679154657"><span class="annot"><span class="annottext">b -&gt; s
+</span><a href="#local-6989586621679154657"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679154656"><span class="annot"><span class="annottext">s -&gt; Maybe a
+</span><a href="#local-6989586621679154656"><span class="hs-identifier hs-var">sma</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; s) -&gt; (s -&gt; Either s a) -&gt; Prism s s a b
+forall b t s a. (b -&gt; t) -&gt; (s -&gt; Either t a) -&gt; Prism s t a b
+</span><a href="Text.URI.Lens.html#prism"><span class="hs-identifier hs-var">prism</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; s
+</span><a href="#local-6989586621679154657"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679154655"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679154655"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Either s a -&gt; (a -&gt; Either s a) -&gt; Maybe a -&gt; Either s a
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; Either s a
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679154655"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a -&gt; Either s a
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; Maybe a
+</span><a href="#local-6989586621679154656"><span class="hs-identifier hs-var">sma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679154655"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- | Lift a function into optic.</span><span>
+</span><span id="line-183"></span><span id="local-6989586621679154872"><span id="local-6989586621679154873"><span id="local-6989586621679154875"><span id="local-6989586621679154877"><span class="annot"><a href="Text.URI.Lens.html#to"><span class="hs-identifier hs-type">to</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Profunctor</span></span><span> </span><span class="annot"><a href="#local-6989586621679154877"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="annot"><a href="#local-6989586621679154875"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154873"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154872"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154877"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154872"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154875"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154872"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154877"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154873"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679154875"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154873"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-184"></span><span id="to"><span class="annot"><span class="annottext">to :: (s -&gt; a) -&gt; p a (f a) -&gt; p s (f s)
+</span><a href="Text.URI.Lens.html#to"><span class="hs-identifier hs-var hs-var">to</span></a></span></span><span> </span><span id="local-6989586621679154654"><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679154654"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; a) -&gt; (f a -&gt; f s) -&gt; p a (f a) -&gt; p s (f s)
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Profunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p b c -&gt; p a d
+</span><span class="hs-identifier hs-var">dimap</span></span><span> </span><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679154654"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(s -&gt; a) -&gt; f a -&gt; f s
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><span class="hs-identifier hs-var">contramap</span></span><span> </span><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679154654"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span></pre></body></html>

@@ -1,0 +1,415 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LINE 1 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-1"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+
+#include &quot;HsNetDef.h&quot;
+</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LINE 7 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Network.Socket.Buffer</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="Network.Socket.Buffer.html#sendBufTo"><span class="hs-identifier">sendBufTo</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Network.Socket.Buffer.html#sendBuf"><span class="hs-identifier">sendBuf</span></a></span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Network.Socket.Buffer.html#recvBufFrom"><span class="hs-identifier">recvBufFrom</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Network.Socket.Buffer.html#recvBuf"><span class="hs-identifier">recvBuf</span></a></span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Network.Socket.Buffer.html#recvBufNoWait"><span class="hs-identifier">recvBufNoWait</span></a></span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-pragma">{-# LINE 17 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.C.Error</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">getErrno</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">eAGAIN</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">eWOULDBLOCK</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-pragma">{-# LINE 19 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.Marshal.Alloc</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">alloca</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.IO.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">IOErrorType</span></span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">InvalidArgument</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Error</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">mkIOError</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ioeSetErrorString</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">catchIOError</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-pragma">{-# LINE 26 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Network.Socket.Imports.html"><span class="hs-identifier">Network.Socket.Imports</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Network.Socket.Internal.html"><span class="hs-identifier">Network.Socket.Internal</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Network.Socket.Name.html"><span class="hs-identifier">Network.Socket.Name</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Network.Socket.Types.html"><span class="hs-identifier">Network.Socket.Types</span></a></span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- | Send data to the socket.  The recipient can be specified</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- explicitly, so the socket need not be in a connected state.</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- Returns the number of bytes sent.  Applications are responsible for</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- ensuring that all data has been sent.</span><span>
+</span><span id="line-36"></span><span id="local-6989586621679053795"><span id="local-6989586621679053796"><span class="annot"><a href="Network.Socket.Buffer.html#sendBufTo"><span class="hs-identifier hs-type">sendBufTo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#SocketAddress"><span class="hs-identifier hs-type">SocketAddress</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679053796"><span class="hs-identifier hs-type">sa</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-37"></span><span>             </span><span class="annot"><a href="Network.Socket.Types.html#Socket"><span class="hs-identifier hs-type">Socket</span></a></span><span> </span><span class="hs-comment">-- (possibly) bound/connected Socket</span><span>
+</span><span id="line-38"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053795"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-39"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>         </span><span class="hs-comment">-- Data to send</span><span>
+</span><span id="line-40"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679053796"><span class="hs-identifier hs-type">sa</span></a></span><span>
+</span><span id="line-41"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span></span><span>      </span><span class="hs-comment">-- Number of Bytes sent</span><span>
+</span><span id="line-42"></span><span id="sendBufTo"><span class="annot"><span class="annottext">sendBufTo :: Socket -&gt; Ptr a -&gt; Int -&gt; sa -&gt; IO Int
+</span><a href="Network.Socket.Buffer.html#sendBufTo"><span class="hs-identifier hs-var hs-var">sendBufTo</span></a></span></span><span> </span><span id="local-6989586621679053794"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053794"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679053793"><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679053793"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679053792"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053792"><span class="hs-identifier hs-var">nbytes</span></a></span></span><span> </span><span id="local-6989586621679053791"><span class="annot"><span class="annottext">sa
+</span><a href="#local-6989586621679053791"><span class="hs-identifier hs-var">sa</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-43"></span><span>  </span><span class="annot"><span class="annottext">sa -&gt; (Ptr sa -&gt; Int -&gt; IO Int) -&gt; IO Int
+forall sa a.
+SocketAddress sa =&gt;
+sa -&gt; (Ptr sa -&gt; Int -&gt; IO a) -&gt; IO a
+</span><a href="Network.Socket.Types.html#withSocketAddress"><span class="hs-identifier hs-var">withSocketAddress</span></a></span><span> </span><span class="annot"><span class="annottext">sa
+</span><a href="#local-6989586621679053791"><span class="hs-identifier hs-var">sa</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr sa -&gt; Int -&gt; IO Int) -&gt; IO Int)
+-&gt; (Ptr sa -&gt; Int -&gt; IO Int) -&gt; IO Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053789"><span class="annot"><span class="annottext">Ptr sa
+</span><a href="#local-6989586621679053789"><span class="hs-identifier hs-var">p_sa</span></a></span></span><span> </span><span id="local-6989586621679053788"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053788"><span class="hs-identifier hs-var">siz</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(CInt -&gt; Int) -&gt; IO CInt -&gt; IO Int
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><span class="annottext">Socket -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall r. Socket -&gt; (CInt -&gt; IO r) -&gt; IO r
+</span><a href="Network.Socket.Types.html#withFdSocket"><span class="hs-identifier hs-var">withFdSocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053794"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">((CInt -&gt; IO CInt) -&gt; IO CInt) -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053785"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053785"><span class="hs-identifier hs-var">fd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-45"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679053784"><span class="annot"><span class="annottext">sz :: CInt
+</span><a href="#local-6989586621679053784"><span class="hs-identifier hs-var hs-var">sz</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; CInt
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053788"><span class="hs-identifier hs-var">siz</span></a></span><span>
+</span><span id="line-46"></span><span>            </span><span id="local-6989586621679053783"><span class="annot"><span class="annottext">n :: CSize
+</span><a href="#local-6989586621679053783"><span class="hs-identifier hs-var hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053792"><span class="hs-identifier hs-var">nbytes</span></a></span><span>
+</span><span id="line-47"></span><span>            </span><span id="local-6989586621679053782"><span class="annot"><span class="annottext">flags :: CInt
+</span><a href="#local-6989586621679053782"><span class="hs-identifier hs-var hs-var">flags</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-48"></span><span>        </span><span class="annot"><span class="annottext">Socket -&gt; String -&gt; IO CInt -&gt; IO CInt
+forall a. (Eq a, Num a) =&gt; Socket -&gt; String -&gt; IO a -&gt; IO a
+</span><a href="Network.Socket.Internal.html#throwSocketErrorWaitWrite"><span class="hs-identifier hs-var">throwSocketErrorWaitWrite</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053794"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.sendBufTo&quot;</span></span><span> </span><span class="annot"><span class="annottext">(IO CInt -&gt; IO CInt) -&gt; IO CInt -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-49"></span><span>          </span><span class="annot"><span class="annottext">CInt -&gt; Ptr a -&gt; CSize -&gt; CInt -&gt; Ptr sa -&gt; CInt -&gt; IO CInt
+forall a sa.
+CInt -&gt; Ptr a -&gt; CSize -&gt; CInt -&gt; Ptr sa -&gt; CInt -&gt; IO CInt
+</span><a href="Network.Socket.Buffer.html#c_sendto"><span class="hs-identifier hs-var">c_sendto</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053785"><span class="hs-identifier hs-var">fd</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679053793"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679053783"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053782"><span class="hs-identifier hs-var">flags</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr sa
+</span><a href="#local-6989586621679053789"><span class="hs-identifier hs-var">p_sa</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053784"><span class="hs-identifier hs-var">sz</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-pragma">{-# LINE 58 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- | Send data to the socket. The socket must be connected to a remote</span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- socket. Returns the number of bytes sent.  Applications are</span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- responsible for ensuring that all data has been sent.</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Network.Socket.Buffer.html#sendBuf"><span class="hs-identifier hs-type">sendBuf</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#Socket"><span class="hs-identifier hs-type">Socket</span></a></span><span>    </span><span class="hs-comment">-- Bound/Connected Socket</span><span>
+</span><span id="line-63"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span>  </span><span class="hs-comment">-- Pointer to the data to send</span><span>
+</span><span id="line-64"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>        </span><span class="hs-comment">-- Length of the buffer</span><span>
+</span><span id="line-65"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>     </span><span class="hs-comment">-- Number of Bytes sent</span><span>
+</span><span id="line-66"></span><span id="sendBuf"><span class="annot"><span class="annottext">sendBuf :: Socket -&gt; Ptr Word8 -&gt; Int -&gt; IO Int
+</span><a href="Network.Socket.Buffer.html#sendBuf"><span class="hs-identifier hs-var hs-var">sendBuf</span></a></span></span><span> </span><span id="local-6989586621679053779"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053779"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679053778"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053778"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span id="local-6989586621679053777"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053777"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(CInt -&gt; Int) -&gt; IO CInt -&gt; IO Int
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-pragma">{-# LINE 77 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-77"></span><span>    </span><span class="annot"><span class="annottext">Socket -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall r. Socket -&gt; (CInt -&gt; IO r) -&gt; IO r
+</span><a href="Network.Socket.Types.html#withFdSocket"><span class="hs-identifier hs-var">withFdSocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053779"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">((CInt -&gt; IO CInt) -&gt; IO CInt) -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053776"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053776"><span class="hs-identifier hs-var">fd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-78"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679053775"><span class="annot"><span class="annottext">flags :: CInt
+</span><a href="#local-6989586621679053775"><span class="hs-identifier hs-var hs-var">flags</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-79"></span><span>            </span><span id="local-6989586621679053774"><span class="annot"><span class="annottext">clen :: CSize
+</span><a href="#local-6989586621679053774"><span class="hs-identifier hs-var hs-var">clen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053777"><span class="hs-identifier hs-var">len</span></a></span><span>
+</span><span id="line-80"></span><span>        </span><span class="annot"><span class="annottext">Socket -&gt; String -&gt; IO CInt -&gt; IO CInt
+forall a. (Eq a, Num a) =&gt; Socket -&gt; String -&gt; IO a -&gt; IO a
+</span><a href="Network.Socket.Internal.html#throwSocketErrorWaitWrite"><span class="hs-identifier hs-var">throwSocketErrorWaitWrite</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053779"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.sendBuf&quot;</span></span><span> </span><span class="annot"><span class="annottext">(IO CInt -&gt; IO CInt) -&gt; IO CInt -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-81"></span><span>          </span><span class="annot"><span class="annottext">CInt -&gt; Ptr Word8 -&gt; CSize -&gt; CInt -&gt; IO CInt
+forall a. CInt -&gt; Ptr a -&gt; CSize -&gt; CInt -&gt; IO CInt
+</span><a href="Network.Socket.Buffer.html#c_send"><span class="hs-identifier hs-var">c_send</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053776"><span class="hs-identifier hs-var">fd</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053778"><span class="hs-identifier hs-var">str</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679053774"><span class="hs-identifier hs-var">clen</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053775"><span class="hs-identifier hs-var">flags</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-pragma">{-# LINE 83 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- | Receive data from the socket, writing it into buffer instead of</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- creating a new string.  The socket need not be in a connected</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- state. Returns @(nbytes, address)@ where @nbytes@ is the number of</span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- bytes received and @address@ is a 'SockAddr' representing the</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- address of the sending socket.</span><span>
+</span><span id="line-89"></span><span class="hs-comment">--</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- If the first return value is zero, it means EOF.</span><span>
+</span><span id="line-91"></span><span class="hs-comment">--</span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- For 'Stream' sockets, the second return value would be invalid.</span><span>
+</span><span id="line-93"></span><span class="hs-comment">--</span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- NOTE: blocking on Windows unless you compile with -threaded (see</span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- GHC ticket #1129)</span><span>
+</span><span id="line-96"></span><span id="local-6989586621679053771"><span id="local-6989586621679053772"><span class="annot"><a href="Network.Socket.Buffer.html#recvBufFrom"><span class="hs-identifier hs-type">recvBufFrom</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#SocketAddress"><span class="hs-identifier hs-type">SocketAddress</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679053772"><span class="hs-identifier hs-type">sa</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#Socket"><span class="hs-identifier hs-type">Socket</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053771"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679053772"><span class="hs-identifier hs-type">sa</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-97"></span><span id="recvBufFrom"><span class="annot"><span class="annottext">recvBufFrom :: Socket -&gt; Ptr a -&gt; Int -&gt; IO (Int, sa)
+</span><a href="Network.Socket.Buffer.html#recvBufFrom"><span class="hs-identifier hs-var hs-var">recvBufFrom</span></a></span></span><span> </span><span id="local-6989586621679053770"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053770"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679053769"><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679053769"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679053768"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053768"><span class="hs-identifier hs-var">nbytes</span></a></span></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053768"><span class="hs-identifier hs-var">nbytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IOError -&gt; IO (Int, sa)
+forall a. IOError -&gt; IO a
+</span><span class="hs-identifier hs-var">ioError</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; IOError
+</span><a href="Network.Socket.Buffer.html#mkInvalidRecvArgError"><span class="hs-identifier hs-var">mkInvalidRecvArgError</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.recvBufFrom&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Ptr sa -&gt; Int -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall sa a. SocketAddress sa =&gt; (Ptr sa -&gt; Int -&gt; IO a) -&gt; IO a
+</span><a href="Network.Socket.Types.html#withNewSocketAddress"><span class="hs-identifier hs-var">withNewSocketAddress</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr sa -&gt; Int -&gt; IO (Int, sa)) -&gt; IO (Int, sa))
+-&gt; (Ptr sa -&gt; Int -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053763"><span class="annot"><span class="annottext">Ptr sa
+</span><a href="#local-6989586621679053763"><span class="hs-identifier hs-var">ptr_sa</span></a></span></span><span> </span><span id="local-6989586621679053762"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053762"><span class="hs-identifier hs-var">sz</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Ptr CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall a b. Storable a =&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><span class="hs-identifier hs-var">alloca</span></span><span> </span><span class="annot"><span class="annottext">((Ptr CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa))
+-&gt; (Ptr CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053761"><span class="annot"><span class="annottext">Ptr CInt
+</span><a href="#local-6989586621679053761"><span class="hs-identifier hs-var">ptr_len</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-100"></span><span>        </span><span class="annot"><span class="annottext">Socket -&gt; (CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall r. Socket -&gt; (CInt -&gt; IO r) -&gt; IO r
+</span><a href="Network.Socket.Types.html#withFdSocket"><span class="hs-identifier hs-var">withFdSocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053770"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">((CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa))
+-&gt; (CInt -&gt; IO (Int, sa)) -&gt; IO (Int, sa)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053760"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053760"><span class="hs-identifier hs-var">fd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-101"></span><span>            </span><span class="annot"><span class="annottext">Ptr CInt -&gt; CInt -&gt; IO ()
+forall a. Storable a =&gt; Ptr a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">poke</span></span><span> </span><span class="annot"><span class="annottext">Ptr CInt
+</span><a href="#local-6989586621679053761"><span class="hs-identifier hs-var">ptr_len</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; CInt
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053762"><span class="hs-identifier hs-var">sz</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679053758"><span class="annot"><span class="annottext">cnbytes :: CSize
+</span><a href="#local-6989586621679053758"><span class="hs-identifier hs-var hs-var">cnbytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053768"><span class="hs-identifier hs-var">nbytes</span></a></span><span>
+</span><span id="line-103"></span><span>                </span><span id="local-6989586621679053757"><span class="annot"><span class="annottext">flags :: CInt
+</span><a href="#local-6989586621679053757"><span class="hs-identifier hs-var hs-var">flags</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-104"></span><span>            </span><span id="local-6989586621679053756"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053756"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Socket -&gt; String -&gt; IO CInt -&gt; IO CInt
+forall a. (Eq a, Num a) =&gt; Socket -&gt; String -&gt; IO a -&gt; IO a
+</span><a href="Network.Socket.Internal.html#throwSocketErrorWaitRead"><span class="hs-identifier hs-var">throwSocketErrorWaitRead</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053770"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.recvBufFrom&quot;</span></span><span> </span><span class="annot"><span class="annottext">(IO CInt -&gt; IO CInt) -&gt; IO CInt -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-105"></span><span>                     </span><span class="annot"><span class="annottext">CInt -&gt; Ptr a -&gt; CSize -&gt; CInt -&gt; Ptr sa -&gt; Ptr CInt -&gt; IO CInt
+forall a sa.
+CInt -&gt; Ptr a -&gt; CSize -&gt; CInt -&gt; Ptr sa -&gt; Ptr CInt -&gt; IO CInt
+</span><a href="Network.Socket.Buffer.html#c_recvfrom"><span class="hs-identifier hs-var">c_recvfrom</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053760"><span class="hs-identifier hs-var">fd</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679053769"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679053758"><span class="hs-identifier hs-var">cnbytes</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053757"><span class="hs-identifier hs-var">flags</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr sa
+</span><a href="#local-6989586621679053763"><span class="hs-identifier hs-var">ptr_sa</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CInt
+</span><a href="#local-6989586621679053761"><span class="hs-identifier hs-var">ptr_len</span></a></span><span>
+</span><span id="line-106"></span><span>            </span><span id="local-6989586621679053753"><span class="annot"><span class="annottext">sa
+</span><a href="#local-6989586621679053753"><span class="hs-identifier hs-var">sockaddr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr sa -&gt; IO sa
+forall sa. SocketAddress sa =&gt; Ptr sa -&gt; IO sa
+</span><a href="Network.Socket.Types.html#peekSocketAddress"><span class="hs-identifier hs-var">peekSocketAddress</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr sa
+</span><a href="#local-6989586621679053763"><span class="hs-identifier hs-var">ptr_sa</span></a></span><span>
+</span><span id="line-107"></span><span>                </span><span class="annot"><span class="annottext">IO sa -&gt; (IOError -&gt; IO sa) -&gt; IO sa
+forall a. IO a -&gt; (IOError -&gt; IO a) -&gt; IO a
+</span><span class="hs-operator hs-var">`catchIOError`</span></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">IOError
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Socket -&gt; IO sa
+forall sa. SocketAddress sa =&gt; Socket -&gt; IO sa
+</span><a href="Network.Socket.Name.html#getPeerName"><span class="hs-identifier hs-var">getPeerName</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053770"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-108"></span><span>            </span><span class="annot"><span class="annottext">(Int, sa) -&gt; IO (Int, sa)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CInt -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053756"><span class="hs-identifier hs-var">len</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sa
+</span><a href="#local-6989586621679053753"><span class="hs-identifier hs-var">sockaddr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- | Receive data from the socket.  The socket must be in a connected</span><span>
+</span><span id="line-111"></span><span class="hs-comment">-- state. This function may return fewer bytes than specified.  If the</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- message is longer than the specified length, it may be discarded</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- depending on the type of socket.  This function may block until a</span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- message arrives.</span><span>
+</span><span id="line-115"></span><span class="hs-comment">--</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- Considering hardware and network realities, the maximum number of</span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- bytes to receive should be a small power of 2, e.g., 4096.</span><span>
+</span><span id="line-118"></span><span class="hs-comment">--</span><span>
+</span><span id="line-119"></span><span class="hs-comment">-- The return value is the length of received data. Zero means</span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- EOF. Historical note: Version 2.8.x.y or earlier,</span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- an EOF error was thrown. This was changed in version 3.0.</span><span>
+</span><span id="line-122"></span><span class="annot"><a href="Network.Socket.Buffer.html#recvBuf"><span class="hs-identifier hs-type">recvBuf</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#Socket"><span class="hs-identifier hs-type">Socket</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-123"></span><span id="recvBuf"><span class="annot"><span class="annottext">recvBuf :: Socket -&gt; Ptr Word8 -&gt; Int -&gt; IO Int
+</span><a href="Network.Socket.Buffer.html#recvBuf"><span class="hs-identifier hs-var hs-var">recvBuf</span></a></span></span><span> </span><span id="local-6989586621679053750"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053750"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679053749"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053749"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679053748"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053748"><span class="hs-identifier hs-var">nbytes</span></a></span></span><span>
+</span><span id="line-124"></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053748"><span class="hs-identifier hs-var">nbytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IOError -&gt; IO Int
+forall a. IOError -&gt; IO a
+</span><span class="hs-identifier hs-var">ioError</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; IOError
+</span><a href="Network.Socket.Buffer.html#mkInvalidRecvArgError"><span class="hs-identifier hs-var">mkInvalidRecvArgError</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.recvBuf&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="hs-pragma">{-# LINE 133 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-133"></span><span>    </span><span id="local-6989586621679053747"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053747"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Socket -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall r. Socket -&gt; (CInt -&gt; IO r) -&gt; IO r
+</span><a href="Network.Socket.Types.html#withFdSocket"><span class="hs-identifier hs-var">withFdSocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053750"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">((CInt -&gt; IO CInt) -&gt; IO CInt) -&gt; (CInt -&gt; IO CInt) -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053746"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053746"><span class="hs-identifier hs-var">fd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-134"></span><span>        </span><span class="annot"><span class="annottext">Socket -&gt; String -&gt; IO CInt -&gt; IO CInt
+forall a. (Eq a, Num a) =&gt; Socket -&gt; String -&gt; IO a -&gt; IO a
+</span><a href="Network.Socket.Internal.html#throwSocketErrorWaitRead"><span class="hs-identifier hs-var">throwSocketErrorWaitRead</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053750"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Network.Socket.recvBuf&quot;</span></span><span> </span><span class="annot"><span class="annottext">(IO CInt -&gt; IO CInt) -&gt; IO CInt -&gt; IO CInt
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-135"></span><span>             </span><span class="annot"><span class="annottext">CInt -&gt; Ptr CChar -&gt; CSize -&gt; CInt -&gt; IO CInt
+</span><a href="Network.Socket.Buffer.html#c_recv"><span class="hs-identifier hs-var">c_recv</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053746"><span class="hs-identifier hs-var">fd</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr CChar
+forall a b. Ptr a -&gt; Ptr b
+</span><span class="hs-identifier hs-var">castPtr</span></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053749"><span class="hs-identifier hs-var">ptr</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053748"><span class="hs-identifier hs-var">nbytes</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span class="hs-comment">{-flags-}</span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="hs-pragma">{-# LINE 137 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-identifier">return</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">fromIntegral</span><span> </span><span class="hs-identifier">len</span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | Receive data from the socket. This function returns immediately</span><span>
+</span><span id="line-140"></span><span class="hs-comment">--   even if data is not available. In other words, IO manager is NOT</span><span>
+</span><span id="line-141"></span><span class="hs-comment">--   involved. The length of data is returned if received.</span><span>
+</span><span id="line-142"></span><span class="hs-comment">--   -1 is returned in the case of EAGAIN or EWOULDBLOCK.</span><span>
+</span><span id="line-143"></span><span class="hs-comment">--   -2 is returned in other error cases.</span><span>
+</span><span id="line-144"></span><span class="annot"><a href="Network.Socket.Buffer.html#recvBufNoWait"><span class="hs-identifier hs-type">recvBufNoWait</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Network.Socket.Types.html#Socket"><span class="hs-identifier hs-type">Socket</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-145"></span><span id="recvBufNoWait"><span class="annot"><span class="annottext">recvBufNoWait :: Socket -&gt; Ptr Word8 -&gt; Int -&gt; IO Int
+</span><a href="Network.Socket.Buffer.html#recvBufNoWait"><span class="hs-identifier hs-var hs-var">recvBufNoWait</span></a></span></span><span> </span><span id="local-6989586621679053743"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053743"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679053742"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053742"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679053741"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053741"><span class="hs-identifier hs-var">nbytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Socket -&gt; (CInt -&gt; IO Int) -&gt; IO Int
+forall r. Socket -&gt; (CInt -&gt; IO r) -&gt; IO r
+</span><a href="Network.Socket.Types.html#withFdSocket"><span class="hs-identifier hs-var">withFdSocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621679053743"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">((CInt -&gt; IO Int) -&gt; IO Int) -&gt; (CInt -&gt; IO Int) -&gt; IO Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679053740"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053740"><span class="hs-identifier hs-var">fd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="hs-pragma">{-# LINE 165 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-165"></span><span>    </span><span id="local-6989586621679053739"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053739"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Ptr CChar -&gt; CSize -&gt; CInt -&gt; IO CInt
+</span><a href="Network.Socket.Buffer.html#c_recv"><span class="hs-identifier hs-var">c_recv</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053740"><span class="hs-identifier hs-var">fd</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr CChar
+forall a b. Ptr a -&gt; Ptr b
+</span><span class="hs-identifier hs-var">castPtr</span></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679053742"><span class="hs-identifier hs-var">ptr</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679053741"><span class="hs-identifier hs-var">nbytes</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span class="hs-comment">{-flags-}</span><span>
+</span><span id="line-166"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053739"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">CInt -&gt; CInt -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-keyword">then</span><span>
+</span><span id="line-167"></span><span>        </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; IO Int) -&gt; Int -&gt; IO Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679053739"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-168"></span><span>      </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-169"></span><span>        </span><span id="local-6989586621679053738"><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679053738"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Errno
+</span><span class="hs-identifier hs-var">getErrno</span></span><span>
+</span><span id="line-170"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679053738"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Errno -&gt; Errno -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><span class="hs-identifier hs-var">eAGAIN</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">||</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679053738"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Errno -&gt; Errno -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><span class="hs-identifier hs-var">eWOULDBLOCK</span></span><span> </span><span class="hs-keyword">then</span><span>
+</span><span id="line-171"></span><span>            </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>          </span><span class="hs-keyword">else</span><span>
+</span><span id="line-173"></span><span>            </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span>
+</span><span id="line-174"></span><span>
+</span><span id="line-175"></span><span class="hs-pragma">{-# LINE 175 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span class="annot"><a href="Network.Socket.Buffer.html#mkInvalidRecvArgError"><span class="hs-identifier hs-type">mkInvalidRecvArgError</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IOError</span></span><span>
+</span><span id="line-177"></span><span id="mkInvalidRecvArgError"><span class="annot"><span class="annottext">mkInvalidRecvArgError :: String -&gt; IOError
+</span><a href="Network.Socket.Buffer.html#mkInvalidRecvArgError"><span class="hs-identifier hs-var hs-var">mkInvalidRecvArgError</span></a></span></span><span> </span><span id="local-6989586621679053736"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679053736"><span class="hs-identifier hs-var">loc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IOError -&gt; String -&gt; IOError
+</span><span class="hs-identifier hs-var">ioeSetErrorString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IOErrorType -&gt; String -&gt; Maybe Handle -&gt; Maybe String -&gt; IOError
+</span><span class="hs-identifier hs-var">mkIOError</span></span><span>
+</span><span id="line-178"></span><span>                                    </span><span class="annot"><span class="annottext">IOErrorType
+</span><span class="hs-identifier hs-var">InvalidArgument</span></span><span>
+</span><span id="line-179"></span><span>                                    </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679053736"><span class="hs-identifier hs-var">loc</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Handle
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe String
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;non-positive length&quot;</span></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span id="local-6989586621679053836"><span class="hs-pragma">{-# LINE 182 &quot;Network/Socket/Buffer.hsc&quot; #-}</span></span><span>
+</span><span id="line-182"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">ccall</span><span> </span><span class="hs-keyword">unsafe</span><span> </span><span class="hs-string">&quot;send&quot;</span><span>
+</span><span id="line-183"></span><span>  </span><span class="hs-identifier">c_send</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">CInt</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Ptr</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">CSize</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">CInt</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">IO</span><span> </span><span class="hs-identifier">CInt</span><span>
+</span><span id="line-184"></span><span>
+</span><span id="line-185"></span><span class="hs-pragma">{-# LINE 190 &quot;Network/Socket/Buffer.hsc&quot; #-}</span><span>
+</span><span id="line-190"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-keyword">ccall</span></span><span> </span><span class="annot"><span class="hs-keyword">unsafe</span></span><span> </span><span class="annot"><span class="hs-string">&quot;recv&quot;</span></span><span>
+</span><span id="line-191"></span><span>  </span><span id="c_recv"><span class="annot"><a href="Network.Socket.Buffer.html#c_recv"><span class="hs-identifier hs-var">c_recv</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CChar</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CSize</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span>
+</span><span id="line-192"></span><span id="local-6989586621679053837"><span id="local-6989586621679053838"><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">CALLCONV</span><span> </span><span class="hs-identifier">SAFE_ON_WIN</span><span> </span><span class="hs-string">&quot;sendto&quot;</span><span>
+</span><span id="line-193"></span><span>  </span><span id="c_sendto"><span class="annot"><a href="Network.Socket.Buffer.html#c_sendto"><span class="hs-identifier hs-var">c_sendto</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053838"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CSize</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053837"><span class="hs-identifier hs-type">sa</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span></span></span><span>
+</span><span id="line-194"></span><span id="local-6989586621679053823"><span id="local-6989586621679053824"><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">CALLCONV</span><span> </span><span class="hs-identifier">SAFE_ON_WIN</span><span> </span><span class="hs-string">&quot;recvfrom&quot;</span><span>
+</span><span id="line-195"></span><span>  </span><span id="c_recvfrom"><span class="annot"><a href="Network.Socket.Buffer.html#c_recvfrom"><span class="hs-identifier hs-var">c_recvfrom</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053824"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CSize</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679053823"><span class="hs-identifier hs-type">sa</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span></span></span><span>
+</span><span id="line-196"></span></pre></body></html>

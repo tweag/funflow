@@ -1,0 +1,1286 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP, BangPatterns, PatternGuards, DeriveDataTypeable #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Codec.Archive.Tar.Index.StringTable</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier">StringTable</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-6"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#lookup"><span class="hs-identifier">lookup</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-7"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#index"><span class="hs-identifier">index</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-8"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#construct"><span class="hs-identifier">construct</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier">StringTableBuilder</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#empty"><span class="hs-identifier">empty</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#insert"><span class="hs-identifier">insert</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#inserts"><span class="hs-identifier">inserts</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#finalise"><span class="hs-identifier">finalise</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#unfinalise"><span class="hs-identifier">unfinalise</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#serialise"><span class="hs-identifier">serialise</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#serialiseSize"><span class="hs-identifier">serialiseSize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV1"><span class="hs-identifier">deserialiseV1</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV2"><span class="hs-identifier">deserialiseV2</span></a></span><span class="hs-special">,</span><span class="hs-cpp">
+
+#ifdef TESTS
+</span><span>    </span><span class="hs-identifier">prop_valid</span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-identifier">prop_sorted</span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-identifier">prop_finalise_unfinalise</span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-identifier">prop_serialise_deserialise</span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-identifier">prop_serialiseSize</span><span class="hs-special">,</span><span class="hs-cpp">
+#endif
+</span><span> </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>   </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">lookup</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">lookup</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">insert</span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Function</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">on</span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Word32</span></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Int32</span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Monoid</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+#if (MIN_VERSION_base(4,5,0))
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&lt;&gt;)</span></span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">assert</span></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Array.Unboxed</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">A</span></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Array.Unboxed</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">!</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+#if MIN_VERSION_containers(0,5,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map.Strict</span></span><span>        </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Map.Strict</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Map</span></span><span class="hs-special">)</span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-identifier">Data.Map</span><span>               </span><span class="hs-keyword">as</span><span> </span><span class="hs-identifier">Map</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Data.Map</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Map</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>        </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Unsafe</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span>   </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS</span></span><span class="hs-cpp">
+#if MIN_VERSION_bytestring(0,10,2) || defined(MIN_VERSION_bytestring_builder)
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span>          </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder.Extra</span></span><span>    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">byteStringCopy</span></span><span class="hs-special">)</span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data.ByteString.Lazy.Builder</span><span>     </span><span class="hs-keyword">as</span><span> </span><span class="hs-identifier">BS</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data.ByteString.Lazy.Builder.Extras</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="hs-identifier">BS</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">byteStringCopy</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- | An effecient mapping from strings to a dense set of integers.</span><span>
+</span><span id="line-67"></span><span class="hs-comment">--</span><span>
+</span><span id="line-68"></span><span class="hs-keyword">data</span><span> </span><span id="StringTable"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-var">StringTable</span></a></span></span><span> </span><span id="local-6989586621679058096"><span class="annot"><a href="#local-6989586621679058096"><span class="hs-identifier hs-type">id</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="StringTable"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-var">StringTable</span></a></span></span><span>
+</span><span id="line-69"></span><span>         </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>           </span><span class="hs-comment">-- all strings concatenated</span><span>
+</span><span id="line-70"></span><span>         </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">A.UArray</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word32</span></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- string offset table</span><span>
+</span><span id="line-71"></span><span>         </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">A.UArray</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">)</span><span>  </span><span class="hs-comment">-- string index to id table</span><span>
+</span><span id="line-72"></span><span>         </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">A.UArray</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">)</span><span>  </span><span class="hs-comment">-- string id to index table</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679058030"><span id="local-6989586621679058032"><span id="local-6989586621679058034"><span class="annot"><span class="annottext">Int -&gt; StringTable id -&gt; ShowS
+[StringTable id] -&gt; ShowS
+StringTable id -&gt; String
+(Int -&gt; StringTable id -&gt; ShowS)
+-&gt; (StringTable id -&gt; String)
+-&gt; ([StringTable id] -&gt; ShowS)
+-&gt; Show (StringTable id)
+forall id. Int -&gt; StringTable id -&gt; ShowS
+forall id. [StringTable id] -&gt; ShowS
+forall id. StringTable id -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [StringTable id] -&gt; ShowS
+$cshowList :: forall id. [StringTable id] -&gt; ShowS
+show :: StringTable id -&gt; String
+$cshow :: forall id. StringTable id -&gt; String
+showsPrec :: Int -&gt; StringTable id -&gt; ShowS
+$cshowsPrec :: forall id. Int -&gt; StringTable id -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span id="local-6989586621679058028"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679058025"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="annot"><a href="#local-6989586621679058028"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679058028"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058028"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-76"></span><span>  </span><span id="local-6989586621679058023"><span class="annot"><span class="annottext">StringTable id
+</span><a href="#local-6989586621679058023"><span class="hs-identifier hs-var">tbl1</span></a></span></span><span> </span><span id="local-6989586621679058022"><span class="annot"><span class="annottext">== :: StringTable id -&gt; StringTable id -&gt; Bool
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">==</span></span></span><span> </span><span id="local-6989586621679058021"><span class="annot"><span class="annottext">StringTable id
+</span><a href="#local-6989586621679058021"><span class="hs-identifier hs-var">tbl2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StringTable id -&gt; StringTableBuilder id
+forall id. Enum id =&gt; StringTable id -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#unfinalise"><span class="hs-identifier hs-var">unfinalise</span></a></span><span> </span><span class="annot"><span class="annottext">StringTable id
+</span><a href="#local-6989586621679058023"><span class="hs-identifier hs-var">tbl1</span></a></span><span> </span><span class="annot"><span class="annottext">StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">StringTable id -&gt; StringTableBuilder id
+forall id. Enum id =&gt; StringTable id -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#unfinalise"><span class="hs-identifier hs-var">unfinalise</span></a></span><span> </span><span class="annot"><span class="annottext">StringTable id
+</span><a href="#local-6989586621679058021"><span class="hs-identifier hs-var">tbl2</span></a></span></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | Look up a string in the token table. If the string is present, return</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- its corresponding index.</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span id="local-6989586621679058020"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#lookup"><span class="hs-identifier hs-type">lookup</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679058020"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058020"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679058020"><span class="hs-identifier hs-type">id</span></a></span></span><span>
+</span><span id="line-82"></span><span id="lookup"><span class="annot"><span class="annottext">lookup :: StringTable id -&gt; ByteString -&gt; Maybe id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#lookup"><span class="hs-identifier hs-var hs-var">lookup</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span id="local-6989586621679058019"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058019"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679058018"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679058018"><span class="hs-identifier hs-var">offsets</span></a></span></span><span> </span><span id="local-6989586621679058017"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679058017"><span class="hs-identifier hs-var">ids</span></a></span></span><span> </span><span id="local-6989586621679058016"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679058016"><span class="hs-identifier hs-var">_ixs</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679058015"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058015"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; ByteString -&gt; Maybe id
+forall a. Enum a =&gt; Int32 -&gt; Int32 -&gt; ByteString -&gt; Maybe a
+</span><a href="#local-6989586621679058014"><span class="hs-identifier hs-var">binarySearch</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058013"><span class="hs-identifier hs-var">topBound</span></a></span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058015"><span class="hs-identifier hs-var">str</span></a></span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679058013"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058013"><span class="hs-identifier hs-var">topBound</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; (Int32, Int32)
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; (i, i)
+</span><span class="hs-identifier hs-var">A.bounds</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679058018"><span class="hs-identifier hs-var">offsets</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span>    </span><span id="local-6989586621679058014"><span class="annot"><span class="annottext">binarySearch :: Int32 -&gt; Int32 -&gt; ByteString -&gt; Maybe a
+</span><a href="#local-6989586621679058014"><span class="hs-identifier hs-var hs-var">binarySearch</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058011"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058011"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058010"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058010"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058009"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058009"><span class="hs-identifier hs-var">key</span></a></span></span><span>
+</span><span id="line-88"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058011"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058010"><span class="hs-identifier hs-var">b</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe a
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-89"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; Ordering
+forall a. Ord a =&gt; a -&gt; a -&gt; Ordering
+</span><span class="hs-identifier hs-var">compare</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058009"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; UArray Int32 Word32 -&gt; Int32 -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#index%27"><span class="hs-identifier hs-var">index'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058019"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679058018"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058005"><span class="hs-identifier hs-var">mid</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-90"></span><span>          </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">LT</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; ByteString -&gt; Maybe a
+</span><a href="#local-6989586621679058014"><span class="hs-identifier hs-var">binarySearch</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058011"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058005"><span class="hs-identifier hs-var">mid</span></a></span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058009"><span class="hs-identifier hs-var">key</span></a></span><span>
+</span><span id="line-91"></span><span>          </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">EQ</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; Maybe a
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Maybe a) -&gt; a -&gt; Maybe a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$!</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; a
+forall a. Enum a =&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">toEnum</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679058017"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; Int32 -&gt; Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; i -&gt; e
+</span><span class="hs-glyph hs-var">!</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058005"><span class="hs-identifier hs-var">mid</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>          </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">GT</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; ByteString -&gt; Maybe a
+</span><a href="#local-6989586621679058014"><span class="hs-identifier hs-var">binarySearch</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058005"><span class="hs-identifier hs-var">mid</span></a></span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058010"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058009"><span class="hs-identifier hs-var">key</span></a></span><span>
+</span><span id="line-93"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679058005"><span class="annot"><span class="annottext">mid :: Int32
+</span><a href="#local-6989586621679058005"><span class="hs-identifier hs-var hs-var">mid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058011"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679058010"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`div`</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">2</span></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#index%27"><span class="hs-identifier hs-type">index'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">A.UArray</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word32</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-96"></span><span id="index%27"><span class="annot"><span class="annottext">index' :: ByteString -&gt; UArray Int32 Word32 -&gt; Int32 -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#index%27"><span class="hs-identifier hs-var hs-var">index'</span></a></span></span><span> </span><span id="local-6989586621679058000"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058000"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679057999"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057999"><span class="hs-identifier hs-var">offsets</span></a></span></span><span> </span><span id="local-6989586621679057998"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057998"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.unsafeTake</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057996"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.unsafeDrop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057993"><span class="hs-identifier hs-var">start</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058000"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><a href="#local-6989586621679057993"><span class="hs-identifier hs-type">start</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679057992"><span class="hs-identifier hs-type">end</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679057996"><span class="hs-identifier hs-type">len</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621679057993"><span class="annot"><span class="annottext">start :: Int
+</span><a href="#local-6989586621679057993"><span class="hs-identifier hs-var hs-var">start</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057999"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; Int32 -&gt; Word32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; i -&gt; e
+</span><span class="hs-glyph hs-var">!</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057998"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-100"></span><span>    </span><span id="local-6989586621679057992"><span class="annot"><span class="annottext">end :: Int
+</span><a href="#local-6989586621679057992"><span class="hs-identifier hs-var hs-var">end</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057999"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; Int32 -&gt; Word32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; i -&gt; e
+</span><span class="hs-glyph hs-var">!</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057998"><span class="hs-identifier hs-var">i</span></a></span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679057996"><span class="annot"><span class="annottext">len :: Int
+</span><a href="#local-6989586621679057996"><span class="hs-identifier hs-var hs-var">len</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057992"><span class="hs-identifier hs-var">end</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057993"><span class="hs-identifier hs-var">start</span></a></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- | Given the index of a string in the table, return the string.</span><span>
+</span><span id="line-105"></span><span class="hs-comment">--</span><span>
+</span><span id="line-106"></span><span id="local-6989586621679057991"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#index"><span class="hs-identifier hs-type">index</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679057991"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057991"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679057991"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span></span><span>
+</span><span id="line-107"></span><span id="index"><span class="annot"><span class="annottext">index :: StringTable id -&gt; id -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#index"><span class="hs-identifier hs-var hs-var">index</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span id="local-6989586621679057990"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057990"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679057989"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057989"><span class="hs-identifier hs-var">offsets</span></a></span></span><span> </span><span id="local-6989586621679057988"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057988"><span class="hs-identifier hs-var">_ids</span></a></span></span><span> </span><span id="local-6989586621679057987"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057987"><span class="hs-identifier hs-var">ixs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-108"></span><span>    </span><span class="annot"><span class="annottext">ByteString -&gt; UArray Int32 Word32 -&gt; Int32 -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#index%27"><span class="hs-identifier hs-var">index'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057990"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057989"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; ByteString) -&gt; (id -&gt; Int32) -&gt; id -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057987"><span class="hs-identifier hs-var">ixs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; Int32 -&gt; Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; i -&gt; e
+</span><span class="hs-glyph hs-var">!</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; Int32) -&gt; (id -&gt; Int32) -&gt; id -&gt; Int32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int32) -&gt; (id -&gt; Int) -&gt; id -&gt; Int32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">id -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span class="hs-comment">-- | Given a list of strings, construct a 'StringTable' mapping those strings</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- to a dense set of integers. Also return the ids for all the strings used</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- in the construction.</span><span>
+</span><span id="line-114"></span><span class="hs-comment">--</span><span>
+</span><span id="line-115"></span><span id="local-6989586621679057985"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#construct"><span class="hs-identifier hs-type">construct</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679057985"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057985"><span class="hs-identifier hs-type">id</span></a></span></span><span>
+</span><span id="line-116"></span><span id="construct"><span class="annot"><span class="annottext">construct :: [ByteString] -&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#construct"><span class="hs-identifier hs-var hs-var">construct</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StringTableBuilder id -&gt; StringTable id
+forall id. Enum id =&gt; StringTableBuilder id -&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#finalise"><span class="hs-identifier hs-var">finalise</span></a></span><span> </span><span class="annot"><span class="annottext">(StringTableBuilder id -&gt; StringTable id)
+-&gt; ([ByteString] -&gt; StringTableBuilder id)
+-&gt; [ByteString]
+-&gt; StringTable id
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(StringTableBuilder id -&gt; ByteString -&gt; StringTableBuilder id)
+-&gt; StringTableBuilder id -&gt; [ByteString] -&gt; StringTableBuilder id
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl'</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679057983"><span class="annot"><span class="annottext">StringTableBuilder id
+</span><a href="#local-6989586621679057983"><span class="hs-identifier hs-var">tbl</span></a></span></span><span> </span><span id="local-6989586621679057982"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057982"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(StringTableBuilder id, id) -&gt; StringTableBuilder id
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id)
+forall id.
+Enum id =&gt;
+ByteString -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id)
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#insert"><span class="hs-identifier hs-var">insert</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057982"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">StringTableBuilder id
+</span><a href="#local-6989586621679057983"><span class="hs-identifier hs-var">tbl</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">StringTableBuilder id
+forall id. StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#empty"><span class="hs-identifier hs-var">empty</span></a></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-keyword">data</span><span> </span><span id="StringTableBuilder"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-var">StringTableBuilder</span></a></span></span><span> </span><span id="local-6989586621679058113"><span class="annot"><a href="#local-6989586621679058113"><span class="hs-identifier hs-type">id</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="StringTableBuilder"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-var">StringTableBuilder</span></a></span></span><span>
+</span><span id="line-120"></span><span>                                              </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Map</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="annot"><a href="#local-6989586621679058113"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>                               </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Word32</span></span><span>
+</span><span id="line-122"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679057977"><span id="local-6989586621679057979"><span class="annot"><span class="annottext">StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+(StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool)
+-&gt; (StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool)
+-&gt; Eq (StringTableBuilder id)
+forall id.
+Eq id =&gt;
+StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+$c/= :: forall id.
+Eq id =&gt;
+StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+== :: StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+$c== :: forall id.
+Eq id =&gt;
+StringTableBuilder id -&gt; StringTableBuilder id -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679057971"><span id="local-6989586621679057973"><span id="local-6989586621679057975"><span class="annot"><span class="annottext">Int -&gt; StringTableBuilder id -&gt; ShowS
+[StringTableBuilder id] -&gt; ShowS
+StringTableBuilder id -&gt; String
+(Int -&gt; StringTableBuilder id -&gt; ShowS)
+-&gt; (StringTableBuilder id -&gt; String)
+-&gt; ([StringTableBuilder id] -&gt; ShowS)
+-&gt; Show (StringTableBuilder id)
+forall id. Show id =&gt; Int -&gt; StringTableBuilder id -&gt; ShowS
+forall id. Show id =&gt; [StringTableBuilder id] -&gt; ShowS
+forall id. Show id =&gt; StringTableBuilder id -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [StringTableBuilder id] -&gt; ShowS
+$cshowList :: forall id. Show id =&gt; [StringTableBuilder id] -&gt; ShowS
+show :: StringTableBuilder id -&gt; String
+$cshow :: forall id. Show id =&gt; StringTableBuilder id -&gt; String
+showsPrec :: Int -&gt; StringTableBuilder id -&gt; ShowS
+$cshowsPrec :: forall id. Show id =&gt; Int -&gt; StringTableBuilder id -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span id="local-6989586621679058118"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#empty"><span class="hs-identifier hs-type">empty</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058118"><span class="hs-identifier hs-type">id</span></a></span></span><span>
+</span><span id="line-125"></span><span id="empty"><span class="annot"><span class="annottext">empty :: StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#empty"><span class="hs-identifier hs-var hs-var">empty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+forall id. Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-var">StringTableBuilder</span></a></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+forall k a. Map k a
+</span><span class="hs-identifier hs-var">Map.empty</span></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span id="local-6989586621679058119"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#insert"><span class="hs-identifier hs-type">insert</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679058119"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058119"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058119"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679058119"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-128"></span><span id="insert"><span class="annot"><span class="annottext">insert :: ByteString -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id)
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#insert"><span class="hs-identifier hs-var hs-var">insert</span></a></span></span><span> </span><span id="local-6989586621679057969"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057969"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span id="local-6989586621679057968"><span class="annot"><span class="annottext">builder :: StringTableBuilder id
+</span><a href="#local-6989586621679057968"><span class="hs-identifier hs-var">builder</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span id="local-6989586621679057967"><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057967"><span class="hs-identifier hs-var">smap</span></a></span></span><span> </span><span id="local-6989586621679057966"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057966"><span class="hs-identifier hs-var">nextid</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-129"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Map ByteString id -&gt; Maybe id
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Map.lookup</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057969"><span class="hs-identifier hs-var">str</span></a></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057967"><span class="hs-identifier hs-var">smap</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-130"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679057964"><span class="annot"><span class="annottext">id
+</span><a href="#local-6989586621679057964"><span class="hs-identifier hs-var">id</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StringTableBuilder id
+</span><a href="#local-6989586621679057968"><span class="hs-identifier hs-var">builder</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">id
+</span><a href="#local-6989586621679057964"><span class="hs-identifier hs-var">id</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>      </span><span class="annot"><span class="annottext">Maybe id
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679057963"><span class="annot"><span class="annottext">id :: id
+</span><a href="#local-6989586621679057963"><span class="hs-identifier hs-var hs-var">id</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; id
+forall a. Enum a =&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">toEnum</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057966"><span class="hs-identifier hs-var">nextid</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>                     </span><span class="hs-glyph">!</span><span id="local-6989586621679057962"><span class="annot"><span class="annottext">smap' :: Map ByteString id
+</span><a href="#local-6989586621679057962"><span class="hs-identifier hs-var hs-var">smap'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; id -&gt; Map ByteString id -&gt; Map ByteString id
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><span class="hs-identifier hs-var">Map.insert</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057969"><span class="hs-identifier hs-var">str</span></a></span><span> </span><span class="annot"><span class="annottext">id
+</span><a href="#local-6989586621679057963"><span class="hs-identifier hs-var">id</span></a></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057967"><span class="hs-identifier hs-var">smap</span></a></span><span>
+</span><span id="line-133"></span><span>                   </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+forall id. Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-var">StringTableBuilder</span></a></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057962"><span class="hs-identifier hs-var">smap'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057966"><span class="hs-identifier hs-var">nextid</span></a></span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Word32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">id
+</span><a href="#local-6989586621679057963"><span class="hs-identifier hs-var">id</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span id="local-6989586621679057960"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#inserts"><span class="hs-identifier hs-type">inserts</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679057960"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057960"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057960"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679057960"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span></span><span>
+</span><span id="line-136"></span><span id="inserts"><span class="annot"><span class="annottext">inserts :: [ByteString]
+-&gt; StringTableBuilder id -&gt; (StringTableBuilder id, [id])
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#inserts"><span class="hs-identifier hs-var hs-var">inserts</span></a></span></span><span> </span><span id="local-6989586621679057959"><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679057959"><span class="hs-identifier hs-var">bss</span></a></span></span><span> </span><span id="local-6989586621679057958"><span class="annot"><span class="annottext">StringTableBuilder id
+</span><a href="#local-6989586621679057958"><span class="hs-identifier hs-var">builder</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(StringTableBuilder id
+ -&gt; ByteString -&gt; (StringTableBuilder id, id))
+-&gt; StringTableBuilder id
+-&gt; [ByteString]
+-&gt; (StringTableBuilder id, [id])
+forall (t :: * -&gt; *) a b c.
+Traversable t =&gt;
+(a -&gt; b -&gt; (a, c)) -&gt; a -&gt; t b -&gt; (a, t c)
+</span><span class="hs-identifier hs-var">mapAccumL</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString
+ -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id))
+-&gt; StringTableBuilder id
+-&gt; ByteString
+-&gt; (StringTableBuilder id, id)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id)
+forall id.
+Enum id =&gt;
+ByteString -&gt; StringTableBuilder id -&gt; (StringTableBuilder id, id)
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#insert"><span class="hs-identifier hs-var">insert</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">StringTableBuilder id
+</span><a href="#local-6989586621679057958"><span class="hs-identifier hs-var">builder</span></a></span><span> </span><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679057959"><span class="hs-identifier hs-var">bss</span></a></span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span id="local-6989586621679058125"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#finalise"><span class="hs-identifier hs-type">finalise</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679058125"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058125"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058125"><span class="hs-identifier hs-type">id</span></a></span></span><span>
+</span><span id="line-139"></span><span id="finalise"><span class="annot"><span class="annottext">finalise :: StringTableBuilder id -&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#finalise"><span class="hs-identifier hs-var hs-var">finalise</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span id="local-6989586621679057955"><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+forall id.
+ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-var">StringTable</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057954"><span class="hs-identifier hs-var">strs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057953"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057952"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057951"><span class="hs-identifier hs-var">ixs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-142"></span><span>    </span><span id="local-6989586621679057954"><span class="annot"><span class="annottext">strs :: ByteString
+</span><a href="#local-6989586621679057954"><span class="hs-identifier hs-var hs-var">strs</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.concat</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ByteString id -&gt; [ByteString]
+forall k a. Map k a -&gt; [k]
+</span><span class="hs-identifier hs-var">Map.keys</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-143"></span><span>    </span><span id="local-6989586621679057953"><span class="annot"><span class="annottext">offsets :: UArray Int32 Word32
+</span><a href="#local-6989586621679057953"><span class="hs-identifier hs-var hs-var">offsets</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [Word32] -&gt; UArray Int32 Word32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [e] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.listArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ByteString id -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><span class="hs-identifier hs-var">Map.size</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-144"></span><span>            </span><span class="annot"><span class="annottext">([Word32] -&gt; UArray Int32 Word32)
+-&gt; ([ByteString] -&gt; [Word32])
+-&gt; [ByteString]
+-&gt; UArray Int32 Word32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Word32 -&gt; ByteString -&gt; Word32)
+-&gt; Word32 -&gt; [ByteString] -&gt; [Word32]
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">scanl</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679057945"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057945"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679057944"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057944"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057945"><span class="hs-identifier hs-var">off</span></a></span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057944"><span class="hs-identifier hs-var">str</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word32
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-145"></span><span>            </span><span class="annot"><span class="annottext">([ByteString] -&gt; UArray Int32 Word32)
+-&gt; [ByteString] -&gt; UArray Int32 Word32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id -&gt; [ByteString]
+forall k a. Map k a -&gt; [k]
+</span><span class="hs-identifier hs-var">Map.keys</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span><span>
+</span><span id="line-146"></span><span>    </span><span id="local-6989586621679057952"><span class="annot"><span class="annottext">ids :: UArray Int32 Int32
+</span><a href="#local-6989586621679057952"><span class="hs-identifier hs-var hs-var">ids</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [Int32] -&gt; UArray Int32 Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [e] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.listArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map ByteString id -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><span class="hs-identifier hs-var">Map.size</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-147"></span><span>            </span><span class="annot"><span class="annottext">([Int32] -&gt; UArray Int32 Int32)
+-&gt; ([id] -&gt; [Int32]) -&gt; [id] -&gt; UArray Int32 Int32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(id -&gt; Int32) -&gt; [id] -&gt; [Int32]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int32) -&gt; (id -&gt; Int) -&gt; id -&gt; Int32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">id -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span class="hs-special">)</span><span>
+</span><span id="line-148"></span><span>            </span><span class="annot"><span class="annottext">([id] -&gt; UArray Int32 Int32) -&gt; [id] -&gt; UArray Int32 Int32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id -&gt; [id]
+forall k a. Map k a -&gt; [a]
+</span><span class="hs-identifier hs-var">Map.elems</span></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057955"><span class="hs-identifier hs-var">smap</span></a></span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621679057951"><span class="annot"><span class="annottext">ixs :: UArray Int32 Int32
+</span><a href="#local-6989586621679057951"><span class="hs-identifier hs-var hs-var">ixs</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [(Int32, Int32)] -&gt; UArray Int32 Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [(i, e)] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.array</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; (Int32, Int32)
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; (i, i)
+</span><span class="hs-identifier hs-var">A.bounds</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057952"><span class="hs-identifier hs-var">ids</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057940"><span class="hs-identifier hs-var">id</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057939"><span class="hs-identifier hs-var">ix</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679057939"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057939"><span class="hs-identifier hs-var">ix</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679057940"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057940"><span class="hs-identifier hs-var">id</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; [(Int32, Int32)]
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; [(i, e)]
+</span><span class="hs-identifier hs-var">A.assocs</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057952"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span id="local-6989586621679058152"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#unfinalise"><span class="hs-identifier hs-type">unfinalise</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Enum</span></span><span> </span><span class="annot"><a href="#local-6989586621679058152"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058152"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-type">StringTableBuilder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058152"><span class="hs-identifier hs-type">id</span></a></span></span><span>
+</span><span id="line-152"></span><span id="unfinalise"><span class="annot"><span class="annottext">unfinalise :: StringTable id -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#unfinalise"><span class="hs-identifier hs-var hs-var">unfinalise</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span id="local-6989586621679057937"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057937"><span class="hs-identifier hs-var">strs</span></a></span></span><span> </span><span id="local-6989586621679057936"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057936"><span class="hs-identifier hs-var">offsets</span></a></span></span><span> </span><span id="local-6989586621679057935"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057935"><span class="hs-identifier hs-var">ids</span></a></span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-153"></span><span>    </span><span class="annot"><span class="annottext">Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+forall id. Map ByteString id -&gt; Word32 -&gt; StringTableBuilder id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTableBuilder"><span class="hs-identifier hs-var">StringTableBuilder</span></a></span><span> </span><span class="annot"><span class="annottext">Map ByteString id
+</span><a href="#local-6989586621679057934"><span class="hs-identifier hs-var">smap</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057933"><span class="hs-identifier hs-var">nextid</span></a></span><span>
+</span><span id="line-154"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-155"></span><span>    </span><span id="local-6989586621679057934"><span class="annot"><span class="annottext">smap :: Map ByteString id
+</span><a href="#local-6989586621679057934"><span class="hs-identifier hs-var hs-var">smap</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(ByteString, id)] -&gt; Map ByteString id
+forall k a. Eq k =&gt; [(k, a)] -&gt; Map k a
+</span><span class="hs-identifier hs-var">Map.fromAscList</span></span><span>
+</span><span id="line-156"></span><span>               </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; UArray Int32 Word32 -&gt; Int32 -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#index%27"><span class="hs-identifier hs-var">index'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057937"><span class="hs-identifier hs-var">strs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057936"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057931"><span class="hs-identifier hs-var">ix</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; id
+forall a. Enum a =&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">toEnum</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057935"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; Int32 -&gt; Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; i -&gt; e
+</span><span class="hs-glyph hs-var">!</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057931"><span class="hs-identifier hs-var">ix</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679057931"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057931"><span class="hs-identifier hs-var">ix</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-glyph">..</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057930"><span class="hs-identifier hs-var">h</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span id="local-6989586621679057930"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057930"><span class="hs-identifier hs-var">h</span></a></span></span><span class="hs-special">)</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; (Int32, Int32)
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; (i, i)
+</span><span class="hs-identifier hs-var">A.bounds</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057935"><span class="hs-identifier hs-var">ids</span></a></span><span>
+</span><span id="line-159"></span><span>    </span><span id="local-6989586621679057933"><span class="annot"><span class="annottext">nextid :: Word32
+</span><a href="#local-6989586621679057933"><span class="hs-identifier hs-var hs-var">nextid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057930"><span class="hs-identifier hs-var">h</span></a></span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span>
+</span><span id="line-162"></span><span class="hs-comment">-------------------------</span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- (de)serialisation</span><span>
+</span><span id="line-164"></span><span class="hs-comment">--</span><span>
+</span><span id="line-165"></span><span>
+</span><span id="line-166"></span><span id="local-6989586621679057929"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#serialise"><span class="hs-identifier hs-type">serialise</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057929"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.Builder</span></span></span><span>
+</span><span id="line-167"></span><span id="serialise"><span class="annot"><span class="annottext">serialise :: StringTable id -&gt; Builder
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#serialise"><span class="hs-identifier hs-var hs-var">serialise</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span id="local-6989586621679057928"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057928"><span class="hs-identifier hs-var">strs</span></a></span></span><span> </span><span id="local-6989586621679057927"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057927"><span class="hs-identifier hs-var">offs</span></a></span></span><span> </span><span id="local-6989586621679057926"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057926"><span class="hs-identifier hs-var">ids</span></a></span></span><span> </span><span id="local-6989586621679057925"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057925"><span class="hs-identifier hs-var">ixs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-168"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679057924"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057924"><span class="hs-identifier hs-var">ixEnd</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; (Int32, Int32)
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; (i, i)
+</span><span class="hs-identifier hs-var">A.bounds</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057927"><span class="hs-identifier hs-var">offs</span></a></span><span> </span><span class="hs-keyword">in</span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span>      </span><span class="annot"><span class="annottext">Word32 -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.word32BE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057928"><span class="hs-identifier hs-var">strs</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-171"></span><span>   </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.word32BE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057924"><span class="hs-identifier hs-var">ixEnd</span></a></span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>   </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.byteStringCopy</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057928"><span class="hs-identifier hs-var">strs</span></a></span><span>
+</span><span id="line-173"></span><span>   </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Word32 -&gt; Builder -&gt; Builder) -&gt; Builder -&gt; [Word32] -&gt; Builder
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679057921"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057921"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679057920"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057920"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.word32BE</span></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679057921"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057920"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; [Word32]
+forall (a :: * -&gt; * -&gt; *) e i. (IArray a e, Ix i) =&gt; a i e -&gt; [e]
+</span><span class="hs-identifier hs-var">A.elems</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057927"><span class="hs-identifier hs-var">offs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-174"></span><span>   </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; Builder -&gt; Builder) -&gt; Builder -&gt; [Int32] -&gt; Builder
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679057918"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057918"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679057917"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057917"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.int32BE</span></span><span>  </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057918"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057917"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; [Int32]
+forall (a :: * -&gt; * -&gt; *) e i. (IArray a e, Ix i) =&gt; a i e -&gt; [e]
+</span><span class="hs-identifier hs-var">A.elems</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057926"><span class="hs-identifier hs-var">ids</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>   </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; Builder -&gt; Builder) -&gt; Builder -&gt; [Int32] -&gt; Builder
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679057915"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057915"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679057914"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057914"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Builder
+</span><span class="hs-identifier hs-var">BS.int32BE</span></span><span>  </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057915"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679057914"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UArray Int32 Int32 -&gt; [Int32]
+forall (a :: * -&gt; * -&gt; *) e i. (IArray a e, Ix i) =&gt; a i e -&gt; [e]
+</span><span class="hs-identifier hs-var">A.elems</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057925"><span class="hs-identifier hs-var">ixs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-176"></span><span>
+</span><span id="line-177"></span><span id="local-6989586621679057913"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#serialiseSize"><span class="hs-identifier hs-type">serialiseSize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057913"><span class="hs-identifier hs-type">id</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-178"></span><span id="serialiseSize"><span class="annot"><span class="annottext">serialiseSize :: StringTable id -&gt; Int
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#serialiseSize"><span class="hs-identifier hs-var hs-var">serialiseSize</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span id="local-6989586621679057912"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057912"><span class="hs-identifier hs-var">strs</span></a></span></span><span> </span><span id="local-6989586621679057911"><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057911"><span class="hs-identifier hs-var">offs</span></a></span></span><span> </span><span id="local-6989586621679057910"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057910"><span class="hs-identifier hs-var">_ids</span></a></span></span><span> </span><span id="local-6989586621679057909"><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057909"><span class="hs-identifier hs-var">_ixs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-179"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679057908"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057908"><span class="hs-identifier hs-var">ixEnd</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32 -&gt; (Int32, Int32)
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+a i e -&gt; (i, i)
+</span><span class="hs-identifier hs-var">A.bounds</span></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057911"><span class="hs-identifier hs-var">offs</span></a></span><span>
+</span><span id="line-180"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span>
+</span><span id="line-181"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057912"><span class="hs-identifier hs-var">strs</span></a></span><span>
+</span><span id="line-182"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057908"><span class="hs-identifier hs-var">ixEnd</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span>  </span><span class="annot"><span class="annottext">Int32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057908"><span class="hs-identifier hs-var">ixEnd</span></a></span><span>
+</span><span id="line-184"></span><span>
+</span><span id="line-185"></span><span id="local-6989586621679057906"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV1"><span class="hs-identifier hs-type">deserialiseV1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057906"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span class="hs-special">)</span></span><span>
+</span><span id="line-186"></span><span id="deserialiseV1"><span class="annot"><span class="annottext">deserialiseV1 :: ByteString -&gt; Maybe (StringTable id, ByteString)
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV1"><span class="hs-identifier hs-var hs-var">deserialiseV1</span></a></span></span><span> </span><span id="local-6989586621679057905"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-187"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-188"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679057904"><span class="annot"><span class="annottext">lenStrs :: Int
+</span><a href="#local-6989586621679057904"><span class="hs-identifier hs-var hs-var">lenStrs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>        </span><span id="local-6989586621679057902"><span class="annot"><span class="annottext">lenArr :: Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var hs-var">lenArr</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span class="hs-special">)</span><span>
+</span><span id="line-190"></span><span>        </span><span id="local-6989586621679057901"><span class="annot"><span class="annottext">lenTotal :: Int
+</span><a href="#local-6989586621679057901"><span class="hs-identifier hs-var hs-var">lenTotal</span></a></span></span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057904"><span class="hs-identifier hs-var">lenStrs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span>
+</span><span id="line-191"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057901"><span class="hs-identifier hs-var">lenTotal</span></a></span><span>
+</span><span id="line-192"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679057900"><span class="annot"><span class="annottext">strs :: ByteString
+</span><a href="#local-6989586621679057900"><span class="hs-identifier hs-var hs-var">strs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057904"><span class="hs-identifier hs-var">lenStrs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-193"></span><span>        </span><span id="local-6989586621679057897"><span class="annot"><span class="annottext">arr :: UArray Int32 Word32
+</span><a href="#local-6989586621679057897"><span class="hs-identifier hs-var hs-var">arr</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [(Int32, Word32)] -&gt; UArray Int32 Word32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [(i, e)] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.array</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-194"></span><span>                       </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057896"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057895"><span class="hs-identifier hs-var">off</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-195"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679057896"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057896"><span class="hs-identifier hs-var">i</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679057895"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057895"><span class="hs-identifier hs-var">off</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Int32] -&gt; [Int] -&gt; [(Int32, Int)]
+forall a b. [a] -&gt; [b] -&gt; [(a, b)]
+</span><span class="hs-identifier hs-var">zip</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">..</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">]</span><span>
+</span><span id="line-196"></span><span>                                         </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057894"><span class="hs-identifier hs-var">offArrS</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057894"><span class="hs-identifier hs-var">offArrS</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="hs-glyph">..</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057893"><span class="hs-identifier hs-var">offArrE</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-197"></span><span>                       </span><span class="hs-special">]</span><span>
+</span><span id="line-198"></span><span>        </span><span id="local-6989586621679057892"><span class="annot"><span class="annottext">ids :: UArray Int32 Int32
+</span><a href="#local-6989586621679057892"><span class="hs-identifier hs-var hs-var">ids</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [(Int32, Int32)] -&gt; UArray Int32 Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [(i, e)] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.array</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>                       </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057891"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057891"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679057891"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621679057891"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">..</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">]</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-200"></span><span>        </span><span id="local-6989586621679057890"><span class="annot"><span class="annottext">ixs :: UArray Int32 Int32
+</span><a href="#local-6989586621679057890"><span class="hs-identifier hs-var hs-var">ixs</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057892"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="hs-comment">-- two identity mappings</span><span>
+</span><span id="line-201"></span><span>        </span><span id="local-6989586621679057894"><span class="annot"><span class="annottext">offArrS :: Int
+</span><a href="#local-6989586621679057894"><span class="hs-identifier hs-var hs-var">offArrS</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057904"><span class="hs-identifier hs-var">lenStrs</span></a></span><span>
+</span><span id="line-202"></span><span>        </span><span id="local-6989586621679057893"><span class="annot"><span class="annottext">offArrE :: Int
+</span><a href="#local-6989586621679057893"><span class="hs-identifier hs-var hs-var">offArrE</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057894"><span class="hs-identifier hs-var">offArrS</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057902"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-203"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679057889"><span class="annot"><span class="annottext">stringTable :: StringTable id
+</span><a href="#local-6989586621679057889"><span class="hs-identifier hs-var hs-var">stringTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+forall id.
+ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-var">StringTable</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057900"><span class="hs-identifier hs-var">strs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057897"><span class="hs-identifier hs-var">arr</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057892"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057890"><span class="hs-identifier hs-var">ixs</span></a></span><span>
+</span><span id="line-204"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679057888"><span class="annot"><span class="annottext">bs' :: ByteString
+</span><a href="#local-6989586621679057888"><span class="hs-identifier hs-var hs-var">bs'</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057901"><span class="hs-identifier hs-var">lenTotal</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057905"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-205"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(StringTable id, ByteString) -&gt; Maybe (StringTable id, ByteString)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StringTable id
+forall id. StringTable id
+</span><a href="#local-6989586621679057889"><span class="hs-identifier hs-var">stringTable</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057888"><span class="hs-identifier hs-var">bs'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-206"></span><span>
+</span><span id="line-207"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>
+</span><span id="line-208"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (StringTable id, ByteString)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-209"></span><span>
+</span><span id="line-210"></span><span id="local-6989586621679057887"><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV2"><span class="hs-identifier hs-type">deserialiseV2</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-type">StringTable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679057887"><span class="hs-identifier hs-type">id</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span class="hs-special">)</span></span><span>
+</span><span id="line-211"></span><span id="deserialiseV2"><span class="annot"><span class="annottext">deserialiseV2 :: ByteString -&gt; Maybe (StringTable id, ByteString)
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#deserialiseV2"><span class="hs-identifier hs-var hs-var">deserialiseV2</span></a></span></span><span> </span><span id="local-6989586621679057886"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-212"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-213"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679057885"><span class="annot"><span class="annottext">lenStrs :: Int
+</span><a href="#local-6989586621679057885"><span class="hs-identifier hs-var hs-var">lenStrs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-214"></span><span>        </span><span id="local-6989586621679057884"><span class="annot"><span class="annottext">lenArr :: Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var hs-var">lenArr</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span class="hs-special">)</span><span>
+</span><span id="line-215"></span><span>        </span><span id="local-6989586621679057883"><span class="annot"><span class="annottext">lenTotal :: Int
+</span><a href="#local-6989586621679057883"><span class="hs-identifier hs-var hs-var">lenTotal</span></a></span></span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>                   </span><span class="hs-comment">-- the two length prefixes</span><span>
+</span><span id="line-216"></span><span>                </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057885"><span class="hs-identifier hs-var">lenStrs</span></a></span><span>
+</span><span id="line-217"></span><span>                </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span>
+</span><span id="line-218"></span><span>                </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span> </span><span class="hs-comment">-- offsets array is 1 longer</span><span>
+</span><span id="line-219"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057883"><span class="hs-identifier hs-var">lenTotal</span></a></span><span>
+</span><span id="line-220"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679057882"><span class="annot"><span class="annottext">strs :: ByteString
+</span><a href="#local-6989586621679057882"><span class="hs-identifier hs-var hs-var">strs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057885"><span class="hs-identifier hs-var">lenStrs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-221"></span><span>        </span><span id="local-6989586621679057881"><span class="annot"><span class="annottext">offs :: UArray Int32 Word32
+</span><a href="#local-6989586621679057881"><span class="hs-identifier hs-var hs-var">offs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [Word32] -&gt; UArray Int32 Word32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [e] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.listArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-222"></span><span>                           </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057880"><span class="hs-identifier hs-var">off</span></a></span><span>
+</span><span id="line-223"></span><span>                           </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679057880"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057880"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int]
+</span><a href="#local-6989586621679057879"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057878"><span class="hs-identifier hs-var">offsOff</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-224"></span><span>        </span><span class="hs-comment">-- the second two arrays are 1 shorter</span><span>
+</span><span id="line-225"></span><span>        </span><span id="local-6989586621679057877"><span class="annot"><span class="annottext">ids :: UArray Int32 Int32
+</span><a href="#local-6989586621679057877"><span class="hs-identifier hs-var hs-var">ids</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [Int32] -&gt; UArray Int32 Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [e] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.listArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span>
+</span><span id="line-226"></span><span>                           </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Int32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readInt32BE"><span class="hs-identifier hs-var">readInt32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057875"><span class="hs-identifier hs-var">off</span></a></span><span>
+</span><span id="line-227"></span><span>                           </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679057875"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057875"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int]
+</span><a href="#local-6989586621679057879"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057874"><span class="hs-identifier hs-var">idsOff</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-228"></span><span>        </span><span id="local-6989586621679057873"><span class="annot"><span class="annottext">ixs :: UArray Int32 Int32
+</span><a href="#local-6989586621679057873"><span class="hs-identifier hs-var hs-var">ixs</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int32, Int32) -&gt; [Int32] -&gt; UArray Int32 Int32
+forall (a :: * -&gt; * -&gt; *) e i.
+(IArray a e, Ix i) =&gt;
+(i, i) -&gt; [e] -&gt; a i e
+</span><span class="hs-identifier hs-var">A.listArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span>
+</span><span id="line-229"></span><span>                           </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Int32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readInt32BE"><span class="hs-identifier hs-var">readInt32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057872"><span class="hs-identifier hs-var">off</span></a></span><span>
+</span><span id="line-230"></span><span>                           </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679057872"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057872"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int]
+</span><a href="#local-6989586621679057879"><span class="hs-identifier hs-var">offsets</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057871"><span class="hs-identifier hs-var">ixsOff</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-231"></span><span>        </span><span id="local-6989586621679057878"><span class="annot"><span class="annottext">offsOff :: Int
+</span><a href="#local-6989586621679057878"><span class="hs-identifier hs-var hs-var">offsOff</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057885"><span class="hs-identifier hs-var">lenStrs</span></a></span><span>
+</span><span id="line-232"></span><span>        </span><span id="local-6989586621679057874"><span class="annot"><span class="annottext">idsOff :: Int
+</span><a href="#local-6989586621679057874"><span class="hs-identifier hs-var hs-var">idsOff</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057878"><span class="hs-identifier hs-var">offsOff</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span>
+</span><span id="line-233"></span><span>        </span><span id="local-6989586621679057871"><span class="annot"><span class="annottext">ixsOff :: Int
+</span><a href="#local-6989586621679057871"><span class="hs-identifier hs-var hs-var">ixsOff</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057874"><span class="hs-identifier hs-var">idsOff</span></a></span><span>  </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-234"></span><span>        </span><span id="local-6989586621679057879"><span class="annot"><span class="annottext">offsets :: Int -&gt; [Int]
+</span><a href="#local-6989586621679057879"><span class="hs-identifier hs-var hs-var">offsets</span></a></span></span><span> </span><span id="local-6989586621679057870"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057870"><span class="hs-identifier hs-var">from</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057870"><span class="hs-identifier hs-var">from</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057870"><span class="hs-identifier hs-var">from</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="hs-glyph">..</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057870"><span class="hs-identifier hs-var">from</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057884"><span class="hs-identifier hs-var">lenArr</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-235"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679057869"><span class="annot"><span class="annottext">stringTable :: StringTable id
+</span><a href="#local-6989586621679057869"><span class="hs-identifier hs-var hs-var">stringTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+forall id.
+ByteString
+-&gt; UArray Int32 Word32
+-&gt; UArray Int32 Int32
+-&gt; UArray Int32 Int32
+-&gt; StringTable id
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#StringTable"><span class="hs-identifier hs-var">StringTable</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057882"><span class="hs-identifier hs-var">strs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Word32
+</span><a href="#local-6989586621679057881"><span class="hs-identifier hs-var">offs</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057877"><span class="hs-identifier hs-var">ids</span></a></span><span> </span><span class="annot"><span class="annottext">UArray Int32 Int32
+</span><a href="#local-6989586621679057873"><span class="hs-identifier hs-var">ixs</span></a></span><span>
+</span><span id="line-236"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679057868"><span class="annot"><span class="annottext">bs' :: ByteString
+</span><a href="#local-6989586621679057868"><span class="hs-identifier hs-var hs-var">bs'</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057883"><span class="hs-identifier hs-var">lenTotal</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057886"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-237"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(StringTable id, ByteString) -&gt; Maybe (StringTable id, ByteString)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StringTable id
+forall id. StringTable id
+</span><a href="#local-6989586621679057869"><span class="hs-identifier hs-var">stringTable</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057868"><span class="hs-identifier hs-var">bs'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-238"></span><span>
+</span><span id="line-239"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>
+</span><span id="line-240"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (StringTable id, ByteString)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-241"></span><span>
+</span><span id="line-242"></span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#readInt32BE"><span class="hs-identifier hs-type">readInt32BE</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span>
+</span><span id="line-243"></span><span id="readInt32BE"><span class="annot"><span class="annottext">readInt32BE :: ByteString -&gt; Int -&gt; Int32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readInt32BE"><span class="hs-identifier hs-var hs-var">readInt32BE</span></a></span></span><span> </span><span id="local-6989586621679057867"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057867"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679057866"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057866"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var">readWord32BE</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057867"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057866"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-244"></span><span>
+</span><span id="line-245"></span><span class="annot"><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-type">readWord32BE</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word32</span></span><span>
+</span><span id="line-246"></span><span id="readWord32BE"><span class="annot"><span class="annottext">readWord32BE :: ByteString -&gt; Int -&gt; Word32
+</span><a href="Codec.Archive.Tar.Index.StringTable.html#readWord32BE"><span class="hs-identifier hs-var hs-var">readWord32BE</span></a></span></span><span> </span><span id="local-6989586621679057865"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621679057864"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-247"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; Word32 -&gt; Word32
+forall a. (?callStack::CallStack) =&gt; Bool -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">assert</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">3</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Word32 -&gt; Word32) -&gt; Word32 -&gt; Word32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-248"></span><span>    </span><span class="annot"><span class="annottext">Word8 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.unsafeIndex</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int -&gt; Word32
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">`shiftL`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">24</span></span><span>
+</span><span id="line-249"></span><span>  </span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.unsafeIndex</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int -&gt; Word32
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">`shiftL`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span>
+</span><span id="line-250"></span><span>  </span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.unsafeIndex</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int -&gt; Word32
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">`shiftL`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-251"></span><span>  </span><span class="annot"><span class="annottext">Word32 -&gt; Word32 -&gt; Word32
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.unsafeIndex</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679057865"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679057864"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">3</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+
+#ifdef TESTS
+</span><span>
+</span><span id="line-255"></span><span class="hs-identifier">prop_valid</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-256"></span><span class="hs-identifier">prop_valid</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-257"></span><span>     </span><span class="hs-identifier">all</span><span> </span><span class="hs-identifier">lookupIndex</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">enumStrings</span><span> </span><span class="hs-identifier">tbl</span><span class="hs-special">)</span><span>
+</span><span id="line-258"></span><span>  </span><span class="hs-operator">&amp;&amp;</span><span> </span><span class="hs-identifier">all</span><span> </span><span class="hs-identifier">indexLookup</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">enumIds</span><span> </span><span class="hs-identifier">tbl</span><span class="hs-special">)</span><span>
+</span><span id="line-259"></span><span>
+</span><span id="line-260"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-261"></span><span>    </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">Int</span><span>
+</span><span id="line-262"></span><span>    </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">construct</span><span> </span><span class="hs-identifier">strs</span><span>
+</span><span id="line-263"></span><span>
+</span><span id="line-264"></span><span>    </span><span class="hs-identifier">lookupIndex</span><span> </span><span class="hs-identifier">str</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">index</span><span> </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-identifier">ident</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">str</span><span>
+</span><span id="line-265"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span class="hs-identifier">Just</span><span> </span><span class="hs-identifier">ident</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">lookup</span><span> </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-identifier">str</span><span>
+</span><span id="line-266"></span><span>
+</span><span id="line-267"></span><span>    </span><span class="hs-identifier">indexLookup</span><span> </span><span class="hs-identifier">ident</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">lookup</span><span> </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-identifier">str</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">Just</span><span> </span><span class="hs-identifier">ident</span><span>
+</span><span id="line-268"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span class="hs-identifier">str</span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">index</span><span> </span><span class="hs-identifier">tbl</span><span> </span><span class="hs-identifier">ident</span><span>
+</span><span id="line-269"></span><span>
+</span><span id="line-270"></span><span class="hs-comment">-- this is important so we can use Map.fromAscList</span><span>
+</span><span id="line-271"></span><span class="hs-identifier">prop_sorted</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-272"></span><span class="hs-identifier">prop_sorted</span><span> </span><span class="hs-identifier">strings</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-273"></span><span>    </span><span class="hs-identifier">isSorted</span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-identifier">index'</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-identifier">offsets</span><span> </span><span class="hs-identifier">ix</span><span>
+</span><span id="line-274"></span><span>             </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">ix</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">A.range</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">A.bounds</span><span> </span><span class="hs-identifier">ids</span><span class="hs-special">)</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-275"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-276"></span><span>    </span><span class="hs-identifier">_tbl</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">Int</span><span>
+</span><span id="line-277"></span><span>    </span><span class="hs-identifier">_tbl</span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-identifier">offsets</span><span> </span><span class="hs-identifier">ids</span><span> </span><span class="hs-identifier">_ixs</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">construct</span><span> </span><span class="hs-identifier">strings</span><span>
+</span><span id="line-278"></span><span>    </span><span class="hs-identifier">isSorted</span><span> </span><span class="hs-identifier">xs</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">and</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">zipWith</span><span> </span><span class="hs-special">(</span><span class="hs-operator">&lt;</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">xs</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">tail</span><span> </span><span class="hs-identifier">xs</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-279"></span><span>
+</span><span id="line-280"></span><span class="hs-identifier">prop_finalise_unfinalise</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-281"></span><span class="hs-identifier">prop_finalise_unfinalise</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-282"></span><span>    </span><span class="hs-identifier">builder</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">unfinalise</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">finalise</span><span> </span><span class="hs-identifier">builder</span><span class="hs-special">)</span><span>
+</span><span id="line-283"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-284"></span><span>    </span><span class="hs-identifier">builder</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">StringTableBuilder</span><span> </span><span class="hs-identifier">Int</span><span>
+</span><span id="line-285"></span><span>    </span><span class="hs-identifier">builder</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">foldl'</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-identifier">tbl</span><span> </span><span class="hs-identifier">s</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">fst</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">insert</span><span> </span><span class="hs-identifier">s</span><span> </span><span class="hs-identifier">tbl</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">empty</span><span> </span><span class="hs-identifier">strs</span><span>
+</span><span id="line-286"></span><span>
+</span><span id="line-287"></span><span class="hs-identifier">prop_serialise_deserialise</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-288"></span><span class="hs-identifier">prop_serialise_deserialise</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-289"></span><span>    </span><span class="hs-identifier">Just</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">strtable</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">BS.empty</span><span class="hs-special">)</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">deserialiseV2</span><span>
+</span><span id="line-290"></span><span>                                </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">BS.toLazyByteString</span><span>
+</span><span id="line-291"></span><span>                                </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">serialise</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">strtable</span><span>
+</span><span id="line-292"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-293"></span><span>    </span><span class="hs-identifier">strtable</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">Int</span><span>
+</span><span id="line-294"></span><span>    </span><span class="hs-identifier">strtable</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">construct</span><span> </span><span class="hs-identifier">strs</span><span>
+</span><span id="line-295"></span><span>
+</span><span id="line-296"></span><span class="hs-identifier">prop_serialiseSize</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-297"></span><span class="hs-identifier">prop_serialiseSize</span><span> </span><span class="hs-identifier">strs</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-298"></span><span>    </span><span class="hs-special">(</span><span class="hs-identifier">fromIntegral</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">LBS.length</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">BS.toLazyByteString</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">serialise</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">strtable</span><span>
+</span><span id="line-299"></span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">serialiseSize</span><span> </span><span class="hs-identifier">strtable</span><span>
+</span><span id="line-300"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-301"></span><span>    </span><span class="hs-identifier">strtable</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">Int</span><span>
+</span><span id="line-302"></span><span>    </span><span class="hs-identifier">strtable</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">construct</span><span> </span><span class="hs-identifier">strs</span><span>
+</span><span id="line-303"></span><span>
+</span><span id="line-304"></span><span class="hs-identifier">enumStrings</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Enum</span><span> </span><span class="hs-identifier">id</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">id</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">BS.ByteString</span><span class="hs-special">]</span><span>
+</span><span id="line-305"></span><span class="hs-identifier">enumStrings</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">bs</span><span> </span><span class="hs-identifier">offsets</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">map</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">index'</span><span> </span><span class="hs-identifier">bs</span><span> </span><span class="hs-identifier">offsets</span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-number">0</span><span class="hs-glyph">..</span><span class="hs-identifier">h</span><span class="hs-glyph">-</span><span class="hs-number">1</span><span class="hs-special">]</span><span>
+</span><span id="line-306"></span><span>  </span><span class="hs-keyword">where</span><span> </span><span class="hs-special">(</span><span class="hs-number">0</span><span class="hs-special">,</span><span class="hs-identifier">h</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">A.bounds</span><span> </span><span class="hs-identifier">offsets</span><span>
+</span><span id="line-307"></span><span>
+</span><span id="line-308"></span><span class="hs-identifier">enumIds</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Enum</span><span> </span><span class="hs-identifier">id</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">id</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">id</span><span class="hs-special">]</span><span>
+</span><span id="line-309"></span><span class="hs-identifier">enumIds</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">StringTable</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">offsets</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">toEnum</span><span> </span><span class="hs-number">0</span><span> </span><span class="hs-glyph">..</span><span> </span><span class="hs-identifier">toEnum</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">fromIntegral</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">h</span><span class="hs-glyph">-</span><span class="hs-number">1</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-310"></span><span>  </span><span class="hs-keyword">where</span><span> </span><span class="hs-special">(</span><span class="hs-number">0</span><span class="hs-special">,</span><span class="hs-identifier">h</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">A.bounds</span><span> </span><span class="hs-identifier">offsets</span><span>
+</span><span id="line-311"></span><span>
+</span><span id="line-312"></span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">LBS.ByteString</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">BS.ByteString</span><span class="hs-cpp">
+#if MIN_VERSION_bytestring(0,10,0)
+</span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">LBS.toStrict</span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">BS.concat</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">LBS.toChunks</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if !(MIN_VERSION_base(4,5,0))
+</span><span class="hs-special">(</span><span class="hs-operator">&lt;&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Monoid</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">m</span><span>
+</span><span id="line-323"></span><span class="hs-special">(</span><span class="hs-operator">&lt;&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mappend</span><span class="hs-cpp">
+#endif
+</span></pre></body></html>

@@ -1,0 +1,780 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Text.XML.Stream.Token</span><span>
+</span><span id="line-4"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier">tokenToBuilder</span></a></span><span>
+</span><span id="line-5"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier">TName</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#Token"><span class="hs-identifier">Token</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier">TAttribute</span></a></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#NSLevel"><span class="hs-identifier">NSLevel</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.XML.Types</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Instruction</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Content</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ExternalID</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">encodeUtf8Builder</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">encodeUtf8BuilderEscaped</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.String</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">IsString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">fromString</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder.Prim</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">E</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder.Prim</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&gt;*&lt;)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(&gt;$&lt;)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">condB</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">mconcat</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(&lt;&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Map</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Set</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">foldl'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">first</span></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Word8</span></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="annot"><a href="Text.XML.Stream.Token.html#oneSpace"><span class="hs-identifier hs-type">oneSpace</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-27"></span><span id="oneSpace"><span class="annot"><span class="annottext">oneSpace :: Builder
+</span><a href="Text.XML.Stream.Token.html#oneSpace"><span class="hs-identifier hs-var hs-var">oneSpace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot; &quot;</span></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">data</span><span> </span><span id="Token"><span class="annot"><a href="Text.XML.Stream.Token.html#Token"><span class="hs-identifier hs-var">Token</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TokenXMLDeclaration"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenXMLDeclaration"><span class="hs-identifier hs-var">TokenXMLDeclaration</span></a></span></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-type">TAttribute</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-30"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenInstruction"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenInstruction"><span class="hs-identifier hs-var">TokenInstruction</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Instruction</span></span><span>
+</span><span id="line-31"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenBeginElement"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenBeginElement"><span class="hs-identifier hs-var">TokenBeginElement</span></a></span></span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-type">TAttribute</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-comment">-- ^ indent</span><span>
+</span><span id="line-32"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenEndElement"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenEndElement"><span class="hs-identifier hs-var">TokenEndElement</span></a></span></span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span>
+</span><span id="line-33"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenContent"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenContent"><span class="hs-identifier hs-var">TokenContent</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Content</span></span><span>
+</span><span id="line-34"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenComment"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenComment"><span class="hs-identifier hs-var">TokenComment</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-35"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenDoctype"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenDoctype"><span class="hs-identifier hs-var">TokenDoctype</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ExternalID</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-36"></span><span>           </span><span class="hs-glyph">|</span><span> </span><span id="TokenCDATA"><span class="annot"><a href="Text.XML.Stream.Token.html#TokenCDATA"><span class="hs-identifier hs-var">TokenCDATA</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679092155"><span id="local-6989586621679092157"><span id="local-6989586621679092159"><span class="annot"><span class="annottext">Int -&gt; Token -&gt; ShowS
+[Token] -&gt; ShowS
+Token -&gt; String
+(Int -&gt; Token -&gt; ShowS)
+-&gt; (Token -&gt; String) -&gt; ([Token] -&gt; ShowS) -&gt; Show Token
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Token] -&gt; ShowS
+$cshowList :: [Token] -&gt; ShowS
+show :: Token -&gt; String
+$cshow :: Token -&gt; String
+showsPrec :: Int -&gt; Token -&gt; ShowS
+$cshowsPrec :: Int -&gt; Token -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-38"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-type">tokenToBuilder</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#Token"><span class="hs-identifier hs-type">Token</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-39"></span><span id="tokenToBuilder"><span class="annot"><span class="annottext">tokenToBuilder :: Token -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var hs-var">tokenToBuilder</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenXMLDeclaration"><span class="hs-identifier hs-type">TokenXMLDeclaration</span></a></span><span> </span><span id="local-6989586621679092153"><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092153"><span class="hs-identifier hs-var">attrs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-40"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;?xml&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-41"></span><span>    </span><span class="annot"><span class="annottext">Builder -&gt; [TAttribute] -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#foldAttrs"><span class="hs-identifier hs-var">foldAttrs</span></a></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="Text.XML.Stream.Token.html#oneSpace"><span class="hs-identifier hs-var">oneSpace</span></a></span><span> </span><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092153"><span class="hs-identifier hs-var">attrs</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;?&gt;&quot;</span></span><span>
+</span><span id="line-43"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenInstruction"><span class="hs-identifier hs-type">TokenInstruction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Instruction</span></span><span> </span><span id="local-6989586621679092150"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092150"><span class="hs-identifier hs-var">target</span></a></span></span><span> </span><span id="local-6989586621679092149"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092149"><span class="hs-identifier hs-var">data_</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;?&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092150"><span class="hs-identifier hs-var">target</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-46"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot; &quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092149"><span class="hs-identifier hs-var">data_</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;?&gt;&quot;</span></span><span>
+</span><span id="line-49"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenBeginElement"><span class="hs-identifier hs-type">TokenBeginElement</span></a></span><span> </span><span id="local-6989586621679092148"><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092148"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621679092147"><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092147"><span class="hs-identifier hs-var">attrs'</span></a></span></span><span> </span><span id="local-6989586621679092146"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679092146"><span class="hs-identifier hs-var">isEmpty</span></a></span></span><span> </span><span id="local-6989586621679092145"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679092145"><span class="hs-identifier hs-var">indent</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><span class="annottext">TName -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-var">tnameToText</span></a></span><span> </span><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092148"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-52"></span><span>    </span><span class="annot"><span class="annottext">Builder -&gt; [TAttribute] -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#foldAttrs"><span class="hs-identifier hs-var">foldAttrs</span></a></span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-special">(</span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679092145"><span class="hs-identifier hs-var">indent</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">||</span></span><span> </span><span class="annot"><span class="annottext">[TAttribute] -&gt; Bool
+forall a. [a] -&gt; Bool
+</span><a href="#local-6989586621679092142"><span class="hs-identifier hs-var">lessThan3</span></a></span><span> </span><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092141"><span class="hs-identifier hs-var">attrs</span></a></span><span>
+</span><span id="line-54"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="Text.XML.Stream.Token.html#oneSpace"><span class="hs-identifier hs-var">oneSpace</span></a></span><span>
+</span><span id="line-55"></span><span>            </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">[Builder] -&gt; Builder
+forall a. Monoid a =&gt; [a] -&gt; a
+</span><span class="hs-identifier hs-var">mconcat</span></span><span> </span><span class="annot"><span class="annottext">([Builder] -&gt; Builder) -&gt; [Builder] -&gt; Builder
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; [Builder] -&gt; [Builder]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder -&gt; [Builder]
+forall a. Int -&gt; a -&gt; [a]
+</span><span class="hs-identifier hs-var">replicate</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679092145"><span class="hs-identifier hs-var">indent</span></a></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot; &quot;</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>        </span><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092141"><span class="hs-identifier hs-var">attrs</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">(</span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679092146"><span class="hs-identifier hs-var">isEmpty</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;/&gt;&quot;</span></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&gt;&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679092141"><span class="annot"><span class="annottext">attrs :: [TAttribute]
+</span><a href="#local-6989586621679092141"><span class="hs-identifier hs-var hs-var">attrs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[TAttribute] -&gt; [TAttribute]
+</span><a href="Text.XML.Stream.Token.html#nubAttrs"><span class="hs-identifier hs-var">nubAttrs</span></a></span><span> </span><span class="annot"><span class="annottext">([TAttribute] -&gt; [TAttribute]) -&gt; [TAttribute] -&gt; [TAttribute]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(TAttribute -&gt; TAttribute) -&gt; [TAttribute] -&gt; [TAttribute]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(TName -&gt; TName) -&gt; TAttribute -&gt; TAttribute
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (b, d) (c, d)
+</span><span class="hs-identifier hs-var">first</span></span><span> </span><span class="annot"><span class="annottext">TName -&gt; TName
+</span><a href="Text.XML.Stream.Token.html#splitTName"><span class="hs-identifier hs-var">splitTName</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092147"><span class="hs-identifier hs-var">attrs'</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span id="local-6989586621679092142"><span class="annot"><span class="annottext">lessThan3 :: [a] -&gt; Bool
+</span><a href="#local-6989586621679092142"><span class="hs-identifier hs-var hs-var">lessThan3</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><a href="#local-6989586621679092142"><span class="hs-identifier hs-var">lessThan3</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><a href="#local-6989586621679092142"><span class="hs-identifier hs-var">lessThan3</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-63"></span><span>    </span><span class="annot"><a href="#local-6989586621679092142"><span class="hs-identifier hs-var">lessThan3</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-64"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenEndElement"><span class="hs-identifier hs-type">TokenEndElement</span></a></span><span> </span><span id="local-6989586621679092137"><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092137"><span class="hs-identifier hs-var">name</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;/&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">TName -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-var">tnameToText</span></a></span><span> </span><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092137"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&gt;&quot;</span></span><span>
+</span><span id="line-65"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenContent"><span class="hs-identifier hs-type">TokenContent</span></a></span><span> </span><span id="local-6989586621679092136"><span class="annot"><span class="annottext">Content
+</span><a href="#local-6989586621679092136"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Content -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#contentToText"><span class="hs-identifier hs-var">contentToText</span></a></span><span> </span><span class="annot"><span class="annottext">Content
+</span><a href="#local-6989586621679092136"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-66"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenCDATA"><span class="hs-identifier hs-type">TokenCDATA</span></a></span><span> </span><span id="local-6989586621679092134"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092134"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;![CDATA[&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#escCDATA"><span class="hs-identifier hs-var">escCDATA</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092134"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;]]&gt;&quot;</span></span><span>
+</span><span id="line-67"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenComment"><span class="hs-identifier hs-type">TokenComment</span></a></span><span> </span><span id="local-6989586621679092132"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092132"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;!--&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092132"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;--&gt;&quot;</span></span><span>
+</span><span id="line-68"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tokenToBuilder"><span class="hs-identifier hs-var">tokenToBuilder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TokenDoctype"><span class="hs-identifier hs-type">TokenDoctype</span></a></span><span> </span><span id="local-6989586621679092131"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092131"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621679092130"><span class="annot"><span class="annottext">Maybe ExternalID
+</span><a href="#local-6989586621679092130"><span class="hs-identifier hs-var">eid</span></a></span></span><span> </span><span class="annot"><span class="annottext">[(Text, Text)]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&lt;!DOCTYPE &quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-70"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092131"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><span class="annottext">Maybe ExternalID -&gt; Builder
+</span><a href="#local-6989586621679092129"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe ExternalID
+</span><a href="#local-6989586621679092130"><span class="hs-identifier hs-var">eid</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&gt;&quot;</span></span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-74"></span><span>    </span><span id="local-6989586621679092129"><span class="annot"><span class="annottext">go :: Maybe ExternalID -&gt; Builder
+</span><a href="#local-6989586621679092129"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe ExternalID
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-75"></span><span>    </span><span class="annot"><a href="#local-6989586621679092129"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">SystemID</span></span><span> </span><span id="local-6989586621679092127"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092127"><span class="hs-identifier hs-var">uri</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot; SYSTEM \&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092127"><span class="hs-identifier hs-var">uri</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;\&quot;&quot;</span></span><span>
+</span><span id="line-76"></span><span>    </span><span class="annot"><a href="#local-6989586621679092129"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">PublicID</span></span><span> </span><span id="local-6989586621679092125"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092125"><span class="hs-identifier hs-var">pid</span></a></span></span><span> </span><span id="local-6989586621679092124"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092124"><span class="hs-identifier hs-var">uri</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-77"></span><span>        </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot; PUBLIC \&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-78"></span><span>        </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092125"><span class="hs-identifier hs-var">pid</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-79"></span><span>        </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;\&quot; \&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-80"></span><span>        </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092124"><span class="hs-identifier hs-var">uri</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-81"></span><span>        </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;\&quot;&quot;</span></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">data</span><span> </span><span id="TName"><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-var">TName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TName"><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-var">TName</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679092117"><span id="local-6989586621679092119"><span id="local-6989586621679092121"><span class="annot"><span class="annottext">Int -&gt; TName -&gt; ShowS
+[TName] -&gt; ShowS
+TName -&gt; String
+(Int -&gt; TName -&gt; ShowS)
+-&gt; (TName -&gt; String) -&gt; ([TName] -&gt; ShowS) -&gt; Show TName
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TName] -&gt; ShowS
+$cshowList :: [TName] -&gt; ShowS
+show :: TName -&gt; String
+$cshow :: TName -&gt; String
+showsPrec :: Int -&gt; TName -&gt; ShowS
+$cshowsPrec :: Int -&gt; TName -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092113"><span id="local-6989586621679092115"><span class="annot"><span class="annottext">TName -&gt; TName -&gt; Bool
+(TName -&gt; TName -&gt; Bool) -&gt; (TName -&gt; TName -&gt; Bool) -&gt; Eq TName
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: TName -&gt; TName -&gt; Bool
+$c/= :: TName -&gt; TName -&gt; Bool
+== :: TName -&gt; TName -&gt; Bool
+$c== :: TName -&gt; TName -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092097"><span id="local-6989586621679092099"><span id="local-6989586621679092101"><span id="local-6989586621679092103"><span id="local-6989586621679092105"><span id="local-6989586621679092107"><span id="local-6989586621679092109"><span class="annot"><span class="annottext">Eq TName
+Eq TName
+-&gt; (TName -&gt; TName -&gt; Ordering)
+-&gt; (TName -&gt; TName -&gt; Bool)
+-&gt; (TName -&gt; TName -&gt; Bool)
+-&gt; (TName -&gt; TName -&gt; Bool)
+-&gt; (TName -&gt; TName -&gt; Bool)
+-&gt; (TName -&gt; TName -&gt; TName)
+-&gt; (TName -&gt; TName -&gt; TName)
+-&gt; Ord TName
+TName -&gt; TName -&gt; Bool
+TName -&gt; TName -&gt; Ordering
+TName -&gt; TName -&gt; TName
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: TName -&gt; TName -&gt; TName
+$cmin :: TName -&gt; TName -&gt; TName
+max :: TName -&gt; TName -&gt; TName
+$cmax :: TName -&gt; TName -&gt; TName
+&gt;= :: TName -&gt; TName -&gt; Bool
+$c&gt;= :: TName -&gt; TName -&gt; Bool
+&gt; :: TName -&gt; TName -&gt; Bool
+$c&gt; :: TName -&gt; TName -&gt; Bool
+&lt;= :: TName -&gt; TName -&gt; Bool
+$c&lt;= :: TName -&gt; TName -&gt; Bool
+&lt; :: TName -&gt; TName -&gt; Bool
+$c&lt; :: TName -&gt; TName -&gt; Bool
+compare :: TName -&gt; TName -&gt; Ordering
+$ccompare :: TName -&gt; TName -&gt; Ordering
+$cp1Ord :: Eq TName
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-type">tnameToText</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-87"></span><span id="tnameToText"><span class="annot"><span class="annottext">tnameToText :: TName -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-var hs-var">tnameToText</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span id="local-6989586621679092095"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092095"><span class="hs-identifier hs-var">name</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092095"><span class="hs-identifier hs-var">name</span></a></span><span>
+</span><span id="line-88"></span><span class="annot"><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-var">tnameToText</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679092094"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092094"><span class="hs-identifier hs-var">prefix</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679092093"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092093"><span class="hs-identifier hs-var">name</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-89"></span><span>  </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092094"><span class="hs-identifier hs-var">prefix</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;:&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092093"><span class="hs-identifier hs-var">name</span></a></span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="annot"><a href="Text.XML.Stream.Token.html#contentToText"><span class="hs-identifier hs-type">contentToText</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Content</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-92"></span><span id="contentToText"><span class="annot"><span class="annottext">contentToText :: Content -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#contentToText"><span class="hs-identifier hs-var hs-var">contentToText</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ContentText</span></span><span> </span><span id="local-6989586621679092091"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092091"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8 -&gt; Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8BuilderEscaped</span></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8
+</span><a href="Text.XML.Stream.Token.html#charUtf8XmlEscaped"><span class="hs-identifier hs-var">charUtf8XmlEscaped</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092091"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-93"></span><span class="annot"><a href="Text.XML.Stream.Token.html#contentToText"><span class="hs-identifier hs-var">contentToText</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ContentEntity</span></span><span> </span><span id="local-6989586621679092088"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092088"><span class="hs-identifier hs-var">e</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&amp;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092088"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;;&quot;</span></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#charUtf8XmlEscaped"><span class="hs-pragma hs-type">charUtf8XmlEscaped</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-96"></span><span class="annot"><a href="Text.XML.Stream.Token.html#charUtf8XmlEscaped"><span class="hs-identifier hs-type">charUtf8XmlEscaped</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">E.BoundedPrim</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span>
+</span><span id="line-97"></span><span id="charUtf8XmlEscaped"><span class="annot"><span class="annottext">charUtf8XmlEscaped :: BoundedPrim Word8
+</span><a href="Text.XML.Stream.Token.html#charUtf8XmlEscaped"><span class="hs-identifier hs-var hs-var">charUtf8XmlEscaped</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span>  </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092086"><span class="hs-identifier hs-var">_gt</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; BoundedPrim Word8
+forall a. FixedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">E.liftFixedToBounded</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092083"><span class="hs-identifier hs-var">_lt</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, Word8))) -&gt; BoundedPrim Word8
+forall a. (Word8, (Word8, (Word8, Word8))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092082"><span class="hs-identifier hs-var">fixed4</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092080"><span class="hs-identifier hs-var">_l</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092079"><span class="hs-identifier hs-var">_t</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var">_sc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>       </span><span class="hs-comment">-- &amp;lt;</span><span>
+</span><span id="line-100"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092086"><span class="hs-identifier hs-var">_gt</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, Word8))) -&gt; BoundedPrim Word8
+forall a. (Word8, (Word8, (Word8, Word8))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092082"><span class="hs-identifier hs-var">fixed4</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092077"><span class="hs-identifier hs-var">_g</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092079"><span class="hs-identifier hs-var">_t</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var">_sc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>       </span><span class="hs-comment">-- &amp;gt;</span><span>
+</span><span id="line-101"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim Word8
+forall a.
+(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092076"><span class="hs-identifier hs-var">fixed5</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092075"><span class="hs-identifier hs-var">_a</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092074"><span class="hs-identifier hs-var">_m</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092073"><span class="hs-identifier hs-var">_p</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var">_sc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>  </span><span class="hs-comment">-- &amp;amp;</span><span>
+</span><span id="line-102"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092072"><span class="hs-identifier hs-var">_dq</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim Word8
+forall a.
+(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092076"><span class="hs-identifier hs-var">fixed5</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092071"><span class="hs-identifier hs-var">_ha</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092070"><span class="hs-identifier hs-var">_3</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092069"><span class="hs-identifier hs-var">_4</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var">_sc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-comment">-- &amp;#34;</span><span>
+</span><span id="line-103"></span><span>    </span><span class="annot"><span class="annottext">(Word8 -&gt; Bool)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a.
+(a -&gt; Bool) -&gt; BoundedPrim a -&gt; BoundedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">condB</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092068"><span class="hs-identifier hs-var">_sq</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim Word8
+forall a.
+(Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092076"><span class="hs-identifier hs-var">fixed5</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var">_am</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092071"><span class="hs-identifier hs-var">_ha</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092070"><span class="hs-identifier hs-var">_3</span></a></span><span class="hs-special">,</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092067"><span class="hs-identifier hs-var">_9</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var">_sc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(BoundedPrim Word8 -&gt; BoundedPrim Word8)
+-&gt; BoundedPrim Word8 -&gt; BoundedPrim Word8
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-comment">-- &amp;#39;</span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; BoundedPrim Word8
+forall a. FixedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">E.liftFixedToBounded</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span class="hs-special">)</span><span>         </span><span class="hs-comment">-- fallback for Chars smaller than '&gt;'</span><span>
+</span><span id="line-105"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621679092086"><span class="annot"><span class="annottext">_gt :: Word8
+</span><a href="#local-6989586621679092086"><span class="hs-identifier hs-var hs-var">_gt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">62</span></span><span> </span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-107"></span><span>    </span><span id="local-6989586621679092083"><span class="annot"><span class="annottext">_lt :: Word8
+</span><a href="#local-6989586621679092083"><span class="hs-identifier hs-var hs-var">_lt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">60</span></span><span> </span><span class="hs-comment">-- &lt;</span><span>
+</span><span id="line-108"></span><span>    </span><span id="local-6989586621679092081"><span class="annot"><span class="annottext">_am :: Word8
+</span><a href="#local-6989586621679092081"><span class="hs-identifier hs-var hs-var">_am</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">38</span></span><span> </span><span class="hs-comment">-- &amp;</span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679092072"><span class="annot"><span class="annottext">_dq :: Word8
+</span><a href="#local-6989586621679092072"><span class="hs-identifier hs-var hs-var">_dq</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">34</span></span><span> </span><span class="hs-comment">-- &quot;</span><span>
+</span><span id="line-110"></span><span>    </span><span id="local-6989586621679092068"><span class="annot"><span class="annottext">_sq :: Word8
+</span><a href="#local-6989586621679092068"><span class="hs-identifier hs-var hs-var">_sq</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">39</span></span><span> </span><span class="hs-comment">-- '</span><span>
+</span><span id="line-111"></span><span>    </span><span id="local-6989586621679092080"><span class="annot"><span class="annottext">_l :: Word8
+</span><a href="#local-6989586621679092080"><span class="hs-identifier hs-var hs-var">_l</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">108</span></span><span> </span><span class="hs-comment">-- l</span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679092079"><span class="annot"><span class="annottext">_t :: Word8
+</span><a href="#local-6989586621679092079"><span class="hs-identifier hs-var hs-var">_t</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">116</span></span><span> </span><span class="hs-comment">-- t</span><span>
+</span><span id="line-113"></span><span>    </span><span id="local-6989586621679092077"><span class="annot"><span class="annottext">_g :: Word8
+</span><a href="#local-6989586621679092077"><span class="hs-identifier hs-var hs-var">_g</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">103</span></span><span> </span><span class="hs-comment">-- g</span><span>
+</span><span id="line-114"></span><span>    </span><span id="local-6989586621679092075"><span class="annot"><span class="annottext">_a :: Word8
+</span><a href="#local-6989586621679092075"><span class="hs-identifier hs-var hs-var">_a</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">97</span></span><span>  </span><span class="hs-comment">-- a</span><span>
+</span><span id="line-115"></span><span>    </span><span id="local-6989586621679092074"><span class="annot"><span class="annottext">_m :: Word8
+</span><a href="#local-6989586621679092074"><span class="hs-identifier hs-var hs-var">_m</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">109</span></span><span> </span><span class="hs-comment">-- m</span><span>
+</span><span id="line-116"></span><span>    </span><span id="local-6989586621679092073"><span class="annot"><span class="annottext">_p :: Word8
+</span><a href="#local-6989586621679092073"><span class="hs-identifier hs-var hs-var">_p</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">112</span></span><span> </span><span class="hs-comment">-- p</span><span>
+</span><span id="line-117"></span><span>    </span><span id="local-6989586621679092070"><span class="annot"><span class="annottext">_3 :: Word8
+</span><a href="#local-6989586621679092070"><span class="hs-identifier hs-var hs-var">_3</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">51</span></span><span>  </span><span class="hs-comment">-- 3</span><span>
+</span><span id="line-118"></span><span>    </span><span id="local-6989586621679092069"><span class="annot"><span class="annottext">_4 :: Word8
+</span><a href="#local-6989586621679092069"><span class="hs-identifier hs-var hs-var">_4</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">52</span></span><span>  </span><span class="hs-comment">-- 4</span><span>
+</span><span id="line-119"></span><span>    </span><span id="local-6989586621679092071"><span class="annot"><span class="annottext">_ha :: Word8
+</span><a href="#local-6989586621679092071"><span class="hs-identifier hs-var hs-var">_ha</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">35</span></span><span>  </span><span class="hs-comment">-- #, hash</span><span>
+</span><span id="line-120"></span><span>    </span><span id="local-6989586621679092067"><span class="annot"><span class="annottext">_9 :: Word8
+</span><a href="#local-6989586621679092067"><span class="hs-identifier hs-var hs-var">_9</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">57</span></span><span>  </span><span class="hs-comment">-- 9</span><span>
+</span><span id="line-121"></span><span>    </span><span id="local-6989586621679092078"><span class="annot"><span class="annottext">_sc :: Word8
+</span><a href="#local-6989586621679092078"><span class="hs-identifier hs-var hs-var">_sc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">59</span></span><span>  </span><span class="hs-comment">-- ;</span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679092082"><span class="hs-pragma hs-type">fixed4</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-123"></span><span>    </span><span id="local-6989586621679092082"><span class="annot"><span class="annottext">fixed4 :: (Word8, (Word8, (Word8, Word8))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092082"><span class="hs-identifier hs-var hs-var">fixed4</span></a></span></span><span> </span><span id="local-6989586621679092066"><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, Word8)))
+</span><a href="#local-6989586621679092066"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim a -&gt; BoundedPrim a
+forall a. FixedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">E.liftFixedToBounded</span></span><span> </span><span class="annot"><span class="annottext">(FixedPrim a -&gt; BoundedPrim a) -&gt; FixedPrim a -&gt; BoundedPrim a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, Word8)))
+-&gt; a -&gt; (Word8, (Word8, (Word8, Word8)))
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, Word8)))
+</span><a href="#local-6989586621679092066"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; (Word8, (Word8, (Word8, Word8))))
+-&gt; FixedPrim (Word8, (Word8, (Word8, Word8))) -&gt; FixedPrim a
+forall (f :: * -&gt; *) b a. Contravariant f =&gt; (b -&gt; a) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&gt;$&lt;</span></span><span>
+</span><span id="line-124"></span><span>      </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+-&gt; FixedPrim (Word8, (Word8, Word8))
+-&gt; FixedPrim (Word8, (Word8, (Word8, Word8)))
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+-&gt; FixedPrim (Word8, Word8) -&gt; FixedPrim (Word8, (Word8, Word8))
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; FixedPrim Word8 -&gt; FixedPrim (Word8, Word8)
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679092076"><span class="hs-pragma hs-type">fixed5</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-127"></span><span>    </span><span id="local-6989586621679092076"><span class="annot"><span class="annottext">fixed5 :: (Word8, (Word8, (Word8, (Word8, Word8)))) -&gt; BoundedPrim a
+</span><a href="#local-6989586621679092076"><span class="hs-identifier hs-var hs-var">fixed5</span></a></span></span><span> </span><span id="local-6989586621679092064"><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8))))
+</span><a href="#local-6989586621679092064"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim a -&gt; BoundedPrim a
+forall a. FixedPrim a -&gt; BoundedPrim a
+</span><span class="hs-identifier hs-var">E.liftFixedToBounded</span></span><span> </span><span class="annot"><span class="annottext">(FixedPrim a -&gt; BoundedPrim a) -&gt; FixedPrim a -&gt; BoundedPrim a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8))))
+-&gt; a -&gt; (Word8, (Word8, (Word8, (Word8, Word8))))
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(Word8, (Word8, (Word8, (Word8, Word8))))
+</span><a href="#local-6989586621679092064"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; (Word8, (Word8, (Word8, (Word8, Word8)))))
+-&gt; FixedPrim (Word8, (Word8, (Word8, (Word8, Word8))))
+-&gt; FixedPrim a
+forall (f :: * -&gt; *) b a. Contravariant f =&gt; (b -&gt; a) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&gt;$&lt;</span></span><span>
+</span><span id="line-128"></span><span>      </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+-&gt; FixedPrim (Word8, (Word8, (Word8, Word8)))
+-&gt; FixedPrim (Word8, (Word8, (Word8, (Word8, Word8))))
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+-&gt; FixedPrim (Word8, (Word8, Word8))
+-&gt; FixedPrim (Word8, (Word8, (Word8, Word8)))
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+-&gt; FixedPrim (Word8, Word8) -&gt; FixedPrim (Word8, (Word8, Word8))
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; FixedPrim Word8 -&gt; FixedPrim (Word8, Word8)
+forall (f :: * -&gt; *) a b. Monoidal f =&gt; f a -&gt; f b -&gt; f (a, b)
+</span><span class="hs-operator hs-var">&gt;*&lt;</span></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><span class="hs-identifier hs-var">E.word8</span></span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span class="hs-keyword">type</span><span> </span><span id="TAttribute"><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-var">TAttribute</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Content</span></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span class="annot"><a href="Text.XML.Stream.Token.html#foldAttrs"><span class="hs-identifier hs-type">foldAttrs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span> </span><span class="hs-comment">-- ^ before</span><span>
+</span><span id="line-133"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-type">TAttribute</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-134"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-135"></span><span id="foldAttrs"><span class="annot"><span class="annottext">foldAttrs :: Builder -&gt; [TAttribute] -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#foldAttrs"><span class="hs-identifier hs-var hs-var">foldAttrs</span></a></span></span><span> </span><span id="local-6989586621679092063"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679092063"><span class="hs-identifier hs-var">before</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-136"></span><span>    </span><span class="annot"><span class="annottext">(TAttribute -&gt; Builder) -&gt; [TAttribute] -&gt; Builder
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="annot"><span class="annottext">TAttribute -&gt; Builder
+forall (t :: * -&gt; *). Foldable t =&gt; (TName, t Content) -&gt; Builder
+</span><a href="#local-6989586621679092061"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-137"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-138"></span><span>    </span><span id="local-6989586621679092061"><span class="annot"><span class="annottext">go :: (TName, t Content) -&gt; Builder
+</span><a href="#local-6989586621679092061"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679092060"><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092060"><span class="hs-identifier hs-var">key</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092059"><span class="annot"><span class="annottext">t Content
+</span><a href="#local-6989586621679092059"><span class="hs-identifier hs-var">val</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-139"></span><span>      </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679092063"><span class="hs-identifier hs-var">before</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-140"></span><span>      </span><span class="annot"><span class="annottext">TName -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#tnameToText"><span class="hs-identifier hs-var">tnameToText</span></a></span><span> </span><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092060"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-141"></span><span>      </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;=\&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-142"></span><span>      </span><span class="annot"><span class="annottext">(Content -&gt; Builder) -&gt; t Content -&gt; Builder
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="annot"><span class="annottext">Content -&gt; Builder
+</span><a href="#local-6989586621679092058"><span class="hs-identifier hs-var">go'</span></a></span><span> </span><span class="annot"><span class="annottext">t Content
+</span><a href="#local-6989586621679092059"><span class="hs-identifier hs-var">val</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span>
+</span><span id="line-143"></span><span>      </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;\&quot;&quot;</span></span><span>
+</span><span id="line-144"></span><span>    </span><span id="local-6989586621679092058"><span class="annot"><span class="annottext">go' :: Content -&gt; Builder
+</span><a href="#local-6989586621679092058"><span class="hs-identifier hs-var hs-var">go'</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ContentText</span></span><span> </span><span id="local-6989586621679092057"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092057"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-145"></span><span>      </span><span class="annot"><span class="annottext">BoundedPrim Word8 -&gt; Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8BuilderEscaped</span></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8
+</span><a href="Text.XML.Stream.Token.html#charUtf8XmlEscaped"><span class="hs-identifier hs-var">charUtf8XmlEscaped</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092057"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-146"></span><span>    </span><span class="annot"><a href="#local-6989586621679092058"><span class="hs-identifier hs-var">go'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ContentEntity</span></span><span> </span><span id="local-6989586621679092056"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092056"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;&amp;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092056"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><span class="hs-string">&quot;;&quot;</span></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IsString</span></span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621679092053"><span class="annot"><span class="annottext">fromString :: String -&gt; TName
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fromString</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Text -&gt; TName
+</span><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-var">TName</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; TName) -&gt; (String -&gt; Text) -&gt; String -&gt; TName
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-keyword">data</span><span> </span><span id="NSLevel"><span class="annot"><a href="Text.XML.Stream.Token.html#NSLevel"><span class="hs-identifier hs-var">NSLevel</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="NSLevel"><span class="annot"><a href="Text.XML.Stream.Token.html#NSLevel"><span class="hs-identifier hs-var">NSLevel</span></a></span></span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="defaultNS"><span class="annot"><span class="annottext">NSLevel -&gt; Maybe Text
+</span><a href="Text.XML.Stream.Token.html#defaultNS"><span class="hs-identifier hs-var hs-var">defaultNS</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="prefixes"><span class="annot"><span class="annottext">NSLevel -&gt; Map Text Text
+</span><a href="Text.XML.Stream.Token.html#prefixes"><span class="hs-identifier hs-var hs-var">prefixes</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Map</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679092042"><span id="local-6989586621679092044"><span id="local-6989586621679092046"><span class="annot"><span class="annottext">Int -&gt; NSLevel -&gt; ShowS
+[NSLevel] -&gt; ShowS
+NSLevel -&gt; String
+(Int -&gt; NSLevel -&gt; ShowS)
+-&gt; (NSLevel -&gt; String) -&gt; ([NSLevel] -&gt; ShowS) -&gt; Show NSLevel
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [NSLevel] -&gt; ShowS
+$cshowList :: [NSLevel] -&gt; ShowS
+show :: NSLevel -&gt; String
+$cshow :: NSLevel -&gt; String
+showsPrec :: Int -&gt; NSLevel -&gt; ShowS
+$cshowsPrec :: Int -&gt; NSLevel -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span class="annot"><a href="Text.XML.Stream.Token.html#nubAttrs"><span class="hs-identifier hs-type">nubAttrs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-type">TAttribute</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Stream.Token.html#TAttribute"><span class="hs-identifier hs-type">TAttribute</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-158"></span><span id="nubAttrs"><span class="annot"><span class="annottext">nubAttrs :: [TAttribute] -&gt; [TAttribute]
+</span><a href="Text.XML.Stream.Token.html#nubAttrs"><span class="hs-identifier hs-var hs-var">nubAttrs</span></a></span></span><span> </span><span id="local-6989586621679092041"><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092041"><span class="hs-identifier hs-var">orig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-159"></span><span>    </span><span class="annot"><span class="annottext">[TAttribute] -&gt; [TAttribute]
+</span><a href="#local-6989586621679092040"><span class="hs-identifier hs-var">front</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-160"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-161"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679092040"><span class="annot"><span class="annottext">[TAttribute] -&gt; [TAttribute]
+</span><a href="#local-6989586621679092040"><span class="hs-identifier hs-var">front</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Set TName
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(([TAttribute] -&gt; [TAttribute], Set TName)
+ -&gt; TAttribute -&gt; ([TAttribute] -&gt; [TAttribute], Set TName))
+-&gt; ([TAttribute] -&gt; [TAttribute], Set TName)
+-&gt; [TAttribute]
+-&gt; ([TAttribute] -&gt; [TAttribute], Set TName)
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl'</span></span><span> </span><span class="annot"><span class="annottext">([TAttribute] -&gt; [TAttribute], Set TName)
+-&gt; TAttribute -&gt; ([TAttribute] -&gt; [TAttribute], Set TName)
+forall a b c.
+Ord a =&gt;
+([(a, b)] -&gt; c, Set a) -&gt; (a, b) -&gt; ([(a, b)] -&gt; c, Set a)
+</span><a href="#local-6989586621679092039"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[TAttribute] -&gt; [TAttribute]
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Set TName
+forall a. Set a
+</span><span class="hs-identifier hs-var">Set.empty</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TAttribute]
+</span><a href="#local-6989586621679092041"><span class="hs-identifier hs-var">orig</span></a></span><span>
+</span><span id="line-162"></span><span>    </span><span id="local-6989586621679092039"><span class="annot"><span class="annottext">go :: ([(a, b)] -&gt; c, Set a) -&gt; (a, b) -&gt; ([(a, b)] -&gt; c, Set a)
+</span><a href="#local-6989586621679092039"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679092036"><span class="annot"><span class="annottext">[(a, b)] -&gt; c
+</span><a href="#local-6989586621679092036"><span class="hs-identifier hs-var">dlist</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092035"><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679092035"><span class="hs-identifier hs-var">used</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679092034"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679092034"><span class="hs-identifier hs-var">k</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092033"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679092033"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679092034"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Set a -&gt; Bool
+forall a. Ord a =&gt; a -&gt; Set a -&gt; Bool
+</span><span class="hs-operator hs-var">`Set.member`</span></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679092035"><span class="hs-identifier hs-var">used</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[(a, b)] -&gt; c
+</span><a href="#local-6989586621679092036"><span class="hs-identifier hs-var">dlist</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679092035"><span class="hs-identifier hs-var">used</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-164"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[(a, b)] -&gt; c
+</span><a href="#local-6989586621679092036"><span class="hs-identifier hs-var">dlist</span></a></span><span> </span><span class="annot"><span class="annottext">([(a, b)] -&gt; c) -&gt; ([(a, b)] -&gt; [(a, b)]) -&gt; [(a, b)] -&gt; c
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679092034"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679092033"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span class="annot"><span class="annottext">(a, b) -&gt; [(a, b)] -&gt; [(a, b)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a -&gt; Set a -&gt; Set a
+forall a. Ord a =&gt; a -&gt; Set a -&gt; Set a
+</span><span class="hs-identifier hs-var">Set.insert</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679092034"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679092035"><span class="hs-identifier hs-var">used</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span>
+</span><span id="line-166"></span><span class="annot"><a href="Text.XML.Stream.Token.html#splitTName"><span class="hs-identifier hs-type">splitTName</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span>
+</span><span id="line-167"></span><span id="splitTName"><span class="annot"><span class="annottext">splitTName :: TName -&gt; TName
+</span><a href="Text.XML.Stream.Token.html#splitTName"><span class="hs-identifier hs-var hs-var">splitTName</span></a></span></span><span> </span><span id="local-6989586621679092030"><span class="annot"><span class="annottext">x :: TName
+</span><a href="#local-6989586621679092030"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092030"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-168"></span><span class="annot"><a href="Text.XML.Stream.Token.html#splitTName"><span class="hs-identifier hs-var">splitTName</span></a></span><span> </span><span id="local-6989586621679092029"><span class="annot"><span class="annottext">x :: TName
+</span><a href="#local-6989586621679092029"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-type">TName</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span id="local-6989586621679092028"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092028"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-169"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Bool
+</span><span class="hs-identifier hs-var">T.null</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092026"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TName
+</span><a href="#local-6989586621679092029"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-170"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Text -&gt; TName
+</span><a href="Text.XML.Stream.Token.html#TName"><span class="hs-identifier hs-var">TName</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092025"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; TName) -&gt; Text -&gt; TName
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Text -&gt; Text
+</span><span class="hs-identifier hs-var">T.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092026"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-171"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-172"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679092025"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092025"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679092026"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092026"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; Text -&gt; (Text, Text)
+</span><span class="hs-identifier hs-var">T.break</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">':'</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092028"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="annot"><a href="Text.XML.Stream.Token.html#escCDATA"><span class="hs-identifier hs-type">escCDATA</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-175"></span><span id="escCDATA"><span class="annot"><span class="annottext">escCDATA :: Text -&gt; Builder
+</span><a href="Text.XML.Stream.Token.html#escCDATA"><span class="hs-identifier hs-var hs-var">escCDATA</span></a></span></span><span> </span><span id="local-6989586621679092022"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092022"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><span class="hs-identifier hs-var">encodeUtf8Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Text -&gt; Text
+</span><span class="hs-identifier hs-var">T.replace</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;]]&gt;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;]]]]&gt;&lt;![CDATA[&gt;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679092022"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-176"></span></pre></body></html>

@@ -1,0 +1,496 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE RankNTypes, ScopedTypeVariables, CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      :  Data.Generics.Schemes</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Copyright   :  (c) The University of Glasgow, CWI 2001--2003</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- License     :  BSD-style (see the LICENSE file)</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Maintainer  :  generics@haskell.org</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Portability :  non-portable (local universal quantification)</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- \&quot;Scrap your boilerplate\&quot; --- Generic programming in Haskell</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- See &lt;http://www.cs.uu.nl/wiki/GenericProgramming/SYB&gt;. The present module</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- provides frequently used generic traversal schemes.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Generics.Schemes</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everywhere"><span class="hs-identifier">everywhere</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everywhere%27"><span class="hs-identifier">everywhere'</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everywhereBut"><span class="hs-identifier">everywhereBut</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everywhereM"><span class="hs-identifier">everywhereM</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#somewhere"><span class="hs-identifier">somewhere</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier">everything</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everythingBut"><span class="hs-identifier">everythingBut</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#everythingWithContext"><span class="hs-identifier">everythingWithContext</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#listify"><span class="hs-identifier">listify</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#something"><span class="hs-identifier">something</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#synthesize"><span class="hs-identifier">synthesize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gsize"><span class="hs-identifier">gsize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#glength"><span class="hs-identifier">glength</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gdepth"><span class="hs-identifier">gdepth</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gcount"><span class="hs-identifier">gcount</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-35"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gnodecount"><span class="hs-identifier">gnodecount</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-36"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gtypecount"><span class="hs-identifier">gtypecount</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-37"></span><span>        </span><span class="annot"><a href="Data.Generics.Schemes.html#gfindtype"><span class="hs-identifier">gfindtype</span></a></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span> </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#ifdef __HADDOCK__
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Prelude</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html"><span class="hs-identifier">Data.Generics.Aliases</span></a></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- | Apply a transformation everywhere in bottom-up manner</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="annot"><a href="Data.Generics.Schemes.html#everywhere"><span class="hs-identifier hs-type">everywhere</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044482"><span class="annot"><a href="#local-6989586621679044482"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044482"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044482"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044482"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>           </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044382"><span class="annot"><a href="#local-6989586621679044382"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044382"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044382"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044382"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- Use gmapT to recurse into immediate subterms;</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- recall: gmapT preserves the outermost constructor;</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- post-process recursively transformed result via f</span><span>
+</span><span id="line-58"></span><span class="hs-comment">--</span><span>
+</span><span id="line-59"></span><span id="everywhere"><span class="annot"><span class="annottext">everywhere :: (forall a. Data a =&gt; a -&gt; a) -&gt; forall a. Data a =&gt; a -&gt; a
+</span><a href="Data.Generics.Schemes.html#everywhere"><span class="hs-identifier hs-var hs-var">everywhere</span></a></span></span><span> </span><span id="local-6989586621679044381"><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044381"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044380"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><a href="#local-6989586621679044380"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044379"><span class="annot"><a href="#local-6989586621679044379"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044379"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044379"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044379"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span id="local-6989586621679044380"><span class="annot"><span class="annottext">go :: a -&gt; a
+</span><a href="#local-6989586621679044380"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044381"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; (a -&gt; a) -&gt; a -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+forall a. Data a =&gt; (forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">gmapT</span></span><span> </span><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044380"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- | Apply a transformation everywhere in top-down manner</span><span>
+</span><span id="line-65"></span><span class="annot"><a href="Data.Generics.Schemes.html#everywhere%27"><span class="hs-identifier hs-type">everywhere'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044376"><span class="annot"><a href="#local-6989586621679044376"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044376"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044376"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044376"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span>            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044375"><span class="annot"><a href="#local-6989586621679044375"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044375"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044375"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044375"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- Arguments of (.) are flipped compared to everywhere</span><span>
+</span><span id="line-69"></span><span id="everywhere%27"><span class="annot"><span class="annottext">everywhere' :: (forall a. Data a =&gt; a -&gt; a) -&gt; forall a. Data a =&gt; a -&gt; a
+</span><a href="Data.Generics.Schemes.html#everywhere%27"><span class="hs-identifier hs-var hs-var">everywhere'</span></a></span></span><span> </span><span id="local-6989586621679044374"><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044374"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044373"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><a href="#local-6989586621679044373"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044372"><span class="annot"><a href="#local-6989586621679044372"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044372"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044372"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044372"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621679044373"><span class="annot"><span class="annottext">go :: a -&gt; a
+</span><a href="#local-6989586621679044373"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+forall a. Data a =&gt; (forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">gmapT</span></span><span> </span><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044373"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; (a -&gt; a) -&gt; a -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044374"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- | Variation on everywhere with an extra stop condition</span><span>
+</span><span id="line-76"></span><span class="annot"><a href="Data.Generics.Schemes.html#everywhereBut"><span class="hs-identifier hs-type">everywhereBut</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericT"><span class="hs-identifier hs-type">GenericT</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericT"><span class="hs-identifier hs-type">GenericT</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- Guarded to let traversal cease if predicate q holds for x</span><span>
+</span><span id="line-79"></span><span id="everywhereBut"><span class="annot"><span class="annottext">everywhereBut :: GenericQ Bool
+-&gt; (forall a. Data a =&gt; a -&gt; a) -&gt; forall a. Data a =&gt; a -&gt; a
+</span><a href="Data.Generics.Schemes.html#everywhereBut"><span class="hs-identifier hs-var hs-var">everywhereBut</span></a></span></span><span> </span><span id="local-6989586621679044370"><span class="annot"><span class="annottext">GenericQ Bool
+</span><a href="#local-6989586621679044370"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span id="local-6989586621679044369"><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044369"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044368"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-80"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-81"></span><span>    </span><span class="annot"><a href="#local-6989586621679044368"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericT"><span class="hs-identifier hs-type">GenericT</span></a></span><span>
+</span><span id="line-82"></span><span>    </span><span id="local-6989586621679044368"><span class="annot"><span class="annottext">go :: a -&gt; a
+</span><a href="#local-6989586621679044368"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044367"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044367"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-83"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">a -&gt; Bool
+GenericQ Bool
+</span><a href="#local-6989586621679044370"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044367"><span class="hs-identifier hs-var">x</span></a></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044367"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-84"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044369"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+forall a. Data a =&gt; (forall a. Data a =&gt; a -&gt; a) -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">gmapT</span></span><span> </span><span class="annot"><span class="annottext">forall a. Data a =&gt; a -&gt; a
+</span><a href="#local-6989586621679044368"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044367"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- | Monadic variation on everywhere</span><span>
+</span><span id="line-88"></span><span class="annot"><a href="Data.Generics.Schemes.html#everywhereM"><span class="hs-identifier hs-type">everywhereM</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044366"><span class="annot"><a href="#local-6989586621679044366"><span class="hs-identifier hs-type">m</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679044366"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044366"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044366"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- Bottom-up order is also reflected in order of do-actions</span><span>
+</span><span id="line-91"></span><span id="everywhereM"><span class="annot"><span class="annottext">everywhereM :: GenericM m -&gt; GenericM m
+</span><a href="Data.Generics.Schemes.html#everywhereM"><span class="hs-identifier hs-var hs-var">everywhereM</span></a></span></span><span> </span><span id="local-6989586621679044365"><span class="annot"><span class="annottext">GenericM m
+</span><a href="#local-6989586621679044365"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+GenericM m
+</span><a href="#local-6989586621679044364"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-93"></span><span>    </span><span class="annot"><a href="#local-6989586621679044364"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044366"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621679044364"><span class="annot"><span class="annottext">go :: a -&gt; m a
+</span><a href="#local-6989586621679044364"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044363"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044363"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-95"></span><span>      </span><span id="local-6989586621679044362"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044362"><span class="hs-identifier hs-var">x'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">GenericM m -&gt; a -&gt; m a
+forall a (m :: * -&gt; *).
+(Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">gmapM</span></span><span> </span><span class="annot"><span class="annottext">GenericM m
+</span><a href="#local-6989586621679044364"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044363"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-96"></span><span>      </span><span class="annot"><span class="annottext">a -&gt; m a
+GenericM m
+</span><a href="#local-6989586621679044365"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044362"><span class="hs-identifier hs-var">x'</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- | Apply a monadic transformation at least somewhere</span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Data.Generics.Schemes.html#somewhere"><span class="hs-identifier hs-type">somewhere</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044360"><span class="annot"><a href="#local-6989586621679044360"><span class="hs-identifier hs-type">m</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadPlus</span></span><span> </span><span class="annot"><a href="#local-6989586621679044360"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044360"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044360"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- We try &quot;f&quot; in top-down manner, but descent into &quot;x&quot; when we fail</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- at the root of the term. The transformation fails if &quot;f&quot; fails</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- everywhere, say succeeds nowhere.</span><span>
+</span><span id="line-105"></span><span class="hs-comment">--</span><span>
+</span><span id="line-106"></span><span id="somewhere"><span class="annot"><span class="annottext">somewhere :: GenericM m -&gt; GenericM m
+</span><a href="Data.Generics.Schemes.html#somewhere"><span class="hs-identifier hs-var hs-var">somewhere</span></a></span></span><span> </span><span id="local-6989586621679044359"><span class="annot"><span class="annottext">GenericM m
+</span><a href="#local-6989586621679044359"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+GenericM m
+</span><a href="#local-6989586621679044358"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-108"></span><span>    </span><span class="annot"><a href="#local-6989586621679044358"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericM"><span class="hs-identifier hs-type">GenericM</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044360"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679044358"><span class="annot"><span class="annottext">go :: a -&gt; m a
+</span><a href="#local-6989586621679044358"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044357"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044357"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+GenericM m
+</span><a href="#local-6989586621679044359"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044357"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">m a -&gt; m a -&gt; m a
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m a -&gt; m a
+</span><span class="hs-operator hs-var">`mplus`</span></span><span> </span><span class="annot"><span class="annottext">GenericM m -&gt; a -&gt; m a
+forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">gmapMp</span></span><span> </span><span class="annot"><span class="annottext">GenericM m
+</span><a href="#local-6989586621679044358"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044357"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- | Summarise all nodes in top-down, left-to-right order</span><span>
+</span><span id="line-113"></span><span class="annot"><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier hs-type">everything</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044438"><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- Apply f to x to summarise top-level node;</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- use gmapQ to recurse into immediate subterms;</span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- use ordinary foldl to reduce list of intermediate results</span><span>
+</span><span id="line-118"></span><span class="hs-comment">--</span><span>
+</span><span id="line-119"></span><span id="everything"><span class="annot"><span class="annottext">everything :: (r -&gt; r -&gt; r) -&gt; GenericQ r -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier hs-var hs-var">everything</span></a></span></span><span> </span><span id="local-6989586621679044354"><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044354"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679044353"><span class="annot"><span class="annottext">GenericQ r
+</span><a href="#local-6989586621679044353"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; r
+GenericQ r
+</span><a href="#local-6989586621679044352"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-120"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-121"></span><span>    </span><span class="annot"><a href="#local-6989586621679044352"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044438"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679044352"><span class="annot"><span class="annottext">go :: a -&gt; r
+</span><a href="#local-6989586621679044352"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044351"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044351"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(r -&gt; r -&gt; r) -&gt; r -&gt; [r] -&gt; r
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044354"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; r
+GenericQ r
+</span><a href="#local-6989586621679044353"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044351"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GenericQ r -&gt; a -&gt; [r]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="annot"><span class="annottext">GenericQ r
+</span><a href="#local-6989586621679044352"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044351"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span class="hs-comment">-- | Variation of &quot;everything&quot; with an added stop condition</span><span>
+</span><span id="line-125"></span><span class="annot"><a href="Data.Generics.Schemes.html#everythingBut"><span class="hs-identifier hs-type">everythingBut</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044348"><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-126"></span><span id="everythingBut"><span class="annot"><span class="annottext">everythingBut :: (r -&gt; r -&gt; r) -&gt; GenericQ (r, Bool) -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everythingBut"><span class="hs-identifier hs-var hs-var">everythingBut</span></a></span></span><span> </span><span id="local-6989586621679044347"><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044347"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679044346"><span class="annot"><span class="annottext">GenericQ (r, Bool)
+</span><a href="#local-6989586621679044346"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; r
+GenericQ r
+</span><a href="#local-6989586621679044345"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>    </span><span class="annot"><a href="#local-6989586621679044345"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044348"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-129"></span><span>    </span><span id="local-6989586621679044345"><span class="annot"><span class="annottext">go :: a -&gt; r
+</span><a href="#local-6989586621679044345"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044344"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044344"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679044343"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044343"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679044342"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679044342"><span class="hs-identifier hs-var">stop</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; (r, Bool)
+GenericQ (r, Bool)
+</span><a href="#local-6989586621679044346"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044344"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-130"></span><span>           </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679044342"><span class="hs-identifier hs-var">stop</span></a></span><span>
+</span><span id="line-131"></span><span>                </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044343"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-132"></span><span>                </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">(r -&gt; r -&gt; r) -&gt; r -&gt; [r] -&gt; r
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044347"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044343"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GenericQ r -&gt; a -&gt; [r]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="annot"><span class="annottext">GenericQ r
+</span><a href="#local-6989586621679044345"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044344"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- | Summarise all nodes in top-down, left-to-right order, carrying some state</span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- down the tree during the computation, but not left-to-right to siblings.</span><span>
+</span><span id="line-136"></span><span class="annot"><a href="Data.Generics.Schemes.html#everythingWithContext"><span class="hs-identifier hs-type">everythingWithContext</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044341"><span class="annot"><a href="#local-6989586621679044341"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679044340"><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679044341"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044341"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679044341"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-137"></span><span id="everythingWithContext"><span class="annot"><span class="annottext">everythingWithContext :: s -&gt; (r -&gt; r -&gt; r) -&gt; GenericQ (s -&gt; (r, s)) -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everythingWithContext"><span class="hs-identifier hs-var hs-var">everythingWithContext</span></a></span></span><span> </span><span id="local-6989586621679044339"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044339"><span class="hs-identifier hs-var">s0</span></a></span></span><span> </span><span id="local-6989586621679044338"><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044338"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679044337"><span class="annot"><span class="annottext">GenericQ (s -&gt; (r, s))
+</span><a href="#local-6989586621679044337"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; GenericQ r
+</span><a href="#local-6989586621679044336"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044339"><span class="hs-identifier hs-var">s0</span></a></span><span>
+</span><span id="line-138"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-139"></span><span>    </span><span class="annot"><a href="#local-6989586621679044336"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679044341"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044340"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621679044336"><span class="annot"><span class="annottext">go :: s -&gt; GenericQ r
+</span><a href="#local-6989586621679044336"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044335"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044335"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679044334"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044334"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(r -&gt; r -&gt; r) -&gt; r -&gt; [r] -&gt; r
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+</span><a href="#local-6989586621679044338"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044333"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GenericQ r -&gt; a -&gt; [r]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; GenericQ r
+</span><a href="#local-6989586621679044336"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044332"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044334"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679044333"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044333"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679044332"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044332"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; s -&gt; (r, s)
+GenericQ (s -&gt; (r, s))
+</span><a href="#local-6989586621679044337"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044334"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044335"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- | Get a list of all entities that meet a predicate</span><span>
+</span><span id="line-144"></span><span id="local-6989586621679044331"><span class="annot"><a href="Data.Generics.Schemes.html#listify"><span class="hs-identifier hs-type">listify</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679044331"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044331"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679044331"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">]</span></span><span>
+</span><span id="line-145"></span><span id="listify"><span class="annot"><span class="annottext">listify :: (r -&gt; Bool) -&gt; GenericQ [r]
+</span><a href="Data.Generics.Schemes.html#listify"><span class="hs-identifier hs-var hs-var">listify</span></a></span></span><span> </span><span id="local-6989586621679044330"><span class="annot"><span class="annottext">r -&gt; Bool
+</span><a href="#local-6989586621679044330"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">([r] -&gt; [r] -&gt; [r]) -&gt; GenericQ [r] -&gt; GenericQ [r]
+forall r. (r -&gt; r -&gt; r) -&gt; GenericQ r -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier hs-var">everything</span></a></span><span> </span><span class="annot"><span class="annottext">[r] -&gt; [r] -&gt; [r]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">(++)</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[r] -&gt; (r -&gt; [r]) -&gt; a -&gt; [r]
+forall a b r. (Typeable a, Typeable b) =&gt; r -&gt; (b -&gt; r) -&gt; a -&gt; r
+</span><a href="Data.Generics.Aliases.html#mkQ"><span class="hs-operator hs-var">`mkQ`</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679044328"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044328"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">r -&gt; Bool
+</span><a href="#local-6989586621679044330"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044328"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679044328"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-keyword">else</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span class="hs-comment">-- | Look up a subterm by means of a maybe-typed filter</span><span>
+</span><span id="line-149"></span><span id="local-6989586621679044327"><span class="annot"><a href="Data.Generics.Schemes.html#something"><span class="hs-identifier hs-type">something</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679044327"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679044327"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- &quot;something&quot; can be defined in terms of &quot;everything&quot;</span><span>
+</span><span id="line-152"></span><span class="hs-comment">-- when a suitable &quot;choice&quot; operator is used for reduction</span><span>
+</span><span id="line-153"></span><span class="hs-comment">--</span><span>
+</span><span id="line-154"></span><span id="something"><span class="annot"><span class="annottext">something :: GenericQ (Maybe u) -&gt; GenericQ (Maybe u)
+</span><a href="Data.Generics.Schemes.html#something"><span class="hs-identifier hs-var hs-var">something</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Maybe u -&gt; Maybe u -&gt; Maybe u)
+-&gt; GenericQ (Maybe u) -&gt; GenericQ (Maybe u)
+forall r. (r -&gt; r -&gt; r) -&gt; GenericQ r -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier hs-var">everything</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe u -&gt; Maybe u -&gt; Maybe u
+forall a. Maybe a -&gt; Maybe a -&gt; Maybe a
+</span><a href="Data.Generics.Aliases.html#orElse"><span class="hs-identifier hs-var">orElse</span></a></span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span class="hs-comment">-- | Bottom-up synthesis of a data structure;</span><span>
+</span><span id="line-158"></span><span class="hs-comment">--   1st argument z is the initial element for the synthesis;</span><span>
+</span><span id="line-159"></span><span class="hs-comment">--   2nd argument o is for reduction of results from subterms;</span><span>
+</span><span id="line-160"></span><span class="hs-comment">--   3rd argument f updates the synthesised data according to the given term</span><span>
+</span><span id="line-161"></span><span class="hs-comment">--</span><span>
+</span><span id="line-162"></span><span class="annot"><a href="Data.Generics.Schemes.html#synthesize"><span class="hs-identifier hs-type">synthesize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679044325"><span class="annot"><a href="#local-6989586621679044325"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679044324"><span class="annot"><a href="#local-6989586621679044324"><span class="hs-identifier hs-type">t</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679044325"><span class="hs-identifier hs-type">s</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044324"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044325"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044325"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679044325"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044324"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044324"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-163"></span><span id="synthesize"><span class="annot"><span class="annottext">synthesize :: s -&gt; (t -&gt; s -&gt; s) -&gt; GenericQ (s -&gt; t) -&gt; GenericQ t
+</span><a href="Data.Generics.Schemes.html#synthesize"><span class="hs-identifier hs-var hs-var">synthesize</span></a></span></span><span> </span><span id="local-6989586621679044323"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044323"><span class="hs-identifier hs-var">z</span></a></span></span><span> </span><span id="local-6989586621679044322"><span class="annot"><span class="annottext">t -&gt; s -&gt; s
+</span><a href="#local-6989586621679044322"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span id="local-6989586621679044321"><span class="annot"><span class="annottext">GenericQ (s -&gt; t)
+</span><a href="#local-6989586621679044321"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; t
+GenericQ t
+</span><a href="#local-6989586621679044320"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-164"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-165"></span><span>    </span><span class="annot"><a href="#local-6989586621679044320"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679044324"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-166"></span><span>    </span><span id="local-6989586621679044320"><span class="annot"><span class="annottext">go :: a -&gt; t
+</span><a href="#local-6989586621679044320"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679044319"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044319"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; s -&gt; t
+GenericQ (s -&gt; t)
+</span><a href="#local-6989586621679044321"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044319"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(t -&gt; s -&gt; s) -&gt; s -&gt; [t] -&gt; s
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="annot"><span class="annottext">t -&gt; s -&gt; s
+</span><a href="#local-6989586621679044322"><span class="hs-identifier hs-var">o</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679044323"><span class="hs-identifier hs-var">z</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GenericQ t -&gt; a -&gt; [t]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="annot"><span class="annottext">GenericQ t
+</span><a href="#local-6989586621679044320"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044319"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span class="hs-comment">-- | Compute size of an arbitrary data structure</span><span>
+</span><span id="line-170"></span><span id="local-6989586621679044317"><span class="annot"><a href="Data.Generics.Schemes.html#gsize"><span class="hs-identifier hs-type">gsize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044317"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044317"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-171"></span><span id="gsize"><span class="annot"><span class="annottext">gsize :: a -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gsize"><span class="hs-identifier hs-var hs-var">gsize</span></a></span></span><span> </span><span id="local-6989586621679044316"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044316"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; Int
+forall (t :: * -&gt; *) a. (Foldable t, Num a) =&gt; t a -&gt; a
+</span><span class="hs-identifier hs-var">sum</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall d. Data d =&gt; d -&gt; Int) -&gt; a -&gt; [Int]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="annot"><span class="annottext">forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gsize"><span class="hs-identifier hs-var">gsize</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044316"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- | Count the number of immediate subterms of the given term</span><span>
+</span><span id="line-175"></span><span class="annot"><a href="Data.Generics.Schemes.html#glength"><span class="hs-identifier hs-type">glength</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-176"></span><span id="glength"><span class="annot"><span class="annottext">glength :: a -&gt; Int
+</span><a href="Data.Generics.Schemes.html#glength"><span class="hs-identifier hs-var hs-var">glength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[()] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><span class="hs-identifier hs-var">length</span></span><span> </span><span class="annot"><span class="annottext">([()] -&gt; Int) -&gt; (a -&gt; [()]) -&gt; a -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall d. Data d =&gt; d -&gt; ()) -&gt; a -&gt; [()]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; d -&gt; ()
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span>
+</span><span id="line-178"></span><span>
+</span><span id="line-179"></span><span class="hs-comment">-- | Determine depth of the given term</span><span>
+</span><span id="line-180"></span><span class="annot"><a href="Data.Generics.Schemes.html#gdepth"><span class="hs-identifier hs-type">gdepth</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-181"></span><span id="gdepth"><span class="annot"><span class="annottext">gdepth :: a -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gdepth"><span class="hs-identifier hs-var hs-var">gdepth</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">(+)</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; (a -&gt; Int) -&gt; a -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int -&gt; Int) -&gt; Int -&gt; [Int] -&gt; Int
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">max</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">([Int] -&gt; Int) -&gt; (a -&gt; [Int]) -&gt; a -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall d. Data d =&gt; d -&gt; Int) -&gt; a -&gt; [Int]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="annot"><span class="annottext">forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gdepth"><span class="hs-identifier hs-var">gdepth</span></a></span><span>
+</span><span id="line-182"></span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- | Determine the number of all suitable nodes in a given term</span><span>
+</span><span id="line-185"></span><span class="annot"><a href="Data.Generics.Schemes.html#gcount"><span class="hs-identifier hs-type">gcount</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-186"></span><span id="gcount"><span class="annot"><span class="annottext">gcount :: GenericQ Bool -&gt; forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gcount"><span class="hs-identifier hs-var hs-var">gcount</span></a></span></span><span> </span><span id="local-6989586621679044310"><span class="annot"><span class="annottext">GenericQ Bool
+</span><a href="#local-6989586621679044310"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>  </span><span class="annot"><span class="annottext">(Int -&gt; Int -&gt; Int)
+-&gt; (forall d. Data d =&gt; d -&gt; Int) -&gt; forall d. Data d =&gt; d -&gt; Int
+forall r. (r -&gt; r -&gt; r) -&gt; GenericQ r -&gt; GenericQ r
+</span><a href="Data.Generics.Schemes.html#everything"><span class="hs-identifier hs-var">everything</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">(+)</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679044309"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044309"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">a -&gt; Bool
+GenericQ Bool
+</span><a href="#local-6989586621679044310"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044309"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span>
+</span><span id="line-188"></span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- | Determine the number of all nodes in a given term</span><span>
+</span><span id="line-190"></span><span class="annot"><a href="Data.Generics.Schemes.html#gnodecount"><span class="hs-identifier hs-type">gnodecount</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-191"></span><span id="gnodecount"><span class="annot"><span class="annottext">gnodecount :: a -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gnodecount"><span class="hs-identifier hs-var hs-var">gnodecount</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GenericQ Bool -&gt; forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gcount"><span class="hs-identifier hs-var">gcount</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; a -&gt; Bool
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">)</span><span>
+</span><span id="line-192"></span><span>
+</span><span id="line-193"></span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- | Determine the number of nodes of a given type in a given term</span><span>
+</span><span id="line-195"></span><span id="local-6989586621679044308"><span class="annot"><a href="Data.Generics.Schemes.html#gtypecount"><span class="hs-identifier hs-type">gtypecount</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679044308"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044308"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Generics.Aliases.html#GenericQ"><span class="hs-identifier hs-type">GenericQ</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-196"></span><span id="gtypecount"><span class="annot"><span class="annottext">gtypecount :: a -&gt; forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gtypecount"><span class="hs-identifier hs-var hs-var">gtypecount</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679044307"><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-glyph">::</span><span class="annot"><a href="#local-6989586621679044307"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GenericQ Bool -&gt; forall d. Data d =&gt; d -&gt; Int
+</span><a href="Data.Generics.Schemes.html#gcount"><span class="hs-identifier hs-var">gcount</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; (a -&gt; Bool) -&gt; a -&gt; Bool
+forall a b r. (Typeable a, Typeable b) =&gt; r -&gt; (b -&gt; r) -&gt; a -&gt; r
+</span><a href="Data.Generics.Aliases.html#mkQ"><span class="hs-operator hs-var">`mkQ`</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-glyph">::</span><span class="annot"><a href="#local-6989586621679044307"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-197"></span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span class="hs-comment">-- | Find (unambiguously) an immediate subterm of a given type</span><span>
+</span><span id="line-200"></span><span id="local-6989586621679044305"><span id="local-6989586621679044306"><span class="annot"><a href="Data.Generics.Schemes.html#gfindtype"><span class="hs-identifier hs-type">gfindtype</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679044306"><span class="hs-identifier hs-type">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679044305"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679044306"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679044305"><span class="hs-identifier hs-type">y</span></a></span></span></span><span>
+</span><span id="line-201"></span><span id="gfindtype"><span class="annot"><span class="annottext">gfindtype :: x -&gt; Maybe y
+</span><a href="Data.Generics.Schemes.html#gfindtype"><span class="hs-identifier hs-var hs-var">gfindtype</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[y] -&gt; Maybe y
+forall a. [a] -&gt; Maybe a
+</span><a href="#local-6989586621679044304"><span class="hs-identifier hs-var">singleton</span></a></span><span>
+</span><span id="line-202"></span><span>          </span><span class="annot"><span class="annottext">([y] -&gt; Maybe y) -&gt; (x -&gt; [y]) -&gt; x -&gt; Maybe y
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">([y] -&gt; Maybe y -&gt; [y]) -&gt; [y] -&gt; [Maybe y] -&gt; [y]
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl</span></span><span> </span><span class="annot"><span class="annottext">[y] -&gt; Maybe y -&gt; [y]
+forall a. [a] -&gt; Maybe a -&gt; [a]
+</span><a href="#local-6989586621679044303"><span class="hs-identifier hs-var">unJust</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-203"></span><span>          </span><span class="annot"><span class="annottext">([Maybe y] -&gt; [y]) -&gt; (x -&gt; [Maybe y]) -&gt; x -&gt; [y]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall d. Data d =&gt; d -&gt; Maybe y) -&gt; x -&gt; [Maybe y]
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u]
+</span><span class="hs-identifier hs-var">gmapQ</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe y
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe y -&gt; (y -&gt; Maybe y) -&gt; d -&gt; Maybe y
+forall a b r. (Typeable a, Typeable b) =&gt; r -&gt; (b -&gt; r) -&gt; a -&gt; r
+</span><a href="Data.Generics.Aliases.html#mkQ"><span class="hs-operator hs-var">`mkQ`</span></a></span><span> </span><span class="annot"><span class="annottext">y -&gt; Maybe y
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span class="hs-special">)</span><span>
+</span><span id="line-204"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-205"></span><span>  </span><span id="local-6989586621679044303"><span class="annot"><span class="annottext">unJust :: [a] -&gt; Maybe a -&gt; [a]
+</span><a href="#local-6989586621679044303"><span class="hs-identifier hs-var hs-var">unJust</span></a></span></span><span> </span><span id="local-6989586621679044302"><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679044302"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679044301"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044301"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044301"><span class="hs-identifier hs-var">x</span></a></span><span class="annot"><span class="annottext">a -&gt; [a] -&gt; [a]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679044302"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-206"></span><span>  </span><span class="annot"><a href="#local-6989586621679044303"><span class="hs-identifier hs-var">unJust</span></a></span><span> </span><span id="local-6989586621679044300"><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679044300"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679044300"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-207"></span><span>  </span><span id="local-6989586621679044304"><span class="annot"><span class="annottext">singleton :: [a] -&gt; Maybe a
+</span><a href="#local-6989586621679044304"><span class="hs-identifier hs-var hs-var">singleton</span></a></span></span><span> </span><span class="hs-special">[</span><span id="local-6989586621679044299"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044299"><span class="hs-identifier hs-var">s</span></a></span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Maybe a
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679044299"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-208"></span><span>  </span><span class="annot"><a href="#local-6989586621679044304"><span class="hs-identifier hs-var">singleton</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe a
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-209"></span></pre></body></html>

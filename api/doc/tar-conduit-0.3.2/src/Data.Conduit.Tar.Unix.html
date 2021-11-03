@@ -1,0 +1,792 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP                 #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards     #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Conduit.Tar.Unix</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Unix.html#getFileInfo"><span class="hs-identifier">getFileInfo</span></a></span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Unix.html#restoreFileInternal"><span class="hs-identifier">restoreFileInternal</span></a></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Conduit</span></span><span>                       </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">throwM</span></span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception.Safe</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>                 </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">void</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">when</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">unless</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span>         </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S8</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Either</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Conduit.Tar.Types.html"><span class="hs-identifier">Data.Conduit.Tar.Types</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Foreign.C.Types</span></span><span>               </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">CTime</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">System.Directory</span></span><span>              </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Dir</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">System.Posix.Files</span></span><span>            </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Posix</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">System.Posix.User</span></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Posix</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">System.FilePath.Posix</span></span><span>         </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Posix</span></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="annot"><a href="Data.Conduit.Tar.Unix.html#getFileInfo"><span class="hs-identifier hs-type">getFileInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span>
+</span><span id="line-24"></span><span id="getFileInfo"><span class="annot"><span class="annottext">getFileInfo :: FilePath -&gt; IO FileInfo
+</span><a href="Data.Conduit.Tar.Unix.html#getFileInfo"><span class="hs-identifier hs-var hs-var">getFileInfo</span></a></span></span><span> </span><span id="local-6989586621679071697"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071697"><span class="hs-identifier hs-var">fpStr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679071696"><span class="annot"><span class="annottext">fp :: ByteString
+</span><a href="#local-6989586621679071696"><span class="hs-identifier hs-var hs-var">fp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#encodeFilePath"><span class="hs-identifier hs-var">encodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071697"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span id="local-6989586621679071694"><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO FileStatus
+</span><span class="hs-identifier hs-var">Posix.getSymbolicLinkStatus</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071697"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679071692"><span class="annot"><span class="annottext">uid :: UserID
+</span><a href="#local-6989586621679071692"><span class="hs-identifier hs-var hs-var">uid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; UserID
+</span><span class="hs-identifier hs-var">Posix.fileOwner</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>
+</span><span id="line-28"></span><span>        </span><span id="local-6989586621679071690"><span class="annot"><span class="annottext">gid :: GroupID
+</span><a href="#local-6989586621679071690"><span class="hs-identifier hs-var hs-var">gid</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; GroupID
+</span><span class="hs-identifier hs-var">Posix.fileGroup</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-comment">-- Allow for username/group retrieval failure, especially useful for non-tty environment.</span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-comment">-- Workaround for: https://ghc.haskell.org/trac/ghc/ticket/1487</span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-comment">-- Moreover, names are non-critical as they are not used during unarchival process</span><span>
+</span><span id="line-32"></span><span>    </span><span id="local-6989586621679071688"><span class="annot"><span class="annottext">Either IOException UserEntry
+</span><a href="#local-6989586621679071688"><span class="hs-identifier hs-var">euEntry</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IOException</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Posix.UserEntry</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO UserEntry -&gt; IO (Either IOException UserEntry)
+forall (m :: * -&gt; *) e a.
+(MonadCatch m, Exception e) =&gt;
+m a -&gt; m (Either e a)
+</span><span class="hs-identifier hs-var">try</span></span><span> </span><span class="annot"><span class="annottext">(IO UserEntry -&gt; IO (Either IOException UserEntry))
+-&gt; IO UserEntry -&gt; IO (Either IOException UserEntry)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">UserID -&gt; IO UserEntry
+</span><span class="hs-identifier hs-var">Posix.getUserEntryForID</span></span><span> </span><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679071692"><span class="hs-identifier hs-var">uid</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span id="local-6989586621679071685"><span class="annot"><span class="annottext">Either IOException GroupEntry
+</span><a href="#local-6989586621679071685"><span class="hs-identifier hs-var">egEntry</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IOException</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Posix.GroupEntry</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO GroupEntry -&gt; IO (Either IOException GroupEntry)
+forall (m :: * -&gt; *) e a.
+(MonadCatch m, Exception e) =&gt;
+m a -&gt; m (Either e a)
+</span><span class="hs-identifier hs-var">try</span></span><span> </span><span class="annot"><span class="annottext">(IO GroupEntry -&gt; IO (Either IOException GroupEntry))
+-&gt; IO GroupEntry -&gt; IO (Either IOException GroupEntry)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">GroupID -&gt; IO GroupEntry
+</span><span class="hs-identifier hs-var">Posix.getGroupEntryForID</span></span><span> </span><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679071690"><span class="hs-identifier hs-var">gid</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679071683"><span class="annot"><span class="annottext">FileType
+</span><a href="#local-6989586621679071683"><span class="hs-identifier hs-var">fType</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679071682"><span class="annot"><span class="annottext">FileOffset
+</span><a href="#local-6989586621679071682"><span class="hs-identifier hs-var">fSize</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-36"></span><span>            </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isRegularFile</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTNormal"><span class="hs-identifier hs-var">FTNormal</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; FileOffset
+</span><span class="hs-identifier hs-var">Posix.fileSize</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isSymbolicLink</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-38"></span><span>                     </span><span id="local-6989586621679071677"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071677"><span class="hs-identifier hs-var">ln</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO FilePath
+</span><span class="hs-identifier hs-var">Posix.readSymbolicLink</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071697"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-39"></span><span>                     </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTSymbolicLink"><span class="hs-identifier hs-var">FTSymbolicLink</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#encodeFilePath"><span class="hs-identifier hs-var">encodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071677"><span class="hs-identifier hs-var">ln</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isCharacterDevice</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTCharacterSpecial"><span class="hs-identifier hs-var">FTCharacterSpecial</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isBlockDevice</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTBlockSpecial"><span class="hs-identifier hs-var">FTBlockSpecial</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isDirectory</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTDirectory"><span class="hs-identifier hs-var">FTDirectory</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; Bool
+</span><span class="hs-identifier hs-var">Posix.isNamedPipe</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(FileType, FileOffset) -&gt; IO (FileType, FileOffset)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTFifo"><span class="hs-identifier hs-var">FTFifo</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>                  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO (FileType, FileOffset)
+forall a. HasCallStack =&gt; FilePath -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO (FileType, FileOffset))
+-&gt; FilePath -&gt; IO (FileType, FileOffset)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Unsupported file type: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; FilePath
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; FilePath
+</span><span class="hs-identifier hs-var">S8.unpack</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071696"><span class="hs-identifier hs-var">fp</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><span class="annottext">FileInfo -&gt; IO FileInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(FileInfo -&gt; IO FileInfo) -&gt; FileInfo -&gt; IO FileInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$!</span></span><span> </span><span class="annot"><span class="annottext">FileInfo :: ByteString
+-&gt; UserID
+-&gt; ByteString
+-&gt; GroupID
+-&gt; ByteString
+-&gt; FileMode
+-&gt; FileOffset
+-&gt; FileType
+-&gt; EpochTime
+-&gt; FileInfo
+</span><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span>
+</span><span id="line-46"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">filePath :: ByteString
+</span><a href="Data.Conduit.Tar.Types.html#filePath"><span class="hs-identifier hs-var">filePath</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071696"><span class="hs-identifier hs-var">fp</span></a></span><span>
+</span><span id="line-47"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileUserId :: UserID
+</span><a href="Data.Conduit.Tar.Types.html#fileUserId"><span class="hs-identifier hs-var">fileUserId</span></a></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679071692"><span class="hs-identifier hs-var">uid</span></a></span><span>
+</span><span id="line-48"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileUserName :: ByteString
+</span><a href="Data.Conduit.Tar.Types.html#fileUserName"><span class="hs-identifier hs-var">fileUserName</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(IOException -&gt; ByteString)
+-&gt; (UserEntry -&gt; ByteString)
+-&gt; Either IOException UserEntry
+-&gt; ByteString
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; IOException -&gt; ByteString
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;&quot;</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; ByteString
+</span><span class="hs-identifier hs-var">S8.pack</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; ByteString)
+-&gt; (UserEntry -&gt; FilePath) -&gt; UserEntry -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">UserEntry -&gt; FilePath
+</span><span class="hs-identifier hs-var hs-var">Posix.userName</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either IOException UserEntry
+</span><a href="#local-6989586621679071688"><span class="hs-identifier hs-var">euEntry</span></a></span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileGroupId :: GroupID
+</span><a href="Data.Conduit.Tar.Types.html#fileGroupId"><span class="hs-identifier hs-var">fileGroupId</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679071690"><span class="hs-identifier hs-var">gid</span></a></span><span>
+</span><span id="line-50"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileGroupName :: ByteString
+</span><a href="Data.Conduit.Tar.Types.html#fileGroupName"><span class="hs-identifier hs-var">fileGroupName</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(IOException -&gt; ByteString)
+-&gt; (GroupEntry -&gt; ByteString)
+-&gt; Either IOException GroupEntry
+-&gt; ByteString
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; IOException -&gt; ByteString
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;&quot;</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; ByteString
+</span><span class="hs-identifier hs-var">S8.pack</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; ByteString)
+-&gt; (GroupEntry -&gt; FilePath) -&gt; GroupEntry -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">GroupEntry -&gt; FilePath
+</span><span class="hs-identifier hs-var hs-var">Posix.groupName</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either IOException GroupEntry
+</span><a href="#local-6989586621679071685"><span class="hs-identifier hs-var">egEntry</span></a></span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileMode :: FileMode
+</span><a href="Data.Conduit.Tar.Types.html#fileMode"><span class="hs-identifier hs-var">fileMode</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; FileMode
+</span><span class="hs-identifier hs-var">Posix.fileMode</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span> </span><span class="annot"><span class="annottext">FileMode -&gt; FileMode -&gt; FileMode
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">FileMode
+</span><span class="hs-number">0o7777</span></span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileSize :: FileOffset
+</span><a href="Data.Conduit.Tar.Types.html#fileSize"><span class="hs-identifier hs-var">fileSize</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileOffset
+</span><a href="#local-6989586621679071682"><span class="hs-identifier hs-var">fSize</span></a></span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileType :: FileType
+</span><a href="Data.Conduit.Tar.Types.html#fileType"><span class="hs-identifier hs-var">fileType</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileType
+</span><a href="#local-6989586621679071683"><span class="hs-identifier hs-var">fType</span></a></span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">fileModTime :: EpochTime
+</span><a href="Data.Conduit.Tar.Types.html#fileModTime"><span class="hs-identifier hs-var">fileModTime</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileStatus -&gt; EpochTime
+</span><span class="hs-identifier hs-var">Posix.modificationTime</span></span><span> </span><span class="annot"><span class="annottext">FileStatus
+</span><a href="#local-6989586621679071694"><span class="hs-identifier hs-var">fs</span></a></span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- | See 'Data.Conduit.Tar.restoreFileWithErrors' for documentation</span><span>
+</span><span id="line-58"></span><span id="local-6989586621679071644"><span class="annot"><a href="Data.Conduit.Tar.Unix.html#restoreFileInternal"><span class="hs-identifier hs-type">restoreFileInternal</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-59"></span><span>       </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadResource</span></span><span> </span><span class="annot"><a href="#local-6989586621679071644"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ConduitM</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">S8.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">SomeException</span></span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679071644"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-63"></span><span id="restoreFileInternal"><span class="annot"><span class="annottext">restoreFileInternal :: Bool
+-&gt; FileInfo
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+</span><a href="Data.Conduit.Tar.Unix.html#restoreFileInternal"><span class="hs-identifier hs-var hs-var">restoreFileInternal</span></a></span></span><span> </span><span id="local-6989586621679071643"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span></span><span> </span><span id="local-6989586621679071642"><span class="annot"><span class="annottext">fi :: FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679071633"><span id="local-6989586621679071634"><span id="local-6989586621679071635"><span id="local-6989586621679071636"><span id="local-6989586621679071637"><span id="local-6989586621679071638"><span id="local-6989586621679071639"><span id="local-6989586621679071640"><span id="local-6989586621679071641"><span class="annot"><span class="annottext">FileMode
+FileOffset
+GroupID
+UserID
+EpochTime
+ByteString
+FileType
+fileModTime :: EpochTime
+fileType :: FileType
+fileSize :: FileOffset
+fileMode :: FileMode
+fileGroupName :: ByteString
+fileGroupId :: GroupID
+fileUserName :: ByteString
+fileUserId :: UserID
+filePath :: ByteString
+fileModTime :: FileInfo -&gt; EpochTime
+fileType :: FileInfo -&gt; FileType
+fileSize :: FileInfo -&gt; FileOffset
+fileMode :: FileInfo -&gt; FileMode
+fileGroupName :: FileInfo -&gt; ByteString
+fileGroupId :: FileInfo -&gt; GroupID
+fileUserName :: FileInfo -&gt; ByteString
+fileUserId :: FileInfo -&gt; UserID
+filePath :: FileInfo -&gt; ByteString
+</span><a href="#local-6989586621679071633"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679071632"><span class="annot"><span class="annottext">fpStr :: FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var hs-var">fpStr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; FilePath
+</span><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-var">decodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071641"><span class="hs-identifier hs-var">filePath</span></a></span><span>
+</span><span id="line-65"></span><span>        </span><span id="local-6989586621679071630"><span class="annot"><span class="annottext">tryAnyCond :: f b -&gt; f (Either SomeException b)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var hs-var">tryAnyCond</span></a></span></span><span> </span><span id="local-6989586621679071629"><span class="annot"><span class="annottext">f b
+</span><a href="#local-6989586621679071629"><span class="hs-identifier hs-var">action</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">f b -&gt; f (Either SomeException b)
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><span class="hs-identifier hs-var">tryAny</span></span><span> </span><span class="annot"><span class="annottext">f b
+</span><a href="#local-6989586621679071629"><span class="hs-identifier hs-var">action</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">(b -&gt; Either SomeException b) -&gt; f b -&gt; f (Either SomeException b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Either SomeException b
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">f b
+</span><a href="#local-6989586621679071629"><span class="hs-identifier hs-var">action</span></a></span><span>
+</span><span id="line-66"></span><span>        </span><span id="local-6989586621679071627"><span class="annot"><span class="annottext">restorePermissions :: IO [SomeException]
+</span><a href="#local-6989586621679071627"><span class="hs-identifier hs-var hs-var">restorePermissions</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-67"></span><span>            </span><span id="local-6989586621679071626"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071626"><span class="hs-identifier hs-var">eExc1</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; UserID -&gt; GroupID -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setOwnerAndGroup</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679071640"><span class="hs-identifier hs-var">fileUserId</span></a></span><span> </span><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679071638"><span class="hs-identifier hs-var">fileGroupId</span></a></span><span>
+</span><span id="line-68"></span><span>            </span><span id="local-6989586621679071624"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071624"><span class="hs-identifier hs-var">eExc2</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FileMode -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setFileMode</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">FileMode
+</span><a href="#local-6989586621679071636"><span class="hs-identifier hs-var">fileMode</span></a></span><span>
+</span><span id="line-69"></span><span>            </span><span class="annot"><span class="annottext">[SomeException] -&gt; IO [SomeException]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">([SomeException] -&gt; IO [SomeException])
+-&gt; [SomeException] -&gt; IO [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$!</span></span><span> </span><span class="annot"><span class="annottext">([SomeException], [()]) -&gt; [SomeException]
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">(([SomeException], [()]) -&gt; [SomeException])
+-&gt; ([SomeException], [()]) -&gt; [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Either SomeException ()] -&gt; ([SomeException], [()])
+forall a b. [Either a b] -&gt; ([a], [b])
+</span><span class="hs-identifier hs-var">partitionEithers</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071626"><span class="hs-identifier hs-var">eExc1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071624"><span class="hs-identifier hs-var">eExc2</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-70"></span><span>        </span><span class="hs-comment">-- | Catch all exceptions, but only if lenient is set to True</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">FileType
+</span><a href="#local-6989586621679071634"><span class="hs-identifier hs-var">fileType</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-72"></span><span>        </span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTDirectory"><span class="hs-identifier hs-var">FTDirectory</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-73"></span><span>            </span><span id="local-6989586621679071621"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071621"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO [SomeException]
+ -&gt; ConduitT
+      ByteString (IO (FileInfo, [SomeException])) m [SomeException])
+-&gt; IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-74"></span><span>                </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Dir.createDirectoryIfMissing</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-75"></span><span>                </span><span class="annot"><span class="annottext">IO [SomeException]
+</span><a href="#local-6989586621679071627"><span class="hs-identifier hs-var">restorePermissions</span></a></span><span>
+</span><span id="line-76"></span><span>            </span><span class="annot"><span class="annottext">IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="annot"><span class="annottext">(IO (FileInfo, [SomeException])
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-77"></span><span>                </span><span id="local-6989586621679071617"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071617"><span class="hs-identifier hs-var">eExc</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; IO Bool
+</span><span class="hs-identifier hs-var">Dir.doesDirectoryExist</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">IO Bool -&gt; (Bool -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span>
+</span><span id="line-78"></span><span>                                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-operator hs-var">`when`</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; EpochTime -&gt; EpochTime -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setFileTimes</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>                </span><span class="annot"><span class="annottext">(FileInfo, [SomeException]) -&gt; IO (FileInfo, [SomeException])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(SomeException -&gt; [SomeException])
+-&gt; (() -&gt; [SomeException])
+-&gt; Either SomeException ()
+-&gt; [SomeException]
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071621"><span class="hs-identifier hs-var">excs</span></a></span><span> </span><span class="annot"><span class="annottext">[SomeException] -&gt; [SomeException] -&gt; [SomeException]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([SomeException] -&gt; [SomeException])
+-&gt; (SomeException -&gt; [SomeException])
+-&gt; SomeException
+-&gt; [SomeException]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">SomeException -&gt; [SomeException]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; () -&gt; [SomeException]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071621"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071617"><span class="hs-identifier hs-var">eExc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>        </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTSymbolicLink"><span class="hs-identifier hs-type">FTSymbolicLink</span></a></span><span> </span><span id="local-6989586621679071614"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071614"><span class="hs-identifier hs-var">link</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-81"></span><span>            </span><span id="local-6989586621679071613"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071613"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO [SomeException]
+ -&gt; ConduitT
+      ByteString (IO (FileInfo, [SomeException])) m [SomeException])
+-&gt; IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-82"></span><span>                </span><span class="hs-comment">-- Try to unlink any existing file/symlink</span><span>
+</span><span id="line-83"></span><span>                </span><span class="annot"><span class="annottext">IO (Either SomeException ()) -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="annot"><span class="annottext">(IO (Either SomeException ()) -&gt; IO ())
+-&gt; IO (Either SomeException ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><span class="hs-identifier hs-var">tryAny</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.removeLink</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-84"></span><span>                </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Dir.createDirectoryIfMissing</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath
+</span><span class="hs-identifier hs-var">Posix.takeDirectory</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-85"></span><span>                </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.createSymbolicLink</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; FilePath
+</span><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-var">decodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071614"><span class="hs-identifier hs-var">link</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-86"></span><span>                </span><span id="local-6989586621679071609"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071609"><span class="hs-identifier hs-var">eExc1</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; UserID -&gt; GroupID -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setSymbolicLinkOwnerAndGroup</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679071640"><span class="hs-identifier hs-var">fileUserId</span></a></span><span> </span><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679071638"><span class="hs-identifier hs-var">fileGroupId</span></a></span><span class="hs-cpp">
+#if MIN_VERSION_unix(2,7,0)
+</span><span>                </span><span class="hs-comment">-- Try best effort in setting symbolic link modification time.</span><span>
+</span><span id="line-89"></span><span>                </span><span class="hs-keyword">let</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CTime</span></span><span> </span><span id="local-6989586621679071606"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679071606"><span class="hs-identifier hs-var">epochInt32</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span>
+</span><span id="line-90"></span><span>                    </span><span id="local-6989586621679071605"><span class="annot"><span class="annottext">unixModTime :: POSIXTime
+</span><a href="#local-6989586621679071605"><span class="hs-identifier hs-var hs-var">unixModTime</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; POSIXTime
+forall a. Num a =&gt; Integer -&gt; a
+</span><span class="hs-identifier hs-var">fromInteger</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64 -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679071606"><span class="hs-identifier hs-var">epochInt32</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>                </span><span id="local-6989586621679071604"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071604"><span class="hs-identifier hs-var">eExc2</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><span class="hs-identifier hs-var">tryAny</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; POSIXTime -&gt; POSIXTime -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setSymbolicLinkTimesHiRes</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621679071605"><span class="hs-identifier hs-var">unixModTime</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621679071605"><span class="hs-identifier hs-var">unixModTime</span></a></span><span class="hs-cpp">
+#endif
+</span><span>                </span><span class="annot"><span class="annottext">[SomeException] -&gt; IO [SomeException]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">([SomeException] -&gt; IO [SomeException])
+-&gt; [SomeException] -&gt; IO [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">([SomeException], [()]) -&gt; [SomeException]
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">(([SomeException], [()]) -&gt; [SomeException])
+-&gt; ([SomeException], [()]) -&gt; [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Either SomeException ()] -&gt; ([SomeException], [()])
+forall a b. [Either a b] -&gt; ([a], [b])
+</span><span class="hs-identifier hs-var">partitionEithers</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071609"><span class="hs-identifier hs-var">eExc1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071604"><span class="hs-identifier hs-var">eExc2</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-94"></span><span>            </span><span class="annot"><span class="annottext">Bool
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071613"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(FileInfo, [SomeException]) -&gt; IO (FileInfo, [SomeException])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071613"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTHardLink"><span class="hs-identifier hs-type">FTHardLink</span></a></span><span> </span><span id="local-6989586621679071600"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071600"><span class="hs-identifier hs-var">link</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-96"></span><span>            </span><span id="local-6989586621679071599"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071599"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO [SomeException]
+ -&gt; ConduitT
+      ByteString (IO (FileInfo, [SomeException])) m [SomeException])
+-&gt; IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-97"></span><span>                </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679071598"><span class="annot"><span class="annottext">linkedFp :: FilePath
+</span><a href="#local-6989586621679071598"><span class="hs-identifier hs-var hs-var">linkedFp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; FilePath
+</span><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-var">decodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679071600"><span class="hs-identifier hs-var">link</span></a></span><span>
+</span><span id="line-98"></span><span>                </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-99"></span><span>                    </span><span id="local-6989586621679071597"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071597"><span class="hs-identifier hs-var">linkedFileExists</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO Bool
+</span><span class="hs-identifier hs-var">Posix.fileExist</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071598"><span class="hs-identifier hs-var">linkedFp</span></a></span><span>
+</span><span id="line-100"></span><span>                    </span><span class="hs-comment">-- If the linked file does not exist (yet), we cannot create a hard link.</span><span>
+</span><span id="line-101"></span><span>                    </span><span class="hs-comment">-- Try to &quot;pre-create&quot; it.</span><span>
+</span><span id="line-102"></span><span>                    </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071597"><span class="hs-identifier hs-var">linkedFileExists</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-103"></span><span>                        </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Dir.createDirectoryIfMissing</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath
+</span><span class="hs-identifier hs-var">Posix.takeDirectory</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071598"><span class="hs-identifier hs-var">linkedFp</span></a></span><span>
+</span><span id="line-104"></span><span>                        </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeFile</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071598"><span class="hs-identifier hs-var">linkedFp</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;&quot;</span></span><span>
+</span><span id="line-105"></span><span>                </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Dir.createDirectoryIfMissing</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath
+</span><span class="hs-identifier hs-var">Posix.takeDirectory</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-106"></span><span>                </span><span class="hs-comment">-- Try to unlink any existing file/hard link</span><span>
+</span><span id="line-107"></span><span>                </span><span class="annot"><span class="annottext">IO (Either SomeException ()) -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="annot"><span class="annottext">(IO (Either SomeException ()) -&gt; IO ())
+-&gt; IO (Either SomeException ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><span class="hs-identifier hs-var">tryAny</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.removeLink</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-108"></span><span>                </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.createLink</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071598"><span class="hs-identifier hs-var">linkedFp</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-109"></span><span>                </span><span class="annot"><span class="annottext">IO [SomeException] -&gt; IO [SomeException]
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO [SomeException] -&gt; IO [SomeException])
+-&gt; IO [SomeException] -&gt; IO [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-110"></span><span>                    </span><span id="local-6989586621679071593"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071593"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+</span><a href="#local-6989586621679071627"><span class="hs-identifier hs-var">restorePermissions</span></a></span><span>
+</span><span id="line-111"></span><span>                    </span><span id="local-6989586621679071592"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071592"><span class="hs-identifier hs-var">eExc</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; EpochTime -&gt; EpochTime -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setFileTimes</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span>
+</span><span id="line-112"></span><span>                    </span><span class="annot"><span class="annottext">[SomeException] -&gt; IO [SomeException]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(SomeException -&gt; [SomeException])
+-&gt; (() -&gt; [SomeException])
+-&gt; Either SomeException ()
+-&gt; [SomeException]
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071593"><span class="hs-identifier hs-var">excs</span></a></span><span> </span><span class="annot"><span class="annottext">[SomeException] -&gt; [SomeException] -&gt; [SomeException]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([SomeException] -&gt; [SomeException])
+-&gt; (SomeException -&gt; [SomeException])
+-&gt; SomeException
+-&gt; [SomeException]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">SomeException -&gt; [SomeException]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; () -&gt; [SomeException]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071593"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071592"><span class="hs-identifier hs-var">eExc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>            </span><span class="annot"><span class="annottext">Bool
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071599"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(FileInfo, [SomeException]) -&gt; IO (FileInfo, [SomeException])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071599"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-114"></span><span>        </span><span class="annot"><span class="annottext">FileType
+</span><a href="Data.Conduit.Tar.Types.html#FTNormal"><span class="hs-identifier hs-var">FTNormal</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-115"></span><span>            </span><span class="annot"><span class="annottext">Bool
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span><span> </span><span class="annot"><span class="annottext">(ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; IO ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><span class="hs-identifier hs-var">Dir.createDirectoryIfMissing</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath
+</span><span class="hs-identifier hs-var">Posix.takeDirectory</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-116"></span><span>            </span><span class="annot"><span class="annottext">FilePath
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o.
+MonadResource m =&gt;
+FilePath -&gt; ConduitT ByteString o m ()
+</span><span class="hs-identifier hs-var">sinkFile</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span>
+</span><span id="line-117"></span><span>            </span><span id="local-6989586621679071590"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071590"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO [SomeException]
+ -&gt; ConduitT
+      ByteString (IO (FileInfo, [SomeException])) m [SomeException])
+-&gt; IO [SomeException]
+-&gt; ConduitT
+     ByteString (IO (FileInfo, [SomeException])) m [SomeException]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-118"></span><span>                </span><span id="local-6989586621679071589"><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071589"><span class="hs-identifier hs-var">excs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO [SomeException]
+</span><a href="#local-6989586621679071627"><span class="hs-identifier hs-var">restorePermissions</span></a></span><span>
+</span><span id="line-119"></span><span>                </span><span id="local-6989586621679071588"><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071588"><span class="hs-identifier hs-var">eExc</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO (Either SomeException ())
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; m (Either SomeException a)
+</span><a href="#local-6989586621679071630"><span class="hs-identifier hs-var">tryAnyCond</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO (Either SomeException ()))
+-&gt; IO () -&gt; IO (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; EpochTime -&gt; EpochTime -&gt; IO ()
+</span><span class="hs-identifier hs-var">Posix.setFileTimes</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679071632"><span class="hs-identifier hs-var">fpStr</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span> </span><span class="annot"><span class="annottext">EpochTime
+</span><a href="#local-6989586621679071633"><span class="hs-identifier hs-var">fileModTime</span></a></span><span>
+</span><span id="line-120"></span><span>                </span><span class="annot"><span class="annottext">[SomeException] -&gt; IO [SomeException]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(SomeException -&gt; [SomeException])
+-&gt; (() -&gt; [SomeException])
+-&gt; Either SomeException ()
+-&gt; [SomeException]
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071589"><span class="hs-identifier hs-var">excs</span></a></span><span> </span><span class="annot"><span class="annottext">[SomeException] -&gt; [SomeException] -&gt; [SomeException]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([SomeException] -&gt; [SomeException])
+-&gt; (SomeException -&gt; [SomeException])
+-&gt; SomeException
+-&gt; [SomeException]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">SomeException -&gt; [SomeException]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; () -&gt; [SomeException]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071589"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either SomeException ()
+</span><a href="#local-6989586621679071588"><span class="hs-identifier hs-var">eExc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>            </span><span class="annot"><span class="annottext">Bool
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[SomeException] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071590"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="annot"><span class="annottext">(IO (FileInfo, [SomeException])
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(FileInfo, [SomeException]) -&gt; IO (FileInfo, [SomeException])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[SomeException]
+</span><a href="#local-6989586621679071590"><span class="hs-identifier hs-var">excs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>        </span><span id="local-6989586621679071587"><span class="annot"><span class="annottext">FileType
+</span><a href="#local-6989586621679071587"><span class="hs-identifier hs-var">ty</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-123"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679071586"><span class="annot"><span class="annottext">exc :: TarException
+</span><a href="#local-6989586621679071586"><span class="hs-identifier hs-var hs-var">exc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileType -&gt; TarException
+</span><a href="Data.Conduit.Tar.Types.html#UnsupportedType"><span class="hs-identifier hs-var">UnsupportedType</span></a></span><span> </span><span class="annot"><span class="annottext">FileType
+</span><a href="#local-6989586621679071587"><span class="hs-identifier hs-var">ty</span></a></span><span>
+</span><span id="line-124"></span><span>            </span><span class="annot"><span class="annottext">Bool
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679071643"><span class="hs-identifier hs-var">lenient</span></a></span><span> </span><span class="annot"><span class="annottext">(ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ()
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; IO ()
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TarException -&gt; IO ()
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="annot"><span class="annottext">TarException
+</span><a href="#local-6989586621679071586"><span class="hs-identifier hs-var">exc</span></a></span><span>
+</span><span id="line-125"></span><span>            </span><span class="annot"><span class="annottext">IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="annot"><span class="annottext">(IO (FileInfo, [SomeException])
+ -&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ())
+-&gt; IO (FileInfo, [SomeException])
+-&gt; ConduitM ByteString (IO (FileInfo, [SomeException])) m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(FileInfo, [SomeException]) -&gt; IO (FileInfo, [SomeException])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679071642"><span class="hs-identifier hs-var">fi</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">TarException -&gt; SomeException
+forall e. Exception e =&gt; e -&gt; SomeException
+</span><span class="hs-identifier hs-var">toException</span></span><span> </span><span class="annot"><span class="annottext">TarException
+</span><a href="#local-6989586621679071586"><span class="hs-identifier hs-var">exc</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span></pre></body></html>

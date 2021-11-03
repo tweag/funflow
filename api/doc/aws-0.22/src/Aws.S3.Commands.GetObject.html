@@ -1,0 +1,463 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.S3.Commands.GetObject</span><span>
+</span><span id="line-4"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.S3.Core.html"><span class="hs-identifier">Aws.S3.Core</span></a></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Resource</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ResourceT</span></span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-special">(</span><span class="hs-comment">{- IsString -}</span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B8</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span>  </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Conduit</span></span><span>          </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Conduit</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(.|)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Conduit.List</span></span><span>     </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CL</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span>    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Conduit</span></span><span>  </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Types</span></span><span>    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">data</span><span> </span><span id="GetObject"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-var">GetObject</span></a></span></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="GetObject"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-var">GetObject</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-25"></span><span>        </span><span id="goBucket"><span class="annot"><span class="annottext">GetObject -&gt; Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goBucket"><span class="hs-identifier hs-var hs-var">goBucket</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#Bucket"><span class="hs-identifier hs-type">Bucket</span></a></span><span>
+</span><span id="line-26"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goObjectName"><span class="annot"><span class="annottext">GetObject -&gt; Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goObjectName"><span class="hs-identifier hs-var hs-var">goObjectName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#Object"><span class="hs-identifier hs-type">Object</span></a></span><span>
+</span><span id="line-27"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goVersionId"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goVersionId"><span class="hs-identifier hs-var hs-var">goVersionId</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-28"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseContentType"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseContentType"><span class="hs-identifier hs-var hs-var">goResponseContentType</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-29"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseContentLanguage"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseContentLanguage"><span class="hs-identifier hs-var hs-var">goResponseContentLanguage</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-30"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseExpires"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseExpires"><span class="hs-identifier hs-var hs-var">goResponseExpires</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-31"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseCacheControl"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseCacheControl"><span class="hs-identifier hs-var hs-var">goResponseCacheControl</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-32"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseContentDisposition"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseContentDisposition"><span class="hs-identifier hs-var hs-var">goResponseContentDisposition</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-33"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseContentEncoding"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseContentEncoding"><span class="hs-identifier hs-var hs-var">goResponseContentEncoding</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-34"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goResponseContentRange"><span class="annot"><span class="annottext">GetObject -&gt; Maybe (Int, Int)
+</span><a href="Aws.S3.Commands.GetObject.html#goResponseContentRange"><span class="hs-identifier hs-var hs-var">goResponseContentRange</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">,</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goIfMatch"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goIfMatch"><span class="hs-identifier hs-var hs-var">goIfMatch</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-36"></span><span>      </span><span class="hs-comment">-- ^ Return the object only if its entity tag (ETag, which is an md5sum of the content) is the same as the one specified; otherwise, catch a 'StatusCodeException' with a status of 412 precondition failed.</span><span>
+</span><span id="line-37"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="goIfNoneMatch"><span class="annot"><span class="annottext">GetObject -&gt; Maybe Bucket
+</span><a href="Aws.S3.Commands.GetObject.html#goIfNoneMatch"><span class="hs-identifier hs-var hs-var">goIfNoneMatch</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-38"></span><span>      </span><span class="hs-comment">-- ^ Return the object only if its entity tag (ETag, which is an md5sum of the content) is different from the one specified; otherwise, catch a 'StatusCodeException' with a status of 304 not modified.</span><span>
+</span><span id="line-39"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679231697"><span id="local-6989586621679231699"><span id="local-6989586621679231701"><span class="annot"><span class="annottext">Int -&gt; GetObject -&gt; ShowS
+[GetObject] -&gt; ShowS
+GetObject -&gt; String
+(Int -&gt; GetObject -&gt; ShowS)
+-&gt; (GetObject -&gt; String)
+-&gt; ([GetObject] -&gt; ShowS)
+-&gt; Show GetObject
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GetObject] -&gt; ShowS
+$cshowList :: [GetObject] -&gt; ShowS
+show :: GetObject -&gt; String
+$cshow :: GetObject -&gt; String
+showsPrec :: Int -&gt; GetObject -&gt; ShowS
+$cshowsPrec :: Int -&gt; GetObject -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#getObject"><span class="hs-identifier hs-type">getObject</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#Bucket"><span class="hs-identifier hs-type">Bucket</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span>
+</span><span id="line-43"></span><span id="getObject"><span class="annot"><span class="annottext">getObject :: Bucket -&gt; Bucket -&gt; GetObject
+</span><a href="Aws.S3.Commands.GetObject.html#getObject"><span class="hs-identifier hs-var hs-var">getObject</span></a></span></span><span> </span><span id="local-6989586621679231694"><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231694"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679231693"><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231693"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bucket
+-&gt; Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; Maybe (Int, Int)
+-&gt; Maybe Bucket
+-&gt; Maybe Bucket
+-&gt; GetObject
+</span><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-var">GetObject</span></a></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231694"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231693"><span class="hs-identifier hs-var">o</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-keyword">data</span><span> </span><span id="GetObjectResponse"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-var">GetObjectResponse</span></a></span></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="GetObjectResponse"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-var">GetObjectResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-47"></span><span>        </span><span id="gorMetadata"><span class="annot"><span class="annottext">GetObjectResponse -&gt; ObjectMetadata
+</span><a href="Aws.S3.Commands.GetObject.html#gorMetadata"><span class="hs-identifier hs-var hs-var">gorMetadata</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#ObjectMetadata"><span class="hs-identifier hs-type">ObjectMetadata</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-48"></span><span>        </span><span id="gorResponse"><span class="annot"><span class="annottext">GetObjectResponse
+-&gt; Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="Aws.S3.Commands.GetObject.html#gorResponse"><span class="hs-identifier hs-var hs-var">gorResponse</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Response</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">C.ConduitM</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ResourceT</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">data</span><span> </span><span id="GetObjectMemoryResponse"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectMemoryResponse"><span class="hs-identifier hs-var">GetObjectMemoryResponse</span></a></span></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="GetObjectMemoryResponse"><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectMemoryResponse"><span class="hs-identifier hs-var">GetObjectMemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Core.html#ObjectMetadata"><span class="hs-identifier hs-type">ObjectMetadata</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">HTTP.Response</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679231683"><span id="local-6989586621679231685"><span id="local-6989586621679231687"><span class="annot"><span class="annottext">Int -&gt; GetObjectMemoryResponse -&gt; ShowS
+[GetObjectMemoryResponse] -&gt; ShowS
+GetObjectMemoryResponse -&gt; String
+(Int -&gt; GetObjectMemoryResponse -&gt; ShowS)
+-&gt; (GetObjectMemoryResponse -&gt; String)
+-&gt; ([GetObjectMemoryResponse] -&gt; ShowS)
+-&gt; Show GetObjectMemoryResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GetObjectMemoryResponse] -&gt; ShowS
+$cshowList :: [GetObjectMemoryResponse] -&gt; ShowS
+show :: GetObjectMemoryResponse -&gt; String
+$cshow :: GetObjectMemoryResponse -&gt; String
+showsPrec :: Int -&gt; GetObjectMemoryResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; GetObjectMemoryResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | ServiceConfiguration: 'S3Configuration'</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#S3Configuration"><span class="hs-identifier hs-type">S3Configuration</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span id="local-6989586621679231680"><span class="annot"><span class="annottext">signQuery :: GetObject
+-&gt; ServiceConfiguration GetObject queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679231667"><span id="local-6989586621679231668"><span id="local-6989586621679231669"><span id="local-6989586621679231670"><span id="local-6989586621679231671"><span id="local-6989586621679231672"><span id="local-6989586621679231673"><span id="local-6989586621679231674"><span id="local-6989586621679231675"><span id="local-6989586621679231676"><span id="local-6989586621679231677"><span id="local-6989586621679231678"><span class="annot"><span class="annottext">Maybe (Int, Int)
+Maybe Bucket
+Bucket
+goIfNoneMatch :: Maybe Bucket
+goIfMatch :: Maybe Bucket
+goResponseContentRange :: Maybe (Int, Int)
+goResponseContentEncoding :: Maybe Bucket
+goResponseContentDisposition :: Maybe Bucket
+goResponseCacheControl :: Maybe Bucket
+goResponseExpires :: Maybe Bucket
+goResponseContentLanguage :: Maybe Bucket
+goResponseContentType :: Maybe Bucket
+goVersionId :: Maybe Bucket
+goObjectName :: Bucket
+goBucket :: Bucket
+goIfNoneMatch :: GetObject -&gt; Maybe Bucket
+goIfMatch :: GetObject -&gt; Maybe Bucket
+goResponseContentRange :: GetObject -&gt; Maybe (Int, Int)
+goResponseContentEncoding :: GetObject -&gt; Maybe Bucket
+goResponseContentDisposition :: GetObject -&gt; Maybe Bucket
+goResponseCacheControl :: GetObject -&gt; Maybe Bucket
+goResponseExpires :: GetObject -&gt; Maybe Bucket
+goResponseContentLanguage :: GetObject -&gt; Maybe Bucket
+goResponseContentType :: GetObject -&gt; Maybe Bucket
+goVersionId :: GetObject -&gt; Maybe Bucket
+goObjectName :: GetObject -&gt; Bucket
+goBucket :: GetObject -&gt; Bucket
+</span><a href="#local-6989586621679231667"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">S3Query
+-&gt; S3Configuration queryType -&gt; SignatureData -&gt; SignedQuery
+forall qt.
+S3Query -&gt; S3Configuration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.S3.Core.html#s3SignQuery"><span class="hs-identifier hs-var">s3SignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">S3Query :: Method
+-&gt; Maybe ByteString
+-&gt; Maybe ByteString
+-&gt; Query
+-&gt; Query
+-&gt; Maybe ByteString
+-&gt; Maybe (Digest MD5)
+-&gt; RequestHeaders
+-&gt; RequestHeaders
+-&gt; Maybe RequestBody
+-&gt; S3Query
+</span><a href="Aws.S3.Core.html#S3Query"><span class="hs-identifier hs-type">S3Query</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-59"></span><span>                                   </span><span class="annot"><span class="annottext">s3QMethod :: Method
+</span><a href="#local-6989586621679231664"><span class="hs-identifier hs-var">s3QMethod</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Method
+</span><a href="Aws.Core.html#Get"><span class="hs-identifier hs-var">Get</span></a></span><span>
+</span><span id="line-60"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QBucket :: Maybe ByteString
+</span><a href="#local-6989586621679231662"><span class="hs-identifier hs-var">s3QBucket</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Maybe ByteString) -&gt; ByteString -&gt; Maybe ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231678"><span class="hs-identifier hs-var">goBucket</span></a></span><span>
+</span><span id="line-61"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QObject :: Maybe ByteString
+</span><a href="Aws.S3.Core.html#s3QObject"><span class="hs-identifier hs-var">s3QObject</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Maybe ByteString) -&gt; ByteString -&gt; Maybe ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679231677"><span class="hs-identifier hs-var">goObjectName</span></a></span><span>
+</span><span id="line-62"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QSubresources :: Query
+</span><a href="Aws.S3.Core.html#s3QSubresources"><span class="hs-identifier hs-var">s3QSubresources</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe (ByteString, Bucket)] -&gt; Query
+forall a. QueryLike a =&gt; a -&gt; Query
+</span><span class="hs-identifier hs-var">HTTP.toQuery</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-63"></span><span>                                                       </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;versionId&quot;</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231676"><span class="hs-identifier hs-var">goVersionId</span></a></span><span>
+</span><span id="line-64"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-content-type&quot;</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231675"><span class="hs-identifier hs-var">goResponseContentType</span></a></span><span>
+</span><span id="line-65"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-content-language&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231674"><span class="hs-identifier hs-var">goResponseContentLanguage</span></a></span><span>
+</span><span id="line-66"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-expires&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231673"><span class="hs-identifier hs-var">goResponseExpires</span></a></span><span>
+</span><span id="line-67"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-cache-control&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231672"><span class="hs-identifier hs-var">goResponseCacheControl</span></a></span><span>
+</span><span id="line-68"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-content-disposition&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231671"><span class="hs-identifier hs-var">goResponseContentDisposition</span></a></span><span>
+</span><span id="line-69"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;response-content-encoding&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (ByteString, Bucket))
+-&gt; Maybe Bucket -&gt; Maybe (ByteString, Bucket)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231670"><span class="hs-identifier hs-var">goResponseContentEncoding</span></a></span><span>
+</span><span id="line-70"></span><span>                                                     </span><span class="hs-special">]</span><span>
+</span><span id="line-71"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QQuery :: Query
+</span><a href="Aws.S3.Core.html#s3QQuery"><span class="hs-identifier hs-var">s3QQuery</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-72"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QContentType :: Maybe ByteString
+</span><a href="Aws.S3.Core.html#s3QContentType"><span class="hs-identifier hs-var">s3QContentType</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-73"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QContentMd5 :: Maybe (Digest MD5)
+</span><a href="Aws.S3.Core.html#s3QContentMd5"><span class="hs-identifier hs-var">s3QContentMd5</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (Digest MD5)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-74"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QAmzHeaders :: RequestHeaders
+</span><a href="Aws.S3.Core.html#s3QAmzHeaders"><span class="hs-identifier hs-var">s3QAmzHeaders</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-75"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QOtherHeaders :: RequestHeaders
+</span><a href="Aws.S3.Core.html#s3QOtherHeaders"><span class="hs-identifier hs-var">s3QOtherHeaders</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe (HeaderName, ByteString)] -&gt; RequestHeaders
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-76"></span><span>                                                       </span><span class="annot"><span class="annottext">(Int, Int) -&gt; (HeaderName, ByteString)
+forall a a a.
+(IsString a, Show a, Show a) =&gt;
+(a, a) -&gt; (a, ByteString)
+</span><a href="#local-6989586621679231650"><span class="hs-identifier hs-var">decodeRange</span></a></span><span> </span><span class="annot"><span class="annottext">((Int, Int) -&gt; (HeaderName, ByteString))
+-&gt; Maybe (Int, Int) -&gt; Maybe (HeaderName, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int)
+</span><a href="#local-6989586621679231669"><span class="hs-identifier hs-var">goResponseContentRange</span></a></span><span>
+</span><span id="line-77"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HeaderName
+</span><span class="hs-string">&quot;if-match&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (HeaderName, ByteString))
+-&gt; (Bucket -&gt; ByteString) -&gt; Bucket -&gt; (HeaderName, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (HeaderName, ByteString))
+-&gt; Maybe Bucket -&gt; Maybe (HeaderName, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231668"><span class="hs-identifier hs-var">goIfMatch</span></a></span><span>
+</span><span id="line-78"></span><span>                                                     </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HeaderName
+</span><span class="hs-string">&quot;if-none-match&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (HeaderName, ByteString))
+-&gt; (Bucket -&gt; ByteString) -&gt; Bucket -&gt; (HeaderName, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Bucket -&gt; (HeaderName, ByteString))
+-&gt; Maybe Bucket -&gt; Maybe (HeaderName, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Bucket
+</span><a href="#local-6989586621679231667"><span class="hs-identifier hs-var">goIfNoneMatch</span></a></span><span>
+</span><span id="line-79"></span><span>                                                     </span><span class="hs-special">]</span><span>
+</span><span id="line-80"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QRequestBody :: Maybe RequestBody
+</span><a href="Aws.S3.Core.html#s3QRequestBody"><span class="hs-identifier hs-var">s3QRequestBody</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe RequestBody
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-81"></span><span>                                 </span><span class="hs-special">}</span><span>
+</span><span id="line-82"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679231650"><span class="annot"><span class="annottext">decodeRange :: (a, a) -&gt; (a, ByteString)
+</span><a href="#local-6989586621679231650"><span class="hs-identifier hs-var hs-var">decodeRange</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679231647"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679231647"><span class="hs-identifier hs-var">pos</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679231646"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679231646"><span class="hs-identifier hs-var">len</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-string">&quot;range&quot;</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">B8.concat</span></span><span> </span><span class="annot"><span class="annottext">([ByteString] -&gt; ByteString) -&gt; [ByteString] -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;bytes=&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">B8.pack</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679231647"><span class="hs-identifier hs-var">pos</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;-&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">B8.pack</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679231646"><span class="hs-identifier hs-var">len</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#S3Metadata"><span class="hs-identifier hs-type">S3Metadata</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span id="local-6989586621679231639"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; GetObject
+-&gt; IORef (ResponseMetadata GetObjectResponse)
+-&gt; HTTPResponseConsumer GetObjectResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span id="local-6989586621679231637"><span class="annot"><span class="annottext">Request
+</span><a href="#local-6989586621679231637"><span class="hs-identifier hs-var">httpReq</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span class="hs-special">{</span><span id="local-6989586621679231625"><span id="local-6989586621679231626"><span id="local-6989586621679231627"><span id="local-6989586621679231628"><span id="local-6989586621679231629"><span id="local-6989586621679231630"><span id="local-6989586621679231631"><span id="local-6989586621679231632"><span id="local-6989586621679231633"><span id="local-6989586621679231634"><span id="local-6989586621679231635"><span id="local-6989586621679231636"><span class="annot"><span class="annottext">Maybe (Int, Int)
+Maybe Bucket
+Bucket
+goIfNoneMatch :: Maybe Bucket
+goIfMatch :: Maybe Bucket
+goResponseContentRange :: Maybe (Int, Int)
+goResponseContentEncoding :: Maybe Bucket
+goResponseContentDisposition :: Maybe Bucket
+goResponseCacheControl :: Maybe Bucket
+goResponseExpires :: Maybe Bucket
+goResponseContentLanguage :: Maybe Bucket
+goResponseContentType :: Maybe Bucket
+goVersionId :: Maybe Bucket
+goObjectName :: Bucket
+goBucket :: Bucket
+goIfNoneMatch :: GetObject -&gt; Maybe Bucket
+goIfMatch :: GetObject -&gt; Maybe Bucket
+goResponseContentRange :: GetObject -&gt; Maybe (Int, Int)
+goResponseContentEncoding :: GetObject -&gt; Maybe Bucket
+goResponseContentDisposition :: GetObject -&gt; Maybe Bucket
+goResponseCacheControl :: GetObject -&gt; Maybe Bucket
+goResponseExpires :: GetObject -&gt; Maybe Bucket
+goResponseContentLanguage :: GetObject -&gt; Maybe Bucket
+goResponseContentType :: GetObject -&gt; Maybe Bucket
+goVersionId :: GetObject -&gt; Maybe Bucket
+goObjectName :: GetObject -&gt; Bucket
+goBucket :: GetObject -&gt; Bucket
+</span><a href="#local-6989586621679231625"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621679231624"><span class="annot"><span class="annottext">IORef (ResponseMetadata GetObjectResponse)
+</span><a href="#local-6989586621679231624"><span class="hs-identifier hs-var">metadata</span></a></span></span><span> </span><span id="local-6989586621679231623"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231623"><span class="hs-identifier hs-var">resp</span></a></span></span><span>
+</span><span id="line-87"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Status
+</span><a href="#local-6989586621679231622"><span class="hs-identifier hs-var">status</span></a></span><span> </span><span class="annot"><span class="annottext">Status -&gt; Status -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Status
+</span><span class="hs-identifier hs-var">HTTP.status200</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-88"></span><span>            </span><span id="local-6989586621679231620"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231620"><span class="hs-identifier hs-var">rsp</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">HTTPResponseConsumer
+  (Response (ConduitM () ByteString (ResourceT IO) ()))
+-&gt; IORef S3Metadata
+-&gt; HTTPResponseConsumer
+     (Response (ConduitM () ByteString (ResourceT IO) ()))
+forall a.
+HTTPResponseConsumer a
+-&gt; IORef S3Metadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.S3.Core.html#s3BinaryResponseConsumer"><span class="hs-identifier hs-var">s3BinaryResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">HTTPResponseConsumer
+  (Response (ConduitM () ByteString (ResourceT IO) ()))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">IORef (ResponseMetadata GetObjectResponse)
+IORef S3Metadata
+</span><a href="#local-6989586621679231624"><span class="hs-identifier hs-var">metadata</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231623"><span class="hs-identifier hs-var">resp</span></a></span><span>
+</span><span id="line-89"></span><span>            </span><span id="local-6989586621679231618"><span class="annot"><span class="annottext">ObjectMetadata
+</span><a href="#local-6989586621679231618"><span class="hs-identifier hs-var">om</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">RequestHeaders -&gt; ResourceT IO ObjectMetadata
+forall (m :: * -&gt; *).
+MonadThrow m =&gt;
+RequestHeaders -&gt; m ObjectMetadata
+</span><a href="Aws.S3.Core.html#parseObjectMetadata"><span class="hs-identifier hs-var">parseObjectMetadata</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+-&gt; RequestHeaders
+forall body. Response body -&gt; RequestHeaders
+</span><span class="hs-identifier hs-var hs-var">HTTP.responseHeaders</span></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231623"><span class="hs-identifier hs-var">resp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>            </span><span class="annot"><span class="annottext">GetObjectResponse -&gt; ResourceT IO GetObjectResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(GetObjectResponse -&gt; ResourceT IO GetObjectResponse)
+-&gt; GetObjectResponse -&gt; ResourceT IO GetObjectResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ObjectMetadata
+-&gt; Response (ConduitM () ByteString (ResourceT IO) ())
+-&gt; GetObjectResponse
+</span><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-var">GetObjectResponse</span></a></span><span> </span><span class="annot"><span class="annottext">ObjectMetadata
+</span><a href="#local-6989586621679231618"><span class="hs-identifier hs-var">om</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231620"><span class="hs-identifier hs-var">rsp</span></a></span><span>
+</span><span id="line-91"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Request -&gt; HTTPResponseConsumer GetObjectResponse
+forall (m :: * -&gt; *) a.
+MonadThrow m =&gt;
+Request -&gt; Response (ConduitM () ByteString m ()) -&gt; m a
+</span><a href="Aws.Core.html#throwStatusCodeException"><span class="hs-identifier hs-var">throwStatusCodeException</span></a></span><span> </span><span class="annot"><span class="annottext">Request
+</span><a href="#local-6989586621679231637"><span class="hs-identifier hs-var">httpReq</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231623"><span class="hs-identifier hs-var">resp</span></a></span><span>
+</span><span id="line-92"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-93"></span><span>        </span><span id="local-6989586621679231622"><span class="annot"><span class="annottext">status :: Status
+</span><a href="#local-6989586621679231622"><span class="hs-identifier hs-var hs-var">status</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ()) -&gt; Status
+forall body. Response body -&gt; Status
+</span><span class="hs-identifier hs-var hs-var">HTTP.responseStatus</span></span><span>    </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231623"><span class="hs-identifier hs-var">resp</span></a></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObject"><span class="hs-identifier hs-type">GetObject</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectMemoryResponse"><span class="hs-identifier hs-type">GetObjectMemoryResponse</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621679231607"><span class="annot"><span class="annottext">loadToMemory :: GetObjectResponse
+-&gt; ResourceT IO (MemoryResponse GetObjectResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.S3.Commands.GetObject.html#GetObjectResponse"><span class="hs-identifier hs-type">GetObjectResponse</span></a></span><span> </span><span id="local-6989586621679231605"><span class="annot"><span class="annottext">ObjectMetadata
+</span><a href="#local-6989586621679231605"><span class="hs-identifier hs-var">om</span></a></span></span><span> </span><span id="local-6989586621679231604"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231604"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-100"></span><span>        </span><span id="local-6989586621679231603"><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679231603"><span class="hs-identifier hs-var">bss</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ConduitT () Void (ResourceT IO) [ByteString]
+-&gt; ResourceT IO [ByteString]
+forall (m :: * -&gt; *) r. Monad m =&gt; ConduitT () Void m r -&gt; m r
+</span><span class="hs-identifier hs-var">C.runConduit</span></span><span> </span><span class="annot"><span class="annottext">(ConduitT () Void (ResourceT IO) [ByteString]
+ -&gt; ResourceT IO [ByteString])
+-&gt; ConduitT () Void (ResourceT IO) [ByteString]
+-&gt; ResourceT IO [ByteString]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+-&gt; ConduitM () ByteString (ResourceT IO) ()
+forall body. Response body -&gt; body
+</span><span class="hs-identifier hs-var hs-var">HTTP.responseBody</span></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231604"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">ConduitM () ByteString (ResourceT IO) ()
+-&gt; ConduitM ByteString Void (ResourceT IO) [ByteString]
+-&gt; ConduitT () Void (ResourceT IO) [ByteString]
+forall (m :: * -&gt; *) a b c r.
+Monad m =&gt;
+ConduitM a b m () -&gt; ConduitM b c m r -&gt; ConduitM a c m r
+</span><span class="hs-operator hs-var">.|</span></span><span> </span><span class="annot"><span class="annottext">ConduitM ByteString Void (ResourceT IO) [ByteString]
+forall (m :: * -&gt; *) a o. Monad m =&gt; ConduitT a o m [a]
+</span><span class="hs-identifier hs-var">CL.consume</span></span><span>
+</span><span id="line-101"></span><span>        </span><span class="annot"><span class="annottext">GetObjectMemoryResponse -&gt; ResourceT IO GetObjectMemoryResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(GetObjectMemoryResponse -&gt; ResourceT IO GetObjectMemoryResponse)
+-&gt; GetObjectMemoryResponse -&gt; ResourceT IO GetObjectMemoryResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ObjectMetadata -&gt; Response ByteString -&gt; GetObjectMemoryResponse
+</span><a href="Aws.S3.Commands.GetObject.html#GetObjectMemoryResponse"><span class="hs-identifier hs-var">GetObjectMemoryResponse</span></a></span><span> </span><span class="annot"><span class="annottext">ObjectMetadata
+</span><a href="#local-6989586621679231605"><span class="hs-identifier hs-var">om</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679231604"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-102"></span><span>            </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">responseBody :: ByteString
+</span><span class="hs-identifier hs-var">HTTP.responseBody</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">L.fromChunks</span></span><span> </span><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679231603"><span class="hs-identifier hs-var">bss</span></a></span><span>
+</span><span id="line-103"></span><span>            </span><span class="hs-special">}</span><span>
+</span><span id="line-104"></span></pre></body></html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">--------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module    : Test.SmallCheck.Drivers</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright : (c) Colin Runciman et al.</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License   : BSD3</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Maintainer: Roman Cheplyaka &lt;roma@ro-che.info&gt;</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- You should only need this module if you wish to create your own way to</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- run SmallCheck tests</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--------------------------------------------------------------------</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 704
+</span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test.SmallCheck.Drivers</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-19"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheck"><span class="hs-identifier">smallCheck</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheckM"><span class="hs-identifier">smallCheckM</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheckWithHook"><span class="hs-identifier">smallCheckWithHook</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#test"><span class="hs-identifier">test</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#ppFailure"><span class="hs-identifier">ppFailure</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#PropertyFailure"><span class="hs-identifier">PropertyFailure</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#PropertySuccess"><span class="hs-identifier">PropertySuccess</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#Argument"><span class="hs-identifier">Argument</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#Reason"><span class="hs-identifier">Reason</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html#TestQuality"><span class="hs-identifier">TestQuality</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">when</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html"><span class="hs-identifier">Test.SmallCheck.Property</span></a></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html"><span class="hs-identifier">Test.SmallCheck.Property.Result</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.Printf</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">printf</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.IORef</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">readIORef</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">writeIORef</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">IORef</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">newIORef</span></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- NB: explicit import list to avoid name clash with modifyIORef'</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | A simple driver that runs the test in the 'IO' monad and prints the</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- results.</span><span>
+</span><span id="line-33"></span><span id="local-6989586621679059459"><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheck"><span class="hs-identifier hs-type">smallCheck</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html#Testable"><span class="hs-identifier hs-type">Testable</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679059459"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059459"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-34"></span><span id="smallCheck"><span class="annot"><span class="annottext">smallCheck :: Depth -&gt; a -&gt; IO ()
+</span><a href="Test.SmallCheck.Drivers.html#smallCheck"><span class="hs-identifier hs-var hs-var">smallCheck</span></a></span></span><span> </span><span id="local-6989586621679059458"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059458"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span id="local-6989586621679059457"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059457"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-special">(</span><span class="hs-special">(</span><span id="local-6989586621679059456"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059456"><span class="hs-identifier hs-var">good</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679059455"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059455"><span class="hs-identifier hs-var">bad</span></a></span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span id="local-6989586621679059454"><span class="annot"><span class="annottext">Maybe PropertyFailure
+</span><a href="#local-6989586621679059454"><span class="hs-identifier hs-var">mbEx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Depth -&gt; a -&gt; IO ((Integer, Integer), Maybe PropertyFailure)
+forall a.
+Testable IO a =&gt;
+Depth -&gt; a -&gt; IO ((Integer, Integer), Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#runTestWithStats"><span class="hs-identifier hs-var">runTestWithStats</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059458"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059457"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679059452"><span class="annot"><span class="annottext">testsRun :: Integer
+</span><a href="#local-6989586621679059452"><span class="hs-identifier hs-var hs-var">testsRun</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059456"><span class="hs-identifier hs-var">good</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059455"><span class="hs-identifier hs-var">bad</span></a></span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe PropertyFailure
+</span><a href="#local-6989586621679059454"><span class="hs-identifier hs-var">mbEx</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-38"></span><span>    </span><span class="annot"><span class="annottext">Maybe PropertyFailure
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-39"></span><span>      </span><span class="annot"><span class="annottext">String -&gt; Integer -&gt; IO ()
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Completed %d tests without failure.\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059452"><span class="hs-identifier hs-var">testsRun</span></a></span><span>
+</span><span id="line-40"></span><span>      </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059455"><span class="hs-identifier hs-var">bad</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-41"></span><span>        </span><span class="annot"><span class="annottext">String -&gt; Integer -&gt; IO ()
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;But %d did not meet ==&gt; condition.\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059455"><span class="hs-identifier hs-var">bad</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679059449"><span class="annot"><span class="annottext">PropertyFailure
+</span><a href="#local-6989586621679059449"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-43"></span><span>      </span><span class="annot"><span class="annottext">String -&gt; Integer -&gt; IO ()
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Failed test no. %d.\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059452"><span class="hs-identifier hs-var">testsRun</span></a></span><span>
+</span><span id="line-44"></span><span>      </span><span class="annot"><span class="annottext">String -&gt; IO ()
+</span><span class="hs-identifier hs-var">putStrLn</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">PropertyFailure -&gt; String
+</span><a href="Test.SmallCheck.Property.Result.html#ppFailure"><span class="hs-identifier hs-var">ppFailure</span></a></span><span> </span><span class="annot"><span class="annottext">PropertyFailure
+</span><a href="#local-6989586621679059449"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span id="local-6989586621679059508"><span class="annot"><a href="Test.SmallCheck.Drivers.html#runTestWithStats"><span class="hs-identifier hs-type">runTestWithStats</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html#Testable"><span class="hs-identifier hs-type">Testable</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679059508"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059508"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#PropertyFailure"><span class="hs-identifier hs-type">PropertyFailure</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-47"></span><span id="runTestWithStats"><span class="annot"><span class="annottext">runTestWithStats :: Depth -&gt; a -&gt; IO ((Integer, Integer), Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#runTestWithStats"><span class="hs-identifier hs-var hs-var">runTestWithStats</span></a></span></span><span> </span><span id="local-6989586621679059447"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059447"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span id="local-6989586621679059446"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059446"><span class="hs-identifier hs-var">prop</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-48"></span><span>  </span><span id="local-6989586621679059445"><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059445"><span class="hs-identifier hs-var">good</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; IO (IORef Integer)
+forall a. a -&gt; IO (IORef a)
+</span><span class="hs-identifier hs-var">newIORef</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-49"></span><span>  </span><span id="local-6989586621679059444"><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059444"><span class="hs-identifier hs-var">bad</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; IO (IORef Integer)
+forall a. a -&gt; IO (IORef a)
+</span><span class="hs-identifier hs-var">newIORef</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-keyword">let</span><span>
+</span><span id="line-52"></span><span>    </span><span id="local-6989586621679059443"><span class="annot"><span class="annottext">hook :: TestQuality -&gt; IO ()
+</span><a href="#local-6989586621679059443"><span class="hs-identifier hs-var hs-var">hook</span></a></span></span><span> </span><span class="annot"><span class="annottext">TestQuality
+</span><a href="Test.SmallCheck.Property.html#GoodTest"><span class="hs-identifier hs-var">GoodTest</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef Integer -&gt; (Integer -&gt; Integer) -&gt; IO ()
+forall a. IORef a -&gt; (a -&gt; a) -&gt; IO ()
+</span><a href="Test.SmallCheck.Drivers.html#modifyIORef%27"><span class="hs-identifier hs-var">modifyIORef'</span></a></span><span> </span><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059445"><span class="hs-identifier hs-var">good</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>    </span><span class="annot"><a href="#local-6989586621679059443"><span class="hs-identifier hs-var">hook</span></a></span><span> </span><span class="annot"><span class="annottext">TestQuality
+</span><a href="Test.SmallCheck.Property.html#BadTest"><span class="hs-identifier hs-var">BadTest</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef Integer -&gt; (Integer -&gt; Integer) -&gt; IO ()
+forall a. IORef a -&gt; (a -&gt; a) -&gt; IO ()
+</span><a href="Test.SmallCheck.Drivers.html#modifyIORef%27"><span class="hs-identifier hs-var">modifyIORef'</span></a></span><span> </span><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059444"><span class="hs-identifier hs-var">bad</span></a></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span>  </span><span id="local-6989586621679059439"><span class="annot"><span class="annottext">Maybe PropertyFailure
+</span><a href="#local-6989586621679059439"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Depth -&gt; (TestQuality -&gt; IO ()) -&gt; a -&gt; IO (Maybe PropertyFailure)
+forall (m :: * -&gt; *) a.
+Testable m a =&gt;
+Depth -&gt; (TestQuality -&gt; m ()) -&gt; a -&gt; m (Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#smallCheckWithHook"><span class="hs-identifier hs-var">smallCheckWithHook</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059447"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">TestQuality -&gt; IO ()
+</span><a href="#local-6989586621679059443"><span class="hs-identifier hs-var">hook</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059446"><span class="hs-identifier hs-var">prop</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span>  </span><span id="local-6989586621679059438"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059438"><span class="hs-identifier hs-var">goodN</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IORef Integer -&gt; IO Integer
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059445"><span class="hs-identifier hs-var">good</span></a></span><span>
+</span><span id="line-58"></span><span>  </span><span id="local-6989586621679059437"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059437"><span class="hs-identifier hs-var">badN</span></a></span></span><span>  </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IORef Integer -&gt; IO Integer
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">IORef Integer
+</span><a href="#local-6989586621679059444"><span class="hs-identifier hs-var">bad</span></a></span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><span class="annottext">((Integer, Integer), Maybe PropertyFailure)
+-&gt; IO ((Integer, Integer), Maybe PropertyFailure)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059438"><span class="hs-identifier hs-var">goodN</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679059437"><span class="hs-identifier hs-var">badN</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe PropertyFailure
+</span><a href="#local-6989586621679059439"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- NB: modifyIORef' is in base starting at least from GHC 7.6.1.</span><span>
+</span><span id="line-63"></span><span class="hs-comment">--</span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- So get rid of this once 7.6.1 becomes widely adopted.</span><span>
+</span><span id="line-65"></span><span id="local-6989586621679059493"><span class="annot"><a href="Test.SmallCheck.Drivers.html#modifyIORef%27"><span class="hs-identifier hs-type">modifyIORef'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IORef</span></span><span> </span><span class="annot"><a href="#local-6989586621679059493"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679059493"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059493"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-66"></span><span id="modifyIORef%27"><span class="annot"><span class="annottext">modifyIORef' :: IORef a -&gt; (a -&gt; a) -&gt; IO ()
+</span><a href="Test.SmallCheck.Drivers.html#modifyIORef%27"><span class="hs-identifier hs-var hs-var">modifyIORef'</span></a></span></span><span> </span><span id="local-6989586621679059436"><span class="annot"><span class="annottext">IORef a
+</span><a href="#local-6989586621679059436"><span class="hs-identifier hs-var">ref</span></a></span></span><span> </span><span id="local-6989586621679059435"><span class="annot"><span class="annottext">a -&gt; a
+</span><a href="#local-6989586621679059435"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679059434"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059434"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IORef a -&gt; IO a
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">IORef a
+</span><a href="#local-6989586621679059436"><span class="hs-identifier hs-var">ref</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679059433"><span class="annot"><span class="annottext">x' :: a
+</span><a href="#local-6989586621679059433"><span class="hs-identifier hs-var hs-var">x'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+</span><a href="#local-6989586621679059435"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059434"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059433"><span class="hs-identifier hs-var">x'</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; IO () -&gt; IO ()
+</span><span class="hs-operator hs-var">`seq`</span></span><span> </span><span class="annot"><span class="annottext">IORef a -&gt; a -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">IORef a
+</span><a href="#local-6989586621679059436"><span class="hs-identifier hs-var">ref</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059433"><span class="hs-identifier hs-var">x'</span></a></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- | Use this if:</span><span>
+</span><span id="line-72"></span><span class="hs-comment">--</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- * You need to run a test in a monad different from 'IO'</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- * You need to analyse the results rather than just print them</span><span>
+</span><span id="line-76"></span><span id="local-6989586621679059431"><span id="local-6989586621679059432"><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheckM"><span class="hs-identifier hs-type">smallCheckM</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html#Testable"><span class="hs-identifier hs-type">Testable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679059432"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679059431"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059431"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059432"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#PropertyFailure"><span class="hs-identifier hs-type">PropertyFailure</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-77"></span><span id="smallCheckM"><span class="annot"><span class="annottext">smallCheckM :: Depth -&gt; a -&gt; m (Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#smallCheckM"><span class="hs-identifier hs-var hs-var">smallCheckM</span></a></span></span><span> </span><span id="local-6989586621679059430"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059430"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Depth -&gt; (TestQuality -&gt; m ()) -&gt; a -&gt; m (Maybe PropertyFailure)
+forall (m :: * -&gt; *) a.
+Testable m a =&gt;
+Depth -&gt; (TestQuality -&gt; m ()) -&gt; a -&gt; m (Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#smallCheckWithHook"><span class="hs-identifier hs-var">smallCheckWithHook</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059430"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m () -&gt; TestQuality -&gt; m ()
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; TestQuality -&gt; m ()) -&gt; m () -&gt; TestQuality -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">() -&gt; m ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | Like `smallCheckM`, but allows to specify a monadic hook that gets</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- executed after each test is run.</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- Useful for applications that want to report progress information to the</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- user.</span><span>
+</span><span id="line-84"></span><span id="local-6989586621679059491"><span id="local-6989586621679059492"><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheckWithHook"><span class="hs-identifier hs-type">smallCheckWithHook</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html#Testable"><span class="hs-identifier hs-type">Testable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679059492"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679059491"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.Property.html#TestQuality"><span class="hs-identifier hs-type">TestQuality</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059492"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059491"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059492"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#PropertyFailure"><span class="hs-identifier hs-type">PropertyFailure</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-85"></span><span id="smallCheckWithHook"><span class="annot"><span class="annottext">smallCheckWithHook :: Depth -&gt; (TestQuality -&gt; m ()) -&gt; a -&gt; m (Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Drivers.html#smallCheckWithHook"><span class="hs-identifier hs-var hs-var">smallCheckWithHook</span></a></span></span><span> </span><span id="local-6989586621679059428"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059428"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span id="local-6989586621679059427"><span class="annot"><span class="annottext">TestQuality -&gt; m ()
+</span><a href="#local-6989586621679059427"><span class="hs-identifier hs-var">hook</span></a></span></span><span> </span><span id="local-6989586621679059426"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059426"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Depth
+-&gt; (TestQuality -&gt; m ()) -&gt; Property m -&gt; m (Maybe PropertyFailure)
+forall (m :: * -&gt; *).
+Monad m =&gt;
+Depth
+-&gt; (TestQuality -&gt; m ()) -&gt; Property m -&gt; m (Maybe PropertyFailure)
+</span><a href="Test.SmallCheck.Property.html#runProperty"><span class="hs-identifier hs-var">runProperty</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679059428"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">TestQuality -&gt; m ()
+</span><a href="#local-6989586621679059427"><span class="hs-identifier hs-var">hook</span></a></span><span> </span><span class="annot"><span class="annottext">(Property m -&gt; m (Maybe PropertyFailure))
+-&gt; Property m -&gt; m (Maybe PropertyFailure)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Property m
+forall (m :: * -&gt; *) a. Testable m a =&gt; a -&gt; Property m
+</span><a href="Test.SmallCheck.Property.html#test"><span class="hs-identifier hs-var">test</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059426"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-86"></span></pre></body></html>

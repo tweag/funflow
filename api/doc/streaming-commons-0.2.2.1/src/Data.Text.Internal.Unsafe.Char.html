@@ -1,0 +1,186 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP, MagicHash #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      : Data.Text.Internal.Unsafe.Char</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Copyright   : (c) 2008, 2009 Tom Harper,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--               (c) 2009, 2010 Bryan O'Sullivan,</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--               (c) 2009 Duncan Coutts</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  : bos@serpentine.com</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Portability : GHC</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- /Warning/: this is an internal module, and does not have a stable</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- API or name. Functions in this module may not check or enforce</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- preconditions expected by public modules. Use at your own risk!</span><span>
+</span><span id="line-17"></span><span class="hs-comment">--</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- Fast character manipulation functions.</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Text.Internal.Unsafe.Char</span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">(</span><span>
+</span><span id="line-21"></span><span>      </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#ord"><span class="hs-identifier">ord</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr"><span class="hs-identifier">unsafeChr</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr8"><span class="hs-identifier">unsafeChr8</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr32"><span class="hs-identifier">unsafeChr32</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeWrite"><span class="hs-identifier">unsafeWrite</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-comment">-- , unsafeWriteRev</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span class="hs-cpp">
+
+#ifdef ASSERTS
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control.Exception</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">assert</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.ST</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ST</span></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(.&amp;.)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Shift.html"><span class="hs-identifier">Data.Text.Internal.Unsafe.Shift</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Text.Internal.Unsafe.Shift.html#shiftR"><span class="hs-identifier">shiftR</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Exts</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Char</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Int</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">chr#</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ord#</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">word2Int#</span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Word</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Word8</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Word16</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Word32</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Array</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">A</span></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#ord"><span class="hs-identifier hs-type">ord</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-40"></span><span id="ord"><span class="annot"><span class="annottext">ord :: Char -&gt; Int
+</span><a href="Data.Text.Internal.Unsafe.Char.html#ord"><span class="hs-identifier hs-var hs-var">ord</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">C#</span></span><span> </span><span id="local-6989586621679064306"><span class="annot"><span class="annottext">Char#
+</span><a href="#local-6989586621679064306"><span class="hs-identifier hs-var">c#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><span class="hs-identifier hs-var">I#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char# -&gt; Int#
+</span><span class="hs-identifier hs-var">ord#</span></span><span> </span><span class="annot"><span class="annottext">Char#
+</span><a href="#local-6989586621679064306"><span class="hs-identifier hs-var">c#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#ord"><span class="hs-pragma hs-type">ord</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr"><span class="hs-identifier hs-type">unsafeChr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word16</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span>
+</span><span id="line-44"></span><span id="unsafeChr"><span class="annot"><span class="annottext">unsafeChr :: Word16 -&gt; Char
+</span><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr"><span class="hs-identifier hs-var hs-var">unsafeChr</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">W16#</span></span><span> </span><span id="local-6989586621679064304"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064304"><span class="hs-identifier hs-var">w#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Char# -&gt; Char
+</span><span class="hs-identifier hs-var">C#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Char#
+</span><span class="hs-identifier hs-var">chr#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">word2Int#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064304"><span class="hs-identifier hs-var">w#</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr"><span class="hs-pragma hs-type">unsafeChr</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr8"><span class="hs-identifier hs-type">unsafeChr8</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span>
+</span><span id="line-48"></span><span id="unsafeChr8"><span class="annot"><span class="annottext">unsafeChr8 :: Word8 -&gt; Char
+</span><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr8"><span class="hs-identifier hs-var hs-var">unsafeChr8</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">W8#</span></span><span> </span><span id="local-6989586621679064303"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064303"><span class="hs-identifier hs-var">w#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Char# -&gt; Char
+</span><span class="hs-identifier hs-var">C#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Char#
+</span><span class="hs-identifier hs-var">chr#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">word2Int#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064303"><span class="hs-identifier hs-var">w#</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr8"><span class="hs-pragma hs-type">unsafeChr8</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr32"><span class="hs-identifier hs-type">unsafeChr32</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word32</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span>
+</span><span id="line-52"></span><span id="unsafeChr32"><span class="annot"><span class="annottext">unsafeChr32 :: Word32 -&gt; Char
+</span><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr32"><span class="hs-identifier hs-var hs-var">unsafeChr32</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">W32#</span></span><span> </span><span id="local-6989586621679064301"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064301"><span class="hs-identifier hs-var">w#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Char# -&gt; Char
+</span><span class="hs-identifier hs-var">C#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Char#
+</span><span class="hs-identifier hs-var">chr#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">word2Int#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679064301"><span class="hs-identifier hs-var">w#</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeChr32"><span class="hs-pragma hs-type">unsafeChr32</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | Write a character into the array at the given offset.  Returns</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- the number of 'Word16's written.</span><span>
+</span><span id="line-57"></span><span id="local-6989586621679064300"><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeWrite"><span class="hs-identifier hs-type">unsafeWrite</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">A.MArray</span></span><span> </span><span class="annot"><a href="#local-6989586621679064300"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ST</span></span><span> </span><span class="annot"><a href="#local-6989586621679064300"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-58"></span><span id="unsafeWrite"><span class="annot"><span class="annottext">unsafeWrite :: MArray s -&gt; Int -&gt; Char -&gt; ST s Int
+</span><a href="Data.Text.Internal.Unsafe.Char.html#unsafeWrite"><span class="hs-identifier hs-var hs-var">unsafeWrite</span></a></span></span><span> </span><span id="local-6989586621679064299"><span class="annot"><span class="annottext">MArray s
+</span><a href="#local-6989586621679064299"><span class="hs-identifier hs-var">marr</span></a></span></span><span> </span><span id="local-6989586621679064298"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064298"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621679064297"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679064297"><span class="hs-identifier hs-var">c</span></a></span></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064296"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0x10000</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span class="hs-cpp">
+#if defined(ASSERTS)
+</span><span>        </span><span class="hs-identifier">assert</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">i</span><span> </span><span class="hs-operator">&gt;=</span><span> </span><span class="hs-number">0</span><span class="hs-special">)</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">assert</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">i</span><span> </span><span class="hs-operator">&lt;</span><span> </span><span class="hs-identifier">A.length</span><span> </span><span class="hs-identifier">marr</span><span class="hs-special">)</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">return</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>        </span><span class="annot"><span class="annottext">MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+forall s. MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+</span><span class="hs-identifier hs-var">A.unsafeWrite</span></span><span> </span><span class="annot"><span class="annottext">MArray s
+</span><a href="#local-6989586621679064299"><span class="hs-identifier hs-var">marr</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064298"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Word16
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064296"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>        </span><span class="annot"><span class="annottext">Int -&gt; ST s Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span class="hs-cpp">
+#if defined(ASSERTS)
+</span><span>        </span><span class="hs-identifier">assert</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">i</span><span> </span><span class="hs-operator">&gt;=</span><span> </span><span class="hs-number">0</span><span class="hs-special">)</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">assert</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">i</span><span> </span><span class="hs-operator">&lt;</span><span> </span><span class="hs-identifier">A.length</span><span> </span><span class="hs-identifier">marr</span><span> </span><span class="hs-glyph">-</span><span> </span><span class="hs-number">1</span><span class="hs-special">)</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">return</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>        </span><span class="annot"><span class="annottext">MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+forall s. MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+</span><span class="hs-identifier hs-var">A.unsafeWrite</span></span><span> </span><span class="annot"><span class="annottext">MArray s
+</span><a href="#local-6989586621679064299"><span class="hs-identifier hs-var">marr</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064298"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Word16
+</span><a href="#local-6989586621679064293"><span class="hs-identifier hs-var">lo</span></a></span><span>
+</span><span id="line-70"></span><span>        </span><span class="annot"><span class="annottext">MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+forall s. MArray s -&gt; Int -&gt; Word16 -&gt; ST s ()
+</span><span class="hs-identifier hs-var">A.unsafeWrite</span></span><span> </span><span class="annot"><span class="annottext">MArray s
+</span><a href="#local-6989586621679064299"><span class="hs-identifier hs-var">marr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064298"><span class="hs-identifier hs-var">i</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word16
+</span><a href="#local-6989586621679064291"><span class="hs-identifier hs-var">hi</span></a></span><span>
+</span><span id="line-71"></span><span>        </span><span class="annot"><span class="annottext">Int -&gt; ST s Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679064296"><span class="annot"><span class="annottext">n :: Int
+</span><a href="#local-6989586621679064296"><span class="hs-identifier hs-var hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><a href="Data.Text.Internal.Unsafe.Char.html#ord"><span class="hs-identifier hs-var">ord</span></a></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679064297"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-73"></span><span>          </span><span id="local-6989586621679064290"><span class="annot"><span class="annottext">m :: Int
+</span><a href="#local-6989586621679064290"><span class="hs-identifier hs-var hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064296"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0x10000</span></span><span>
+</span><span id="line-74"></span><span>          </span><span id="local-6989586621679064293"><span class="annot"><span class="annottext">lo :: Word16
+</span><a href="#local-6989586621679064293"><span class="hs-identifier hs-var hs-var">lo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Word16
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Word16) -&gt; Int -&gt; Word16
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064290"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. UnsafeShift a =&gt; a -&gt; Int -&gt; a
+</span><a href="Data.Text.Internal.Unsafe.Shift.html#shiftR"><span class="hs-operator hs-var">`shiftR`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">10</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0xD800</span></span><span>
+</span><span id="line-75"></span><span>          </span><span id="local-6989586621679064291"><span class="annot"><span class="annottext">hi :: Word16
+</span><a href="#local-6989586621679064291"><span class="hs-identifier hs-var hs-var">hi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Word16
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Word16) -&gt; Int -&gt; Word16
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679064290"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0x3FF</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0xDC00</span></span><span>
+</span><span id="line-76"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Text.Internal.Unsafe.Char.html#unsafeWrite"><span class="hs-pragma hs-type">unsafeWrite</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">{-
+unsafeWriteRev :: A.MArray s Word16 -&gt; Int -&gt; Char -&gt; ST s Int
+unsafeWriteRev marr i c
+    | n &lt; 0x10000 = do
+        assert (i &gt;= 0) . assert (i &lt; A.length marr) $
+          A.unsafeWrite marr i (fromIntegral n)
+        return (i-1)
+    | otherwise = do
+        assert (i &gt;= 1) . assert (i &lt; A.length marr) $
+          A.unsafeWrite marr (i-1) lo
+        A.unsafeWrite marr i hi
+        return (i-2)
+    where n = ord c
+          m = n - 0x10000
+          lo = fromIntegral $ (m `shiftR` 10) + 0xD800
+          hi = fromIntegral $ (m .&amp;. 0x3FF) + 0xDC00
+{-# INLINE unsafeWriteRev #-}
+-}</span><span>
+</span><span id="line-96"></span></pre></body></html>

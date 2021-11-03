@@ -1,0 +1,527 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module      : Basement.Block</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Maintainer  : Haskell Foundation</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Types to represent &#8484;/n&#8484;.</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- &#8484;/n&#8484; is a finite field and is defined as the set of natural number:</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- {0, 1, ..., n &#8722; 1}.</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Basement.Bounded</span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier">Zn64</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#unZn64"><span class="hs-identifier">unZn64</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier">Zn</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#unZn"><span class="hs-identifier">unZn</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#zn64"><span class="hs-identifier">zn64</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#zn"><span class="hs-identifier">zn</span></a></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#zn64Nat"><span class="hs-identifier">zn64Nat</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Bounded.html#znNat"><span class="hs-identifier">znNat</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.TypeLits</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Basement.Compat.Base.html"><span class="hs-identifier">Basement.Compat.Base</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Basement.Compat.Natural.html"><span class="hs-identifier">Basement.Compat.Natural</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Basement.Numerical.Number.html"><span class="hs-identifier">Basement.Numerical.Number</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Proxy</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Basement.Nat.html"><span class="hs-identifier">Basement.Nat</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- | A type level bounded natural backed by a Word64</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">newtype</span><span> </span><span id="Zn64"><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679140807"><span class="annot"><a href="#local-6989586621679140807"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Nat</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Zn64"><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unZn64"><span class="annot"><span class="annottext">Zn64 n -&gt; Word64
+</span><a href="Basement.Bounded.html#unZn64"><span class="hs-identifier hs-var hs-var">unZn64</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679140754"><span id="local-6989586621679140756"><span id="local-6989586621679140758"><span class="annot"><span class="annottext">Int -&gt; Zn64 n -&gt; ShowS
+[Zn64 n] -&gt; ShowS
+Zn64 n -&gt; String
+(Int -&gt; Zn64 n -&gt; ShowS)
+-&gt; (Zn64 n -&gt; String) -&gt; ([Zn64 n] -&gt; ShowS) -&gt; Show (Zn64 n)
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall (n :: Nat). Int -&gt; Zn64 n -&gt; ShowS
+forall (n :: Nat). [Zn64 n] -&gt; ShowS
+forall (n :: Nat). Zn64 n -&gt; String
+showList :: [Zn64 n] -&gt; ShowS
+$cshowList :: forall (n :: Nat). [Zn64 n] -&gt; ShowS
+show :: Zn64 n -&gt; String
+$cshow :: forall (n :: Nat). Zn64 n -&gt; String
+showsPrec :: Int -&gt; Zn64 n -&gt; ShowS
+$cshowsPrec :: forall (n :: Nat). Int -&gt; Zn64 n -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679140749"><span id="local-6989586621679140751"><span class="annot"><span class="annottext">Zn64 n -&gt; Zn64 n -&gt; Bool
+(Zn64 n -&gt; Zn64 n -&gt; Bool)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Bool) -&gt; Eq (Zn64 n)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+/= :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c/= :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+== :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c== :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679140733"><span id="local-6989586621679140735"><span id="local-6989586621679140737"><span id="local-6989586621679140739"><span id="local-6989586621679140741"><span id="local-6989586621679140743"><span id="local-6989586621679140745"><span class="annot"><span class="annottext">Eq (Zn64 n)
+Eq (Zn64 n)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Ordering)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Bool)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Bool)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Bool)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Bool)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Zn64 n)
+-&gt; (Zn64 n -&gt; Zn64 n -&gt; Zn64 n)
+-&gt; Ord (Zn64 n)
+Zn64 n -&gt; Zn64 n -&gt; Bool
+Zn64 n -&gt; Zn64 n -&gt; Ordering
+Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall (n :: Nat). Eq (Zn64 n)
+forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Ordering
+forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+min :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+$cmin :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+max :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+$cmax :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+&gt;= :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c&gt;= :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+&gt; :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c&gt; :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+&lt;= :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c&lt;= :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+&lt; :: Zn64 n -&gt; Zn64 n -&gt; Bool
+$c&lt; :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Bool
+compare :: Zn64 n -&gt; Zn64 n -&gt; Ordering
+$ccompare :: forall (n :: Nat). Zn64 n -&gt; Zn64 n -&gt; Ordering
+$cp1Ord :: forall (n :: Nat). Eq (Zn64 n)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span id="local-6989586621679140731"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140731"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140731"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Prelude.Num</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140731"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-39"></span><span>    </span><span id="local-6989586621679140722"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Zn64 n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#zn64"><span class="hs-identifier hs-var">zn64</span></a></span><span> </span><span class="annot"><span class="annottext">(Word64 -&gt; Zn64 n) -&gt; (Integer -&gt; Word64) -&gt; Integer -&gt; Zn64 n
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Word64
+forall a. Num a =&gt; Integer -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.fromInteger</span></span><span>
+</span><span id="line-40"></span><span>    </span><span id="local-6989586621679140720"><span class="annot"><span class="annottext">+ :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(+)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+forall (n :: Nat).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#add64"><span class="hs-identifier hs-var">add64</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span id="local-6989586621679140717"><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="hs-special">)</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+forall (n :: Nat).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#sub64"><span class="hs-identifier hs-var">sub64</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span id="local-6989586621679140715"><span class="annot"><span class="annottext">* :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(*)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+forall (n :: Nat).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#mul64"><span class="hs-identifier hs-var">mul64</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621679140712"><span class="annot"><span class="annottext">abs :: Zn64 n -&gt; Zn64 n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></span></span><span> </span><span id="local-6989586621679140710"><span class="annot"><span class="annottext">Zn64 n
+</span><a href="#local-6989586621679140710"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn64 n
+</span><a href="#local-6989586621679140710"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621679140709"><span class="annot"><span class="annottext">negate :: Zn64 n -&gt; Zn64 n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></span></span><span> </span><span class="annot"><span class="annottext">Zn64 n
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Zn64 n
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;cannot negate Zn64: use Foundation Numerical hierarchy for this function to not be exposed to Zn64&quot;</span></span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621679140707"><span class="annot"><span class="annottext">signum :: Zn64 n -&gt; Zn64 n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140705"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140705"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64 -&gt; Word64
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.signum</span></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140705"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="NatNumMaxBound"><span class="annot"><a href="Basement.Nat.html#NatNumMaxBound"><span class="hs-identifier hs-var">NatNumMaxBound</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140703"><span class="annot"><a href="#local-6989586621679140703"><span class="hs-identifier hs-type hs-type">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="#local-6989586621679140703"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span id="local-6989586621679140702"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140702"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140702"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Compat.NumLiteral.html#Integral"><span class="hs-identifier hs-type">Integral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140702"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>    </span><span id="local-6989586621679140699"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Zn64 n
+</span><a href="Basement.Compat.NumLiteral.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#zn64"><span class="hs-identifier hs-var">zn64</span></a></span><span> </span><span class="annot"><span class="annottext">(Word64 -&gt; Zn64 n) -&gt; (Integer -&gt; Word64) -&gt; Integer -&gt; Zn64 n
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Word64
+forall a. Num a =&gt; Integer -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.fromInteger</span></span></span><span>
+</span><span id="line-51"></span><span id="local-6989586621679140697"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140697"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140697"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Numerical.Number.html#IsIntegral"><span class="hs-identifier hs-type">IsIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140697"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>    </span><span id="local-6989586621679140691"><span class="annot"><span class="annottext">toInteger :: Zn64 n -&gt; Integer
+</span><a href="Basement.Numerical.Number.html#toInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">toInteger</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140689"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140689"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Integer
+forall a. IsIntegral a =&gt; a -&gt; Integer
+</span><a href="Basement.Numerical.Number.html#toInteger"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140689"><span class="hs-identifier hs-var">n</span></a></span></span><span>
+</span><span id="line-53"></span><span id="local-6989586621679140688"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140688"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140688"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Numerical.Number.html#IsNatural"><span class="hs-identifier hs-type">IsNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679140688"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Nat</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>    </span><span id="local-6989586621679140684"><span class="annot"><span class="annottext">toNatural :: Zn64 n -&gt; Natural
+</span><a href="Basement.Numerical.Number.html#toNatural"><span class="hs-identifier hs-var hs-var hs-var hs-var">toNatural</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140682"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140682"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Natural
+forall a. IsNatural a =&gt; a -&gt; Natural
+</span><a href="Basement.Numerical.Number.html#toNatural"><span class="hs-identifier hs-var">toNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140682"><span class="hs-identifier hs-var">n</span></a></span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | Create an element of &#8484;/n&#8484; from a Word64</span><span>
+</span><span id="line-57"></span><span class="hs-comment">--</span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- If the value is greater than n, then the value is normalized by using the</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- integer modulus n</span><span>
+</span><span id="line-60"></span><span class="annot"><a href="Basement.Bounded.html#zn64"><span class="hs-identifier hs-type">zn64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140817"><span class="annot"><a href="#local-6989586621679140817"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140817"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140817"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140817"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-61"></span><span id="zn64"><span class="annot"><span class="annottext">zn64 :: Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#zn64"><span class="hs-identifier hs-var hs-var">zn64</span></a></span></span><span> </span><span id="local-6989586621679140681"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140681"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140681"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Word64
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+proxy n -&gt; Word64
+</span><a href="Basement.Nat.html#natValWord64"><span class="hs-identifier hs-var">natValWord64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140817"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- | Create an element of &#8484;/n&#8484; from a type level Nat</span><span>
+</span><span id="line-64"></span><span class="annot"><a href="Basement.Bounded.html#zn64Nat"><span class="hs-identifier hs-type">zn64Nat</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140677"><span class="annot"><a href="#local-6989586621679140677"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679140676"><span class="annot"><a href="#local-6989586621679140676"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140677"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140676"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140677"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140676"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CmpNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140677"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140676"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">~</span></span><span> </span><span class="hs-special">'</span><span class="annot"><span class="hs-identifier hs-type">LT</span></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>        </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140677"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-66"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140676"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-67"></span><span id="zn64Nat"><span class="annot"><span class="annottext">zn64Nat :: Proxy m -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#zn64Nat"><span class="hs-identifier hs-var hs-var">zn64Nat</span></a></span></span><span> </span><span id="local-6989586621679140675"><span class="annot"><span class="annottext">Proxy m
+</span><a href="#local-6989586621679140675"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy m -&gt; Word64
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+proxy n -&gt; Word64
+</span><a href="Basement.Nat.html#natValWord64"><span class="hs-identifier hs-var">natValWord64</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy m
+</span><a href="#local-6989586621679140675"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | Add 2 Zn64</span><span>
+</span><span id="line-70"></span><span class="annot"><a href="Basement.Bounded.html#add64"><span class="hs-identifier hs-type">add64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140674"><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-71"></span><span id="add64"><span class="annot"><span class="annottext">add64 :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#add64"><span class="hs-identifier hs-var hs-var">add64</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140673"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140673"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140672"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140672"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140673"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.+</span></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140672"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Word64
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+proxy n -&gt; Word64
+</span><a href="Basement.Nat.html#natValWord64"><span class="hs-identifier hs-var">natValWord64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140674"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | subtract 2 Zn64</span><span>
+</span><span id="line-74"></span><span class="annot"><a href="Basement.Bounded.html#sub64"><span class="hs-identifier hs-type">sub64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140671"><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-75"></span><span id="sub64"><span class="annot"><span class="annottext">sub64 :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#sub64"><span class="hs-identifier hs-var hs-var">sub64</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140670"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140670"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140669"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140669"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140670"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.-</span></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140669"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Word64
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+proxy n -&gt; Word64
+</span><a href="Basement.Nat.html#natValWord64"><span class="hs-identifier hs-var">natValWord64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140671"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- | Multiply 2 Zn64</span><span>
+</span><span id="line-78"></span><span class="annot"><a href="Basement.Bounded.html#mul64"><span class="hs-identifier hs-type">mul64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140668"><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Basement.Nat.html#NatWithinBound"><span class="hs-identifier hs-type">NatWithinBound</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word64</span></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-79"></span><span id="mul64"><span class="annot"><span class="annottext">mul64 :: Zn64 n -&gt; Zn64 n -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#mul64"><span class="hs-identifier hs-var hs-var">mul64</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140667"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140667"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-type">Zn64</span></a></span><span> </span><span id="local-6989586621679140666"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140666"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Zn64 n
+forall (n :: Nat). Word64 -&gt; Zn64 n
+</span><a href="Basement.Bounded.html#Zn64"><span class="hs-identifier hs-var">Zn64</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140667"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.*</span></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679140666"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word64 -&gt; Word64 -&gt; Word64
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Word64
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+(KnownNat n, NatWithinBound Word64 n) =&gt;
+proxy n -&gt; Word64
+</span><a href="Basement.Nat.html#natValWord64"><span class="hs-identifier hs-var">natValWord64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140668"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- | A type level bounded natural</span><span>
+</span><span id="line-82"></span><span class="hs-keyword">newtype</span><span> </span><span id="Zn"><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679140778"><span class="annot"><a href="#local-6989586621679140778"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Nat</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Zn"><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unZn"><span class="annot"><span class="annottext">Zn n -&gt; Natural
+</span><a href="Basement.Bounded.html#unZn"><span class="hs-identifier hs-var hs-var">unZn</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Natural</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679140659"><span id="local-6989586621679140661"><span id="local-6989586621679140663"><span class="annot"><span class="annottext">Int -&gt; Zn n -&gt; ShowS
+[Zn n] -&gt; ShowS
+Zn n -&gt; String
+(Int -&gt; Zn n -&gt; ShowS)
+-&gt; (Zn n -&gt; String) -&gt; ([Zn n] -&gt; ShowS) -&gt; Show (Zn n)
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall (n :: Nat). Int -&gt; Zn n -&gt; ShowS
+forall (n :: Nat). [Zn n] -&gt; ShowS
+forall (n :: Nat). Zn n -&gt; String
+showList :: [Zn n] -&gt; ShowS
+$cshowList :: forall (n :: Nat). [Zn n] -&gt; ShowS
+show :: Zn n -&gt; String
+$cshow :: forall (n :: Nat). Zn n -&gt; String
+showsPrec :: Int -&gt; Zn n -&gt; ShowS
+$cshowsPrec :: forall (n :: Nat). Int -&gt; Zn n -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679140655"><span id="local-6989586621679140657"><span class="annot"><span class="annottext">Zn n -&gt; Zn n -&gt; Bool
+(Zn n -&gt; Zn n -&gt; Bool) -&gt; (Zn n -&gt; Zn n -&gt; Bool) -&gt; Eq (Zn n)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+/= :: Zn n -&gt; Zn n -&gt; Bool
+$c/= :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+== :: Zn n -&gt; Zn n -&gt; Bool
+$c== :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679140640"><span id="local-6989586621679140642"><span id="local-6989586621679140644"><span id="local-6989586621679140646"><span id="local-6989586621679140648"><span id="local-6989586621679140650"><span id="local-6989586621679140652"><span class="annot"><span class="annottext">Eq (Zn n)
+Eq (Zn n)
+-&gt; (Zn n -&gt; Zn n -&gt; Ordering)
+-&gt; (Zn n -&gt; Zn n -&gt; Bool)
+-&gt; (Zn n -&gt; Zn n -&gt; Bool)
+-&gt; (Zn n -&gt; Zn n -&gt; Bool)
+-&gt; (Zn n -&gt; Zn n -&gt; Bool)
+-&gt; (Zn n -&gt; Zn n -&gt; Zn n)
+-&gt; (Zn n -&gt; Zn n -&gt; Zn n)
+-&gt; Ord (Zn n)
+Zn n -&gt; Zn n -&gt; Bool
+Zn n -&gt; Zn n -&gt; Ordering
+Zn n -&gt; Zn n -&gt; Zn n
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall (n :: Nat). Eq (Zn n)
+forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+forall (n :: Nat). Zn n -&gt; Zn n -&gt; Ordering
+forall (n :: Nat). Zn n -&gt; Zn n -&gt; Zn n
+min :: Zn n -&gt; Zn n -&gt; Zn n
+$cmin :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Zn n
+max :: Zn n -&gt; Zn n -&gt; Zn n
+$cmax :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Zn n
+&gt;= :: Zn n -&gt; Zn n -&gt; Bool
+$c&gt;= :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+&gt; :: Zn n -&gt; Zn n -&gt; Bool
+$c&gt; :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+&lt;= :: Zn n -&gt; Zn n -&gt; Bool
+$c&lt;= :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+&lt; :: Zn n -&gt; Zn n -&gt; Bool
+$c&lt; :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Bool
+compare :: Zn n -&gt; Zn n -&gt; Ordering
+$ccompare :: forall (n :: Nat). Zn n -&gt; Zn n -&gt; Ordering
+$cp1Ord :: forall (n :: Nat). Eq (Zn n)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span id="local-6989586621679140639"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140639"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Prelude.Num</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140639"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>    </span><span id="local-6989586621679140631"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Zn n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). KnownNat n =&gt; Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#zn"><span class="hs-identifier hs-var">zn</span></a></span><span> </span><span class="annot"><span class="annottext">(Natural -&gt; Zn n) -&gt; (Integer -&gt; Natural) -&gt; Integer -&gt; Zn n
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Natural
+forall a. Num a =&gt; Integer -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.fromInteger</span></span><span>
+</span><span id="line-87"></span><span>    </span><span id="local-6989586621679140630"><span class="annot"><span class="annottext">+ :: Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="#local-6989586621679140630"><span class="hs-operator hs-var hs-var hs-var hs-var">(+)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn n -&gt; Zn n -&gt; Zn n
+forall (n :: Nat). KnownNat n =&gt; Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#add"><span class="hs-identifier hs-var">add</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679140628"><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="hs-special">)</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn n -&gt; Zn n -&gt; Zn n
+forall (n :: Nat). KnownNat n =&gt; Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#sub"><span class="hs-identifier hs-var">sub</span></a></span><span>
+</span><span id="line-89"></span><span>    </span><span id="local-6989586621679140626"><span class="annot"><span class="annottext">* :: Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="#local-6989586621679140626"><span class="hs-operator hs-var hs-var hs-var hs-var">(*)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn n -&gt; Zn n -&gt; Zn n
+forall (n :: Nat). KnownNat n =&gt; Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#mul"><span class="hs-identifier hs-var">mul</span></a></span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621679140624"><span class="annot"><span class="annottext">abs :: Zn n -&gt; Zn n
+</span><a href="#local-6989586621679140624"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span id="local-6989586621679140623"><span class="annot"><span class="annottext">Zn n
+</span><a href="#local-6989586621679140623"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn n
+</span><a href="#local-6989586621679140623"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621679140622"><span class="annot"><span class="annottext">negate :: Zn n -&gt; Zn n
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></span></span><span> </span><span class="annot"><span class="annottext">Zn n
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Zn n
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;cannot negate Zn: use Foundation Numerical hierarchy for this function to not be exposed to Zn&quot;</span></span><span>
+</span><span id="line-92"></span><span>    </span><span id="local-6989586621679140621"><span class="annot"><span class="annottext">signum :: Zn n -&gt; Zn n
+</span><a href="#local-6989586621679140621"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="annot"><span class="annottext">(Natural -&gt; Zn n) -&gt; (Zn n -&gt; Natural) -&gt; Zn n -&gt; Zn n
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.signum</span></span><span> </span><span class="annot"><span class="annottext">(Natural -&gt; Natural) -&gt; (Zn n -&gt; Natural) -&gt; Zn n -&gt; Natural
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Zn n -&gt; Natural
+forall (n :: Nat). Zn n -&gt; Natural
+</span><a href="Basement.Bounded.html#unZn"><span class="hs-identifier hs-var hs-var">unZn</span></a></span></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="NatNumMaxBound"><span class="annot"><a href="Basement.Nat.html#NatNumMaxBound"><span class="hs-identifier hs-var">NatNumMaxBound</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140620"><span class="annot"><a href="#local-6989586621679140620"><span class="hs-identifier hs-type hs-type">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="#local-6989586621679140620"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span id="local-6989586621679140619"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140619"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Compat.NumLiteral.html#Integral"><span class="hs-identifier hs-type">Integral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140619"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621679140617"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Zn n
+</span><a href="#local-6989586621679140617"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). KnownNat n =&gt; Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#zn"><span class="hs-identifier hs-var">zn</span></a></span><span> </span><span class="annot"><span class="annottext">(Natural -&gt; Zn n) -&gt; (Integer -&gt; Natural) -&gt; Integer -&gt; Zn n
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Natural
+forall a. Num a =&gt; Integer -&gt; a
+</span><span class="hs-identifier hs-var">Prelude.fromInteger</span></span></span><span>
+</span><span id="line-98"></span><span id="local-6989586621679140616"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140616"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Numerical.Number.html#IsIntegral"><span class="hs-identifier hs-type">IsIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140616"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621679140611"><span class="annot"><span class="annottext">toInteger :: Zn n -&gt; Integer
+</span><a href="#local-6989586621679140611"><span class="hs-identifier hs-var hs-var hs-var hs-var">toInteger</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140610"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140610"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Integer
+forall a. IsIntegral a =&gt; a -&gt; Integer
+</span><a href="Basement.Numerical.Number.html#toInteger"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140610"><span class="hs-identifier hs-var">n</span></a></span></span><span>
+</span><span id="line-100"></span><span id="local-6989586621679140609"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140609"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Numerical.Number.html#IsNatural"><span class="hs-identifier hs-type">IsNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140609"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679140606"><span class="annot"><span class="annottext">toNatural :: Zn n -&gt; Natural
+</span><a href="#local-6989586621679140606"><span class="hs-identifier hs-var hs-var hs-var hs-var">toNatural</span></a></span></span><span> </span><span id="local-6989586621679140605"><span class="annot"><span class="annottext">Zn n
+</span><a href="#local-6989586621679140605"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Zn n -&gt; Natural
+forall (n :: Nat). Zn n -&gt; Natural
+</span><a href="Basement.Bounded.html#unZn"><span class="hs-identifier hs-var hs-var">unZn</span></a></span><span> </span><span class="annot"><span class="annottext">Zn n
+</span><a href="#local-6989586621679140605"><span class="hs-identifier hs-var">i</span></a></span></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- | Create an element of &#8484;/n&#8484; from a Natural.</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- If the value is greater than n, then the value is normalized by using the</span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- integer modulus n</span><span>
+</span><span id="line-107"></span><span class="annot"><a href="Basement.Bounded.html#zn"><span class="hs-identifier hs-type">zn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140779"><span class="annot"><a href="#local-6989586621679140779"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140779"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Natural</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140779"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-108"></span><span id="zn"><span class="annot"><span class="annottext">zn :: Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#zn"><span class="hs-identifier hs-var hs-var">zn</span></a></span></span><span> </span><span id="local-6989586621679140604"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140604"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140604"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Natural
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Natural
+</span><a href="Basement.Nat.html#natValNatural"><span class="hs-identifier hs-var">natValNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140779"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- | Create an element of &#8484;/n&#8484; from a type level Nat</span><span>
+</span><span id="line-111"></span><span class="annot"><a href="Basement.Bounded.html#znNat"><span class="hs-identifier hs-type">znNat</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140602"><span class="annot"><a href="#local-6989586621679140602"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679140601"><span class="annot"><a href="#local-6989586621679140601"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140602"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140601"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CmpNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140602"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140601"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">~</span></span><span> </span><span class="hs-special">'</span><span class="annot"><span class="hs-identifier hs-type">LT</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140602"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140601"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-112"></span><span id="znNat"><span class="annot"><span class="annottext">znNat :: Proxy m -&gt; Zn n
+</span><a href="Basement.Bounded.html#znNat"><span class="hs-identifier hs-var hs-var">znNat</span></a></span></span><span> </span><span id="local-6989586621679140600"><span class="annot"><span class="annottext">Proxy m
+</span><a href="#local-6989586621679140600"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy m -&gt; Natural
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Natural
+</span><a href="Basement.Nat.html#natValNatural"><span class="hs-identifier hs-var">natValNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy m
+</span><a href="#local-6989586621679140600"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | Add 2 Zn</span><span>
+</span><span id="line-115"></span><span class="annot"><a href="Basement.Bounded.html#add"><span class="hs-identifier hs-type">add</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140599"><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-116"></span><span id="add"><span class="annot"><span class="annottext">add :: Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#add"><span class="hs-identifier hs-var hs-var">add</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140598"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140598"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140597"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140597"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140598"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.+</span></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140597"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Natural
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Natural
+</span><a href="Basement.Nat.html#natValNatural"><span class="hs-identifier hs-var">natValNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140599"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- | subtract 2 Zn</span><span>
+</span><span id="line-119"></span><span class="annot"><a href="Basement.Bounded.html#sub"><span class="hs-identifier hs-type">sub</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140596"><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-120"></span><span id="sub"><span class="annot"><span class="annottext">sub :: Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#sub"><span class="hs-identifier hs-var hs-var">sub</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140595"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140595"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140594"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140594"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140595"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.-</span></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140594"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Natural
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Natural
+</span><a href="Basement.Nat.html#natValNatural"><span class="hs-identifier hs-var">natValNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140596"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- | Multiply 2 Zn</span><span>
+</span><span id="line-123"></span><span class="annot"><a href="Basement.Bounded.html#mul"><span class="hs-identifier hs-type">mul</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679140593"><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-124"></span><span id="mul"><span class="annot"><span class="annottext">mul :: Zn n -&gt; Zn n -&gt; Zn n
+</span><a href="Basement.Bounded.html#mul"><span class="hs-identifier hs-var hs-var">mul</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140592"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140592"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-type">Zn</span></a></span><span> </span><span id="local-6989586621679140591"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140591"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Zn n
+forall (n :: Nat). Natural -&gt; Zn n
+</span><a href="Basement.Bounded.html#Zn"><span class="hs-identifier hs-var">Zn</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140592"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">Prelude.*</span></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679140591"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`Prelude.mod`</span></span><span> </span><span class="annot"><span class="annottext">Proxy n -&gt; Natural
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Natural
+</span><a href="Basement.Nat.html#natValNatural"><span class="hs-identifier hs-var">natValNatural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy n
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679140593"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span></pre></body></html>

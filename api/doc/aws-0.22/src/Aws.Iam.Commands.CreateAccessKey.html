@@ -1,0 +1,423 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TupleSections         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies          #-}</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Iam.Commands.CreateAccessKey</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier">CreateAccessKey</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier">CreateAccessKeyResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#AccessKey"><span class="hs-identifier">AccessKey</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Core.html"><span class="hs-identifier">Aws.Iam.Core</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Internal.html"><span class="hs-identifier">Aws.Iam.Internal</span></a></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Time</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">($//)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- | Creates a new AWS secret access key and corresponding AWS access key ID</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- for the given user name.</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- If a user name is not provided, IAM will determine the user name based on</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- the access key signing the request.</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- &lt;http://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateAccessKey.html&gt;</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">data</span><span> </span><span id="CreateAccessKey"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-var">CreateAccessKey</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="CreateAccessKey"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-var">CreateAccessKey</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679223510"><span id="local-6989586621679223512"><span class="annot"><span class="annottext">CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+(CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; Eq CreateAccessKey
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c/= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+== :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c== :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223494"><span id="local-6989586621679223496"><span id="local-6989586621679223498"><span id="local-6989586621679223500"><span id="local-6989586621679223502"><span id="local-6989586621679223504"><span id="local-6989586621679223506"><span class="annot"><span class="annottext">Eq CreateAccessKey
+Eq CreateAccessKey
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Ordering)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; Bool)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey)
+-&gt; (CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey)
+-&gt; Ord CreateAccessKey
+CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+CreateAccessKey -&gt; CreateAccessKey -&gt; Ordering
+CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey
+$cmin :: CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey
+max :: CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey
+$cmax :: CreateAccessKey -&gt; CreateAccessKey -&gt; CreateAccessKey
+&gt;= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c&gt;= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+&gt; :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c&gt; :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+&lt;= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c&lt;= :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+&lt; :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+$c&lt; :: CreateAccessKey -&gt; CreateAccessKey -&gt; Bool
+compare :: CreateAccessKey -&gt; CreateAccessKey -&gt; Ordering
+$ccompare :: CreateAccessKey -&gt; CreateAccessKey -&gt; Ordering
+$cp1Ord :: Eq CreateAccessKey
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223487"><span id="local-6989586621679223489"><span id="local-6989586621679223491"><span class="annot"><span class="annottext">Int -&gt; CreateAccessKey -&gt; ShowS
+[CreateAccessKey] -&gt; ShowS
+CreateAccessKey -&gt; String
+(Int -&gt; CreateAccessKey -&gt; ShowS)
+-&gt; (CreateAccessKey -&gt; String)
+-&gt; ([CreateAccessKey] -&gt; ShowS)
+-&gt; Show CreateAccessKey
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CreateAccessKey] -&gt; ShowS
+$cshowList :: [CreateAccessKey] -&gt; ShowS
+show :: CreateAccessKey -&gt; String
+$cshow :: CreateAccessKey -&gt; String
+showsPrec :: Int -&gt; CreateAccessKey -&gt; ShowS
+$cshowsPrec :: Int -&gt; CreateAccessKey -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-type">CreateAccessKey</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-type">CreateAccessKey</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamConfiguration"><span class="hs-identifier hs-type">IamConfiguration</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span id="local-6989586621679223483"><span class="annot"><span class="annottext">signQuery :: CreateAccessKey
+-&gt; ServiceConfiguration CreateAccessKey queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-type">CreateAccessKey</span></a></span><span> </span><span id="local-6989586621679223481"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679223481"><span class="hs-identifier hs-var">user</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall qt.
+ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration qt
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Iam.Internal.html#iamAction%27"><span class="hs-identifier hs-var">iamAction'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;CreateAccessKey&quot;</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;UserName&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; (ByteString, Text))
+-&gt; Maybe Text -&gt; Maybe (ByteString, Text)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679223481"><span class="hs-identifier hs-var">user</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- | Represents the IAM @AccessKey@ data type.</span><span>
+</span><span id="line-38"></span><span class="hs-comment">--</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- &lt;http://docs.aws.amazon.com/IAM/latest/APIReference/API_AccessKey.html&gt;</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="AccessKey"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#AccessKey"><span class="hs-identifier hs-var">AccessKey</span></a></span></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="AccessKey"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#AccessKey"><span class="hs-identifier hs-var">AccessKey</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-42"></span><span>        </span><span id="akAccessKeyId"><span class="annot"><span class="annottext">AccessKey -&gt; Text
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#akAccessKeyId"><span class="hs-identifier hs-var hs-var">akAccessKeyId</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-43"></span><span>      </span><span class="hs-comment">-- ^ The Access Key ID.</span><span>
+</span><span id="line-44"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="akCreateDate"><span class="annot"><span class="annottext">AccessKey -&gt; Maybe UTCTime
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#akCreateDate"><span class="hs-identifier hs-var hs-var">akCreateDate</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">UTCTime</span></span><span>
+</span><span id="line-45"></span><span>      </span><span class="hs-comment">-- ^ Date and time at which the access key was created.</span><span>
+</span><span id="line-46"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="akSecretAccessKey"><span class="annot"><span class="annottext">AccessKey -&gt; Text
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#akSecretAccessKey"><span class="hs-identifier hs-var hs-var">akSecretAccessKey</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-47"></span><span>      </span><span class="hs-comment">-- ^ Secret key used to sign requests. The secret key is accessible only</span><span>
+</span><span id="line-48"></span><span>      </span><span class="hs-comment">-- during key creation.</span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="akStatus"><span class="annot"><span class="annottext">AccessKey -&gt; AccessKeyStatus
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#akStatus"><span class="hs-identifier hs-var hs-var">akStatus</span></a></span></span><span>          </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#AccessKeyStatus"><span class="hs-identifier hs-type">AccessKeyStatus</span></a></span><span>
+</span><span id="line-50"></span><span>      </span><span class="hs-comment">-- ^ Whether the access key is active or not.</span><span>
+</span><span id="line-51"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="akUserName"><span class="annot"><span class="annottext">AccessKey -&gt; Text
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#akUserName"><span class="hs-identifier hs-var hs-var">akUserName</span></a></span></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-52"></span><span>      </span><span class="hs-comment">-- ^ The user name for which this key is defined.</span><span>
+</span><span id="line-53"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679223469"><span id="local-6989586621679223471"><span class="annot"><span class="annottext">AccessKey -&gt; AccessKey -&gt; Bool
+(AccessKey -&gt; AccessKey -&gt; Bool)
+-&gt; (AccessKey -&gt; AccessKey -&gt; Bool) -&gt; Eq AccessKey
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: AccessKey -&gt; AccessKey -&gt; Bool
+$c/= :: AccessKey -&gt; AccessKey -&gt; Bool
+== :: AccessKey -&gt; AccessKey -&gt; Bool
+$c== :: AccessKey -&gt; AccessKey -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223454"><span id="local-6989586621679223456"><span id="local-6989586621679223458"><span id="local-6989586621679223460"><span id="local-6989586621679223462"><span id="local-6989586621679223464"><span id="local-6989586621679223466"><span class="annot"><span class="annottext">Eq AccessKey
+Eq AccessKey
+-&gt; (AccessKey -&gt; AccessKey -&gt; Ordering)
+-&gt; (AccessKey -&gt; AccessKey -&gt; Bool)
+-&gt; (AccessKey -&gt; AccessKey -&gt; Bool)
+-&gt; (AccessKey -&gt; AccessKey -&gt; Bool)
+-&gt; (AccessKey -&gt; AccessKey -&gt; Bool)
+-&gt; (AccessKey -&gt; AccessKey -&gt; AccessKey)
+-&gt; (AccessKey -&gt; AccessKey -&gt; AccessKey)
+-&gt; Ord AccessKey
+AccessKey -&gt; AccessKey -&gt; Bool
+AccessKey -&gt; AccessKey -&gt; Ordering
+AccessKey -&gt; AccessKey -&gt; AccessKey
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: AccessKey -&gt; AccessKey -&gt; AccessKey
+$cmin :: AccessKey -&gt; AccessKey -&gt; AccessKey
+max :: AccessKey -&gt; AccessKey -&gt; AccessKey
+$cmax :: AccessKey -&gt; AccessKey -&gt; AccessKey
+&gt;= :: AccessKey -&gt; AccessKey -&gt; Bool
+$c&gt;= :: AccessKey -&gt; AccessKey -&gt; Bool
+&gt; :: AccessKey -&gt; AccessKey -&gt; Bool
+$c&gt; :: AccessKey -&gt; AccessKey -&gt; Bool
+&lt;= :: AccessKey -&gt; AccessKey -&gt; Bool
+$c&lt;= :: AccessKey -&gt; AccessKey -&gt; Bool
+&lt; :: AccessKey -&gt; AccessKey -&gt; Bool
+$c&lt; :: AccessKey -&gt; AccessKey -&gt; Bool
+compare :: AccessKey -&gt; AccessKey -&gt; Ordering
+$ccompare :: AccessKey -&gt; AccessKey -&gt; Ordering
+$cp1Ord :: Eq AccessKey
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223448"><span id="local-6989586621679223450"><span id="local-6989586621679223452"><span class="annot"><span class="annottext">Int -&gt; AccessKey -&gt; ShowS
+[AccessKey] -&gt; ShowS
+AccessKey -&gt; String
+(Int -&gt; AccessKey -&gt; ShowS)
+-&gt; (AccessKey -&gt; String)
+-&gt; ([AccessKey] -&gt; ShowS)
+-&gt; Show AccessKey
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [AccessKey] -&gt; ShowS
+$cshowList :: [AccessKey] -&gt; ShowS
+show :: AccessKey -&gt; String
+$cshow :: AccessKey -&gt; String
+showsPrec :: Int -&gt; AccessKey -&gt; ShowS
+$cshowsPrec :: Int -&gt; AccessKey -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">data</span><span> </span><span id="CreateAccessKeyResponse"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-var">CreateAccessKeyResponse</span></a></span></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="CreateAccessKeyResponse"><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-var">CreateAccessKeyResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#AccessKey"><span class="hs-identifier hs-type">AccessKey</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679223443"><span id="local-6989586621679223445"><span class="annot"><span class="annottext">CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+(CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; Eq CreateAccessKeyResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c/= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+== :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c== :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223428"><span id="local-6989586621679223430"><span id="local-6989586621679223432"><span id="local-6989586621679223434"><span id="local-6989586621679223436"><span id="local-6989586621679223438"><span id="local-6989586621679223440"><span class="annot"><span class="annottext">Eq CreateAccessKeyResponse
+Eq CreateAccessKeyResponse
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Ordering)
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; (CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool)
+-&gt; (CreateAccessKeyResponse
+    -&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse)
+-&gt; (CreateAccessKeyResponse
+    -&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse)
+-&gt; Ord CreateAccessKeyResponse
+CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Ordering
+CreateAccessKeyResponse
+-&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: CreateAccessKeyResponse
+-&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse
+$cmin :: CreateAccessKeyResponse
+-&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse
+max :: CreateAccessKeyResponse
+-&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse
+$cmax :: CreateAccessKeyResponse
+-&gt; CreateAccessKeyResponse -&gt; CreateAccessKeyResponse
+&gt;= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c&gt;= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+&gt; :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c&gt; :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+&lt;= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c&lt;= :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+&lt; :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+$c&lt; :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Bool
+compare :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Ordering
+$ccompare :: CreateAccessKeyResponse -&gt; CreateAccessKeyResponse -&gt; Ordering
+$cp1Ord :: Eq CreateAccessKeyResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223422"><span id="local-6989586621679223424"><span id="local-6989586621679223426"><span class="annot"><span class="annottext">Int -&gt; CreateAccessKeyResponse -&gt; ShowS
+[CreateAccessKeyResponse] -&gt; ShowS
+CreateAccessKeyResponse -&gt; String
+(Int -&gt; CreateAccessKeyResponse -&gt; ShowS)
+-&gt; (CreateAccessKeyResponse -&gt; String)
+-&gt; ([CreateAccessKeyResponse] -&gt; ShowS)
+-&gt; Show CreateAccessKeyResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CreateAccessKeyResponse] -&gt; ShowS
+$cshowList :: [CreateAccessKeyResponse] -&gt; ShowS
+show :: CreateAccessKeyResponse -&gt; String
+$cshow :: CreateAccessKeyResponse -&gt; String
+showsPrec :: Int -&gt; CreateAccessKeyResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; CreateAccessKeyResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-type">CreateAccessKey</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamMetadata"><span class="hs-identifier hs-type">IamMetadata</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span id="local-6989586621679223418"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; CreateAccessKey
+-&gt; IORef (ResponseMetadata CreateAccessKeyResponse)
+-&gt; HTTPResponseConsumer CreateAccessKeyResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">CreateAccessKey
+</span><span class="hs-identifier">_</span></span><span>
+</span><span id="line-63"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; Response IamMetadata CreateAccessKeyResponse)
+-&gt; IORef IamMetadata
+-&gt; HTTPResponseConsumer CreateAccessKeyResponse
+forall a.
+(Cursor -&gt; Response IamMetadata a)
+-&gt; IORef IamMetadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Iam.Core.html#iamResponseConsumer"><span class="hs-identifier hs-var">iamResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">((Cursor -&gt; Response IamMetadata CreateAccessKeyResponse)
+ -&gt; IORef IamMetadata
+ -&gt; HTTPResponseConsumer CreateAccessKeyResponse)
+-&gt; (Cursor -&gt; Response IamMetadata CreateAccessKeyResponse)
+-&gt; IORef IamMetadata
+-&gt; HTTPResponseConsumer CreateAccessKeyResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679223415"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679223415"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-64"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679223414"><span class="annot"><span class="annottext">attr :: Text -&gt; Response IamMetadata Text
+</span><a href="#local-6989586621679223414"><span class="hs-identifier hs-var hs-var">attr</span></a></span></span><span> </span><span id="local-6989586621679223413"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223413"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Text] -&gt; Response IamMetadata Text
+forall (m :: * -&gt; *) a. MonadThrow m =&gt; String -&gt; [a] -&gt; m a
+</span><a href="Aws.Core.html#force"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Missing &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; String
+</span><span class="hs-identifier hs-var">Text.unpack</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223413"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Response IamMetadata Text)
+-&gt; [Text] -&gt; Response IamMetadata Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-65"></span><span>                            </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679223415"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Text]) -&gt; [Text]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Text]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223413"><span class="hs-identifier hs-var">name</span></a></span><span>
+</span><span id="line-66"></span><span>            </span><span id="local-6989586621679223409"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223409"><span class="hs-identifier hs-var">akAccessKeyId</span></a></span></span><span>     </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Response IamMetadata Text
+</span><a href="#local-6989586621679223414"><span class="hs-identifier hs-var">attr</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;AccessKeyId&quot;</span></span><span>
+</span><span id="line-67"></span><span>            </span><span id="local-6989586621679223408"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223408"><span class="hs-identifier hs-var">akSecretAccessKey</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Response IamMetadata Text
+</span><a href="#local-6989586621679223414"><span class="hs-identifier hs-var">attr</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;SecretAccessKey&quot;</span></span><span>
+</span><span id="line-68"></span><span>            </span><span id="local-6989586621679223407"><span class="annot"><span class="annottext">AccessKeyStatus
+</span><a href="#local-6989586621679223407"><span class="hs-identifier hs-var">akStatus</span></a></span></span><span>          </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; AccessKeyStatus
+</span><a href="#local-6989586621679223406"><span class="hs-identifier hs-var">readAccessKeyStatus</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; AccessKeyStatus)
+-&gt; Response IamMetadata Text
+-&gt; Response IamMetadata AccessKeyStatus
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Response IamMetadata Text
+</span><a href="#local-6989586621679223414"><span class="hs-identifier hs-var">attr</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Status&quot;</span></span><span>
+</span><span id="line-69"></span><span>            </span><span id="local-6989586621679223405"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223405"><span class="hs-identifier hs-var">akUserName</span></a></span></span><span>        </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Response IamMetadata Text
+</span><a href="#local-6989586621679223414"><span class="hs-identifier hs-var">attr</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;UserName&quot;</span></span><span>
+</span><span id="line-70"></span><span>            </span><span id="local-6989586621679223404"><span class="annot"><span class="annottext">Maybe UTCTime
+</span><a href="#local-6989586621679223404"><span class="hs-identifier hs-var">akCreateDate</span></a></span></span><span>      </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response IamMetadata (Maybe UTCTime)
+forall (f :: * -&gt; *). MonadThrow f =&gt; Cursor -&gt; f (Maybe UTCTime)
+</span><a href="#local-6989586621679223403"><span class="hs-identifier hs-var">readDate</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679223415"><span class="hs-identifier hs-var">cursor</span></a></span><span>
+</span><span id="line-71"></span><span>            </span><span class="annot"><span class="annottext">CreateAccessKeyResponse
+-&gt; Response IamMetadata CreateAccessKeyResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(CreateAccessKeyResponse
+ -&gt; Response IamMetadata CreateAccessKeyResponse)
+-&gt; CreateAccessKeyResponse
+-&gt; Response IamMetadata CreateAccessKeyResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">AccessKey -&gt; CreateAccessKeyResponse
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-var">CreateAccessKeyResponse</span></a></span><span> </span><span class="annot"><span class="annottext">AccessKey :: Text
+-&gt; Maybe UTCTime -&gt; Text -&gt; AccessKeyStatus -&gt; Text -&gt; AccessKey
+</span><a href="Aws.Iam.Commands.CreateAccessKey.html#AccessKey"><span class="hs-identifier hs-type">AccessKey</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">Maybe UTCTime
+Text
+AccessKeyStatus
+akCreateDate :: Maybe UTCTime
+akUserName :: Text
+akStatus :: AccessKeyStatus
+akSecretAccessKey :: Text
+akAccessKeyId :: Text
+akUserName :: Text
+akStatus :: AccessKeyStatus
+akSecretAccessKey :: Text
+akCreateDate :: Maybe UTCTime
+akAccessKeyId :: Text
+</span><a href="#local-6989586621679223404"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-72"></span><span>        </span><span class="hs-keyword">where</span><span>
+</span><span id="line-73"></span><span>          </span><span id="local-6989586621679223403"><span class="annot"><span class="annottext">readDate :: Cursor -&gt; f (Maybe UTCTime)
+</span><a href="#local-6989586621679223403"><span class="hs-identifier hs-var hs-var">readDate</span></a></span></span><span> </span><span id="local-6989586621679223402"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679223402"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679223402"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [String]) -&gt; [String]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [String]
+</span><a href="Aws.Core.html#elCont"><span class="hs-identifier hs-var">elCont</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;CreateDate&quot;</span></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-74"></span><span>                        </span><span class="hs-special">(</span><span id="local-6989586621679223400"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679223400"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[String]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UTCTime -&gt; Maybe UTCTime
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(UTCTime -&gt; Maybe UTCTime) -&gt; f UTCTime -&gt; f (Maybe UTCTime)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; f UTCTime
+forall (m :: * -&gt; *). MonadThrow m =&gt; String -&gt; m UTCTime
+</span><a href="Aws.Iam.Core.html#parseDateTime"><span class="hs-identifier hs-var">parseDateTime</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679223400"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-75"></span><span>                        </span><span class="annot"><span class="annottext">[String]
+</span><span class="hs-identifier">_</span></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe UTCTime -&gt; f (Maybe UTCTime)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe UTCTime
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-76"></span><span>          </span><span id="local-6989586621679223406"><span class="annot"><span class="annottext">readAccessKeyStatus :: Text -&gt; AccessKeyStatus
+</span><a href="#local-6989586621679223406"><span class="hs-identifier hs-var hs-var">readAccessKeyStatus</span></a></span></span><span> </span><span id="local-6989586621679223398"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223398"><span class="hs-identifier hs-var">s</span></a></span></span><span>
+</span><span id="line-77"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text
+</span><span class="hs-identifier hs-var">Text.toCaseFold</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223398"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Active&quot;</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AccessKeyStatus
+</span><a href="Aws.Iam.Core.html#AccessKeyActive"><span class="hs-identifier hs-var">AccessKeyActive</span></a></span><span>
+</span><span id="line-78"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>                     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AccessKeyStatus
+</span><a href="Aws.Iam.Core.html#AccessKeyInactive"><span class="hs-identifier hs-var">AccessKeyInactive</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKey"><span class="hs-identifier hs-type">CreateAccessKey</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateAccessKey.html#CreateAccessKeyResponse"><span class="hs-identifier hs-type">CreateAccessKeyResponse</span></a></span><span>
+</span><span id="line-85"></span><span>    </span><span id="local-6989586621679223388"><span class="annot"><span class="annottext">loadToMemory :: CreateAccessKeyResponse
+-&gt; ResourceT IO (MemoryResponse CreateAccessKeyResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CreateAccessKeyResponse
+-&gt; ResourceT IO (MemoryResponse CreateAccessKeyResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-86"></span></pre></body></html>

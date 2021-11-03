@@ -1,0 +1,208 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Module      :  Text.URI.QQ</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright   :  &#169; 2017&#8211;present Mark Karpov</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License     :  BSD 3 clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Maintainer  :  Mark Karpov &lt;markkarpov92@gmail.com&gt;</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Quasi-quoters for compile-time construction of URIs and refined text</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- values.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- All of the quasi-quoters in this module can be used in an expression</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- context. With the @ViewPatterns@ language extension enabled, they may</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- also be used in a pattern context (since /0.3.2.0/).</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Text.URI.QQ</span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Text.URI.QQ.html#uri"><span class="hs-identifier">uri</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#scheme"><span class="hs-identifier">scheme</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#host"><span class="hs-identifier">host</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#username"><span class="hs-identifier">username</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#password"><span class="hs-identifier">password</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#pathPiece"><span class="hs-identifier">pathPiece</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#queryKey"><span class="hs-identifier">queryKey</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#queryValue"><span class="hs-identifier">queryValue</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>    </span><span class="annot"><a href="Text.URI.QQ.html#fragment"><span class="hs-identifier">fragment</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">SomeException</span></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Lib</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">appE</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">viewP</span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Quote</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">QuasiQuoter</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html"><span class="hs-identifier">Text.URI.Parser.Text</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Text.URI.Types.html"><span class="hs-identifier">Text.URI.Types</span></a></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | Construct a 'URI' value at compile time.</span><span>
+</span><span id="line-42"></span><span class="annot"><a href="Text.URI.QQ.html#uri"><span class="hs-identifier hs-type">uri</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-43"></span><span id="uri"><span class="annot"><span class="annottext">uri :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#uri"><span class="hs-identifier hs-var hs-var">uri</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException URI) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException URI
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m URI
+</span><a href="Text.URI.Parser.Text.html#mkURI"><span class="hs-identifier hs-var">mkURI</span></a></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- | Construct a @'RText' 'Scheme'@ value at compile time.</span><span>
+</span><span id="line-46"></span><span class="annot"><a href="Text.URI.QQ.html#scheme"><span class="hs-identifier hs-type">scheme</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-47"></span><span id="scheme"><span class="annot"><span class="annottext">scheme :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#scheme"><span class="hs-identifier hs-var hs-var">scheme</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'Scheme)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'Scheme)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Scheme)
+</span><a href="Text.URI.Types.html#mkScheme"><span class="hs-identifier hs-var">mkScheme</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- | Construct a @'RText' 'Host'@ value at compile time.</span><span>
+</span><span id="line-50"></span><span class="annot"><a href="Text.URI.QQ.html#host"><span class="hs-identifier hs-type">host</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-51"></span><span id="host"><span class="annot"><span class="annottext">host :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#host"><span class="hs-identifier hs-var hs-var">host</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'Host)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'Host)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Host)
+</span><a href="Text.URI.Types.html#mkHost"><span class="hs-identifier hs-var">mkHost</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- | Construct a @'RText' 'Username'@ value at compile time.</span><span>
+</span><span id="line-54"></span><span class="annot"><a href="Text.URI.QQ.html#username"><span class="hs-identifier hs-type">username</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-55"></span><span id="username"><span class="annot"><span class="annottext">username :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#username"><span class="hs-identifier hs-var hs-var">username</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'Username)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'Username)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Username)
+</span><a href="Text.URI.Types.html#mkUsername"><span class="hs-identifier hs-var">mkUsername</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- | Construct a @'RText' 'Password'@ value at compile time.</span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Text.URI.QQ.html#password"><span class="hs-identifier hs-type">password</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-59"></span><span id="password"><span class="annot"><span class="annottext">password :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#password"><span class="hs-identifier hs-var hs-var">password</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'Password)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'Password)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Password)
+</span><a href="Text.URI.Types.html#mkPassword"><span class="hs-identifier hs-var">mkPassword</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- | Construct a @'RText' 'PathPiece'@ value at compile time.</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Text.URI.QQ.html#pathPiece"><span class="hs-identifier hs-type">pathPiece</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-63"></span><span id="pathPiece"><span class="annot"><span class="annottext">pathPiece :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#pathPiece"><span class="hs-identifier hs-var hs-var">pathPiece</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'PathPiece)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'PathPiece)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'PathPiece)
+</span><a href="Text.URI.Types.html#mkPathPiece"><span class="hs-identifier hs-var">mkPathPiece</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- | Construct a @'RText' 'QueryKey'@ value at compile time.</span><span>
+</span><span id="line-66"></span><span class="annot"><a href="Text.URI.QQ.html#queryKey"><span class="hs-identifier hs-type">queryKey</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-67"></span><span id="queryKey"><span class="annot"><span class="annottext">queryKey :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#queryKey"><span class="hs-identifier hs-var hs-var">queryKey</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'QueryKey)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'QueryKey)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'QueryKey)
+</span><a href="Text.URI.Types.html#mkQueryKey"><span class="hs-identifier hs-var">mkQueryKey</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | Construct a @'RText 'QueryValue'@ value at compile time.</span><span>
+</span><span id="line-70"></span><span class="annot"><a href="Text.URI.QQ.html#queryValue"><span class="hs-identifier hs-type">queryValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-71"></span><span id="queryValue"><span class="annot"><span class="annottext">queryValue :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#queryValue"><span class="hs-identifier hs-var hs-var">queryValue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'QueryValue)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'QueryValue)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'QueryValue)
+</span><a href="Text.URI.Types.html#mkQueryValue"><span class="hs-identifier hs-var">mkQueryValue</span></a></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | Construct a @'RText' 'Fragment'@ value at compile time.</span><span>
+</span><span id="line-74"></span><span class="annot"><a href="Text.URI.QQ.html#fragment"><span class="hs-identifier hs-type">fragment</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-75"></span><span id="fragment"><span class="annot"><span class="annottext">fragment :: QuasiQuoter
+</span><a href="Text.URI.QQ.html#fragment"><span class="hs-identifier hs-var hs-var">fragment</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either SomeException (RText 'Fragment)) -&gt; QuasiQuoter
+forall a.
+(Eq a, Lift a) =&gt;
+(Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var">liftToQQ</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException (RText 'Fragment)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Fragment)
+</span><a href="Text.URI.Types.html#mkFragment"><span class="hs-identifier hs-var">mkFragment</span></a></span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- Helpers</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- | Lift a smart constructor for refined text into a 'QuasiQuoter'.</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- The 'Eq' constraint is technically unnecessary here, but the pattern</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- generated by 'quotePat' will only work if the type has an 'Eq' instance.</span><span>
+</span><span id="line-84"></span><span id="local-6989586621679154208"><span class="annot"><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-type">liftToQQ</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="annot"><a href="#local-6989586621679154208"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Lift</span></span><span> </span><span class="annot"><a href="#local-6989586621679154208"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">SomeException</span></span><span> </span><span class="annot"><a href="#local-6989586621679154208"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span></span><span>
+</span><span id="line-85"></span><span id="liftToQQ"><span class="annot"><span class="annottext">liftToQQ :: (Text -&gt; Either SomeException a) -&gt; QuasiQuoter
+</span><a href="Text.URI.QQ.html#liftToQQ"><span class="hs-identifier hs-var hs-var">liftToQQ</span></a></span></span><span> </span><span id="local-6989586621679154158"><span class="annot"><span class="annottext">Text -&gt; Either SomeException a
+</span><a href="#local-6989586621679154158"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-86"></span><span>  </span><span class="annot"><span class="annottext">QuasiQuoter :: (String -&gt; Q Exp)
+-&gt; (String -&gt; Q Pat)
+-&gt; (String -&gt; Q Type)
+-&gt; (String -&gt; Q [Dec])
+-&gt; QuasiQuoter
+</span><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">quoteExp :: String -&gt; Q Exp
+</span><span class="hs-identifier hs-var">quoteExp</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679154156"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679154156"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-88"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException a
+</span><a href="#local-6989586621679154158"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679154156"><span class="hs-identifier hs-var">str</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679154154"><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679154154"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; Q Exp
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SomeException -&gt; String
+forall e. Exception e =&gt; e -&gt; String
+</span><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679154154"><span class="hs-identifier hs-var">err</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679154152"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679154152"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; Q Exp
+forall t. Lift t =&gt; t -&gt; Q Exp
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679154152"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-91"></span><span>      </span><span class="annot"><span class="annottext">quotePat :: String -&gt; Q Pat
+</span><span class="hs-identifier hs-var">quotePat</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679154151"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679154151"><span class="hs-identifier hs-var">str</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-92"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Either SomeException a
+</span><a href="#local-6989586621679154158"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679154151"><span class="hs-identifier hs-var">str</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-93"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679154150"><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679154150"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; Q Pat
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SomeException -&gt; String
+forall e. Exception e =&gt; e -&gt; String
+</span><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679154150"><span class="hs-identifier hs-var">err</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-94"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679154149"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679154149"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">[|</span><span class="hs-special">(</span><span class="hs-operator">==</span><span class="hs-special">)</span><span class="hs-special">|]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; Q Exp
+forall t. Lift t =&gt; t -&gt; Q Exp
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679154149"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Pat -&gt; Q Pat
+</span><span class="hs-operator hs-var">`viewP`</span></span><span> </span><span class="hs-special">[p|</span><span class="hs-identifier">True</span><span class="hs-special">|]</span><span class="hs-special">,</span><span>
+</span><span id="line-95"></span><span>      </span><span class="annot"><span class="annottext">quoteType :: String -&gt; Q Type
+</span><span class="hs-identifier hs-var">quoteType</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; Q Type
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;This usage is not supported&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-96"></span><span>      </span><span class="annot"><span class="annottext">quoteDec :: String -&gt; Q [Dec]
+</span><span class="hs-identifier hs-var">quoteDec</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; Q [Dec]
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;This usage is not supported&quot;</span></span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-98"></span></pre></body></html>

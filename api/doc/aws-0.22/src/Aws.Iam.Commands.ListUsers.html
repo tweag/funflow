@@ -1,0 +1,331 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TupleSections         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies          #-}</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Iam.Commands.ListUsers</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier">ListUsers</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier">ListUsersResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#User"><span class="hs-identifier">User</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Core.html"><span class="hs-identifier">Aws.Iam.Core</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Internal.html"><span class="hs-identifier">Aws.Iam.Internal</span></a></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">laxElement</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">($//)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(&amp;|)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- | Lists users that have the specified path prefix.</span><span>
+</span><span id="line-21"></span><span class="hs-comment">--</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- &lt;http://docs.aws.amazon.com/IAM/latest/APIReference/API_ListUsers.html&gt;</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">data</span><span> </span><span id="ListUsers"><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-var">ListUsers</span></a></span></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="ListUsers"><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-var">ListUsers</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-25"></span><span>        </span><span id="luPathPrefix"><span class="annot"><span class="annottext">ListUsers -&gt; Maybe Text
+</span><a href="Aws.Iam.Commands.ListUsers.html#luPathPrefix"><span class="hs-identifier hs-var hs-var">luPathPrefix</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-26"></span><span>      </span><span class="hs-comment">-- ^ Users defined under this path will be listed. If omitted, defaults</span><span>
+</span><span id="line-27"></span><span>      </span><span class="hs-comment">-- to @/@, which lists all users.</span><span>
+</span><span id="line-28"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="luMarker"><span class="annot"><span class="annottext">ListUsers -&gt; Maybe Text
+</span><a href="Aws.Iam.Commands.ListUsers.html#luMarker"><span class="hs-identifier hs-var hs-var">luMarker</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-29"></span><span>      </span><span class="hs-comment">-- ^ Used for paginating requests. Marks the position of the last</span><span>
+</span><span id="line-30"></span><span>      </span><span class="hs-comment">-- request.</span><span>
+</span><span id="line-31"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="luMaxItems"><span class="annot"><span class="annottext">ListUsers -&gt; Maybe Integer
+</span><a href="Aws.Iam.Commands.ListUsers.html#luMaxItems"><span class="hs-identifier hs-var hs-var">luMaxItems</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span>
+</span><span id="line-32"></span><span>      </span><span class="hs-comment">-- ^ Used for paginating requests. Specifies the maximum number of items</span><span>
+</span><span id="line-33"></span><span>      </span><span class="hs-comment">-- to return in the response. Defaults to 100.</span><span>
+</span><span id="line-34"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679221103"><span id="local-6989586621679221105"><span class="annot"><span class="annottext">ListUsers -&gt; ListUsers -&gt; Bool
+(ListUsers -&gt; ListUsers -&gt; Bool)
+-&gt; (ListUsers -&gt; ListUsers -&gt; Bool) -&gt; Eq ListUsers
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ListUsers -&gt; ListUsers -&gt; Bool
+$c/= :: ListUsers -&gt; ListUsers -&gt; Bool
+== :: ListUsers -&gt; ListUsers -&gt; Bool
+$c== :: ListUsers -&gt; ListUsers -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679221087"><span id="local-6989586621679221089"><span id="local-6989586621679221091"><span id="local-6989586621679221093"><span id="local-6989586621679221095"><span id="local-6989586621679221097"><span id="local-6989586621679221099"><span class="annot"><span class="annottext">Eq ListUsers
+Eq ListUsers
+-&gt; (ListUsers -&gt; ListUsers -&gt; Ordering)
+-&gt; (ListUsers -&gt; ListUsers -&gt; Bool)
+-&gt; (ListUsers -&gt; ListUsers -&gt; Bool)
+-&gt; (ListUsers -&gt; ListUsers -&gt; Bool)
+-&gt; (ListUsers -&gt; ListUsers -&gt; Bool)
+-&gt; (ListUsers -&gt; ListUsers -&gt; ListUsers)
+-&gt; (ListUsers -&gt; ListUsers -&gt; ListUsers)
+-&gt; Ord ListUsers
+ListUsers -&gt; ListUsers -&gt; Bool
+ListUsers -&gt; ListUsers -&gt; Ordering
+ListUsers -&gt; ListUsers -&gt; ListUsers
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ListUsers -&gt; ListUsers -&gt; ListUsers
+$cmin :: ListUsers -&gt; ListUsers -&gt; ListUsers
+max :: ListUsers -&gt; ListUsers -&gt; ListUsers
+$cmax :: ListUsers -&gt; ListUsers -&gt; ListUsers
+&gt;= :: ListUsers -&gt; ListUsers -&gt; Bool
+$c&gt;= :: ListUsers -&gt; ListUsers -&gt; Bool
+&gt; :: ListUsers -&gt; ListUsers -&gt; Bool
+$c&gt; :: ListUsers -&gt; ListUsers -&gt; Bool
+&lt;= :: ListUsers -&gt; ListUsers -&gt; Bool
+$c&lt;= :: ListUsers -&gt; ListUsers -&gt; Bool
+&lt; :: ListUsers -&gt; ListUsers -&gt; Bool
+$c&lt; :: ListUsers -&gt; ListUsers -&gt; Bool
+compare :: ListUsers -&gt; ListUsers -&gt; Ordering
+$ccompare :: ListUsers -&gt; ListUsers -&gt; Ordering
+$cp1Ord :: Eq ListUsers
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679221080"><span id="local-6989586621679221082"><span id="local-6989586621679221084"><span class="annot"><span class="annottext">Int -&gt; ListUsers -&gt; ShowS
+[ListUsers] -&gt; ShowS
+ListUsers -&gt; String
+(Int -&gt; ListUsers -&gt; ShowS)
+-&gt; (ListUsers -&gt; String)
+-&gt; ([ListUsers] -&gt; ShowS)
+-&gt; Show ListUsers
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ListUsers] -&gt; ShowS
+$cshowList :: [ListUsers] -&gt; ShowS
+show :: ListUsers -&gt; String
+$cshow :: ListUsers -&gt; String
+showsPrec :: Int -&gt; ListUsers -&gt; ShowS
+$cshowsPrec :: Int -&gt; ListUsers -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamConfiguration"><span class="hs-identifier hs-type">IamConfiguration</span></a></span><span>
+</span><span id="line-39"></span><span>    </span><span id="local-6989586621679221076"><span class="annot"><span class="annottext">signQuery :: ListUsers
+-&gt; ServiceConfiguration ListUsers queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span class="hs-special">{</span><span id="local-6989586621679221072"><span id="local-6989586621679221073"><span id="local-6989586621679221074"><span class="annot"><span class="annottext">Maybe Integer
+Maybe Text
+luMaxItems :: Maybe Integer
+luMarker :: Maybe Text
+luPathPrefix :: Maybe Text
+luMaxItems :: ListUsers -&gt; Maybe Integer
+luMarker :: ListUsers -&gt; Maybe Text
+luPathPrefix :: ListUsers -&gt; Maybe Text
+</span><a href="#local-6989586621679221072"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span><span class="hs-special">}</span><span>
+</span><span id="line-40"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall qt.
+ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration qt
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Iam.Internal.html#iamAction%27"><span class="hs-identifier hs-var">iamAction'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;ListUsers&quot;</span></span><span> </span><span class="annot"><span class="annottext">([Maybe (ByteString, Text)]
+ -&gt; IamConfiguration queryType -&gt; SignatureData -&gt; SignedQuery)
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-41"></span><span>              </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;PathPrefix&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; (ByteString, Text))
+-&gt; Maybe Text -&gt; Maybe (ByteString, Text)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679221074"><span class="hs-identifier hs-var">luPathPrefix</span></a></span><span>
+</span><span id="line-42"></span><span>            </span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[Maybe (ByteString, Text)]
+-&gt; [Maybe (ByteString, Text)] -&gt; [Maybe (ByteString, Text)]
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Maybe Integer -&gt; [Maybe (ByteString, Text)]
+</span><a href="Aws.Iam.Internal.html#markedIter"><span class="hs-identifier hs-var">markedIter</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679221073"><span class="hs-identifier hs-var">luMarker</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Integer
+</span><a href="#local-6989586621679221072"><span class="hs-identifier hs-var">luMaxItems</span></a></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="ListUsersResponse"><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-var">ListUsersResponse</span></a></span></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="ListUsersResponse"><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-var">ListUsersResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-46"></span><span>        </span><span id="lurUsers"><span class="annot"><span class="annottext">ListUsersResponse -&gt; [User]
+</span><a href="Aws.Iam.Commands.ListUsers.html#lurUsers"><span class="hs-identifier hs-var hs-var">lurUsers</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.Iam.Core.html#User"><span class="hs-identifier hs-type">User</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-47"></span><span>      </span><span class="hs-comment">-- ^ List of 'User's.</span><span>
+</span><span id="line-48"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="lurIsTruncated"><span class="annot"><span class="annottext">ListUsersResponse -&gt; Bool
+</span><a href="Aws.Iam.Commands.ListUsers.html#lurIsTruncated"><span class="hs-identifier hs-var hs-var">lurIsTruncated</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-comment">-- ^ @True@ if the request was truncated because of too many items.</span><span>
+</span><span id="line-50"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="lurMarker"><span class="annot"><span class="annottext">ListUsersResponse -&gt; Maybe Text
+</span><a href="Aws.Iam.Commands.ListUsers.html#lurMarker"><span class="hs-identifier hs-var hs-var">lurMarker</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-51"></span><span>      </span><span class="hs-comment">-- ^ Marks the position at which the request was truncated. This value</span><span>
+</span><span id="line-52"></span><span>      </span><span class="hs-comment">-- must be passed with the next request to continue listing from the</span><span>
+</span><span id="line-53"></span><span>      </span><span class="hs-comment">-- last position.</span><span>
+</span><span id="line-54"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679221061"><span id="local-6989586621679221063"><span class="annot"><span class="annottext">ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+(ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; Eq ListUsersResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c/= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+== :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c== :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679221046"><span id="local-6989586621679221048"><span id="local-6989586621679221050"><span id="local-6989586621679221052"><span id="local-6989586621679221054"><span id="local-6989586621679221056"><span id="local-6989586621679221058"><span class="annot"><span class="annottext">Eq ListUsersResponse
+Eq ListUsersResponse
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Ordering)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; Bool)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse)
+-&gt; (ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse)
+-&gt; Ord ListUsersResponse
+ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+ListUsersResponse -&gt; ListUsersResponse -&gt; Ordering
+ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse
+$cmin :: ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse
+max :: ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse
+$cmax :: ListUsersResponse -&gt; ListUsersResponse -&gt; ListUsersResponse
+&gt;= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c&gt;= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+&gt; :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c&gt; :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+&lt;= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c&lt;= :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+&lt; :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+$c&lt; :: ListUsersResponse -&gt; ListUsersResponse -&gt; Bool
+compare :: ListUsersResponse -&gt; ListUsersResponse -&gt; Ordering
+$ccompare :: ListUsersResponse -&gt; ListUsersResponse -&gt; Ordering
+$cp1Ord :: Eq ListUsersResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679221040"><span id="local-6989586621679221042"><span id="local-6989586621679221044"><span class="annot"><span class="annottext">Int -&gt; ListUsersResponse -&gt; ShowS
+[ListUsersResponse] -&gt; ShowS
+ListUsersResponse -&gt; String
+(Int -&gt; ListUsersResponse -&gt; ShowS)
+-&gt; (ListUsersResponse -&gt; String)
+-&gt; ([ListUsersResponse] -&gt; ShowS)
+-&gt; Show ListUsersResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ListUsersResponse] -&gt; ShowS
+$cshowList :: [ListUsersResponse] -&gt; ShowS
+show :: ListUsersResponse -&gt; String
+$cshow :: ListUsersResponse -&gt; String
+showsPrec :: Int -&gt; ListUsersResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; ListUsersResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamMetadata"><span class="hs-identifier hs-type">IamMetadata</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679221036"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; ListUsers
+-&gt; IORef (ResponseMetadata ListUsersResponse)
+-&gt; HTTPResponseConsumer ListUsersResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ListUsers
+</span><span class="hs-identifier">_</span></span><span>
+</span><span id="line-60"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; Response IamMetadata ListUsersResponse)
+-&gt; IORef IamMetadata -&gt; HTTPResponseConsumer ListUsersResponse
+forall a.
+(Cursor -&gt; Response IamMetadata a)
+-&gt; IORef IamMetadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Iam.Core.html#iamResponseConsumer"><span class="hs-identifier hs-var">iamResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">((Cursor -&gt; Response IamMetadata ListUsersResponse)
+ -&gt; IORef IamMetadata -&gt; HTTPResponseConsumer ListUsersResponse)
+-&gt; (Cursor -&gt; Response IamMetadata ListUsersResponse)
+-&gt; IORef IamMetadata
+-&gt; HTTPResponseConsumer ListUsersResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679221033"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679221033"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-61"></span><span>            </span><span class="hs-special">(</span><span id="local-6989586621679221032"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679221032"><span class="hs-identifier hs-var">lurIsTruncated</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679221031"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679221031"><span class="hs-identifier hs-var">lurMarker</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response IamMetadata (Bool, Maybe Text)
+forall (m :: * -&gt; *).
+MonadThrow m =&gt;
+Cursor -&gt; m (Bool, Maybe Text)
+</span><a href="Aws.Iam.Internal.html#markedIterResponse"><span class="hs-identifier hs-var">markedIterResponse</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679221033"><span class="hs-identifier hs-var">cursor</span></a></span><span>
+</span><span id="line-62"></span><span>            </span><span id="local-6989586621679221029"><span class="annot"><span class="annottext">[User]
+</span><a href="#local-6989586621679221029"><span class="hs-identifier hs-var">lurUsers</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Response IamMetadata User] -&gt; Response IamMetadata [User]
+forall (t :: * -&gt; *) (m :: * -&gt; *) a.
+(Traversable t, Monad m) =&gt;
+t (m a) -&gt; m (t a)
+</span><span class="hs-identifier hs-var">sequence</span></span><span> </span><span class="annot"><span class="annottext">([Response IamMetadata User] -&gt; Response IamMetadata [User])
+-&gt; [Response IamMetadata User] -&gt; Response IamMetadata [User]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-63"></span><span>                </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679221033"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+-&gt; (Cursor -&gt; [Response IamMetadata User])
+-&gt; [Response IamMetadata User]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Axis
+</span><span class="hs-identifier hs-var">laxElement</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;member&quot;</span></span><span> </span><span class="annot"><span class="annottext">Axis
+-&gt; (Cursor -&gt; Response IamMetadata User)
+-&gt; Cursor
+-&gt; [Response IamMetadata User]
+forall node a b.
+(Cursor node -&gt; [a]) -&gt; (a -&gt; b) -&gt; Cursor node -&gt; [b]
+</span><span class="hs-operator hs-var">&amp;|</span></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response IamMetadata User
+forall (m :: * -&gt; *). MonadThrow m =&gt; Cursor -&gt; m User
+</span><a href="Aws.Iam.Core.html#parseUser"><span class="hs-identifier hs-var">parseUser</span></a></span><span>
+</span><span id="line-64"></span><span>            </span><span class="annot"><span class="annottext">ListUsersResponse -&gt; Response IamMetadata ListUsersResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">ListUsersResponse :: [User] -&gt; Bool -&gt; Maybe Text -&gt; ListUsersResponse
+</span><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">Bool
+[User]
+Maybe Text
+lurUsers :: [User]
+lurMarker :: Maybe Text
+lurIsTruncated :: Bool
+lurMarker :: Maybe Text
+lurIsTruncated :: Bool
+lurUsers :: [User]
+</span><a href="#local-6989586621679221029"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#IteratedTransaction"><span class="hs-identifier hs-type">IteratedTransaction</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsers"><span class="hs-identifier hs-type">ListUsers</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-69"></span><span>    </span><span id="local-6989586621679221019"><span class="annot"><span class="annottext">nextIteratedRequest :: ListUsers -&gt; ListUsersResponse -&gt; Maybe ListUsers
+</span><a href="Aws.Core.html#nextIteratedRequest"><span class="hs-identifier hs-var hs-var hs-var hs-var">nextIteratedRequest</span></a></span></span><span> </span><span id="local-6989586621679221017"><span class="annot"><span class="annottext">ListUsers
+</span><a href="#local-6989586621679221017"><span class="hs-identifier hs-var">request</span></a></span></span><span> </span><span id="local-6989586621679221016"><span class="annot"><span class="annottext">ListUsersResponse
+</span><a href="#local-6989586621679221016"><span class="hs-identifier hs-var">response</span></a></span></span><span>
+</span><span id="line-70"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ListUsersResponse -&gt; Maybe Text
+</span><a href="Aws.Iam.Commands.ListUsers.html#lurMarker"><span class="hs-identifier hs-var hs-var">lurMarker</span></a></span><span> </span><span class="annot"><span class="annottext">ListUsersResponse
+</span><a href="#local-6989586621679221016"><span class="hs-identifier hs-var">response</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-71"></span><span>            </span><span class="annot"><span class="annottext">Maybe Text
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ListUsers
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-72"></span><span>            </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679221015"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679221015"><span class="hs-identifier hs-var">marker</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ListUsers -&gt; Maybe ListUsers
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(ListUsers -&gt; Maybe ListUsers) -&gt; ListUsers -&gt; Maybe ListUsers
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ListUsers
+</span><a href="#local-6989586621679221017"><span class="hs-identifier hs-var">request</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">luMarker :: Maybe Text
+</span><a href="Aws.Iam.Commands.ListUsers.html#luMarker"><span class="hs-identifier hs-var">luMarker</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679221015"><span class="hs-identifier hs-var">marker</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.ListUsers.html#ListUsersResponse"><span class="hs-identifier hs-type">ListUsersResponse</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span id="local-6989586621679221012"><span class="annot"><span class="annottext">loadToMemory :: ListUsersResponse
+-&gt; ResourceT IO (MemoryResponse ListUsersResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ListUsersResponse
+-&gt; ResourceT IO (MemoryResponse ListUsersResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-77"></span></pre></body></html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module      : Data.Memory.Internal.Scrubber</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Stability   : stable</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Portability : Compat</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE BangPatterns #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE MagicHash #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE UnboxedTuples #-}</span><span class="hs-cpp">
+#include &quot;MachDeps.h&quot;
+</span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Memory.Internal.Scrubber</span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Memory.Internal.Scrubber.html#getScrubber"><span class="hs-identifier">getScrubber</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Prim</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Memory.Internal.CompatPrim.html"><span class="hs-identifier">Data.Memory.Internal.CompatPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier">booleanPrim</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="annot"><a href="Data.Memory.Internal.Scrubber.html#getScrubber"><span class="hs-identifier hs-type">getScrubber</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Addr#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span id="getScrubber"><span class="annot"><span class="annottext">getScrubber :: Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="Data.Memory.Internal.Scrubber.html#getScrubber"><span class="hs-identifier hs-var hs-var">getScrubber</span></a></span></span><span> </span><span id="local-6989586621679068026"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span></span><span> </span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">4#</span></span><span class="hs-special">)</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+forall d. Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068025"><span class="hs-identifier hs-var">scrub4</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">8#</span></span><span class="hs-special">)</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+forall d. Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068024"><span class="hs-identifier hs-var">scrub8</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">16#</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+forall d. Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068023"><span class="hs-identifier hs-var">scrub16</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">32#</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+forall d. Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068022"><span class="hs-identifier hs-var">scrub32</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>                </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="Data.Memory.Internal.Scrubber.html#scrubBytes"><span class="hs-identifier hs-var">scrubBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068026"><span class="hs-identifier hs-var">sz</span></a></span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-28"></span><span>        </span><span id="local-6989586621679068025"><span class="annot"><span class="annottext">scrub4 :: Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068025"><span class="hs-identifier hs-var hs-var">scrub4</span></a></span></span><span> </span><span id="local-6989586621679068020"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068020"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679068019"><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068019"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord32OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068020"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068019"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-29"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679068025"><span class="hs-pragma hs-type">scrub4</span></a></span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#if WORD_SIZE_IN_BITS == 64
+</span><span>        </span><span id="local-6989586621679068024"><span class="annot"><span class="annottext">scrub8 :: Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068024"><span class="hs-identifier hs-var hs-var">scrub8</span></a></span></span><span> </span><span id="local-6989586621679068018"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068018"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679068017"><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068017"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068018"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068017"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-32"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679068024"><span class="hs-pragma hs-type">scrub8</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-33"></span><span>        </span><span id="local-6989586621679068023"><span class="annot"><span class="annottext">scrub16 :: Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068023"><span class="hs-identifier hs-var hs-var">scrub16</span></a></span></span><span> </span><span id="local-6989586621679068016"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068016"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679068015"><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068015"><span class="hs-identifier hs-var">s1</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-34"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679068014"><span class="annot"><span class="annottext">s2 :: State# d
+</span><a href="#local-6989586621679068014"><span class="hs-identifier hs-var hs-var">s2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068016"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068015"><span class="hs-identifier hs-var">s1</span></a></span><span>
+</span><span id="line-35"></span><span>                </span><span class="hs-glyph">!</span><span id="local-6989586621679068013"><span class="annot"><span class="annottext">s3 :: State# d
+</span><a href="#local-6989586621679068013"><span class="hs-identifier hs-var hs-var">s3</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068016"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068014"><span class="hs-identifier hs-var">s2</span></a></span><span>
+</span><span id="line-36"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068013"><span class="hs-identifier hs-var">s3</span></a></span><span>
+</span><span id="line-37"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679068023"><span class="hs-pragma hs-type">scrub16</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-38"></span><span>        </span><span id="local-6989586621679068022"><span class="annot"><span class="annottext">scrub32 :: Addr# -&gt; State# d -&gt; State# d
+</span><a href="#local-6989586621679068022"><span class="hs-identifier hs-var hs-var">scrub32</span></a></span></span><span> </span><span id="local-6989586621679068012"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068012"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679068011"><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068011"><span class="hs-identifier hs-var">s1</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-39"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679068010"><span class="annot"><span class="annottext">s2 :: State# d
+</span><a href="#local-6989586621679068010"><span class="hs-identifier hs-var hs-var">s2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068012"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068011"><span class="hs-identifier hs-var">s1</span></a></span><span>
+</span><span id="line-40"></span><span>                </span><span class="hs-glyph">!</span><span id="local-6989586621679068009"><span class="annot"><span class="annottext">s3 :: State# d
+</span><a href="#local-6989586621679068009"><span class="hs-identifier hs-var hs-var">s3</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068012"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068010"><span class="hs-identifier hs-var">s2</span></a></span><span>
+</span><span id="line-41"></span><span>                </span><span class="hs-glyph">!</span><span id="local-6989586621679068008"><span class="annot"><span class="annottext">s4 :: State# d
+</span><a href="#local-6989586621679068008"><span class="hs-identifier hs-var hs-var">s4</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068012"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">2#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068009"><span class="hs-identifier hs-var">s3</span></a></span><span>
+</span><span id="line-42"></span><span>                </span><span class="hs-glyph">!</span><span id="local-6989586621679068007"><span class="annot"><span class="annottext">s5 :: State# d
+</span><a href="#local-6989586621679068007"><span class="hs-identifier hs-var hs-var">s5</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord64OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068012"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">3#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068008"><span class="hs-identifier hs-var">s4</span></a></span><span>
+</span><span id="line-43"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">State# d
+</span><a href="#local-6989586621679068007"><span class="hs-identifier hs-var">s5</span></a></span><span>
+</span><span id="line-44"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679068022"><span class="hs-pragma hs-type">scrub32</span></a></span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#else
+</span><span>        </span><span class="hs-identifier">scrub8</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">s1</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-47"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span class="hs-identifier">s2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">0#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s1</span><span>
+</span><span id="line-48"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s3</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">1#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s2</span><span>
+</span><span id="line-49"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="hs-identifier">s3</span><span>
+</span><span id="line-50"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">scrub8</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-identifier">scrub16</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">s1</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-52"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span class="hs-identifier">s2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">0#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s1</span><span>
+</span><span id="line-53"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s3</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">1#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s2</span><span>
+</span><span id="line-54"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s4</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">2#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s3</span><span>
+</span><span id="line-55"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s5</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">3#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s4</span><span>
+</span><span id="line-56"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="hs-identifier">s5</span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">scrub16</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-58"></span><span>        </span><span class="hs-identifier">scrub32</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">s1</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-59"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span class="hs-identifier">s2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">0#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s1</span><span>
+</span><span id="line-60"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s3</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">1#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s2</span><span>
+</span><span id="line-61"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s4</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">2#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s3</span><span>
+</span><span id="line-62"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s5</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">3#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s4</span><span>
+</span><span id="line-63"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s6</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">4#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s5</span><span>
+</span><span id="line-64"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s7</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">5#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s6</span><span>
+</span><span id="line-65"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s8</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">6#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s7</span><span>
+</span><span id="line-66"></span><span>                </span><span class="hs-glyph">!</span><span class="hs-identifier">s9</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">writeWord32OffAddr#</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-number">7#</span><span> </span><span class="hs-number">0##</span><span> </span><span class="hs-identifier">s8</span><span>
+</span><span id="line-67"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="hs-identifier">s9</span><span>
+</span><span id="line-68"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">scrub32</span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-71"></span><span class="annot"><a href="Data.Memory.Internal.Scrubber.html#scrubBytes"><span class="hs-identifier hs-type">scrubBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Addr#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span>
+</span><span id="line-72"></span><span id="scrubBytes"><span class="annot"><span class="annottext">scrubBytes :: Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="Data.Memory.Internal.Scrubber.html#scrubBytes"><span class="hs-identifier hs-var hs-var">scrubBytes</span></a></span></span><span> </span><span id="local-6989586621679068006"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068006"><span class="hs-identifier hs-var">sz8</span></a></span></span><span> </span><span id="local-6989586621679068005"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068005"><span class="hs-identifier hs-var">addr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679068004"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679068004"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="#local-6989586621679068003"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068006"><span class="hs-identifier hs-var">sz8</span></a></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068005"><span class="hs-identifier hs-var">addr</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679068004"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-keyword">where</span><span> </span><span class="annot"><a href="#local-6989586621679068003"><span class="hs-identifier hs-type">loop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Addr#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span>
+</span><span id="line-74"></span><span>        </span><span id="local-6989586621679068003"><span class="annot"><span class="annottext">loop :: Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="#local-6989586621679068003"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679068002"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068002"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679068001"><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068001"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679068000"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679068000"><span class="hs-identifier hs-var">s</span></a></span></span><span>
+</span><span id="line-75"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068002"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679068000"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-76"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>              </span><span class="hs-glyph">=</span><span>
+</span><span id="line-77"></span><span>                </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Word# -&gt; State# RealWorld -&gt; State# RealWorld
+forall d. Addr# -&gt; Int# -&gt; Word# -&gt; State# d -&gt; State# d
+</span><span class="hs-identifier hs-var">writeWord8OffAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068001"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679068000"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-78"></span><span>                    </span><span id="local-6989586621679067999"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679067999"><span class="hs-identifier hs-var">s'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Addr# -&gt; State# RealWorld -&gt; State# RealWorld
+</span><a href="#local-6989586621679068003"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679068002"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">-#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Addr# -&gt; Int# -&gt; Addr#
+</span><span class="hs-identifier hs-var">plusAddr#</span></span><span> </span><span class="annot"><span class="annottext">Addr#
+</span><a href="#local-6989586621679068001"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679067999"><span class="hs-identifier hs-var">s'</span></a></span><span>
+</span><span id="line-79"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679068003"><span class="hs-pragma hs-type">loop</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-80"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Memory.Internal.Scrubber.html#scrubBytes"><span class="hs-pragma hs-type">scrubBytes</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-81"></span></pre></body></html>

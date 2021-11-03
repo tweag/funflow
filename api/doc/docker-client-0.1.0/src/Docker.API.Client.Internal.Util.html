@@ -1,0 +1,436 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE OverloadedLists #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- | 'Util' contains various utility functions used throughout Docker.API.Client's internals.</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Docker.API.Client.Internal.Util</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Binary.Get</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">getWord32be</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">getWord8</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">runGet</span></span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS</span></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Conduit</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ConduitT</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">await</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">yield</span></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Conduit.Tar</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Tar</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Schemas.html"><span class="hs-identifier">Docker.API.Client.Internal.Schemas</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Docker.API.Client.Internal.Schemas.html#CreateContainer"><span class="hs-identifier">CreateContainer</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Schemas.html#HostConfig"><span class="hs-identifier">HostConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html"><span class="hs-identifier">Docker.API.Client.Internal.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#ContainerLogType"><span class="hs-identifier">ContainerLogType</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#ContainerSpec"><span class="hs-identifier">ContainerSpec</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#DockerStreamType"><span class="hs-identifier">DockerStreamType</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Posix.Types</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">GroupID</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">UserID</span></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- | (Internal only, do not export) Converts a client ContainerSpec into the format expected by the docker api</span><span>
+</span><span id="line-19"></span><span class="annot"><a href="Docker.API.Client.Internal.Util.html#containerSpecToCreateContainer"><span class="hs-identifier hs-type">containerSpecToCreateContainer</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#ContainerSpec"><span class="hs-identifier hs-type">ContainerSpec</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Schemas.html#CreateContainer"><span class="hs-identifier hs-type">CreateContainer</span></a></span><span>
+</span><span id="line-20"></span><span id="containerSpecToCreateContainer"><span class="annot"><span class="annottext">containerSpecToCreateContainer :: ContainerSpec -&gt; CreateContainer
+</span><a href="Docker.API.Client.Internal.Util.html#containerSpecToCreateContainer"><span class="hs-identifier hs-var hs-var">containerSpecToCreateContainer</span></a></span></span><span> </span><span id="local-6989586621679107599"><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-21"></span><span>  </span><span class="annot"><span class="annottext">CreateContainer :: Maybe Text
+-&gt; Maybe [Text]
+-&gt; Maybe [Text]
+-&gt; Text
+-&gt; Maybe Text
+-&gt; Maybe HostConfig
+-&gt; CreateContainer
+</span><a href="Docker.API.Client.Internal.Schemas.html#CreateContainer"><span class="hs-identifier hs-type">CreateContainer</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">createContainerUser :: Maybe Text
+</span><a href="Docker.API.Client.Internal.Schemas.html#createContainerUser"><span class="hs-identifier hs-var">createContainerUser</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+</span><a href="#local-6989586621679107596"><span class="hs-identifier hs-var">textToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Maybe Text) -&gt; Text -&gt; Maybe Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; Text
+</span><a href="Docker.API.Client.Internal.Types.html#user"><span class="hs-identifier hs-var hs-var">user</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>      </span><span class="annot"><span class="annottext">createContainerWorkingDir :: Maybe Text
+</span><a href="Docker.API.Client.Internal.Schemas.html#createContainerWorkingDir"><span class="hs-identifier hs-var">createContainerWorkingDir</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+</span><a href="#local-6989586621679107596"><span class="hs-identifier hs-var">textToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Maybe Text) -&gt; Text -&gt; Maybe Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; Text
+</span><a href="Docker.API.Client.Internal.Types.html#workingDir"><span class="hs-identifier hs-var hs-var">workingDir</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>      </span><span class="annot"><span class="annottext">createContainerEnv :: Maybe [Text]
+</span><a href="Docker.API.Client.Internal.Schemas.html#createContainerEnv"><span class="hs-identifier hs-var">createContainerEnv</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Maybe [Text]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Maybe (t a)
+</span><a href="#local-6989586621679107591"><span class="hs-identifier hs-var">listToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Maybe [Text]) -&gt; [Text] -&gt; Maybe [Text]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; [Text]
+</span><a href="Docker.API.Client.Internal.Types.html#envVars"><span class="hs-identifier hs-var hs-var">envVars</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>      </span><span class="annot"><span class="annottext">createContainerImage :: Text
+</span><a href="#local-6989586621679107589"><span class="hs-identifier hs-var">createContainerImage</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; Text
+</span><a href="Docker.API.Client.Internal.Types.html#image"><span class="hs-identifier hs-var hs-var">image</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>      </span><span class="annot"><span class="annottext">createContainerCmd :: Maybe [Text]
+</span><a href="#local-6989586621679107587"><span class="hs-identifier hs-var">createContainerCmd</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Maybe [Text]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Maybe (t a)
+</span><a href="#local-6989586621679107591"><span class="hs-identifier hs-var">listToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Maybe [Text]) -&gt; [Text] -&gt; Maybe [Text]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; [Text]
+</span><a href="Docker.API.Client.Internal.Types.html#cmd"><span class="hs-identifier hs-var hs-var">cmd</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>      </span><span class="annot"><span class="annottext">createContainerHostConfig :: Maybe HostConfig
+</span><a href="#local-6989586621679107585"><span class="hs-identifier hs-var">createContainerHostConfig</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Maybe HostConfig
+</span><a href="#local-6989586621679107584"><span class="hs-identifier hs-var">convertHostVolumes</span></a></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Maybe HostConfig) -&gt; [Text] -&gt; Maybe HostConfig
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ContainerSpec -&gt; [Text]
+</span><a href="Docker.API.Client.Internal.Types.html#hostVolumes"><span class="hs-identifier hs-var hs-var">hostVolumes</span></a></span><span> </span><span class="annot"><span class="annottext">ContainerSpec
+</span><a href="#local-6989586621679107599"><span class="hs-identifier hs-var">spec</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>    </span><span id="local-6989586621679107596"><span class="annot"><span class="annottext">textToMaybe :: Text -&gt; Maybe Text
+</span><a href="#local-6989586621679107596"><span class="hs-identifier hs-var hs-var">textToMaybe</span></a></span></span><span> </span><span id="local-6989586621679107582"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679107582"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool) -&gt; Bool -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Bool
+</span><span class="hs-identifier hs-var">T.null</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679107582"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679107582"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Maybe Text
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-31"></span><span>    </span><span id="local-6989586621679107591"><span class="annot"><span class="annottext">listToMaybe :: t a -&gt; Maybe (t a)
+</span><a href="#local-6989586621679107591"><span class="hs-identifier hs-var hs-var">listToMaybe</span></a></span></span><span> </span><span id="local-6989586621679107579"><span class="annot"><span class="annottext">t a
+</span><a href="#local-6989586621679107579"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool) -&gt; Bool -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">t a -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">t a
+</span><a href="#local-6989586621679107579"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">t a -&gt; Maybe (t a)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">t a
+</span><a href="#local-6989586621679107579"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Maybe (t a)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-32"></span><span>    </span><span id="local-6989586621679107584"><span class="annot"><span class="annottext">convertHostVolumes :: [Text] -&gt; Maybe HostConfig
+</span><a href="#local-6989586621679107584"><span class="hs-identifier hs-var hs-var">convertHostVolumes</span></a></span></span><span> </span><span id="local-6989586621679107577"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679107577"><span class="hs-identifier hs-var">hvs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-33"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679107577"><span class="hs-identifier hs-var">hvs</span></a></span><span>
+</span><span id="line-34"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Maybe HostConfig
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">HostConfig -&gt; Maybe HostConfig
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">HostConfig :: Maybe [Text] -&gt; HostConfig
+</span><a href="Docker.API.Client.Internal.Schemas.html#HostConfig"><span class="hs-identifier hs-type">HostConfig</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">hostConfigBinds :: Maybe [Text]
+</span><a href="#local-6989586621679107575"><span class="hs-identifier hs-var">hostConfigBinds</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Maybe [Text]
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679107577"><span class="hs-identifier hs-var">hvs</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- | Conduit helper which checks the length of the input bytestring and reads data from upstream</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- until the length is at least nBytes. Note that this method may return a Bytestring result which</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- has length &gt;= nBytes.</span><span>
+</span><span id="line-40"></span><span id="local-6989586621679107635"><span id="local-6989586621679107636"><span class="annot"><a href="Docker.API.Client.Internal.Util.html#readUpstream"><span class="hs-identifier hs-type">readUpstream</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679107636"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ConduitT</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="annot"><a href="#local-6989586621679107635"><span class="hs-identifier hs-type">o</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679107636"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-41"></span><span id="readUpstream"><span class="annot"><span class="annottext">readUpstream :: ByteString -&gt; Int -&gt; ConduitT ByteString o m (Maybe ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#readUpstream"><span class="hs-identifier hs-var hs-var">readUpstream</span></a></span></span><span> </span><span id="local-6989586621679107573"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107573"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span id="local-6989586621679107572"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107572"><span class="hs-identifier hs-var">nBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107573"><span class="hs-identifier hs-var">acc</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107572"><span class="hs-identifier hs-var">nBytes</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">do</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; ConduitT ByteString o m (Maybe ByteString)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Maybe ByteString -&gt; ConduitT ByteString o m (Maybe ByteString))
+-&gt; Maybe ByteString -&gt; ConduitT ByteString o m (Maybe ByteString)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107573"><span class="hs-identifier hs-var">acc</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-45"></span><span>      </span><span id="local-6989586621679107570"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107570"><span class="hs-identifier hs-var">result</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ConduitT ByteString o m (Maybe ByteString)
+forall (m :: * -&gt; *) i. Monad m =&gt; Consumer i m (Maybe i)
+</span><span class="hs-identifier hs-var">await</span></span><span>
+</span><span id="line-46"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107570"><span class="hs-identifier hs-var">result</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-47"></span><span>        </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; ConduitT ByteString o m (Maybe ByteString)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-48"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679107569"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107569"><span class="hs-identifier hs-var">val</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; ConduitT ByteString o m (Maybe ByteString)
+forall (m :: * -&gt; *) o.
+Monad m =&gt;
+ByteString -&gt; Int -&gt; ConduitT ByteString o m (Maybe ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#readUpstream"><span class="hs-identifier hs-var">readUpstream</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.concat</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ByteString
+Item [ByteString]
+</span><a href="#local-6989586621679107573"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+Item [ByteString]
+</span><a href="#local-6989586621679107569"><span class="hs-identifier hs-var">val</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107572"><span class="hs-identifier hs-var">nBytes</span></a></span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- | Parses the first byte from a stream metadata bytestring returned by the Docker Engine API</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- and returns the corresponding stream type.</span><span>
+</span><span id="line-52"></span><span class="annot"><a href="Docker.API.Client.Internal.Util.html#getStreamType"><span class="hs-identifier hs-type">getStreamType</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#DockerStreamType"><span class="hs-identifier hs-type">DockerStreamType</span></a></span><span>
+</span><span id="line-53"></span><span id="getStreamType"><span class="annot"><span class="annottext">getStreamType :: ByteString -&gt; DockerStreamType
+</span><a href="Docker.API.Client.Internal.Util.html#getStreamType"><span class="hs-identifier hs-var hs-var">getStreamType</span></a></span></span><span> </span><span id="local-6989586621679107566"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107566"><span class="hs-identifier hs-var">meta</span></a></span></span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679107565"><span class="hs-identifier hs-var">indicator</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="Docker.API.Client.Internal.Types.html#DockerStreamStdIn"><span class="hs-identifier hs-var">DockerStreamStdIn</span></a></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679107565"><span class="hs-identifier hs-var">indicator</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="Docker.API.Client.Internal.Types.html#DockerStreamStdOut"><span class="hs-identifier hs-var">DockerStreamStdOut</span></a></span><span>
+</span><span id="line-56"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679107565"><span class="hs-identifier hs-var">indicator</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">2</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="Docker.API.Client.Internal.Types.html#DockerStreamStdErr"><span class="hs-identifier hs-var">DockerStreamStdErr</span></a></span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; DockerStreamType
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;Unrecognized stream type in docker engine response&quot;</span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679107565"><span class="annot"><span class="annottext">indicator :: Word8
+</span><a href="#local-6989586621679107565"><span class="hs-identifier hs-var hs-var">indicator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Get Word8 -&gt; ByteString -&gt; Word8
+forall a. Get a -&gt; ByteString -&gt; a
+</span><span class="hs-identifier hs-var">runGet</span></span><span> </span><span class="annot"><span class="annottext">Get Word8
+</span><span class="hs-identifier hs-var">getWord8</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.fromStrict</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107566"><span class="hs-identifier hs-var">meta</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- | Converts an 8 byte section length ByteString into an integer. This value</span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- indicates the number of data bytes in the body of a Docker Engine stream record.</span><span>
+</span><span id="line-63"></span><span class="annot"><a href="Docker.API.Client.Internal.Util.html#getSectionLength"><span class="hs-identifier hs-type">getSectionLength</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-64"></span><span id="getSectionLength"><span class="annot"><span class="annottext">getSectionLength :: ByteString -&gt; Int
+</span><a href="Docker.API.Client.Internal.Util.html#getSectionLength"><span class="hs-identifier hs-var hs-var">getSectionLength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word32 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Word32 -&gt; Int) -&gt; (ByteString -&gt; Word32) -&gt; ByteString -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Get Word32 -&gt; ByteString -&gt; Word32
+forall a. Get a -&gt; ByteString -&gt; a
+</span><span class="hs-identifier hs-var">runGet</span></span><span> </span><span class="annot"><span class="annottext">Get Word32
+</span><span class="hs-identifier hs-var">getWord32be</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Word32)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; Word32
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.fromStrict</span></span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- | Parses a docker metadata bytestring of length &gt;= 8 into it's individual components</span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- See https://docs.docker.com/engine/api/v1.40/#operation/ContainerAttach</span><span>
+</span><span id="line-68"></span><span class="annot"><a href="Docker.API.Client.Internal.Util.html#parseDockerStream"><span class="hs-identifier hs-type">parseDockerStream</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#DockerStreamType"><span class="hs-identifier hs-type">DockerStreamType</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span id="parseDockerStream"><span class="annot"><span class="annottext">parseDockerStream :: ByteString -&gt; (DockerStreamType, Int, ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#parseDockerStream"><span class="hs-identifier hs-var hs-var">parseDockerStream</span></a></span></span><span> </span><span id="local-6989586621679107556"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107556"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679107555"><span class="annot"><span class="annottext">parts :: (ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107555"><span class="hs-identifier hs-var hs-var">parts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; (ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107554"><span class="hs-identifier hs-var">splitToParts</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107556"><span class="hs-identifier hs-var">bytes</span></a></span><span>
+</span><span id="line-71"></span><span>      </span><span id="local-6989586621679107553"><span class="annot"><span class="annottext">streamType :: DockerStreamType
+</span><a href="#local-6989586621679107553"><span class="hs-identifier hs-var hs-var">streamType</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; DockerStreamType
+</span><a href="Docker.API.Client.Internal.Util.html#getStreamType"><span class="hs-identifier hs-var">getStreamType</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; DockerStreamType) -&gt; ByteString -&gt; DockerStreamType
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString)) -&gt; ByteString
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107555"><span class="hs-identifier hs-var">parts</span></a></span><span>
+</span><span id="line-72"></span><span>      </span><span id="local-6989586621679107552"><span class="annot"><span class="annottext">sectionLength :: Int
+</span><a href="#local-6989586621679107552"><span class="hs-identifier hs-var hs-var">sectionLength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><a href="Docker.API.Client.Internal.Util.html#getSectionLength"><span class="hs-identifier hs-var">getSectionLength</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Int) -&gt; ByteString -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, ByteString) -&gt; ByteString
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">((ByteString, ByteString) -&gt; ByteString)
+-&gt; (ByteString, ByteString) -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString)) -&gt; (ByteString, ByteString)
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107555"><span class="hs-identifier hs-var">parts</span></a></span><span>
+</span><span id="line-73"></span><span>      </span><span id="local-6989586621679107551"><span class="annot"><span class="annottext">dataBytes :: ByteString
+</span><a href="#local-6989586621679107551"><span class="hs-identifier hs-var hs-var">dataBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ByteString, ByteString) -&gt; ByteString
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span> </span><span class="annot"><span class="annottext">((ByteString, ByteString) -&gt; ByteString)
+-&gt; (ByteString, ByteString) -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString)) -&gt; (ByteString, ByteString)
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107555"><span class="hs-identifier hs-var">parts</span></a></span><span>
+</span><span id="line-74"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107553"><span class="hs-identifier hs-var">streamType</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107552"><span class="hs-identifier hs-var">sectionLength</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107551"><span class="hs-identifier hs-var">dataBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-76"></span><span>    </span><span id="local-6989586621679107554"><span class="annot"><span class="annottext">splitToParts :: ByteString -&gt; (ByteString, (ByteString, ByteString))
+</span><a href="#local-6989586621679107554"><span class="hs-identifier hs-var hs-var">splitToParts</span></a></span></span><span> </span><span id="local-6989586621679107550"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107550"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.singleton</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; ByteString) -&gt; Char -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Char
+</span><span class="hs-identifier hs-var">B.head</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107550"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; (ByteString, ByteString)
+</span><span class="hs-identifier hs-var">B.splitAt</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; ByteString -&gt; (ByteString, ByteString)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(ByteString, ByteString) -&gt; ByteString
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span> </span><span class="annot"><span class="annottext">((ByteString, ByteString) -&gt; ByteString)
+-&gt; (ByteString, ByteString) -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; (ByteString, ByteString)
+</span><span class="hs-identifier hs-var">B.splitAt</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107550"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | Conduit for parsing a multiplexed stream from the Docker Engine API (e.g. the output of the attatch and logs endpoints).</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- This will force memory usage up to the returned frame size (for docker logs this is usually just one line of text).</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- See https://docs.docker.com/engine/api/v1.40/#operation/ContainerAttach for more details on this format.</span><span>
+</span><span id="line-81"></span><span id="local-6989586621679107546"><span class="annot"><a href="Docker.API.Client.Internal.Util.html#parseMultiplexedDockerStream"><span class="hs-identifier hs-type">parseMultiplexedDockerStream</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679107546"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ConduitT</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#DockerStreamType"><span class="hs-identifier hs-type">DockerStreamType</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679107546"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-82"></span><span id="parseMultiplexedDockerStream"><span class="annot"><span class="annottext">parseMultiplexedDockerStream :: ConduitT ByteString (DockerStreamType, ByteString) m ()
+</span><a href="Docker.API.Client.Internal.Util.html#parseMultiplexedDockerStream"><span class="hs-identifier hs-var hs-var">parseMultiplexedDockerStream</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+forall (m :: * -&gt; *).
+Monad m =&gt;
+ByteString
+-&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+</span><a href="#local-6989586621679107544"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier hs-var">B.empty</span></span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-84"></span><span>    </span><span id="local-6989586621679107544"><span class="annot"><span class="annottext">loop :: ByteString
+-&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+</span><a href="#local-6989586621679107544"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679107542"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107542"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-85"></span><span>      </span><span class="hs-comment">-- This whole thing could be recursive</span><span>
+</span><span id="line-86"></span><span>      </span><span class="hs-comment">-- This ensures that we get at least 8 bytes (could be more)</span><span>
+</span><span id="line-87"></span><span>      </span><span id="local-6989586621679107541"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107541"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; Int
+-&gt; ConduitT
+     ByteString (DockerStreamType, ByteString) m (Maybe ByteString)
+forall (m :: * -&gt; *) o.
+Monad m =&gt;
+ByteString -&gt; Int -&gt; ConduitT ByteString o m (Maybe ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#readUpstream"><span class="hs-identifier hs-var">readUpstream</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107542"><span class="hs-identifier hs-var">acc</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-88"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107541"><span class="hs-identifier hs-var">input</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>        </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679107540"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107540"><span class="hs-identifier hs-var">meta</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-91"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679107539"><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107539"><span class="hs-identifier hs-var">streamType</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679107538"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107538"><span class="hs-identifier hs-var">sectionLength</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679107537"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107537"><span class="hs-identifier hs-var">dataBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; (DockerStreamType, Int, ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#parseDockerStream"><span class="hs-identifier hs-var">parseDockerStream</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107540"><span class="hs-identifier hs-var">meta</span></a></span><span>
+</span><span id="line-92"></span><span>          </span><span class="hs-comment">-- This ensures that we have at least as much data as our section (could be more)</span><span>
+</span><span id="line-93"></span><span>          </span><span id="local-6989586621679107536"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107536"><span class="hs-identifier hs-var">section</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; Int
+-&gt; ConduitT
+     ByteString (DockerStreamType, ByteString) m (Maybe ByteString)
+forall (m :: * -&gt; *) o.
+Monad m =&gt;
+ByteString -&gt; Int -&gt; ConduitT ByteString o m (Maybe ByteString)
+</span><a href="Docker.API.Client.Internal.Util.html#readUpstream"><span class="hs-identifier hs-var">readUpstream</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107537"><span class="hs-identifier hs-var">dataBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107538"><span class="hs-identifier hs-var">sectionLength</span></a></span><span>
+</span><span id="line-94"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679107536"><span class="hs-identifier hs-var">section</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-95"></span><span>            </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>            </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679107535"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107535"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-97"></span><span>              </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679107534"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107534"><span class="hs-identifier hs-var">expectedBytes</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679107533"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107533"><span class="hs-identifier hs-var">additionalBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; (ByteString, ByteString)
+</span><span class="hs-identifier hs-var">B.splitAt</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679107538"><span class="hs-identifier hs-var">sectionLength</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107535"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-98"></span><span>              </span><span class="annot"><span class="annottext">(DockerStreamType, ByteString)
+-&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+forall (m :: * -&gt; *) o i. Monad m =&gt; o -&gt; ConduitT i o m ()
+</span><span class="hs-identifier hs-var">yield</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107539"><span class="hs-identifier hs-var">streamType</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107534"><span class="hs-identifier hs-var">expectedBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>              </span><span class="annot"><span class="annottext">ByteString
+-&gt; ConduitT ByteString (DockerStreamType, ByteString) m ()
+</span><a href="#local-6989586621679107544"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679107533"><span class="hs-identifier hs-var">additionalBytes</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- | Creates a DockerStreamType filter using the input ContainerLogType</span><span>
+</span><span id="line-102"></span><span id="local-6989586621679107532"><span class="annot"><a href="Docker.API.Client.Internal.Util.html#createLogTypeFilter"><span class="hs-identifier hs-type">createLogTypeFilter</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#ContainerLogType"><span class="hs-identifier hs-type">ContainerLogType</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><a href="Docker.API.Client.Internal.Types.html#DockerStreamType"><span class="hs-identifier hs-type">DockerStreamType</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679107532"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">)</span></span><span>
+</span><span id="line-103"></span><span id="createLogTypeFilter"><span class="annot"><span class="annottext">createLogTypeFilter :: ContainerLogType -&gt; (DockerStreamType, a) -&gt; Bool
+</span><a href="Docker.API.Client.Internal.Util.html#createLogTypeFilter"><span class="hs-identifier hs-var hs-var">createLogTypeFilter</span></a></span></span><span> </span><span id="local-6989586621679107530"><span class="annot"><span class="annottext">ContainerLogType
+</span><a href="#local-6989586621679107530"><span class="hs-identifier hs-var">clt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ContainerLogType
+</span><a href="#local-6989586621679107530"><span class="hs-identifier hs-var">clt</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-104"></span><span>  </span><span class="annot"><span class="annottext">ContainerLogType
+</span><a href="Docker.API.Client.Internal.Types.html#Stdout"><span class="hs-identifier hs-var">Stdout</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679107528"><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107528"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107528"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-106"></span><span>      </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="Docker.API.Client.Internal.Types.html#DockerStreamStdOut"><span class="hs-identifier hs-var">DockerStreamStdOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-107"></span><span>      </span><span class="annot"><span class="annottext">DockerStreamType
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-108"></span><span>  </span><span class="annot"><span class="annottext">ContainerLogType
+</span><a href="Docker.API.Client.Internal.Types.html#StdErr"><span class="hs-identifier hs-var">StdErr</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679107526"><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107526"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107526"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-110"></span><span>      </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="Docker.API.Client.Internal.Types.html#DockerStreamStdErr"><span class="hs-identifier hs-var">DockerStreamStdErr</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-111"></span><span>      </span><span class="annot"><span class="annottext">DockerStreamType
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-112"></span><span>  </span><span class="annot"><span class="annottext">ContainerLogType
+</span><a href="Docker.API.Client.Internal.Types.html#Both"><span class="hs-identifier hs-var">Both</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679107524"><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107524"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">DockerStreamType
+</span><a href="#local-6989586621679107524"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-114"></span><span>      </span><span class="annot"><span class="annottext">DockerStreamType
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- | Replaces the user and group id for an entry in a tarball with the specified user and group</span><span>
+</span><span id="line-117"></span><span class="annot"><a href="Docker.API.Client.Internal.Util.html#chownTarballContent"><span class="hs-identifier hs-type">chownTarballContent</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">UserID</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">GroupID</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Tar.FileInfo</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Tar.FileInfo</span></span><span>
+</span><span id="line-118"></span><span id="chownTarballContent"><span class="annot"><span class="annottext">chownTarballContent :: UserID -&gt; GroupID -&gt; FileInfo -&gt; FileInfo
+</span><a href="Docker.API.Client.Internal.Util.html#chownTarballContent"><span class="hs-identifier hs-var hs-var">chownTarballContent</span></a></span></span><span> </span><span id="local-6989586621679107522"><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679107522"><span class="hs-identifier hs-var">uid</span></a></span></span><span> </span><span id="local-6989586621679107521"><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679107521"><span class="hs-identifier hs-var">gid</span></a></span></span><span> </span><span id="local-6989586621679107520"><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679107520"><span class="hs-identifier hs-var">info</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-119"></span><span>  </span><span class="annot"><span class="annottext">FileInfo
+</span><a href="#local-6989586621679107520"><span class="hs-identifier hs-var">info</span></a></span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">fileUserName :: ByteString
+</span><span class="hs-identifier hs-var">Tar.fileUserName</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-121"></span><span>      </span><span class="annot"><span class="annottext">fileUserId :: UserID
+</span><span class="hs-identifier hs-var">Tar.fileUserId</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UserID
+</span><a href="#local-6989586621679107522"><span class="hs-identifier hs-var">uid</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-122"></span><span>      </span><span class="annot"><span class="annottext">fileGroupName :: ByteString
+</span><span class="hs-identifier hs-var">Tar.fileGroupName</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-123"></span><span>      </span><span class="annot"><span class="annottext">fileGroupId :: GroupID
+</span><span class="hs-identifier hs-var">Tar.fileGroupId</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GroupID
+</span><a href="#local-6989586621679107521"><span class="hs-identifier hs-var">gid</span></a></span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-125"></span></pre></body></html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">--------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module    : Test.SmallCheck</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright : (c) Colin Runciman et al.</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License   : BSD3</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Maintainer: Roman Cheplyaka &lt;roma@ro-che.info&gt;</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- This module exports the main pieces of SmallCheck functionality.</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- To generate test cases for your own types, refer to</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- &quot;Test.SmallCheck.Series&quot;.</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- For pointers to other sources of information about SmallCheck, please refer</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- to the README at</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- &lt;https://github.com/Bodigrim/smallcheck/blob/master/README.md&gt;</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--------------------------------------------------------------------</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 704
+</span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test.SmallCheck</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-24"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Constructing tests</span></span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-comment">-- | The simplest kind of test is a function (possibly of many</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-comment">-- arguments) returning 'Bool'. The function arguments are interpreted</span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-comment">-- as being universally, existentially or uniquely quantified, depending</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-comment">-- on the quantification context.</span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-comment">-- The default quantification context is universal ('forAll').</span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-comment">-- 'forAll', 'exists' and 'existsUnique' functions set the quantification</span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-comment">-- context for function arguments. Depending on the quantification</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-comment">-- context, the test @\\x y -&gt; p x y@ may be equivalent to:</span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-comment">-- * \( \forall x, y\colon p\, x \, y \) ('forAll'),</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-comment">-- * \( \exists x, y\colon p\, x \, y \) ('exists'),</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-comment">-- * \( \exists! x, y\colon p\, x \, y \) ('existsUnique').</span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-comment">-- The quantification context affects all the variables immediately</span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-comment">-- following the quantification operator, also extending past 'over',</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-comment">-- 'changeDepth' and 'changeDepth1' functions.</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-comment">-- However, it doesn't extend past other functions, like 'monadic', and</span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-comment">-- doesn't affect the operands of '==&gt;'. Such functions start a fresh</span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-comment">-- default quantification context.</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Examples</span></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-comment">-- |</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-comment">-- * @\\x y -&gt; p x y@ means</span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-comment">--   \( \forall x, y\colon p\, x \, y \).</span><span>
+</span><span id="line-56"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-comment">-- * @'exists' $ \\x y -&gt; p x y@ means</span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-comment">--   \( \exists x, y\colon p\, x \, y \).</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-comment">-- * @'exists' $ \\x -&gt; 'forAll' $ \\y -&gt; p x y@ means</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-comment">--   \( \exists x\colon \forall y\colon p \, x \, y  \).</span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-comment">-- * @'existsUnique' $ \\x y -&gt; p x y@ means</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-comment">--   \( \exists! x, y\colon p\, x \, y \).</span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-comment">-- * @'existsUnique' $ \\x -&gt; 'over' s $ \\y -&gt; p x y@ means</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-comment">--   \( \exists! x, y \colon y \in s \wedge p \, x \, y \).</span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-comment">-- * @'existsUnique' $ \\x -&gt; 'monadic' $ \\y -&gt; p x y@ means</span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-comment">--   \( \exists! x \colon \forall y \colon [p \, x \, y] \).</span><span>
+</span><span id="line-71"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span>  </span><span class="hs-comment">-- * @'existsUnique' $ \\x -&gt; 'existsUnique' $ \\y -&gt; p x y@ means</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-comment">--   \( \exists! x \colon \exists! y \colon p \, x \, y \).</span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-comment">-- * @'exists' $ \\x -&gt; (\\y -&gt; p y) '==&gt;' (\\z -&gt; q z)@ means</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-comment">--   \( \exists x \colon (\forall y\colon p\, y) \implies (\forall z\colon q\, z)  \).</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#forAll"><span class="hs-identifier">forAll</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-79"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#exists"><span class="hs-identifier">exists</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#existsUnique"><span class="hs-identifier">existsUnique</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-81"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#over"><span class="hs-identifier">over</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-82"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#monadic"><span class="hs-identifier">monadic</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#%3D%3D%3E"><span class="hs-operator">(==&gt;)</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-85"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#changeDepth"><span class="hs-identifier">changeDepth</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-86"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#changeDepth1"><span class="hs-identifier">changeDepth1</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Running tests</span></span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-comment">-- | 'smallCheck' is a simple way to run a test.</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-comment">-- As an alternative, consider using a testing framework.</span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-93"></span><span>  </span><span class="hs-comment">-- The packages</span><span>
+</span><span id="line-94"></span><span>  </span><span class="hs-comment">-- &lt;http://hackage.haskell.org/package/tasty-smallcheck&gt; and</span><span>
+</span><span id="line-95"></span><span>  </span><span class="hs-comment">-- &lt;http://hackage.haskell.org/package/hspec-smallcheck&gt;</span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-comment">-- provide integration with Tasty and HSpec, two popular testing</span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-comment">-- frameworks.</span><span>
+</span><span id="line-98"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-99"></span><span>  </span><span class="hs-comment">-- They allow to organize SmallCheck properties into a test suite (possibly</span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-comment">-- together with HUnit or QuickCheck tests) and provide other useful</span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-comment">-- features.</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span>  </span><span class="hs-comment">-- For more ways to run the tests, see &quot;Test.SmallCheck.Drivers&quot;.</span><span>
+</span><span id="line-104"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier">Depth</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-105"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Drivers.html#smallCheck"><span class="hs-identifier">smallCheck</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Main types and classes</span></span><span>
+</span><span id="line-108"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#Testable"><span class="hs-identifier">Testable</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.html#Property"><span class="hs-identifier">Property</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-110"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.Property.Result.html#Reason"><span class="hs-identifier">Reason</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.SmallCheck.Property.html"><span class="hs-identifier">Test.SmallCheck.Property</span></a></span><span>
+</span><span id="line-115"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.SmallCheck.Drivers.html"><span class="hs-identifier">Test.SmallCheck.Drivers</span></a></span><span>
+</span><span id="line-116"></span></pre></body></html>

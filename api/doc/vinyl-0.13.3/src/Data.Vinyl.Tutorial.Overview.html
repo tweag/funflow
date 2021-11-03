@@ -1,0 +1,298 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">{-|
+
+    Vinyl is a general solution to the records problem in Haskell using
+    type level strings and other modern GHC features, featuring static
+    structural typing (with a subtyping relation), and automatic
+    row-polymorphic lenses. All this is possible without Template Haskell.
+
+    Let's work through a quick example. We'll need to enable some language
+    extensions first:
+
+&gt;&gt;&gt; :set -XDataKinds
+&gt;&gt;&gt; :set -XPolyKinds
+&gt;&gt;&gt; :set -XTypeApplications
+&gt;&gt;&gt; :set -XTypeOperators
+&gt;&gt;&gt; :set -XTypeFamilies
+&gt;&gt;&gt; :set -XFlexibleContexts
+&gt;&gt;&gt; :set -XFlexibleInstances
+&gt;&gt;&gt; :set -XNoMonomorphismRestriction
+&gt;&gt;&gt; :set -XGADTs
+&gt;&gt;&gt; :set -XTypeSynonymInstances
+&gt;&gt;&gt; :set -XTemplateHaskell
+&gt;&gt;&gt; :set -XStandaloneDeriving
+
+&gt;&gt;&gt; import Data.Vinyl
+&gt;&gt;&gt; import Data.Vinyl.Functor
+&gt;&gt;&gt; import Control.Applicative
+&gt;&gt;&gt; import Control.Lens hiding (Identity)
+&gt;&gt;&gt; import Control.Lens.TH
+&gt;&gt;&gt; import Data.Char
+&gt;&gt;&gt; import Test.DocTest
+&gt;&gt;&gt; import Data.Singletons.TH (genSingletons)
+&gt;&gt;&gt; import Data.Maybe
+
+    Let's define a universe of fields which we want to use.
+
+    First of all, we need a data type defining the field labels:
+
+&gt;&gt;&gt; data Fields = Name | Age | Sleeping | Master deriving Show
+
+    Any record can be now described by a type-level list of these labels.
+    The @DataKinds@ extension must be enabled to automatically turn all the
+    constructors of the @Field@ type into types.
+
+&gt;&gt;&gt; type LifeForm = [Name, Age, Sleeping]
+
+    Now, we need a way to map our labels to concrete types. We use a type
+    family for this purpose. Unfortunately, type families aren't first class in Haskell.  That's
+    why we also need a data type, with which we will parametrise 'Rec'.
+    We also generate the necessary singletons for each field label using
+    Template Haskell.
+
+&gt;&gt;&gt; :{
+type family ElF (f :: Fields) :: * where
+  ElF Name = String
+  ElF Age = Int
+  ElF Sleeping = Bool
+  ElF Master = Rec Attr LifeForm
+newtype Attr f = Attr { _unAttr :: ElF f }
+makeLenses ''Attr
+genSingletons [ ''Fields ]
+instance Show (Attr Name) where show (Attr x) = &quot;name: &quot; ++ show x
+instance Show (Attr Age) where show (Attr x) = &quot;age: &quot; ++ show x
+instance Show (Attr Sleeping) where show (Attr x) = &quot;sleeping: &quot; ++ show x
+instance Show (Attr Master) where show (Attr x) = &quot;master: &quot; ++ show x
+:}
+
+    To make field construction easier, we define an operator.  The first
+    argument of this operator is a singleton - a constructor bringing the
+    data-kinded field label type into the data level.  It's needed because
+    there can be multiple labels with the same field type, so by just
+    supplying a value of type @ElF f@ there would be no way to deduce the
+    correct &quot;f&quot;.
+
+&gt;&gt;&gt; :{
+let (=::) :: sing f -&gt; ElF f -&gt; Attr f
+    _ =:: x = Attr x
+:}
+
+    Now, let's try to make an entity that represents a human:
+
+&gt;&gt;&gt; :{
+let jon = (SName =:: &quot;jon&quot;)
+       :&amp; (SAge =:: 23)
+       :&amp; (SSleeping =:: False)
+       :&amp; RNil
+:}
+
+    Automatically, we can show the record:
+
+&gt;&gt;&gt; print jon
+{name: &quot;jon&quot;, age: 23, sleeping: False}
+
+And its types are all inferred with no problem. Now, make a dog! Dogs
+are life-forms, but unlike humans, they have masters. So, let&#8217;s build
+my dog:
+
+&gt;&gt;&gt; :{
+let tucker = (SName =:: &quot;tucker&quot;)
+          :&amp; (SAge =:: 9)
+          :&amp; (SSleeping =:: True)
+          :&amp; (SMaster =:: jon)
+          :&amp; RNil
+:}
+
+Now, if we want to wake entities up, we don\'t want to have to write a
+separate wake-up function for both dogs and humans (even though they
+are of different type). Luckily, we can use the built-in lenses to
+focus on a particular field in the record for access and update,
+without losing additional information:
+
+&gt;&gt;&gt; :{
+let wakeUp :: (Sleeping &#8712; fields) =&gt; Rec Attr fields -&gt; Rec Attr fields
+    wakeUp = rput $ SSleeping =:: False
+:}
+
+Now, the type annotation on @wakeUp@ was not necessary; I just wanted
+to show how intuitive the type is. Basically, it takes as an input
+any record that has a 'Bool' field labelled @sleeping@, and modifies
+that specific field in the record accordingly.
+
+&gt;&gt;&gt; let tucker' = wakeUp tucker
+&gt;&gt;&gt; let jon' = wakeUp jon
+
+&gt;&gt;&gt; tucker' ^. rlens @Sleeping
+sleeping: False
+
+&gt;&gt;&gt; tucker ^. rlens @Sleeping
+sleeping: True
+
+&gt;&gt;&gt; jon' ^. rlens @Sleeping
+sleeping: False
+
+We can also access the entire lens for a field using the rLens
+function; since lenses are composable, it&#8217;s super easy to do deep
+update on a record:
+
+&gt;&gt;&gt; let masterSleeping = rlens @Master . unAttr . rlens @Sleeping
+&gt;&gt;&gt; let tucker'' = masterSleeping .~ (SSleeping =:: True) $ tucker'
+
+&gt;&gt;&gt; tucker'' ^. masterSleeping
+sleeping: True
+
+A record @Rec f xs@ is a subtype of a record @Rec f ys@ if @ys &#8838; xs@;
+that is to say, if one record can do everything that another record
+can, the former is a subtype of the latter. As such, we should be able
+to provide an upcast operator which &quot;forgets&quot; whatever makes one
+record different from another (whether it be extra data, or different
+order).
+
+Therefore, the following works:
+
+&gt;&gt;&gt; :{
+let upcastedTucker :: Rec Attr LifeForm
+    upcastedTucker = rcast tucker
+:}
+
+The subtyping relationship between record types is expressed with the
+'&lt;:' constraint; so, 'rcast' is of the following type:
+
+&gt; rcast :: r1 &lt;: r2 =&gt; Rec f r2 -&gt; Rec f r1
+
+Also provided is a &quot;&#8773;&quot; constraint which indicates record congruence
+(that is, two record types differ only in the order of their fields).
+
+In fact, 'rcast' is actually given as a special case of the lens 'rsubset',
+which lets you modify entire (possibly non-contiguous) slices of a record!
+
+Consider the following declaration:
+
+&gt; data Rec :: (u -&gt; *) -&gt; [u] -&gt; * where
+&gt;   RNil :: Rec f '[]
+&gt;   (:&amp;) :: f r -&gt; Rec f rs -&gt; Rec f (r ': rs)
+
+Records are implicitly parameterized over a kind @u@, which stands for the
+&quot;universe&quot; or key space. Keys (inhabitants of @u@) are then interpreted into
+the types of their values by the first parameter to 'Rec', @f@. An extremely
+powerful aspect of Vinyl records is that you can construct natural
+transformations between different interpretation functors @f,g@, or postcompose
+some other functor onto the stack. This can be used to immerse each field of a
+record in some particular effect modality, and then the library functions can
+be used to traverse and accumulate these effects.
+
+Let\'s imagine that we want to do validation on a record that
+represents a name and an age:
+
+&gt;&gt;&gt; type Person = [Name, Age]
+
+We\'ve decided that names must be alphabetic, and ages must be positive. For
+validation, we\'ll use 'Maybe' for now, though you should use a
+left-accumulating @Validation@ type (the module @Data.Either.Validation@
+from the @either@ package provides such a type, though we do not
+cover it here).
+
+&gt;&gt;&gt; :{
+let goodPerson :: Rec Attr Person
+    goodPerson = (SName =:: &quot;Jon&quot;)
+              :&amp; (SAge =:: 20)
+              :&amp; RNil
+:}
+
+&gt;&gt;&gt; :{
+let badPerson = (SName =:: &quot;J#@#$on&quot;)
+             :&amp; (SAge =:: 20)
+             :&amp; RNil
+:}
+
+We\'ll give validation a (rather poor) shot.
+
+&gt;&gt;&gt; :{
+let
+    validatePerson :: Rec Attr Person -&gt; Maybe (Rec Attr Person)
+    validatePerson p = (\n a -&gt; (SName =:: n) :&amp; (SAge =:: a) :&amp; RNil) &lt;$&gt; vName &lt;*&gt; vAge
+      where
+      vName = validateName $ p ^. rlens @Name . unAttr
+      vAge  = validateAge $ p ^. rlens @Age . unAttr
+      validateName str | all isAlpha str = Just str
+      validateName _ = Nothing
+      validateAge i | i &gt;= 0 = Just i
+      validateAge _ = Nothing
+:}
+
+Let\'s try it out:
+
+&gt;&gt;&gt; isJust $ validatePerson goodPerson
+True
+
+&gt;&gt;&gt; isJust $ validatePerson badPerson
+False
+
+The results are as expected (@Just@ for @goodPerson@, and a @Nothing@ for
+@badPerson@); but this was not very fun to build.
+
+Further, it would be nice to have some notion of a partial record;
+that is, if part of it can\'t be validated, it would still be nice to
+be able to access the rest. What if we could make a version of this
+record where the elements themselves were validation functions, and
+then that record could be applied to a plain one, to get a record of
+validated fields? That\'s what we&#8217;re going to do.
+
+&gt;&gt;&gt; type Validator f = Lift (-&gt;) f (Maybe :. f)
+
+Let\'s parameterize a record by it: when we do, then an element of type
+@a@ should be a function @Identity a -&gt; Result e a@:
+
+&gt;&gt;&gt; :{
+let lift f = Lift $ Compose . f
+    validateName (Attr str) | all isAlpha str = Just (Attr str)
+    validateName _ = Nothing
+    validateAge (Attr i) | i &gt;= 0 = Just (Attr i)
+    validateAge _ = Nothing
+    vperson :: Rec (Validator Attr) Person
+    vperson = lift validateName :&amp; lift validateAge :&amp; RNil
+:}
+
+And we can use the special application operator '&lt;&lt;*&gt;&gt;' (which is
+analogous to '&lt;*&gt;', but generalized a bit) to use this to validate a
+record:
+
+&gt;&gt;&gt; let goodPersonResult = vperson &lt;&lt;*&gt;&gt; goodPerson
+&gt;&gt;&gt; let badPersonResult  = vperson &lt;&lt;*&gt;&gt; badPerson
+
+&gt;&gt;&gt; isJust . getCompose $ goodPersonResult ^. rlens @Name
+True
+
+&gt;&gt;&gt; isJust . getCompose $ goodPersonResult ^. rlens @Age
+True
+
+&gt;&gt;&gt; isJust . getCompose $ badPersonResult ^. rlens @Name
+False
+
+&gt;&gt;&gt; isJust . getCompose $ badPersonResult ^. rlens @Age
+True
+
+So now we have a partial record, and we can still do stuff with its contents.
+Next, we can even recover the original behavior of the validator (that is, to
+give us a value of type @Maybe (Rec Attr Person)@) using `rtraverse`:
+
+&gt;&gt;&gt; :{
+let mgoodPerson :: Maybe (Rec Attr Person)
+    mgoodPerson = rtraverse getCompose goodPersonResult
+:}
+
+&gt;&gt;&gt; let mbadPerson  = rtraverse getCompose badPersonResult
+
+&gt;&gt;&gt; isJust mgoodPerson
+True
+
+&gt;&gt;&gt; isJust mbadPerson
+False
+
+-}</span><span>
+</span><span id="line-292"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-warn-unused-imports #-}</span><span>
+</span><span id="line-293"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Vinyl.Tutorial.Overview</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-294"></span><span>
+</span><span id="line-295"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Vinyl.Core.html"><span class="hs-identifier">Data.Vinyl.Core</span></a></span><span>
+</span><span id="line-296"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Vinyl.Functor.html"><span class="hs-identifier">Data.Vinyl.Functor</span></a></span><span>
+</span><span id="line-297"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Vinyl.Lens.html"><span class="hs-identifier">Data.Vinyl.Lens</span></a></span><span>
+</span><span id="line-298"></span></pre></body></html>

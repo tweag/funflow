@@ -1,0 +1,540 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE PolyKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Copyright   :  (C) 2013-2015 Edward Kmett and Dan Doel</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  BSD-style (see the file LICENSE)</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Maintainer  :  Edward Kmett &lt;ekmett@gmail.com&gt;</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Stability   :  provisional</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Portability :  Rank2Types, TFs</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Profunctor.Ran</span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier">Ran</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeRan"><span class="hs-identifier">decomposeRan</span></a></span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#precomposeRan"><span class="hs-identifier">precomposeRan</span></a></span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#curryRan"><span class="hs-identifier">curryRan</span></a></span><span>
+</span><span id="line-21"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#uncurryRan"><span class="hs-identifier">uncurryRan</span></a></span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier">Codensity</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeCodensity"><span class="hs-identifier">decomposeCodensity</span></a></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Category</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.html"><span class="hs-identifier">Data.Profunctor</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.Composition.html"><span class="hs-identifier">Data.Profunctor.Composition</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.Monad.html"><span class="hs-identifier">Data.Profunctor.Monad</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html"><span class="hs-identifier">Data.Profunctor.Unsafe</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">,</span><span class="annot"><span class="hs-operator">(.)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- * Ran</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- | This represents the right Kan extension of a 'Profunctor' @q@ along a</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- 'Profunctor' @p@ in a limited version of the 2-category of Profunctors where</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- the only object is the category Hask, 1-morphisms are profunctors composed</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- and compose with Profunctor composition, and 2-morphisms are just natural</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- transformations.</span><span>
+</span><span id="line-42"></span><span class="hs-comment">--</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- 'Ran' has a polymorphic kind since @5.6@.</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- Ran :: (k1 -&gt; k2 -&gt; Type) -&gt; (k1 -&gt; k3 -&gt; Type) -&gt; (k2 -&gt; k3 -&gt; Type)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">newtype</span><span> </span><span id="Ran"><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span></span><span> </span><span id="local-6989586621679091484"><span class="annot"><a href="#local-6989586621679091484"><span class="hs-identifier hs-type">p</span></a></span></span><span> </span><span id="local-6989586621679091482"><span class="annot"><a href="#local-6989586621679091482"><span class="hs-identifier hs-type">q</span></a></span></span><span> </span><span id="local-6989586621679091483"><span class="annot"><a href="#local-6989586621679091483"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679091481"><span class="annot"><a href="#local-6989586621679091481"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Ran"><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="runRan"><span class="annot"><span class="annottext">Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679091502"><span class="annot"><a href="#local-6989586621679091502"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679091484"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091502"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091483"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679091482"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091502"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091481"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span id="local-6989586621679091281"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Profunctor.Monad.html#ProfunctorFunctor"><span class="hs-identifier hs-type">ProfunctorFunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091281"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-49"></span><span>  </span><span id="local-6989586621679091278"><span class="annot"><span class="annottext">promap :: (p :-&gt; q) -&gt; Ran p p :-&gt; Ran p q
+</span><a href="Data.Profunctor.Monad.html#promap"><span class="hs-identifier hs-var hs-var hs-var hs-var">promap</span></a></span></span><span> </span><span id="local-6989586621679091276"><span class="annot"><span class="annottext">p :-&gt; q
+</span><a href="#local-6989586621679091276"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091275"><span class="annot"><span class="annottext">forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091275"><span class="hs-identifier hs-var">g</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x b) -&gt; Ran p q a b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">p x b -&gt; q x b
+p :-&gt; q
+</span><a href="#local-6989586621679091276"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; q x b) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; q x b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">p x a -&gt; p x b
+forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091275"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span id="local-6989586621679091273"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Category</span></span><span> </span><span class="annot"><a href="#local-6989586621679091273"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Monad.html#ProfunctorComonad"><span class="hs-identifier hs-type">ProfunctorComonad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091273"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>  </span><span id="local-6989586621679091268"><span class="annot"><span class="annottext">proextract :: Ran p p :-&gt; p
+</span><a href="Data.Profunctor.Monad.html#proextract"><span class="hs-identifier hs-var hs-var hs-var hs-var">proextract</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091266"><span class="annot"><span class="annottext">forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091266"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p a a -&gt; p a b
+forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091266"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">p a a
+forall k (cat :: k -&gt; k -&gt; *) (a :: k). Category cat =&gt; cat a a
+</span><span class="hs-identifier hs-var">id</span></span><span>
+</span><span id="line-53"></span><span>  </span><span id="local-6989586621679091264"><span class="annot"><span class="annottext">produplicate :: Ran p p :-&gt; Ran p (Ran p p)
+</span><a href="Data.Profunctor.Monad.html#produplicate"><span class="hs-identifier hs-var hs-var hs-var hs-var">produplicate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091262"><span class="annot"><span class="annottext">forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091262"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; Ran p p x b) -&gt; Ran p (Ran p p) a b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="annot"><span class="annottext">((forall x. p x a -&gt; Ran p p x b) -&gt; Ran p (Ran p p) a b)
+-&gt; (forall x. p x a -&gt; Ran p p x b) -&gt; Ran p (Ran p p) a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span> </span><span id="local-6989586621679091261"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091261"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(forall x. p x x -&gt; p x b) -&gt; Ran p p x b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="annot"><span class="annottext">((forall x. p x x -&gt; p x b) -&gt; Ran p p x b)
+-&gt; (forall x. p x x -&gt; p x b) -&gt; Ran p p x b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679091260"><span class="annot"><span class="annottext">p x x
+</span><a href="#local-6989586621679091260"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">p x a -&gt; p x b
+forall x. p x a -&gt; p x b
+</span><a href="#local-6989586621679091262"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091261"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">p x a -&gt; p x x -&gt; p x a
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">p x x
+</span><a href="#local-6989586621679091260"><span class="hs-identifier hs-var">q</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span id="local-6989586621679091258"><span id="local-6989586621679091259"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091259"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091258"><span class="hs-identifier hs-type">q</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091259"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091258"><span class="hs-identifier hs-type">q</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-56"></span><span>  </span><span id="local-6989586621679091251"><span class="annot"><span class="annottext">dimap :: (a -&gt; b) -&gt; (c -&gt; d) -&gt; Ran p q b c -&gt; Ran p q a d
+</span><a href="Data.Profunctor.Unsafe.html#dimap"><span class="hs-identifier hs-var hs-var hs-var hs-var">dimap</span></a></span></span><span> </span><span id="local-6989586621679091249"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091249"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span id="local-6989586621679091248"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679091248"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091247"><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091247"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x d) -&gt; Ran p q a d
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(c -&gt; d) -&gt; q x c -&gt; q x d
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679091248"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(q x c -&gt; q x d) -&gt; (p x a -&gt; q x c) -&gt; p x a -&gt; q x d
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Ran p q b c -&gt; forall x. p x b -&gt; q x c
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091247"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; q x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; q x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091249"><span class="hs-identifier hs-var">ca</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#dimap"><span class="hs-pragma hs-type">dimap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-58"></span><span>  </span><span id="local-6989586621679091245"><span class="annot"><span class="annottext">lmap :: (a -&gt; b) -&gt; Ran p q b c -&gt; Ran p q a c
+</span><a href="Data.Profunctor.Unsafe.html#lmap"><span class="hs-identifier hs-var hs-var hs-var hs-var">lmap</span></a></span></span><span> </span><span id="local-6989586621679091243"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091243"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span id="local-6989586621679091242"><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091242"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x c) -&gt; Ran p q a c
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ran p q b c -&gt; forall x. p x b -&gt; q x c
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091242"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; q x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; q x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091243"><span class="hs-identifier hs-var">ca</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#lmap"><span class="hs-pragma hs-type">lmap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-60"></span><span>  </span><span id="local-6989586621679091241"><span class="annot"><span class="annottext">rmap :: (b -&gt; c) -&gt; Ran p q a b -&gt; Ran p q a c
+</span><a href="#local-6989586621679091241"><span class="hs-identifier hs-var hs-var hs-var hs-var">rmap</span></a></span></span><span> </span><span id="local-6989586621679091240"><span class="annot"><span class="annottext">b -&gt; c
+</span><a href="#local-6989586621679091240"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091239"><span class="annot"><span class="annottext">Ran p q a b
+</span><a href="#local-6989586621679091239"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x c) -&gt; Ran p q a c
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; c) -&gt; q x b -&gt; q x c
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; c
+</span><a href="#local-6989586621679091240"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(q x b -&gt; q x c) -&gt; (p x a -&gt; q x b) -&gt; p x a -&gt; q x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Ran p q a b -&gt; forall x. p x a -&gt; q x b
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q a b
+</span><a href="#local-6989586621679091239"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-pragma hs-type">rmap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621679091238"><span class="annot"><span class="annottext">q b c
+</span><a href="#local-6989586621679091238"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091237"><span class="annot"><span class="annottext">#. :: q b c -&gt; Ran p q a b -&gt; Ran p q a c
+</span><a href="Data.Profunctor.Unsafe.html#%23."><span class="hs-operator hs-var hs-var hs-var hs-var">#.</span></a></span></span><span> </span><span id="local-6989586621679091235"><span class="annot"><span class="annottext">Ran p q a b
+</span><a href="#local-6989586621679091235"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x c) -&gt; Ran p q a c
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679091234"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091234"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">q b c
+</span><a href="#local-6989586621679091238"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">q b c -&gt; q x b -&gt; q x c
+forall (p :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor p, Coercible c b) =&gt;
+q b c -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#%23."><span class="hs-operator hs-var">#.</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q a b -&gt; p x a -&gt; q x b
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q a b
+</span><a href="#local-6989586621679091235"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091234"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">#.</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-64"></span><span>  </span><span id="local-6989586621679091233"><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091233"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679091232"><span class="annot"><span class="annottext">.# :: Ran p q b c -&gt; q a b -&gt; Ran p q a c
+</span><a href="Data.Profunctor.Unsafe.html#.%23"><span class="hs-operator hs-var hs-var hs-var hs-var">.#</span></a></span></span><span> </span><span id="local-6989586621679091230"><span class="annot"><span class="annottext">q a b
+</span><a href="#local-6989586621679091230"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x c) -&gt; Ran p q a c
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679091229"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091229"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ran p q b c -&gt; p x b -&gt; q x c
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q b c
+</span><a href="#local-6989586621679091233"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">q a b
+</span><a href="#local-6989586621679091230"><span class="hs-identifier hs-var">ca</span></a></span><span> </span><span class="annot"><span class="annottext">q a b -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor p, Coercible c b) =&gt;
+q b c -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#%23."><span class="hs-operator hs-var">#.</span></a></span><span> </span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091229"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">.#</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span id="local-6989586621679091226"><span id="local-6989586621679091227"><span id="local-6989586621679091228"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679091223"><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091228"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091227"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091228"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091226"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-68"></span><span>  </span><span id="local-6989586621679091221"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; Ran p q a a -&gt; Ran p q a b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679091220"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091220"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091219"><span class="annot"><span class="annottext">Ran p q a a
+</span><a href="#local-6989586621679091219"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x b) -&gt; Ran p q a b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; q x a -&gt; q x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091220"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(q x a -&gt; q x b) -&gt; (p x a -&gt; q x a) -&gt; p x a -&gt; q x b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Ran p q a a -&gt; forall x. p x a -&gt; q x a
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p q a a
+</span><a href="#local-6989586621679091219"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">fmap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- | @'Ran' p p@ forms a 'Monad' in the 'Profunctor' 2-category, which is isomorphic to a Haskell 'Category' instance.</span><span>
+</span><span id="line-72"></span><span id="local-6989586621679091217"><span id="local-6989586621679091218"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="#local-6989586621679091218"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">~</span></span><span> </span><span class="annot"><a href="#local-6989586621679091217"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Category</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091218"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091217"><span class="hs-identifier hs-type">q</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-73"></span><span>  </span><span id="local-6989586621679091213"><span class="annot"><span class="annottext">id :: Ran p q a a
+</span><a href="#local-6989586621679091213"><span class="hs-identifier hs-var hs-var hs-var hs-var">id</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (x :: k). p x a -&gt; q x a) -&gt; Ran p q a a
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="annot"><span class="annottext">forall (x :: k). p x a -&gt; q x a
+forall k (cat :: k -&gt; k -&gt; *) (a :: k). Category cat =&gt; cat a a
+</span><span class="hs-identifier hs-var">id</span></span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">id</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-75"></span><span>  </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091212"><span class="annot"><span class="annottext">forall (x :: k). p x b -&gt; q x c
+</span><a href="#local-6989586621679091212"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679091211"><span class="annot"><span class="annottext">. :: Ran p q b c -&gt; Ran p q a b -&gt; Ran p q a c
+</span><a href="#local-6989586621679091211"><span class="hs-operator hs-var hs-var hs-var hs-var">.</span></a></span></span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091210"><span class="annot"><span class="annottext">forall (x :: k). p x a -&gt; q x b
+</span><a href="#local-6989586621679091210"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (x :: k). p x a -&gt; q x c) -&gt; Ran p q a c
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">q x b -&gt; q x c
+forall (x :: k). p x b -&gt; q x c
+</span><a href="#local-6989586621679091212"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(q x b -&gt; q x c) -&gt; (q x a -&gt; q x b) -&gt; q x a -&gt; q x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">q x a -&gt; q x b
+forall (x :: k). p x a -&gt; q x b
+</span><a href="#local-6989586621679091210"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">.</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | The 2-morphism that defines a right Kan extension.</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- Note: When @q@ is left adjoint to @'Ran' q (-&gt;)@ then 'decomposeRan' is the 'counit' of the adjunction.</span><span>
+</span><span id="line-81"></span><span id="local-6989586621679091208"><span id="local-6989586621679091209"><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeRan"><span class="hs-identifier hs-type">decomposeRan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091209"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091208"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679091209"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091208"><span class="hs-identifier hs-type">p</span></a></span></span></span><span>
+</span><span id="line-82"></span><span id="decomposeRan"><span class="annot"><span class="annottext">decomposeRan :: Procompose (Ran q p) q a b -&gt; p a b
+</span><a href="Data.Profunctor.Ran.html#decomposeRan"><span class="hs-identifier hs-var hs-var">decomposeRan</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span id="local-6989586621679091206"><span class="annot"><span class="annottext">forall (x :: k). q x x -&gt; p x b
+</span><a href="#local-6989586621679091206"><span class="hs-identifier hs-var">qp</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679091205"><span class="annot"><span class="annottext">q a x
+</span><a href="#local-6989586621679091205"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">q a x -&gt; p a b
+forall (x :: k). q x x -&gt; p x b
+</span><a href="#local-6989586621679091206"><span class="hs-identifier hs-var">qp</span></a></span><span> </span><span class="annot"><span class="annottext">q a x
+</span><a href="#local-6989586621679091205"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-83"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeRan"><span class="hs-pragma hs-type">decomposeRan</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span id="local-6989586621679091203"><span id="local-6989586621679091204"><span class="annot"><a href="Data.Profunctor.Ran.html#precomposeRan"><span class="hs-identifier hs-type">precomposeRan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091204"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091204"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091203"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091203"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091204"><span class="hs-identifier hs-type">q</span></a></span></span></span><span>
+</span><span id="line-86"></span><span id="precomposeRan"><span class="annot"><span class="annottext">precomposeRan :: Procompose q (Ran p (-&gt;)) :-&gt; Ran p q
+</span><a href="Data.Profunctor.Ran.html#precomposeRan"><span class="hs-identifier hs-var hs-var">precomposeRan</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span id="local-6989586621679091202"><span class="annot"><span class="annottext">q x b
+</span><a href="#local-6989586621679091202"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679091201"><span class="annot"><span class="annottext">Ran p (-&gt;) a x
+</span><a href="#local-6989586621679091201"><span class="hs-identifier hs-var">pf</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; q x b) -&gt; Ran p q a b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679091200"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091200"><span class="hs-identifier hs-var">pxa</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ran p (-&gt;) a x -&gt; p x a -&gt; x -&gt; x
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="annot"><span class="annottext">Ran p (-&gt;) a x
+</span><a href="#local-6989586621679091201"><span class="hs-identifier hs-var">pf</span></a></span><span> </span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091200"><span class="hs-identifier hs-var">pxa</span></a></span><span> </span><span class="annot"><span class="annottext">(x -&gt; x) -&gt; q x b -&gt; q x b
+forall (p :: * -&gt; * -&gt; *) a b c.
+Profunctor p =&gt;
+(a -&gt; b) -&gt; p b c -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#lmap"><span class="hs-operator hs-var">`lmap`</span></a></span><span> </span><span class="annot"><span class="annottext">q x b
+</span><a href="#local-6989586621679091202"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#precomposeRan"><span class="hs-pragma hs-type">precomposeRan</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span id="local-6989586621679091197"><span id="local-6989586621679091198"><span id="local-6989586621679091199"><span class="annot"><a href="Data.Profunctor.Ran.html#curryRan"><span class="hs-identifier hs-type">curryRan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091199"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091198"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091197"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679091199"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091198"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091197"><span class="hs-identifier hs-type">r</span></a></span></span></span></span><span>
+</span><span id="line-90"></span><span id="curryRan"><span class="annot"><span class="annottext">curryRan :: (Procompose p q :-&gt; r) -&gt; p :-&gt; Ran q r
+</span><a href="Data.Profunctor.Ran.html#curryRan"><span class="hs-identifier hs-var hs-var">curryRan</span></a></span></span><span> </span><span id="local-6989586621679091196"><span class="annot"><span class="annottext">Procompose p q :-&gt; r
+</span><a href="#local-6989586621679091196"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679091195"><span class="annot"><span class="annottext">p a b
+</span><a href="#local-6989586621679091195"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (x :: k). q x a -&gt; r x b) -&gt; Ran q r a b
+forall k k k (p :: k -&gt; k -&gt; *) (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+(forall (x :: k). p x a -&gt; q x b) -&gt; Ran p q a b
+</span><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-var">Ran</span></a></span><span> </span><span class="annot"><span class="annottext">((forall (x :: k). q x a -&gt; r x b) -&gt; Ran q r a b)
+-&gt; (forall (x :: k). q x a -&gt; r x b) -&gt; Ran q r a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679091194"><span class="annot"><span class="annottext">q x a
+</span><a href="#local-6989586621679091194"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Procompose p q x b -&gt; r x b
+Procompose p q :-&gt; r
+</span><a href="#local-6989586621679091196"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">p a b -&gt; q x a -&gt; Procompose p q x b
+forall k k k (p :: k -&gt; k -&gt; *) (x :: k) (c :: k)
+       (q :: k -&gt; k -&gt; *) (d :: k).
+p x c -&gt; q d x -&gt; Procompose p q d c
+</span><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-var">Procompose</span></a></span><span> </span><span class="annot"><span class="annottext">p a b
+</span><a href="#local-6989586621679091195"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">q x a
+</span><a href="#local-6989586621679091194"><span class="hs-identifier hs-var">q</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#curryRan"><span class="hs-pragma hs-type">curryRan</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621679091191"><span id="local-6989586621679091192"><span id="local-6989586621679091193"><span class="annot"><a href="Data.Profunctor.Ran.html#uncurryRan"><span class="hs-identifier hs-type">uncurryRan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679091193"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Ran"><span class="hs-identifier hs-type">Ran</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091192"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091191"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091193"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091192"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="Data.Profunctor.Types.html#%3A-%3E"><span class="hs-operator hs-type">:-&gt;</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091191"><span class="hs-identifier hs-type">r</span></a></span></span></span></span><span>
+</span><span id="line-94"></span><span id="uncurryRan"><span class="annot"><span class="annottext">uncurryRan :: (p :-&gt; Ran q r) -&gt; Procompose p q :-&gt; r
+</span><a href="Data.Profunctor.Ran.html#uncurryRan"><span class="hs-identifier hs-var hs-var">uncurryRan</span></a></span></span><span> </span><span id="local-6989586621679091190"><span class="annot"><span class="annottext">p :-&gt; Ran q r
+</span><a href="#local-6989586621679091190"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span id="local-6989586621679091189"><span class="annot"><span class="annottext">p x b
+</span><a href="#local-6989586621679091189"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679091188"><span class="annot"><span class="annottext">q a x
+</span><a href="#local-6989586621679091188"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ran q r x b -&gt; q a x -&gt; r a b
+forall k k (p :: k -&gt; k -&gt; *) k (q :: k -&gt; k -&gt; *) (a :: k)
+       (b :: k).
+Ran p q a b -&gt; forall (x :: k). p x a -&gt; q x b
+</span><a href="Data.Profunctor.Ran.html#runRan"><span class="hs-identifier hs-var hs-var">runRan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">p x b -&gt; Ran q r x b
+p :-&gt; Ran q r
+</span><a href="#local-6989586621679091190"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">p x b
+</span><a href="#local-6989586621679091189"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">q a x
+</span><a href="#local-6989586621679091188"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-95"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#uncurryRan"><span class="hs-pragma hs-type">uncurryRan</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- * Codensity</span><span>
+</span><span id="line-99"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- | This represents the right Kan extension of a 'Profunctor' @p@ along</span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- itself. This provides a generalization of the \&quot;difference list\&quot; trick to</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- profunctors.</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- 'Codensity' has a polymorphic kind since @5.6@.</span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- Codensity :: (k1 -&gt; k2 -&gt; Type) -&gt; (k2 -&gt; k2 -&gt; Type)</span><span>
+</span><span id="line-108"></span><span class="hs-keyword">newtype</span><span> </span><span id="Codensity"><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span></span><span> </span><span id="local-6989586621679091333"><span class="annot"><a href="#local-6989586621679091333"><span class="hs-identifier hs-type">p</span></a></span></span><span> </span><span id="local-6989586621679091332"><span class="annot"><a href="#local-6989586621679091332"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679091331"><span class="annot"><a href="#local-6989586621679091331"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Codensity"><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="runCodensity"><span class="annot"><span class="annottext">Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679091341"><span class="annot"><a href="#local-6989586621679091341"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679091333"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091341"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091332"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679091333"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091341"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091331"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span id="local-6989586621679091185"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091185"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091185"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679091179"><span class="annot"><span class="annottext">dimap :: (a -&gt; b) -&gt; (c -&gt; d) -&gt; Codensity p b c -&gt; Codensity p a d
+</span><a href="#local-6989586621679091179"><span class="hs-identifier hs-var hs-var hs-var hs-var">dimap</span></a></span></span><span> </span><span id="local-6989586621679091178"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091178"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span id="local-6989586621679091177"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679091177"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091176"><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091176"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x d) -&gt; Codensity p a d
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(c -&gt; d) -&gt; p x c -&gt; p x d
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679091177"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(p x c -&gt; p x d) -&gt; (p x a -&gt; p x c) -&gt; p x a -&gt; p x d
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Codensity p b c -&gt; forall x. p x b -&gt; p x c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091176"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; p x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; p x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091178"><span class="hs-identifier hs-var">ca</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#dimap"><span class="hs-pragma hs-type">dimap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-113"></span><span>  </span><span id="local-6989586621679091175"><span class="annot"><span class="annottext">lmap :: (a -&gt; b) -&gt; Codensity p b c -&gt; Codensity p a c
+</span><a href="#local-6989586621679091175"><span class="hs-identifier hs-var hs-var hs-var hs-var">lmap</span></a></span></span><span> </span><span id="local-6989586621679091174"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091174"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span id="local-6989586621679091173"><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091173"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x c) -&gt; Codensity p a c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Codensity p b c -&gt; forall x. p x b -&gt; p x c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091173"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; p x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; p x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091174"><span class="hs-identifier hs-var">ca</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-114"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#lmap"><span class="hs-pragma hs-type">lmap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-115"></span><span>  </span><span id="local-6989586621679091172"><span class="annot"><span class="annottext">rmap :: (b -&gt; c) -&gt; Codensity p a b -&gt; Codensity p a c
+</span><a href="#local-6989586621679091172"><span class="hs-identifier hs-var hs-var hs-var hs-var">rmap</span></a></span></span><span> </span><span id="local-6989586621679091171"><span class="annot"><span class="annottext">b -&gt; c
+</span><a href="#local-6989586621679091171"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091170"><span class="annot"><span class="annottext">Codensity p a b
+</span><a href="#local-6989586621679091170"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x c) -&gt; Codensity p a c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; c) -&gt; p x b -&gt; p x c
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; c
+</span><a href="#local-6989586621679091171"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; p x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; p x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Codensity p a b -&gt; forall x. p x a -&gt; p x b
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p a b
+</span><a href="#local-6989586621679091170"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-pragma hs-type">rmap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-117"></span><span>  </span><span id="local-6989586621679091169"><span class="annot"><span class="annottext">q b c
+</span><a href="#local-6989586621679091169"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091168"><span class="annot"><span class="annottext">#. :: q b c -&gt; Codensity p a b -&gt; Codensity p a c
+</span><a href="#local-6989586621679091168"><span class="hs-operator hs-var hs-var hs-var hs-var">#.</span></a></span></span><span> </span><span id="local-6989586621679091167"><span class="annot"><span class="annottext">Codensity p a b
+</span><a href="#local-6989586621679091167"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x c) -&gt; Codensity p a c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679091166"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091166"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">q b c
+</span><a href="#local-6989586621679091169"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">q b c -&gt; p x b -&gt; p x c
+forall (p :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor p, Coercible c b) =&gt;
+q b c -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#%23."><span class="hs-operator hs-var">#.</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p a b -&gt; p x a -&gt; p x b
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p a b
+</span><a href="#local-6989586621679091167"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091166"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">#.</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-119"></span><span>  </span><span id="local-6989586621679091165"><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091165"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679091164"><span class="annot"><span class="annottext">.# :: Codensity p b c -&gt; q a b -&gt; Codensity p a c
+</span><a href="#local-6989586621679091164"><span class="hs-operator hs-var hs-var hs-var hs-var">.#</span></a></span></span><span> </span><span id="local-6989586621679091163"><span class="annot"><span class="annottext">q a b
+</span><a href="#local-6989586621679091163"><span class="hs-identifier hs-var">ca</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x c) -&gt; Codensity p a c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679091162"><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091162"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Codensity p b c -&gt; p x b -&gt; p x c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p b c
+</span><a href="#local-6989586621679091165"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">q a b
+</span><a href="#local-6989586621679091163"><span class="hs-identifier hs-var">ca</span></a></span><span> </span><span class="annot"><span class="annottext">q a b -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) a b c (q :: * -&gt; * -&gt; *).
+(Profunctor p, Coercible c b) =&gt;
+q b c -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#%23."><span class="hs-operator hs-var">#.</span></a></span><span> </span><span class="annot"><span class="annottext">p x a
+</span><a href="#local-6989586621679091162"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">.#</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span id="local-6989586621679091160"><span id="local-6989586621679091161"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679091157"><span class="annot"><a href="Data.Profunctor.Unsafe.html#Profunctor"><span class="hs-identifier hs-type">Profunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091161"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091161"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091160"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-123"></span><span>  </span><span id="local-6989586621679091156"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; Codensity p a a -&gt; Codensity p a b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679091155"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091155"><span class="hs-identifier hs-var">bd</span></a></span></span><span> </span><span id="local-6989586621679091154"><span class="annot"><span class="annottext">Codensity p a a
+</span><a href="#local-6989586621679091154"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall x. p x a -&gt; p x b) -&gt; Codensity p a b
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; p x a -&gt; p x b
+forall (p :: * -&gt; * -&gt; *) b c a.
+Profunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="Data.Profunctor.Unsafe.html#rmap"><span class="hs-identifier hs-var">rmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679091155"><span class="hs-identifier hs-var">bd</span></a></span><span> </span><span class="annot"><span class="annottext">(p x a -&gt; p x b) -&gt; (p x a -&gt; p x a) -&gt; p x a -&gt; p x b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Codensity p a a -&gt; forall x. p x a -&gt; p x a
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+Codensity p a b -&gt; forall (x :: k). p x a -&gt; p x b
+</span><a href="Data.Profunctor.Ran.html#runCodensity"><span class="hs-identifier hs-var hs-var">runCodensity</span></a></span><span> </span><span class="annot"><span class="annottext">Codensity p a a
+</span><a href="#local-6989586621679091154"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">fmap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span id="local-6989586621679091153"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Category</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091153"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-127"></span><span>  </span><span id="local-6989586621679091150"><span class="annot"><span class="annottext">id :: Codensity p a a
+</span><a href="#local-6989586621679091150"><span class="hs-identifier hs-var hs-var hs-var hs-var">id</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (x :: k). p x a -&gt; p x a) -&gt; Codensity p a a
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="annot"><span class="annottext">forall (x :: k). p x a -&gt; p x a
+forall k (cat :: k -&gt; k -&gt; *) (a :: k). Category cat =&gt; cat a a
+</span><span class="hs-identifier hs-var">id</span></span><span>
+</span><span id="line-128"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">id</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-129"></span><span>  </span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span id="local-6989586621679091149"><span class="annot"><span class="annottext">forall (x :: k). p x b -&gt; p x c
+</span><a href="#local-6989586621679091149"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679091148"><span class="annot"><span class="annottext">. :: Codensity p b c -&gt; Codensity p a b -&gt; Codensity p a c
+</span><a href="#local-6989586621679091148"><span class="hs-operator hs-var hs-var hs-var hs-var">.</span></a></span></span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span id="local-6989586621679091147"><span class="annot"><span class="annottext">forall (x :: k). p x a -&gt; p x b
+</span><a href="#local-6989586621679091147"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (x :: k). p x a -&gt; p x c) -&gt; Codensity p a c
+forall k k (p :: k -&gt; k -&gt; *) (a :: k) (b :: k).
+(forall (x :: k). p x a -&gt; p x b) -&gt; Codensity p a b
+</span><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-var">Codensity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">p x b -&gt; p x c
+forall (x :: k). p x b -&gt; p x c
+</span><a href="#local-6989586621679091149"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(p x b -&gt; p x c) -&gt; (p x a -&gt; p x b) -&gt; p x a -&gt; p x c
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">p x a -&gt; p x b
+forall (x :: k). p x a -&gt; p x b
+</span><a href="#local-6989586621679091147"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-130"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">.</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span id="local-6989586621679091144"><span id="local-6989586621679091145"><span id="local-6989586621679091146"><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeCodensity"><span class="hs-identifier hs-type">decomposeCodensity</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091146"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679091146"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091145"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091144"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679091146"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091145"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679091144"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-133"></span><span id="decomposeCodensity"><span class="annot"><span class="annottext">decomposeCodensity :: Procompose (Codensity p) p a b -&gt; p a b
+</span><a href="Data.Profunctor.Ran.html#decomposeCodensity"><span class="hs-identifier hs-var hs-var">decomposeCodensity</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Composition.html#Procompose"><span class="hs-identifier hs-type">Procompose</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.Ran.html#Codensity"><span class="hs-identifier hs-type">Codensity</span></a></span><span> </span><span id="local-6989586621679091143"><span class="annot"><span class="annottext">forall (x :: k). p x x -&gt; p x b
+</span><a href="#local-6989586621679091143"><span class="hs-identifier hs-var">pp</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679091142"><span class="annot"><span class="annottext">p a x
+</span><a href="#local-6989586621679091142"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p a x -&gt; p a b
+forall (x :: k). p x x -&gt; p x b
+</span><a href="#local-6989586621679091143"><span class="hs-identifier hs-var">pp</span></a></span><span> </span><span class="annot"><span class="annottext">p a x
+</span><a href="#local-6989586621679091142"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-134"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.Ran.html#decomposeCodensity"><span class="hs-pragma hs-type">decomposeCodensity</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-135"></span></pre></body></html>

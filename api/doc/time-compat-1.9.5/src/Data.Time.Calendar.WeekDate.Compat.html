@@ -1,0 +1,453 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP                #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE BangPatterns       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 710
+</span><span class="hs-pragma">{-# LANGUAGE PatternSynonyms    #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns       #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Time.Calendar.WeekDate.Compat</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier">Year</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier">WeekOfYear</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">DayOfWeek</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">dayOfWeek</span></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier">FirstWeekType</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#toWeekCalendar"><span class="hs-identifier">toWeekCalendar</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendar"><span class="hs-identifier">fromWeekCalendar</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendarValid"><span class="hs-identifier">fromWeekCalendarValid</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><span class="hs-comment">-- * ISO 8601 Week Date format</span></span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><span class="hs-identifier">toWeekDate</span></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><span class="hs-identifier">fromWeekDate</span></span><span class="hs-special">,</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 710
+</span><span>    </span><span class="hs-keyword">pattern</span><span> </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#YearWeekDay"><span class="hs-identifier">YearWeekDay</span></a></span><span class="hs-special">,</span><span class="hs-cpp">
+#endif
+</span><span>    </span><span class="annot"><span class="hs-identifier">fromWeekDateValid</span></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><span class="hs-identifier">showWeekDate</span></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Time.Orphans.html"><span class="hs-identifier">Data.Time.Orphans</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Time.Calendar</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Time.Calendar.WeekDate</span></span><span class="hs-cpp">
+
+#if !MIN_VERSION_time(1,9,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data.Time.Format</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if !MIN_VERSION_time(1,11,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Data</span></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html"><span class="hs-identifier">Data.Time.Calendar.Types</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Private.html"><span class="hs-identifier">Data.Time.Calendar.Private</span></a></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Time.Calendar.OrdinalDate</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">NFData</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+
+
+#if !MIN_VERSION_time(1,11,0)
+</span><span class="hs-keyword">data</span><span> </span><span id="FirstWeekType"><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier hs-var">FirstWeekType</span></a></span></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="FirstWholeWeek"><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWholeWeek"><span class="hs-identifier hs-var">FirstWholeWeek</span></a></span></span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-comment">-- ^ first week is the first whole week of the year</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FirstMostWeek"><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstMostWeek"><span class="hs-identifier hs-var">FirstMostWeek</span></a></span></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-comment">-- ^ first week is the first week with four days in the year</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679045558"><span id="local-6989586621679045560"><span class="annot"><span class="annottext">FirstWeekType -&gt; FirstWeekType -&gt; Bool
+(FirstWeekType -&gt; FirstWeekType -&gt; Bool)
+-&gt; (FirstWeekType -&gt; FirstWeekType -&gt; Bool) -&gt; Eq FirstWeekType
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: FirstWeekType -&gt; FirstWeekType -&gt; Bool
+$c/= :: FirstWeekType -&gt; FirstWeekType -&gt; Bool
+== :: FirstWeekType -&gt; FirstWeekType -&gt; Bool
+$c== :: FirstWeekType -&gt; FirstWeekType -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-type">firstDayOfWeekCalendar</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier hs-type">FirstWeekType</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier hs-type">Year</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-55"></span><span id="firstDayOfWeekCalendar"><span class="annot"><span class="annottext">firstDayOfWeekCalendar :: FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var hs-var">firstDayOfWeekCalendar</span></a></span></span><span> </span><span id="local-6989586621679045555"><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045555"><span class="hs-identifier hs-var">wt</span></a></span></span><span> </span><span id="local-6989586621679045554"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045554"><span class="hs-identifier hs-var">dow</span></a></span></span><span> </span><span id="local-6989586621679045553"><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045553"><span class="hs-identifier hs-var">year</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span>
+</span><span id="line-56"></span><span>    </span><span id="local-6989586621679045552"><span class="annot"><span class="annottext">jan1st :: Day
+</span><a href="#local-6989586621679045552"><span class="hs-identifier hs-var hs-var">jan1st</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Year -&gt; Int -&gt; Day
+</span><span class="hs-identifier hs-var">fromOrdinalDate</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045553"><span class="hs-identifier hs-var">year</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045555"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-58"></span><span>        </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWholeWeek"><span class="hs-identifier hs-var">FirstWholeWeek</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">DayOfWeek -&gt; Day -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekOnAfter"><span class="hs-identifier hs-var">firstDayOfWeekOnAfter</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045554"><span class="hs-identifier hs-var">dow</span></a></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045552"><span class="hs-identifier hs-var">jan1st</span></a></span><span>
+</span><span id="line-59"></span><span>        </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstMostWeek"><span class="hs-identifier hs-var">FirstMostWeek</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">DayOfWeek -&gt; Day -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekOnAfter"><span class="hs-identifier hs-var">firstDayOfWeekOnAfter</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045554"><span class="hs-identifier hs-var">dow</span></a></span><span> </span><span class="annot"><span class="annottext">(Day -&gt; Day) -&gt; Day -&gt; Day
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Year -&gt; Day -&gt; Day
+</span><span class="hs-identifier hs-var">addDays</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Year
+</span><span class="hs-number">3</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045552"><span class="hs-identifier hs-var">jan1st</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- Note that the year number matches the weeks, and so is not always the same as the Gregorian year number.</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#toWeekCalendar"><span class="hs-identifier hs-type">toWeekCalendar</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-63"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier hs-type">FirstWeekType</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-comment">-- ^ how to reckon the first week of the year</span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-comment">-- ^ the first day of each week</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier hs-type">Year</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier hs-type">WeekOfYear</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span id="toWeekCalendar"><span class="annot"><span class="annottext">toWeekCalendar :: FirstWeekType -&gt; DayOfWeek -&gt; Day -&gt; (Year, Int, DayOfWeek)
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#toWeekCalendar"><span class="hs-identifier hs-var hs-var">toWeekCalendar</span></a></span></span><span> </span><span id="local-6989586621679045548"><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045548"><span class="hs-identifier hs-var">wt</span></a></span></span><span> </span><span id="local-6989586621679045547"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045547"><span class="hs-identifier hs-var">ws</span></a></span></span><span> </span><span id="local-6989586621679045546"><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621679045545"><span class="annot"><span class="annottext">dw :: DayOfWeek
+</span><a href="#local-6989586621679045545"><span class="hs-identifier hs-var hs-var">dw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Day -&gt; DayOfWeek
+</span><span class="hs-identifier hs-var">dayOfWeek</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679045544"><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Day -&gt; (Year, Int)
+</span><span class="hs-identifier hs-var">toOrdinalDate</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621679045542"><span class="annot"><span class="annottext">j1p :: Day
+</span><a href="#local-6989586621679045542"><span class="hs-identifier hs-var hs-var">j1p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var">firstDayOfWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045548"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045547"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Day) -&gt; Year -&gt; Day
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Year -&gt; Year
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">pred</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span id="local-6989586621679045540"><span class="annot"><span class="annottext">j1 :: Day
+</span><a href="#local-6989586621679045540"><span class="hs-identifier hs-var hs-var">j1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var">firstDayOfWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045548"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045547"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span id="local-6989586621679045539"><span class="annot"><span class="annottext">j1s :: Day
+</span><a href="#local-6989586621679045539"><span class="hs-identifier hs-var hs-var">j1s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var">firstDayOfWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045548"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045547"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Day) -&gt; Year -&gt; Day
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Year -&gt; Year
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045540"><span class="hs-identifier hs-var">j1</span></a></span><span>
+</span><span id="line-76"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year -&gt; Year
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">pred</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; Int -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">div</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year -&gt; Int
+forall a. Num a =&gt; Year -&gt; a
+</span><span class="hs-identifier hs-var">fromInteger</span></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Int) -&gt; Year -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Year
+</span><span class="hs-identifier hs-var">diffDays</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045542"><span class="hs-identifier hs-var">j1p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045545"><span class="hs-identifier hs-var">dw</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045539"><span class="hs-identifier hs-var">j1s</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; Int -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">div</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year -&gt; Int
+forall a. Num a =&gt; Year -&gt; a
+</span><span class="hs-identifier hs-var">fromInteger</span></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Int) -&gt; Year -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Year
+</span><span class="hs-identifier hs-var">diffDays</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045540"><span class="hs-identifier hs-var">j1</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045545"><span class="hs-identifier hs-var">dw</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year -&gt; Year
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045544"><span class="hs-identifier hs-var">y0</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; Int -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">div</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year -&gt; Int
+forall a. Num a =&gt; Year -&gt; a
+</span><span class="hs-identifier hs-var">fromInteger</span></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Int) -&gt; Year -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Year
+</span><span class="hs-identifier hs-var">diffDays</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045546"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045539"><span class="hs-identifier hs-var">j1s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045545"><span class="hs-identifier hs-var">dw</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- | Convert from the given kind of &quot;week calendar&quot;.</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- Invalid week and day values will be clipped to the correct range.</span><span>
+</span><span id="line-82"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendar"><span class="hs-identifier hs-type">fromWeekCalendar</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier hs-type">FirstWeekType</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-comment">-- ^ how to reckon the first week of the year</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- ^ the first day of each week</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier hs-type">Year</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier hs-type">WeekOfYear</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-88"></span><span id="fromWeekCalendar"><span class="annot"><span class="annottext">fromWeekCalendar :: FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Int -&gt; DayOfWeek -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendar"><span class="hs-identifier hs-var hs-var">fromWeekCalendar</span></a></span></span><span> </span><span id="local-6989586621679045534"><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045534"><span class="hs-identifier hs-var">wt</span></a></span></span><span> </span><span id="local-6989586621679045533"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045533"><span class="hs-identifier hs-var">ws</span></a></span></span><span> </span><span id="local-6989586621679045532"><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045532"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span id="local-6989586621679045531"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045531"><span class="hs-identifier hs-var">wy</span></a></span></span><span> </span><span id="local-6989586621679045530"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045530"><span class="hs-identifier hs-var">dw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span>
+</span><span id="line-89"></span><span>    </span><span class="annot"><a href="#local-6989586621679045529"><span class="hs-identifier hs-type">d1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621679045529"><span class="annot"><span class="annottext">d1 :: Day
+</span><a href="#local-6989586621679045529"><span class="hs-identifier hs-var hs-var">d1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var">firstDayOfWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045534"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045533"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045532"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621679045528"><span class="annot"><span class="annottext">wy' :: Int
+</span><a href="#local-6989586621679045528"><span class="hs-identifier hs-var hs-var">wy'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int -&gt; Int
+forall t. Ord t =&gt; t -&gt; t -&gt; t -&gt; t
+</span><a href="Data.Time.Calendar.Private.html#clip"><span class="hs-identifier hs-var">clip</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">53</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045531"><span class="hs-identifier hs-var">wy</span></a></span><span>
+</span><span id="line-92"></span><span>    </span><span class="annot"><a href="#local-6989586621679045526"><span class="hs-identifier hs-type">getday</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier hs-type">WeekOfYear</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-93"></span><span>    </span><span id="local-6989586621679045526"><span class="annot"><span class="annottext">getday :: Int -&gt; Day
+</span><a href="#local-6989586621679045526"><span class="hs-identifier hs-var hs-var">getday</span></a></span></span><span> </span><span id="local-6989586621679045525"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045525"><span class="hs-identifier hs-var">wy''</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Year -&gt; Day -&gt; Day
+</span><span class="hs-identifier hs-var">addDays</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Year
+forall a. Integral a =&gt; a -&gt; Year
+</span><span class="hs-identifier hs-var">toInteger</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Year) -&gt; Int -&gt; Year
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">pred</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045525"><span class="hs-identifier hs-var">wy''</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DayOfWeek -&gt; DayOfWeek -&gt; Int
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#dayOfWeekDiff"><span class="hs-identifier hs-var">dayOfWeekDiff</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045530"><span class="hs-identifier hs-var">dw</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045533"><span class="hs-identifier hs-var">ws</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045529"><span class="hs-identifier hs-var">d1</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621679045521"><span class="annot"><span class="annottext">d1s :: Day
+</span><a href="#local-6989586621679045521"><span class="hs-identifier hs-var hs-var">d1s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekCalendar"><span class="hs-identifier hs-var">firstDayOfWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045534"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045533"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">(Year -&gt; Day) -&gt; Year -&gt; Day
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Year -&gt; Year
+forall a. Enum a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">succ</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045532"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span id="local-6989586621679045520"><span class="annot"><span class="annottext">day :: Day
+</span><a href="#local-6989586621679045520"><span class="hs-identifier hs-var hs-var">day</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Day
+</span><a href="#local-6989586621679045526"><span class="hs-identifier hs-var">getday</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045528"><span class="hs-identifier hs-var">wy'</span></a></span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045528"><span class="hs-identifier hs-var">wy'</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">53</span></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045520"><span class="hs-identifier hs-var">day</span></a></span><span> </span><span class="annot"><span class="annottext">Day -&gt; Day -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045521"><span class="hs-identifier hs-var">d1s</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Day
+</span><a href="#local-6989586621679045526"><span class="hs-identifier hs-var">getday</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">52</span></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045520"><span class="hs-identifier hs-var">day</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045520"><span class="hs-identifier hs-var">day</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- | Convert from the given kind of &quot;week calendar&quot;.</span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- Invalid week and day values will return Nothing.</span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendarValid"><span class="hs-identifier hs-type">fromWeekCalendarValid</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-101"></span><span>     </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#FirstWeekType"><span class="hs-identifier hs-type">FirstWeekType</span></a></span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-comment">-- ^ how to reckon the first week of the year</span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-comment">-- ^ the first day of each week</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier hs-type">Year</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier hs-type">WeekOfYear</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-106"></span><span id="fromWeekCalendarValid"><span class="annot"><span class="annottext">fromWeekCalendarValid :: FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Int -&gt; DayOfWeek -&gt; Maybe Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendarValid"><span class="hs-identifier hs-var hs-var">fromWeekCalendarValid</span></a></span></span><span> </span><span id="local-6989586621679045519"><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045519"><span class="hs-identifier hs-var">wt</span></a></span></span><span> </span><span id="local-6989586621679045518"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045518"><span class="hs-identifier hs-var">ws</span></a></span></span><span> </span><span id="local-6989586621679045517"><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045517"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span id="local-6989586621679045516"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045516"><span class="hs-identifier hs-var">wy</span></a></span></span><span> </span><span id="local-6989586621679045515"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045515"><span class="hs-identifier hs-var">dw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span>
+</span><span id="line-107"></span><span>    </span><span id="local-6989586621679045514"><span class="annot"><span class="annottext">d :: Day
+</span><a href="#local-6989586621679045514"><span class="hs-identifier hs-var hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Year -&gt; Int -&gt; DayOfWeek -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#fromWeekCalendar"><span class="hs-identifier hs-var">fromWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045519"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045518"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045517"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045516"><span class="hs-identifier hs-var">wy</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045515"><span class="hs-identifier hs-var">dw</span></a></span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">FirstWeekType -&gt; DayOfWeek -&gt; Day -&gt; (Year, Int, DayOfWeek)
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#toWeekCalendar"><span class="hs-identifier hs-var">toWeekCalendar</span></a></span><span> </span><span class="annot"><span class="annottext">FirstWeekType
+</span><a href="#local-6989586621679045519"><span class="hs-identifier hs-var">wt</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045518"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045514"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">(Year, Int, DayOfWeek) -&gt; (Year, Int, DayOfWeek) -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045517"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045516"><span class="hs-identifier hs-var">wy</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045515"><span class="hs-identifier hs-var">dw</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Day -&gt; Maybe Day
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045514"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Maybe Day
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 710
+</span><span class="hs-comment">-- | Bidirectional abstract constructor for ISO 8601 Week Date format.</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- Invalid week values will be clipped to the correct range.</span><span>
+</span><span id="line-113"></span><span class="hs-keyword">pattern</span><span> </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#YearWeekDay"><span class="hs-identifier hs-type">YearWeekDay</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#Year"><span class="hs-identifier hs-type">Year</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Calendar.Types.html#WeekOfYear"><span class="hs-identifier hs-type">WeekOfYear</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-114"></span><span class="hs-keyword">pattern</span><span> </span><span id="%24bYearWeekDay"><span id="%24mYearWeekDay"><span id="YearWeekDay"><span class="annot"><span class="annottext">$bYearWeekDay :: Year -&gt; Int -&gt; DayOfWeek -&gt; Day
+$mYearWeekDay :: forall r.
+Day -&gt; (Year -&gt; Int -&gt; DayOfWeek -&gt; r) -&gt; (Void# -&gt; r) -&gt; r
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#%24bYearWeekDay"><span class="hs-identifier hs-var hs-var hs-var hs-var">YearWeekDay</span></a></span></span></span></span><span> </span><span class="annot"><a href="#local-6989586621679045511"><span class="hs-identifier hs-type">y</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679045510"><span class="hs-identifier hs-type">wy</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679045509"><span class="hs-identifier hs-type">dw</span></a></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">toWeekDate</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679045511"><span class="annot"><a href="#local-6989586621679045511"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679045510"><span class="annot"><a href="#local-6989586621679045510"><span class="hs-identifier hs-var">wy</span></a></span></span><span class="hs-special">,</span><span class="annot"><span class="hs-identifier hs-type">toEnum</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span id="local-6989586621679045509"><span class="annot"><a href="#local-6989586621679045509"><span class="hs-identifier hs-var">dw</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-115"></span><span>    </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#YearWeekDay"><span class="hs-identifier hs-var">YearWeekDay</span></a></span><span> </span><span id="local-6989586621679045507"><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045507"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span id="local-6989586621679045506"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045506"><span class="hs-identifier hs-var">wy</span></a></span></span><span> </span><span id="local-6989586621679045505"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045505"><span class="hs-identifier hs-var">dw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Year -&gt; Int -&gt; Int -&gt; Day
+</span><span class="hs-identifier hs-var">fromWeekDate</span></span><span> </span><span class="annot"><span class="annottext">Year
+</span><a href="#local-6989586621679045507"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679045506"><span class="hs-identifier hs-var">wy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DayOfWeek -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045505"><span class="hs-identifier hs-var">dw</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 802
+</span><span class="hs-pragma">{-# COMPLETE</span><span> </span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#YearWeekDay"><span class="hs-pragma hs-type">YearWeekDay</span></a></span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">#endif
+</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if !MIN_VERSION_time(1,9,0)
+</span><span>
+</span><span id="line-126"></span><span class="hs-keyword">data</span><span> </span><span class="hs-identifier">DayOfWeek</span><span>
+</span><span id="line-127"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">Monday</span><span>
+</span><span id="line-128"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Tuesday</span><span>
+</span><span id="line-129"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Wednesday</span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Thursday</span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Friday</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Saturday</span><span>
+</span><span id="line-133"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">Sunday</span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Eq</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Ord</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Read</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Data</span><span class="hs-special">)</span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">NFData</span><span> </span><span class="hs-identifier">DayOfWeek</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-identifier">rnf</span><span> </span><span class="hs-glyph">!</span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | \&quot;Circular\&quot;, so for example @[Tuesday ..]@ gives an endless sequence.</span><span>
+</span><span id="line-140"></span><span class="hs-comment">-- Also: 'fromEnum' gives [1 .. 7] for [Monday .. Sunday], and 'toEnum' performs mod 7 to give a cycle of days.</span><span>
+</span><span id="line-141"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Enum</span><span> </span><span class="hs-identifier">DayOfWeek</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-142"></span><span>    </span><span class="hs-identifier">toEnum</span><span> </span><span class="hs-identifier">i</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-143"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="hs-identifier">mod</span><span> </span><span class="hs-identifier">i</span><span> </span><span class="hs-number">7</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-144"></span><span>            </span><span class="hs-number">0</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Sunday</span><span>
+</span><span id="line-145"></span><span>            </span><span class="hs-number">1</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Monday</span><span>
+</span><span id="line-146"></span><span>            </span><span class="hs-number">2</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Tuesday</span><span>
+</span><span id="line-147"></span><span>            </span><span class="hs-number">3</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Wednesday</span><span>
+</span><span id="line-148"></span><span>            </span><span class="hs-number">4</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Thursday</span><span>
+</span><span id="line-149"></span><span>            </span><span class="hs-number">5</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Friday</span><span>
+</span><span id="line-150"></span><span>            </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Saturday</span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Monday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">1</span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Tuesday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">2</span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Wednesday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">3</span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Thursday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">4</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Friday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">5</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Saturday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">6</span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">Sunday</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">7</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-identifier">enumFromTo</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-identifier">wd2</span><span>
+</span><span id="line-159"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">wd1</span><span class="hs-special">]</span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-identifier">enumFromTo</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-glyph">:</span><span> </span><span class="hs-identifier">enumFromTo</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">succ</span><span> </span><span class="hs-identifier">wd1</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">wd2</span><span>
+</span><span id="line-161"></span><span>    </span><span class="hs-identifier">enumFromThenTo</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-identifier">wd3</span><span>
+</span><span id="line-162"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">wd3</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">wd1</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">wd2</span><span class="hs-special">]</span><span>
+</span><span id="line-163"></span><span>    </span><span class="hs-identifier">enumFromThenTo</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-identifier">wd3</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">wd1</span><span> </span><span class="hs-glyph">:</span><span> </span><span class="hs-identifier">enumFromThenTo</span><span> </span><span class="hs-identifier">wd2</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">toEnum</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-special">(</span><span class="hs-number">2</span><span> </span><span class="hs-operator">*</span><span> </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">wd2</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">wd1</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-identifier">wd3</span><span>
+</span><span id="line-164"></span><span>
+</span><span id="line-165"></span><span class="hs-identifier">dayOfWeek</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Day</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">DayOfWeek</span><span>
+</span><span id="line-166"></span><span class="hs-identifier">dayOfWeek</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">ModifiedJulianDay</span><span> </span><span class="hs-identifier">d</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">toEnum</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">fromInteger</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-operator">+</span><span> </span><span class="hs-number">3</span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- FormatTime DayOfWeek</span><span>
+</span><span id="line-172"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">DayOfWeek</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Day</span><span>
+</span><span id="line-175"></span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">ModifiedJulianDay</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">fromIntegral</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">fromEnum</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-operator">+</span><span> </span><span class="hs-number">4</span><span class="hs-special">)</span><span class="hs-cpp">
+
+#if MIN_VERSION_time(1,8,0)
+</span><span class="hs-cpp">#define FORMAT_OPTS tl mpo i
+</span><span class="hs-cpp">#else
+</span><span class="hs-cpp">#define FORMAT_OPTS tl mpo
+</span><span class="hs-cpp">#endif
+</span><span>
+</span><span id="line-183"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">FormatTime</span><span> </span><span class="hs-identifier">DayOfWeek</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-184"></span><span>    </span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'u'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-identifier">d</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'u'</span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span>    </span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'w'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-identifier">d</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'w'</span><span class="hs-special">)</span><span>
+</span><span id="line-186"></span><span>    </span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'a'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-identifier">d</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'a'</span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span>    </span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'A'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">fmap</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-identifier">d</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">FORMAT_OPTS</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">toSomeDay</span><span> </span><span class="hs-identifier">d</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-char">'A'</span><span class="hs-special">)</span><span>
+</span><span id="line-188"></span><span>    </span><span class="hs-identifier">formatCharacter</span><span> </span><span class="hs-identifier">_</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">Nothing</span><span class="hs-cpp">
+
+#endif
+</span><span class="hs-cpp">
+#if !MIN_VERSION_time(1,11,0)
+</span><span class="hs-comment">-- | @dayOfWeekDiff a b = a - b@ in range 0 to 6.</span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- The number of days from b to the next a.</span><span>
+</span><span id="line-195"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#dayOfWeekDiff"><span class="hs-identifier hs-type">dayOfWeekDiff</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-196"></span><span id="dayOfWeekDiff"><span class="annot"><span class="annottext">dayOfWeekDiff :: DayOfWeek -&gt; DayOfWeek -&gt; Int
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#dayOfWeekDiff"><span class="hs-identifier hs-var hs-var">dayOfWeekDiff</span></a></span></span><span> </span><span id="local-6989586621679045503"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045503"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679045502"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045502"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">mod</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DayOfWeek -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045503"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">DayOfWeek -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045502"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span>
+</span><span id="line-197"></span><span>
+</span><span id="line-198"></span><span class="hs-comment">-- | The first day-of-week on or after some day</span><span>
+</span><span id="line-199"></span><span class="annot"><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekOnAfter"><span class="hs-identifier hs-type">firstDayOfWeekOnAfter</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DayOfWeek</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Day</span></span><span>
+</span><span id="line-200"></span><span id="firstDayOfWeekOnAfter"><span class="annot"><span class="annottext">firstDayOfWeekOnAfter :: DayOfWeek -&gt; Day -&gt; Day
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#firstDayOfWeekOnAfter"><span class="hs-identifier hs-var hs-var">firstDayOfWeekOnAfter</span></a></span></span><span> </span><span id="local-6989586621679045500"><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045500"><span class="hs-identifier hs-var">dw</span></a></span></span><span> </span><span id="local-6989586621679045499"><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045499"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Year -&gt; Day -&gt; Day
+</span><span class="hs-identifier hs-var">addDays</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Year
+forall a. Integral a =&gt; a -&gt; Year
+</span><span class="hs-identifier hs-var">toInteger</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Year) -&gt; Int -&gt; Year
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DayOfWeek -&gt; DayOfWeek -&gt; Int
+</span><a href="Data.Time.Calendar.WeekDate.Compat.html#dayOfWeekDiff"><span class="hs-identifier hs-var">dayOfWeekDiff</span></a></span><span> </span><span class="annot"><span class="annottext">DayOfWeek
+</span><a href="#local-6989586621679045500"><span class="hs-identifier hs-var">dw</span></a></span><span> </span><span class="annot"><span class="annottext">(DayOfWeek -&gt; Int) -&gt; DayOfWeek -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Day -&gt; DayOfWeek
+</span><span class="hs-identifier hs-var">dayOfWeek</span></span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045499"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Day
+</span><a href="#local-6989586621679045499"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-cpp">
+#endif
+</span></pre></body></html>

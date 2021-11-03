@@ -1,0 +1,854 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE Rank2Types
+           , MultiParamTypeClasses
+           , FunctionalDependencies
+           , TypeOperators
+           , UndecidableInstances #-}</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 702
+</span><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">#if __GLASGOW_HASKELL__ &gt;= 708
+</span><span class="hs-pragma">{-# LANGUAGE EmptyCase #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-------------------------------------------------------------------------------------------</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Copyright 	: 2008-2013 Edward Kmett</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- License	: BSD</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- Maintainer	: Edward Kmett &lt;ekmett@gmail.com&gt;</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- Stability	: experimental</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- Portability	: rank 2 types, MPTCs, fundeps</span><span>
+</span><span id="line-23"></span><span class="hs-comment">--</span><span>
+</span><span id="line-24"></span><span class="hs-comment">-------------------------------------------------------------------------------------------</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Functor.Adjunction</span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier">Adjunction</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#adjuncted"><span class="hs-identifier">adjuncted</span></a></span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#tabulateAdjunction"><span class="hs-identifier">tabulateAdjunction</span></a></span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#indexAdjunction"><span class="hs-identifier">indexAdjunction</span></a></span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#zapWithAdjunction"><span class="hs-identifier">zapWithAdjunction</span></a></span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#zipR"><span class="hs-identifier">zipR</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#unzipR"><span class="hs-identifier">unzipR</span></a></span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#unabsurdL"><span class="hs-identifier">unabsurdL</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#absurdL"><span class="hs-identifier">absurdL</span></a></span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#cozipL"><span class="hs-identifier">cozipL</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#uncozipL"><span class="hs-identifier">uncozipL</span></a></span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#extractL"><span class="hs-identifier">extractL</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#duplicateL"><span class="hs-identifier">duplicateL</span></a></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#splitL"><span class="hs-identifier">splitL</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#unsplitL"><span class="hs-identifier">unsplitL</span></a></span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &lt; 710
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control.Applicative</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&amp;&amp;&amp;)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(|||)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Free</span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &lt; 707
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control.Monad.Instances</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Identity</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Reader</span></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Writer</span></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Comonad</span></span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Comonad.Cofree</span></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Comonad.Trans.Env</span></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Comonad.Trans.Traced</span></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Identity</span></span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Compose</span></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Product</span></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.Rep.html"><span class="hs-identifier">Data.Functor.Rep</span></a></span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Sum</span></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor</span></span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Void</span></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-62"></span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- | An adjunction between Hask and Hask.</span><span>
+</span><span id="line-64"></span><span class="hs-comment">--</span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- Minimal definition: both 'unit' and 'counit' or both 'leftAdjunct'</span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- and 'rightAdjunct', subject to the constraints imposed by the</span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- default definitions that the following laws should hold.</span><span>
+</span><span id="line-68"></span><span class="hs-comment">--</span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- &gt; unit = leftAdjunct id</span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- &gt; counit = rightAdjunct id</span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- &gt; leftAdjunct f = fmap f . unit</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- &gt; rightAdjunct f = counit . fmap f</span><span>
+</span><span id="line-73"></span><span class="hs-comment">--</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- Any implementation is required to ensure that 'leftAdjunct' and</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- 'rightAdjunct' witness an isomorphism from @Nat (f a, b)@ to</span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- @Nat (a, g b)@</span><span>
+</span><span id="line-77"></span><span class="hs-comment">--</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- &gt; rightAdjunct unit = id</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- &gt; leftAdjunct counit = id</span><span>
+</span><span id="line-80"></span><span class="hs-keyword">class</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Rep.html#Representable"><span class="hs-identifier hs-type">Representable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-81"></span><span>      </span><span id="Adjunction"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-var">Adjunction</span></a></span></span><span> </span><span id="local-6989586621679082941"><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679082942"><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-keyword">where</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 708
+</span><span>  </span><span class="hs-pragma">{-# MINIMAL</span><span> </span><span class="hs-pragma">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#unit"><span class="hs-pragma hs-type">unit</span></a></span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-pragma hs-type">counit</span></a></span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">|</span><span> </span><span class="hs-pragma">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-pragma hs-type">leftAdjunct</span></a></span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-pragma hs-type">rightAdjunct</span></a></span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#endif
+</span><span>  </span><span id="local-6989586621679082925"><span id="unit"><span class="annot"><a href="Data.Functor.Adjunction.html#unit"><span class="hs-keyword hs-type">unit</span></a></span></span><span>         </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679082925"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082925"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-86"></span><span>  </span><span id="local-6989586621679082922"><span id="counit"><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-type">counit</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082922"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082922"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-87"></span><span>  </span><span id="local-6989586621679082938"><span id="local-6989586621679082939"><span id="leftAdjunct"><span class="annot"><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-type">leftAdjunct</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082939"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082938"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082939"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082938"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-88"></span><span>  </span><span id="local-6989586621679082934"><span id="local-6989586621679082935"><span id="rightAdjunct"><span class="annot"><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-type">rightAdjunct</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082935"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082942"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082934"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082941"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082935"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082934"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span>  </span><span id="local-6989586621679082589"><span class="annot"><a href="Data.Functor.Adjunction.html#unit"><span class="hs-keyword hs-var hs-var">unit</span></a></span><span>           </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f a -&gt; f a) -&gt; a -&gt; u (f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; f a
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span></span><span>
+</span><span id="line-91"></span><span>  </span><span id="local-6989586621679082587"><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-var hs-var">counit</span></a></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(u a -&gt; u a) -&gt; f (u a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">u a -&gt; u a
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span></span><span>
+</span><span id="line-92"></span><span>  </span><span id="local-6989586621679082586"><span class="annot"><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var hs-var">leftAdjunct</span></a></span><span> </span><span id="local-6989586621679082585"><span class="annot"><span class="annottext">f a -&gt; b
+</span><a href="#local-6989586621679082585"><span class="hs-identifier hs-var">f</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f a -&gt; b) -&gt; u (f a) -&gt; u b
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">f a -&gt; b
+</span><a href="#local-6989586621679082585"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(u (f a) -&gt; u b) -&gt; (a -&gt; u (f a)) -&gt; a -&gt; u b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; u (f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a.
+Adjunction f u =&gt;
+a -&gt; u (f a)
+</span><a href="Data.Functor.Adjunction.html#unit"><span class="hs-keyword hs-var">unit</span></a></span></span><span>
+</span><span id="line-93"></span><span>  </span><span id="local-6989586621679082583"><span class="annot"><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var hs-var">rightAdjunct</span></a></span><span> </span><span id="local-6989586621679082582"><span class="annot"><span class="annottext">a -&gt; u b
+</span><a href="#local-6989586621679082582"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (u b) -&gt; b
+forall (f :: * -&gt; *) (u :: * -&gt; *) a.
+Adjunction f u =&gt;
+f (u a) -&gt; a
+</span><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-var">counit</span></a></span><span> </span><span class="annot"><span class="annottext">(f (u b) -&gt; b) -&gt; (f a -&gt; f (u b)) -&gt; f a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; u b) -&gt; f a -&gt; f (u b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; u b
+</span><a href="#local-6989586621679082582"><span class="hs-identifier hs-var">f</span></a></span></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- | 'leftAdjunct' and 'rightAdjunct' form two halves of an isomorphism.</span><span>
+</span><span id="line-96"></span><span class="hs-comment">--</span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- This can be used with the combinators from the @lens@ package.</span><span>
+</span><span id="line-98"></span><span class="hs-comment">--</span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- @'adjuncted' :: 'Adjunction' f u =&gt; 'Iso'' (f a -&gt; b) (a -&gt; u b)@</span><span>
+</span><span id="line-100"></span><span id="local-6989586621679082574"><span id="local-6989586621679082575"><span id="local-6989586621679082576"><span id="local-6989586621679082577"><span id="local-6989586621679082578"><span id="local-6989586621679082579"><span id="local-6989586621679082580"><span id="local-6989586621679082581"><span class="annot"><a href="Data.Functor.Adjunction.html#adjuncted"><span class="hs-identifier hs-type">adjuncted</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082581"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082580"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Profunctor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082579"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082578"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>          </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082579"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082577"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082580"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082576"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082578"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082575"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082580"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082574"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082579"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082581"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082577"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082576"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082578"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082581"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082575"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082574"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-102"></span><span id="adjuncted"><span class="annot"><span class="annottext">adjuncted :: p (a -&gt; u b) (g (c -&gt; u d)) -&gt; p (f a -&gt; b) (g (f c -&gt; d))
+</span><a href="Data.Functor.Adjunction.html#adjuncted"><span class="hs-identifier hs-var hs-var">adjuncted</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((f a -&gt; b) -&gt; a -&gt; u b)
+-&gt; (g (c -&gt; u d) -&gt; g (f c -&gt; d))
+-&gt; p (a -&gt; u b) (g (c -&gt; u d))
+-&gt; p (f a -&gt; b) (g (f c -&gt; d))
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Profunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p b c -&gt; p a d
+</span><span class="hs-identifier hs-var">dimap</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; b) -&gt; a -&gt; u b
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((c -&gt; u d) -&gt; f c -&gt; d) -&gt; g (c -&gt; u d) -&gt; g (f c -&gt; d)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">(c -&gt; u d) -&gt; f c -&gt; d
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#adjuncted"><span class="hs-pragma hs-type">adjuncted</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- | Every right adjoint is representable by its left adjoint</span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- applied to a unit element</span><span>
+</span><span id="line-107"></span><span class="hs-comment">--</span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- Use this definition and the primitives in</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- Data.Functor.Representable to meet the requirements of the</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- superclasses of Representable.</span><span>
+</span><span id="line-111"></span><span id="local-6989586621679082702"><span id="local-6989586621679082703"><span id="local-6989586621679082704"><span class="annot"><a href="Data.Functor.Adjunction.html#tabulateAdjunction"><span class="hs-identifier hs-type">tabulateAdjunction</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082704"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082703"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082704"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082702"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082703"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082702"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-112"></span><span id="tabulateAdjunction"><span class="annot"><span class="annottext">tabulateAdjunction :: (f () -&gt; b) -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#tabulateAdjunction"><span class="hs-identifier hs-var hs-var">tabulateAdjunction</span></a></span></span><span> </span><span id="local-6989586621679082572"><span class="annot"><span class="annottext">f () -&gt; b
+</span><a href="#local-6989586621679082572"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f () -&gt; b) -&gt; () -&gt; u b
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f () -&gt; b
+</span><a href="#local-6989586621679082572"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | This definition admits a default definition for the</span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- 'index' method of 'Index&quot;, one of the superclasses of</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- Representable.</span><span>
+</span><span id="line-117"></span><span id="local-6989586621679082688"><span id="local-6989586621679082689"><span id="local-6989586621679082690"><span id="local-6989586621679082691"><span class="annot"><a href="Data.Functor.Adjunction.html#indexAdjunction"><span class="hs-identifier hs-type">indexAdjunction</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082691"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082690"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082690"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082689"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082691"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082688"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082689"><span class="hs-identifier hs-type">b</span></a></span></span></span></span></span><span>
+</span><span id="line-118"></span><span id="indexAdjunction"><span class="annot"><span class="annottext">indexAdjunction :: u b -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#indexAdjunction"><span class="hs-identifier hs-var hs-var">indexAdjunction</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; u b) -&gt; f a -&gt; b
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">((a -&gt; u b) -&gt; f a -&gt; b) -&gt; (u b -&gt; a -&gt; u b) -&gt; u b -&gt; f a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">u b -&gt; a -&gt; u b
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span id="local-6989586621679082566"><span id="local-6989586621679082567"><span id="local-6989586621679082568"><span id="local-6989586621679082569"><span id="local-6989586621679082570"><span class="annot"><a href="Data.Functor.Adjunction.html#zapWithAdjunction"><span class="hs-identifier hs-type">zapWithAdjunction</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082570"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082569"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082568"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082567"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082566"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082569"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082568"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082570"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082567"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082566"><span class="hs-identifier hs-type">c</span></a></span></span></span></span></span></span><span>
+</span><span id="line-121"></span><span id="zapWithAdjunction"><span class="annot"><span class="annottext">zapWithAdjunction :: (a -&gt; b -&gt; c) -&gt; u a -&gt; f b -&gt; c
+</span><a href="Data.Functor.Adjunction.html#zapWithAdjunction"><span class="hs-identifier hs-var hs-var">zapWithAdjunction</span></a></span></span><span> </span><span id="local-6989586621679082565"><span class="annot"><span class="annottext">a -&gt; b -&gt; c
+</span><a href="#local-6989586621679082565"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679082564"><span class="annot"><span class="annottext">u a
+</span><a href="#local-6989586621679082564"><span class="hs-identifier hs-var">ua</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; u c) -&gt; f b -&gt; c
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679082563"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679082563"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(a -&gt; c) -&gt; u a -&gt; u c
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b -&gt; c
+</span><a href="#local-6989586621679082565"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679082563"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">u a
+</span><a href="#local-6989586621679082564"><span class="hs-identifier hs-var">ua</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span id="local-6989586621679082875"><span id="local-6989586621679082876"><span id="local-6989586621679082877"><span class="annot"><a href="Data.Functor.Adjunction.html#splitL"><span class="hs-identifier hs-type">splitL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082877"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082876"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082877"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082875"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082875"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082877"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-124"></span><span id="splitL"><span class="annot"><span class="annottext">splitL :: f a -&gt; (a, f ())
+</span><a href="Data.Functor.Adjunction.html#splitL"><span class="hs-identifier hs-var hs-var">splitL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; u (a, f ())) -&gt; f a -&gt; (a, f ())
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((f () -&gt; (a, f ())) -&gt; () -&gt; u (a, f ()))
+-&gt; () -&gt; (f () -&gt; (a, f ())) -&gt; u (a, f ())
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">(f () -&gt; (a, f ())) -&gt; () -&gt; u (a, f ())
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((f () -&gt; (a, f ())) -&gt; u (a, f ()))
+-&gt; (a -&gt; f () -&gt; (a, f ())) -&gt; a -&gt; u (a, f ())
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span id="local-6989586621679082696"><span id="local-6989586621679082697"><span class="annot"><a href="Data.Functor.Adjunction.html#unsplitL"><span class="hs-identifier hs-type">unsplitL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082697"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082696"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082697"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082697"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082696"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-127"></span><span id="unsplitL"><span class="annot"><span class="annottext">unsplitL :: a -&gt; f () -&gt; f a
+</span><a href="Data.Functor.Adjunction.html#unsplitL"><span class="hs-identifier hs-var hs-var">unsplitL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; f () -&gt; f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">(&lt;$)</span></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span id="local-6989586621679082681"><span id="local-6989586621679082682"><span id="local-6989586621679082683"><span class="annot"><a href="Data.Functor.Adjunction.html#extractL"><span class="hs-identifier hs-type">extractL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082683"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082682"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082683"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082681"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082681"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-130"></span><span id="extractL"><span class="annot"><span class="annottext">extractL :: f a -&gt; a
+</span><a href="Data.Functor.Adjunction.html#extractL"><span class="hs-identifier hs-var hs-var">extractL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a, f ()) -&gt; a
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">((a, f ()) -&gt; a) -&gt; (f a -&gt; (a, f ())) -&gt; f a -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">f a -&gt; (a, f ())
+forall (f :: * -&gt; *) (u :: * -&gt; *) a.
+Adjunction f u =&gt;
+f a -&gt; (a, f ())
+</span><a href="Data.Functor.Adjunction.html#splitL"><span class="hs-identifier hs-var">splitL</span></a></span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span id="local-6989586621679082558"><span id="local-6989586621679082559"><span id="local-6989586621679082560"><span class="annot"><a href="Data.Functor.Adjunction.html#duplicateL"><span class="hs-identifier hs-type">duplicateL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082560"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082559"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082560"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082558"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082560"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082560"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082558"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-133"></span><span id="duplicateL"><span class="annot"><span class="annottext">duplicateL :: f a -&gt; f (f a)
+</span><a href="Data.Functor.Adjunction.html#duplicateL"><span class="hs-identifier hs-var hs-var">duplicateL</span></a></span></span><span> </span><span id="local-6989586621679082557"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679082557"><span class="hs-keyword hs-var">as</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679082557"><span class="hs-keyword hs-var">as</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; f a -&gt; f (f a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;$</span></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679082557"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- | A right adjoint functor admits an intrinsic</span><span>
+</span><span id="line-136"></span><span class="hs-comment">-- notion of zipping</span><span>
+</span><span id="line-137"></span><span id="local-6989586621679082553"><span id="local-6989586621679082554"><span id="local-6989586621679082555"><span id="local-6989586621679082556"><span class="annot"><a href="Data.Functor.Adjunction.html#zipR"><span class="hs-identifier hs-type">zipR</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082556"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082555"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082555"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082554"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082555"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082553"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082555"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082554"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082553"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-138"></span><span id="zipR"><span class="annot"><span class="annottext">zipR :: (u a, u b) -&gt; u (a, b)
+</span><a href="Data.Functor.Adjunction.html#zipR"><span class="hs-identifier hs-var hs-var">zipR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f (u a, u b) -&gt; (a, b)) -&gt; (u a, u b) -&gt; u (a, b)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((u a, u b) -&gt; u a) -&gt; f (u a, u b) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">(u a, u b) -&gt; u a
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">(f (u a, u b) -&gt; a)
+-&gt; (f (u a, u b) -&gt; b) -&gt; f (u a, u b) -&gt; (a, b)
+forall (a :: * -&gt; * -&gt; *) b c c'.
+Arrow a =&gt;
+a b c -&gt; a b c' -&gt; a b (c, c')
+</span><span class="hs-operator hs-var">&amp;&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">((u a, u b) -&gt; u b) -&gt; f (u a, u b) -&gt; b
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">(u a, u b) -&gt; u b
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>
+</span><span id="line-140"></span><span class="hs-comment">-- | Every functor in Haskell permits unzipping</span><span>
+</span><span id="line-141"></span><span id="local-6989586621679082550"><span id="local-6989586621679082551"><span id="local-6989586621679082552"><span class="annot"><a href="Data.Functor.Adjunction.html#unzipR"><span class="hs-identifier hs-type">unzipR</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082552"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082552"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082551"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082550"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082552"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082551"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679082552"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082550"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-142"></span><span id="unzipR"><span class="annot"><span class="annottext">unzipR :: u (a, b) -&gt; (u a, u b)
+</span><a href="Data.Functor.Adjunction.html#unzipR"><span class="hs-identifier hs-var hs-var">unzipR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; a) -&gt; u (a, b) -&gt; u a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">(a, b) -&gt; a
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">(u (a, b) -&gt; u a) -&gt; (u (a, b) -&gt; u b) -&gt; u (a, b) -&gt; (u a, u b)
+forall (a :: * -&gt; * -&gt; *) b c c'.
+Arrow a =&gt;
+a b c -&gt; a b c' -&gt; a b (c, c')
+</span><span class="hs-operator hs-var">&amp;&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; b) -&gt; u (a, b) -&gt; u b
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">(a, b) -&gt; b
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span id="local-6989586621679082549"><span class="annot"><a href="Data.Functor.Adjunction.html#absurdL"><span class="hs-identifier hs-type">absurdL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082549"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span></span><span>
+</span><span id="line-145"></span><span id="absurdL"><span class="annot"><span class="annottext">absurdL :: Void -&gt; f Void
+</span><a href="Data.Functor.Adjunction.html#absurdL"><span class="hs-identifier hs-var hs-var">absurdL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Void -&gt; f Void
+forall a. Void -&gt; a
+</span><span class="hs-identifier hs-var">absurd</span></span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- | A left adjoint must be inhabited, or we can derive bottom.</span><span>
+</span><span id="line-148"></span><span id="local-6989586621679082546"><span id="local-6989586621679082547"><span class="annot"><a href="Data.Functor.Adjunction.html#unabsurdL"><span class="hs-identifier hs-type">unabsurdL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082547"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082546"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082547"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span></span></span><span>
+</span><span id="line-149"></span><span id="unabsurdL"><span class="annot"><span class="annottext">unabsurdL :: f Void -&gt; Void
+</span><a href="Data.Functor.Adjunction.html#unabsurdL"><span class="hs-identifier hs-var hs-var">unabsurdL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Void -&gt; u Void) -&gt; f Void -&gt; Void
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">Void -&gt; u Void
+forall a. Void -&gt; a
+</span><span class="hs-identifier hs-var">absurd</span></span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- | And a left adjoint must be inhabited by exactly one element</span><span>
+</span><span id="line-152"></span><span id="local-6989586621679082542"><span id="local-6989586621679082543"><span id="local-6989586621679082544"><span id="local-6989586621679082545"><span class="annot"><a href="Data.Functor.Adjunction.html#cozipL"><span class="hs-identifier hs-type">cozipL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082545"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082544"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082545"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="#local-6989586621679082543"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082542"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082545"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082543"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082545"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082542"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-153"></span><span id="cozipL"><span class="annot"><span class="annottext">cozipL :: f (Either a b) -&gt; Either (f a) (f b)
+</span><a href="Data.Functor.Adjunction.html#cozipL"><span class="hs-identifier hs-var hs-var">cozipL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Either a b -&gt; u (Either (f a) (f b)))
+-&gt; f (Either a b) -&gt; Either (f a) (f b)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(f a -&gt; Either (f a) (f b)) -&gt; a -&gt; u (Either (f a) (f b))
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; Either (f a) (f b)
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; u (Either (f a) (f b)))
+-&gt; (b -&gt; u (Either (f a) (f b)))
+-&gt; Either a b
+-&gt; u (Either (f a) (f b))
+forall (a :: * -&gt; * -&gt; *) b d c.
+ArrowChoice a =&gt;
+a b d -&gt; a c d -&gt; a (Either b c) d
+</span><span class="hs-operator hs-var">|||</span></span><span> </span><span class="annot"><span class="annottext">(f b -&gt; Either (f a) (f b)) -&gt; b -&gt; u (Either (f a) (f b))
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f b -&gt; Either (f a) (f b)
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span class="hs-special">)</span><span>
+</span><span id="line-154"></span><span>
+</span><span id="line-155"></span><span class="hs-comment">-- | Every functor in Haskell permits 'uncozipping'</span><span>
+</span><span id="line-156"></span><span id="local-6989586621679082539"><span id="local-6989586621679082540"><span id="local-6989586621679082541"><span class="annot"><a href="Data.Functor.Adjunction.html#uncozipL"><span class="hs-identifier hs-type">uncozipL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679082541"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082541"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082540"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082541"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082539"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082541"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="#local-6989586621679082540"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082539"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-157"></span><span id="uncozipL"><span class="annot"><span class="annottext">uncozipL :: Either (f a) (f b) -&gt; f (Either a b)
+</span><a href="Data.Functor.Adjunction.html#uncozipL"><span class="hs-identifier hs-var hs-var">uncozipL</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; Either a b) -&gt; f a -&gt; f (Either a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Either a b
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; f (Either a b))
+-&gt; (f b -&gt; f (Either a b)) -&gt; Either (f a) (f b) -&gt; f (Either a b)
+forall (a :: * -&gt; * -&gt; *) b d c.
+ArrowChoice a =&gt;
+a b d -&gt; a c d -&gt; a (Either b c) d
+</span><span class="hs-operator hs-var">|||</span></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Either a b) -&gt; f b -&gt; f (Either a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Either a b
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span>
+</span><span id="line-158"></span><span>
+</span><span id="line-159"></span><span class="hs-comment">-- Requires deprecated Impredicative types</span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- limitR :: Adjunction f u =&gt; (forall a. u a) -&gt; u (forall a. a)</span><span>
+</span><span id="line-161"></span><span class="hs-comment">-- limitR = leftAdjunct (rightAdjunct (\(x :: forall a. a) -&gt; x))</span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span id="local-6989586621679082538"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082532"><span id="local-6989586621679082534"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679082538"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679082538"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-164"></span><span>  </span><span id="local-6989586621679082528"><span class="annot"><span class="annottext">leftAdjunct :: ((e, a) -&gt; b) -&gt; a -&gt; e -&gt; b
+</span><a href="#local-6989586621679082528"><span class="hs-identifier hs-var hs-var hs-var hs-var">leftAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082527"><span class="annot"><span class="annottext">(e, a) -&gt; b
+</span><a href="#local-6989586621679082527"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679082526"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082526"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679082525"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082525"><span class="hs-identifier hs-var">e</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(e, a) -&gt; b
+</span><a href="#local-6989586621679082527"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082525"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082526"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span>  </span><span id="local-6989586621679082524"><span class="annot"><span class="annottext">rightAdjunct :: (a -&gt; e -&gt; b) -&gt; (e, a) -&gt; b
+</span><a href="#local-6989586621679082524"><span class="hs-identifier hs-var hs-var hs-var hs-var">rightAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082523"><span class="annot"><span class="annottext">a -&gt; e -&gt; b
+</span><a href="#local-6989586621679082523"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">~</span><span class="hs-special">(</span><span id="local-6989586621679082522"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082522"><span class="hs-identifier hs-var">e</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679082521"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082521"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; e -&gt; b
+</span><a href="#local-6989586621679082523"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082521"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082522"><span class="hs-identifier hs-var">e</span></a></span></span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082515"><span id="local-6989586621679082517"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Identity</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Identity</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-168"></span><span>  </span><span id="local-6989586621679082512"><span class="annot"><span class="annottext">leftAdjunct :: (Identity a -&gt; b) -&gt; a -&gt; Identity b
+</span><a href="#local-6989586621679082512"><span class="hs-identifier hs-var hs-var hs-var hs-var">leftAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082511"><span class="annot"><span class="annottext">Identity a -&gt; b
+</span><a href="#local-6989586621679082511"><span class="hs-identifier hs-var">f</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Identity b
+forall a. a -&gt; Identity a
+</span><span class="hs-identifier hs-var">Identity</span></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Identity b) -&gt; (a -&gt; b) -&gt; a -&gt; Identity b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Identity a -&gt; b
+</span><a href="#local-6989586621679082511"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Identity a -&gt; b) -&gt; (a -&gt; Identity a) -&gt; a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Identity a
+forall a. a -&gt; Identity a
+</span><span class="hs-identifier hs-var">Identity</span></span><span>
+</span><span id="line-169"></span><span>  </span><span id="local-6989586621679082509"><span class="annot"><span class="annottext">rightAdjunct :: (a -&gt; Identity b) -&gt; Identity a -&gt; b
+</span><a href="#local-6989586621679082509"><span class="hs-identifier hs-var hs-var hs-var hs-var">rightAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082508"><span class="annot"><span class="annottext">a -&gt; Identity b
+</span><a href="#local-6989586621679082508"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Identity b -&gt; b
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span> </span><span class="annot"><span class="annottext">(Identity b -&gt; b) -&gt; (Identity a -&gt; Identity b) -&gt; Identity a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Identity b
+</span><a href="#local-6989586621679082508"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Identity b) -&gt; (Identity a -&gt; a) -&gt; Identity a -&gt; Identity b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Identity a -&gt; a
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span id="local-6989586621679082505"><span id="local-6989586621679082506"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082497"><span id="local-6989586621679082499"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082506"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082505"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-172"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IdentityT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082506"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IdentityT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082505"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-173"></span><span>  </span><span id="local-6989586621679082496"><span class="annot"><span class="annottext">unit :: a -&gt; IdentityT g (IdentityT f a)
+</span><a href="#local-6989586621679082496"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g (IdentityT f a) -&gt; IdentityT g (IdentityT f a)
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; IdentityT f a
+</span><span class="hs-identifier hs-var">IdentityT</span></span><span> </span><span class="annot"><span class="annottext">(g (IdentityT f a) -&gt; IdentityT g (IdentityT f a))
+-&gt; (a -&gt; g (IdentityT f a)) -&gt; a -&gt; IdentityT g (IdentityT f a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; IdentityT f a) -&gt; a -&gt; g (IdentityT f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; IdentityT f a
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; IdentityT f a
+</span><span class="hs-identifier hs-var">IdentityT</span></span><span>
+</span><span id="line-174"></span><span>  </span><span id="local-6989586621679082494"><span class="annot"><span class="annottext">counit :: IdentityT f (IdentityT g a) -&gt; a
+</span><a href="#local-6989586621679082494"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(IdentityT g a -&gt; g a) -&gt; f (IdentityT g a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">IdentityT g a -&gt; g a
+forall k (f :: k -&gt; *) (a :: k). IdentityT f a -&gt; f a
+</span><span class="hs-identifier hs-var hs-var">runIdentityT</span></span><span> </span><span class="annot"><span class="annottext">(f (IdentityT g a) -&gt; a)
+-&gt; (IdentityT f (IdentityT g a) -&gt; f (IdentityT g a))
+-&gt; IdentityT f (IdentityT g a)
+-&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">IdentityT f (IdentityT g a) -&gt; f (IdentityT g a)
+forall k (f :: k -&gt; *) (a :: k). IdentityT f a -&gt; f a
+</span><span class="hs-identifier hs-var hs-var">runIdentityT</span></span></span></span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span id="local-6989586621679082490"><span id="local-6989586621679082491"><span id="local-6989586621679082492"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082482"><span id="local-6989586621679082484"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082492"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082491"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-177"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">EnvT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082490"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082492"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ReaderT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082490"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082491"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-178"></span><span>  </span><span id="local-6989586621679082481"><span class="annot"><span class="annottext">unit :: a -&gt; ReaderT e m (EnvT e w a)
+</span><a href="#local-6989586621679082481"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>              </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(e -&gt; m (EnvT e w a)) -&gt; ReaderT e m (EnvT e w a)
+forall r (m :: * -&gt; *) a. (r -&gt; m a) -&gt; ReaderT r m a
+</span><span class="hs-identifier hs-var">ReaderT</span></span><span> </span><span class="annot"><span class="annottext">((e -&gt; m (EnvT e w a)) -&gt; ReaderT e m (EnvT e w a))
+-&gt; (a -&gt; e -&gt; m (EnvT e w a)) -&gt; a -&gt; ReaderT e m (EnvT e w a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(((w a -&gt; EnvT e w a) -&gt; m (EnvT e w a))
+ -&gt; (e -&gt; w a -&gt; EnvT e w a) -&gt; e -&gt; m (EnvT e w a))
+-&gt; (e -&gt; w a -&gt; EnvT e w a)
+-&gt; ((w a -&gt; EnvT e w a) -&gt; m (EnvT e w a))
+-&gt; e
+-&gt; m (EnvT e w a)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">((w a -&gt; EnvT e w a) -&gt; m (EnvT e w a))
+-&gt; (e -&gt; w a -&gt; EnvT e w a) -&gt; e -&gt; m (EnvT e w a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">e -&gt; w a -&gt; EnvT e w a
+forall e (w :: * -&gt; *) a. e -&gt; w a -&gt; EnvT e w a
+</span><span class="hs-identifier hs-var">EnvT</span></span><span> </span><span class="annot"><span class="annottext">(((w a -&gt; EnvT e w a) -&gt; m (EnvT e w a)) -&gt; e -&gt; m (EnvT e w a))
+-&gt; (a -&gt; (w a -&gt; EnvT e w a) -&gt; m (EnvT e w a))
+-&gt; a
+-&gt; e
+-&gt; m (EnvT e w a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">((w a -&gt; EnvT e w a) -&gt; a -&gt; m (EnvT e w a))
+-&gt; a -&gt; (w a -&gt; EnvT e w a) -&gt; m (EnvT e w a)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">(w a -&gt; EnvT e w a) -&gt; a -&gt; m (EnvT e w a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span>
+</span><span id="line-179"></span><span>  </span><span id="local-6989586621679082478"><span class="annot"><span class="annottext">counit :: EnvT e w (ReaderT e m a) -&gt; a
+</span><a href="#local-6989586621679082478"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">EnvT</span></span><span> </span><span id="local-6989586621679082477"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082477"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span id="local-6989586621679082476"><span class="annot"><span class="annottext">w (ReaderT e m a)
+</span><a href="#local-6989586621679082476"><span class="hs-identifier hs-var">w</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ReaderT e m a -&gt; m a) -&gt; w (ReaderT e m a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ReaderT e m a -&gt; e -&gt; m a) -&gt; e -&gt; ReaderT e m a -&gt; m a
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">ReaderT e m a -&gt; e -&gt; m a
+forall r (m :: * -&gt; *) a. ReaderT r m a -&gt; r -&gt; m a
+</span><span class="hs-identifier hs-var hs-var">runReaderT</span></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679082477"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">w (ReaderT e m a)
+</span><a href="#local-6989586621679082476"><span class="hs-identifier hs-var">w</span></a></span></span></span></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span id="local-6989586621679082472"><span id="local-6989586621679082473"><span id="local-6989586621679082474"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082464"><span id="local-6989586621679082466"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082474"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082473"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-182"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">WriterT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082472"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082474"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">TracedT</span></span><span> </span><span class="annot"><a href="#local-6989586621679082472"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082473"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-183"></span><span>  </span><span id="local-6989586621679082463"><span class="annot"><span class="annottext">unit :: a -&gt; TracedT s w (WriterT s m a)
+</span><a href="#local-6989586621679082463"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">w (s -&gt; WriterT s m a) -&gt; TracedT s w (WriterT s m a)
+forall m (w :: * -&gt; *) a. w (m -&gt; a) -&gt; TracedT m w a
+</span><span class="hs-identifier hs-var">TracedT</span></span><span> </span><span class="annot"><span class="annottext">(w (s -&gt; WriterT s m a) -&gt; TracedT s w (WriterT s m a))
+-&gt; (a -&gt; w (s -&gt; WriterT s m a))
+-&gt; a
+-&gt; TracedT s w (WriterT s m a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; s -&gt; WriterT s m a) -&gt; a -&gt; w (s -&gt; WriterT s m a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679082461"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679082461"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span id="local-6989586621679082460"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679082460"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">m (a, s) -&gt; WriterT s m a
+forall w (m :: * -&gt; *) a. m (a, w) -&gt; WriterT w m a
+</span><span class="hs-identifier hs-var">WriterT</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; (a, s)) -&gt; m a -&gt; m (a, s)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679082458"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082458"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082458"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679082460"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679082461"><span class="hs-identifier hs-var">ma</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-184"></span><span>  </span><span id="local-6989586621679082457"><span class="annot"><span class="annottext">counit :: WriterT s m (TracedT s w a) -&gt; a
+</span><a href="#local-6989586621679082457"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((TracedT s w a, s) -&gt; w a) -&gt; m (TracedT s w a, s) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679082456"><span class="annot"><span class="annottext">TracedT s w a
+</span><a href="#local-6989586621679082456"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679082455"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679082455"><span class="hs-identifier hs-var">s</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(s -&gt; a) -&gt; s -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679082455"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((s -&gt; a) -&gt; a) -&gt; w (s -&gt; a) -&gt; w a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">TracedT s w a -&gt; w (s -&gt; a)
+forall m (w :: * -&gt; *) a. TracedT m w a -&gt; w (m -&gt; a)
+</span><span class="hs-identifier hs-var hs-var">runTracedT</span></span><span> </span><span class="annot"><span class="annottext">TracedT s w a
+</span><a href="#local-6989586621679082456"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(m (TracedT s w a, s) -&gt; a)
+-&gt; (WriterT s m (TracedT s w a) -&gt; m (TracedT s w a, s))
+-&gt; WriterT s m (TracedT s w a)
+-&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">WriterT s m (TracedT s w a) -&gt; m (TracedT s w a, s)
+forall w (m :: * -&gt; *) a. WriterT w m a -&gt; m (a, w)
+</span><span class="hs-identifier hs-var hs-var">runWriterT</span></span></span></span></span><span>
+</span><span id="line-185"></span><span>
+</span><span id="line-186"></span><span id="local-6989586621679082448"><span id="local-6989586621679082449"><span id="local-6989586621679082450"><span id="local-6989586621679082451"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082440"><span id="local-6989586621679082442"><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082451"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082450"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082449"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082448"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-187"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Compose</span></span><span> </span><span class="annot"><a href="#local-6989586621679082449"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082451"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Compose</span></span><span> </span><span class="annot"><a href="#local-6989586621679082450"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082448"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-188"></span><span>  </span><span id="local-6989586621679082439"><span class="annot"><span class="annottext">unit :: a -&gt; Compose g g' (Compose f' f a)
+</span><a href="#local-6989586621679082439"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g (g' (Compose f' f a)) -&gt; Compose g g' (Compose f' f a)
+forall k k1 (f :: k -&gt; *) (g :: k1 -&gt; k) (a :: k1).
+f (g a) -&gt; Compose f g a
+</span><span class="hs-identifier hs-var">Compose</span></span><span> </span><span class="annot"><span class="annottext">(g (g' (Compose f' f a)) -&gt; Compose g g' (Compose f' f a))
+-&gt; (a -&gt; g (g' (Compose f' f a)))
+-&gt; a
+-&gt; Compose g g' (Compose f' f a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; g' (Compose f' f a)) -&gt; a -&gt; g (g' (Compose f' f a))
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(f' (f a) -&gt; Compose f' f a) -&gt; f a -&gt; g' (Compose f' f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f' (f a) -&gt; Compose f' f a
+forall k k1 (f :: k -&gt; *) (g :: k1 -&gt; k) (a :: k1).
+f (g a) -&gt; Compose f g a
+</span><span class="hs-identifier hs-var">Compose</span></span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>  </span><span id="local-6989586621679082437"><span class="annot"><span class="annottext">counit :: Compose f' f (Compose g g' a) -&gt; a
+</span><a href="#local-6989586621679082437"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f (Compose g g' a) -&gt; g' a) -&gt; f' (f (Compose g g' a)) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Compose g g' a -&gt; g (g' a)) -&gt; f (Compose g g' a) -&gt; g' a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">Compose g g' a -&gt; g (g' a)
+forall k1 (f :: k1 -&gt; *) k2 (g :: k2 -&gt; k1) (a :: k2).
+Compose f g a -&gt; f (g a)
+</span><span class="hs-identifier hs-var hs-var">getCompose</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f' (f (Compose g g' a)) -&gt; a)
+-&gt; (Compose f' f (Compose g g' a) -&gt; f' (f (Compose g g' a)))
+-&gt; Compose f' f (Compose g g' a)
+-&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Compose f' f (Compose g g' a) -&gt; f' (f (Compose g g' a))
+forall k1 (f :: k1 -&gt; *) k2 (g :: k2 -&gt; k1) (a :: k2).
+Compose f g a -&gt; f (g a)
+</span><span class="hs-identifier hs-var hs-var">getCompose</span></span></span></span></span></span><span>
+</span><span id="line-190"></span><span>
+</span><span id="line-191"></span><span id="local-6989586621679082432"><span id="local-6989586621679082433"><span id="local-6989586621679082434"><span id="local-6989586621679082435"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082424"><span id="local-6989586621679082426"><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082435"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082434"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082433"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082432"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-192"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Sum</span></span><span> </span><span class="annot"><a href="#local-6989586621679082435"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082433"><span class="hs-identifier hs-type">f'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Product</span></span><span> </span><span class="annot"><a href="#local-6989586621679082434"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082432"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-193"></span><span>  </span><span id="local-6989586621679082423"><span class="annot"><span class="annottext">unit :: a -&gt; Product g g' (Sum f f' a)
+</span><a href="#local-6989586621679082423"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span> </span><span id="local-6989586621679082422"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082422"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g (Sum f f' a) -&gt; g' (Sum f f' a) -&gt; Product g g' (Sum f f' a)
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (a :: k).
+f a -&gt; g a -&gt; Product f g a
+</span><span class="hs-identifier hs-var">Pair</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(f a -&gt; Sum f f' a) -&gt; a -&gt; g (Sum f f' a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; Sum f f' a
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (a :: k). f a -&gt; Sum f g a
+</span><span class="hs-identifier hs-var">InL</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082422"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(f' a -&gt; Sum f f' a) -&gt; a -&gt; g' (Sum f f' a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f' a -&gt; Sum f f' a
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (a :: k). g a -&gt; Sum f g a
+</span><span class="hs-identifier hs-var">InR</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082422"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-194"></span><span>  </span><span id="local-6989586621679082418"><span class="annot"><span class="annottext">counit :: Sum f f' (Product g g' a) -&gt; a
+</span><a href="#local-6989586621679082418"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">InL</span></span><span> </span><span id="local-6989586621679082417"><span class="annot"><span class="annottext">f (Product g g' a)
+</span><a href="#local-6989586621679082417"><span class="hs-identifier hs-var">l</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Product g g' a -&gt; g a) -&gt; f (Product g g' a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Pair</span></span><span> </span><span id="local-6989586621679082416"><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621679082416"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="annottext">g' a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621679082416"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (Product g g' a)
+</span><a href="#local-6989586621679082417"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-195"></span><span>  </span><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-var">counit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">InR</span></span><span> </span><span id="local-6989586621679082415"><span class="annot"><span class="annottext">f' (Product g g' a)
+</span><a href="#local-6989586621679082415"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Product g g' a -&gt; g' a) -&gt; f' (Product g g' a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Pair</span></span><span> </span><span class="annot"><span class="annottext">g a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679082414"><span class="annot"><span class="annottext">g' a
+</span><a href="#local-6989586621679082414"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">g' a
+</span><a href="#local-6989586621679082414"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f' (Product g g' a)
+</span><a href="#local-6989586621679082415"><span class="hs-identifier hs-var">r</span></a></span></span></span></span></span><span>
+</span><span id="line-196"></span><span>
+</span><span id="line-197"></span><span id="local-6989586621679082412"><span id="local-6989586621679082413"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082404"><span id="local-6989586621679082406"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082413"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082412"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-198"></span><span>         </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Free</span></span><span> </span><span class="annot"><a href="#local-6989586621679082413"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Cofree</span></span><span> </span><span class="annot"><a href="#local-6989586621679082412"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-199"></span><span>  </span><span id="local-6989586621679082403"><span class="annot"><span class="annottext">unit :: a -&gt; Cofree u (Free f a)
+</span><a href="#local-6989586621679082403"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span> </span><span id="local-6989586621679082402"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082402"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Free f a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082402"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Free f a -&gt; u (Cofree u (Free f a)) -&gt; Cofree u (Free f a)
+forall (f :: * -&gt; *) a. a -&gt; f (Cofree f a) -&gt; Cofree f a
+</span><span class="hs-operator hs-var">:&lt;</span></span><span> </span><span class="annot"><span class="annottext">(f () -&gt; Cofree u (Free f a)) -&gt; u (Cofree u (Free f a))
+forall (f :: * -&gt; *) (u :: * -&gt; *) b.
+Adjunction f u =&gt;
+(f () -&gt; b) -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#tabulateAdjunction"><span class="hs-identifier hs-var">tabulateAdjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679082400"><span class="annot"><span class="annottext">f ()
+</span><a href="#local-6989586621679082400"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Free f a -&gt; Free f a) -&gt; a -&gt; Cofree u (Free f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f (Free f a) -&gt; Free f a
+forall (f :: * -&gt; *) (m :: * -&gt; *) a.
+MonadFree f m =&gt;
+f (m a) -&gt; m a
+</span><span class="hs-identifier hs-var">wrap</span></span><span> </span><span class="annot"><span class="annottext">(f (Free f a) -&gt; Free f a)
+-&gt; (Free f a -&gt; f (Free f a)) -&gt; Free f a -&gt; Free f a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Free f a -&gt; f () -&gt; f (Free f a))
+-&gt; f () -&gt; Free f a -&gt; f (Free f a)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">Free f a -&gt; f () -&gt; f (Free f a)
+forall (f :: * -&gt; *) a. Functor f =&gt; a -&gt; f () -&gt; f a
+</span><a href="Data.Functor.Adjunction.html#unsplitL"><span class="hs-identifier hs-var">unsplitL</span></a></span><span> </span><span class="annot"><span class="annottext">f ()
+</span><a href="#local-6989586621679082400"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082402"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>  </span><span id="local-6989586621679082398"><span class="annot"><span class="annottext">counit :: Free f (Cofree u a) -&gt; a
+</span><a href="#local-6989586621679082398"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Pure</span></span><span> </span><span id="local-6989586621679082396"><span class="annot"><span class="annottext">Cofree u a
+</span><a href="#local-6989586621679082396"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Cofree u a -&gt; a
+forall (w :: * -&gt; *) a. Comonad w =&gt; w a -&gt; a
+</span><span class="hs-identifier hs-var">extract</span></span><span> </span><span class="annot"><span class="annottext">Cofree u a
+</span><a href="#local-6989586621679082396"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-201"></span><span>  </span><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-var">counit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Free</span></span><span> </span><span id="local-6989586621679082393"><span class="annot"><span class="annottext">f (Free f (Cofree u a))
+</span><a href="#local-6989586621679082393"><span class="hs-identifier hs-var">k</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cofree u a -&gt; Cofree u a) -&gt; Free f (Cofree u a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(u (Cofree u a) -&gt; f (Free f (Cofree u a)) -&gt; Cofree u a)
+-&gt; f (Free f (Cofree u a)) -&gt; u (Cofree u a) -&gt; Cofree u a
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">u (Cofree u a) -&gt; f (Free f (Cofree u a)) -&gt; Cofree u a
+forall (f :: * -&gt; *) (u :: * -&gt; *) b a.
+Adjunction f u =&gt;
+u b -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#indexAdjunction"><span class="hs-identifier hs-var">indexAdjunction</span></a></span><span> </span><span class="annot"><span class="annottext">f (Free f (Cofree u a))
+</span><a href="#local-6989586621679082393"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">(u (Cofree u a) -&gt; Cofree u a)
+-&gt; (Cofree u a -&gt; u (Cofree u a)) -&gt; Cofree u a -&gt; Cofree u a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Cofree u a -&gt; u (Cofree u a)
+forall (f :: * -&gt; *) (w :: * -&gt; *) a.
+ComonadCofree f w =&gt;
+w a -&gt; f (w a)
+</span><span class="hs-identifier hs-var">unwrap</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f (Free f (Cofree u a)) -&gt; Free f (Cofree u a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a. Adjunction f u =&gt; f a -&gt; a
+</span><a href="Data.Functor.Adjunction.html#extractL"><span class="hs-identifier hs-var">extractL</span></a></span><span> </span><span class="annot"><span class="annottext">f (Free f (Cofree u a))
+</span><a href="#local-6989586621679082393"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-202"></span><span>
+</span><span id="line-203"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082384"><span id="local-6989586621679082386"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">V1</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">U1</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-204"></span><span>  </span><span id="local-6989586621679082383"><span class="annot"><span class="annottext">unit :: a -&gt; U1 (V1 a)
+</span><a href="#local-6989586621679082383"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 (V1 a)
+forall k (p :: k). U1 p
+</span><span class="hs-identifier hs-var">U1</span></span><span>
+</span><span id="line-205"></span><span>  </span><span id="local-6989586621679082381"><span class="annot"><span class="annottext">counit :: V1 (U1 a) -&gt; a
+</span><a href="#local-6989586621679082381"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V1 (U1 a) -&gt; a
+forall a b. V1 a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#absurdV1"><span class="hs-identifier hs-var">absurdV1</span></a></span><span>
+</span><span id="line-206"></span><span>
+</span><span id="line-207"></span><span id="local-6989586621679082671"><span id="local-6989586621679082672"><span class="annot"><a href="Data.Functor.Adjunction.html#absurdV1"><span class="hs-identifier hs-type">absurdV1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V1</span></span><span> </span><span class="annot"><a href="#local-6989586621679082672"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679082671"><span class="hs-identifier hs-type">b</span></a></span></span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 708
+</span><span id="absurdV1"><span class="annot"><span class="annottext">absurdV1 :: V1 a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#absurdV1"><span class="hs-identifier hs-var hs-var">absurdV1</span></a></span></span><span> </span><span id="local-6989586621679082379"><span class="annot"><span class="annottext">V1 a
+</span><a href="#local-6989586621679082379"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">V1 a
+</span><a href="#local-6989586621679082379"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">absurdV1</span><span> </span><span class="hs-identifier">x</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">x</span><span> </span><span class="hs-special">`</span><span class="hs-identifier">seq</span><span class="hs-special">`</span><span> </span><span class="hs-identifier">undefined</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-214"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082373"><span id="local-6989586621679082375"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Par1</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Par1</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-215"></span><span>  </span><span id="local-6989586621679082370"><span class="annot"><span class="annottext">leftAdjunct :: (Par1 a -&gt; b) -&gt; a -&gt; Par1 b
+</span><a href="#local-6989586621679082370"><span class="hs-identifier hs-var hs-var hs-var hs-var">leftAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082369"><span class="annot"><span class="annottext">Par1 a -&gt; b
+</span><a href="#local-6989586621679082369"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Par1 b
+forall p. p -&gt; Par1 p
+</span><span class="hs-identifier hs-var">Par1</span></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Par1 b) -&gt; (a -&gt; b) -&gt; a -&gt; Par1 b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Par1 a -&gt; b
+</span><a href="#local-6989586621679082369"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Par1 a -&gt; b) -&gt; (a -&gt; Par1 a) -&gt; a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Par1 a
+forall p. p -&gt; Par1 p
+</span><span class="hs-identifier hs-var">Par1</span></span><span>
+</span><span id="line-216"></span><span>  </span><span id="local-6989586621679082367"><span class="annot"><span class="annottext">rightAdjunct :: (a -&gt; Par1 b) -&gt; Par1 a -&gt; b
+</span><a href="#local-6989586621679082367"><span class="hs-identifier hs-var hs-var hs-var hs-var">rightAdjunct</span></a></span></span><span> </span><span id="local-6989586621679082366"><span class="annot"><span class="annottext">a -&gt; Par1 b
+</span><a href="#local-6989586621679082366"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Par1 b -&gt; b
+forall p. Par1 p -&gt; p
+</span><span class="hs-identifier hs-var hs-var">unPar1</span></span><span> </span><span class="annot"><span class="annottext">(Par1 b -&gt; b) -&gt; (Par1 a -&gt; Par1 b) -&gt; Par1 a -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Par1 b
+</span><a href="#local-6989586621679082366"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Par1 b) -&gt; (Par1 a -&gt; a) -&gt; Par1 a -&gt; Par1 b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Par1 a -&gt; a
+forall p. Par1 p -&gt; p
+</span><span class="hs-identifier hs-var hs-var">unPar1</span></span><span>
+</span><span id="line-217"></span><span>
+</span><span id="line-218"></span><span id="local-6989586621679082363"><span id="local-6989586621679082364"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082355"><span id="local-6989586621679082357"><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082364"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082363"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rec1</span></span><span> </span><span class="annot"><a href="#local-6989586621679082364"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rec1</span></span><span> </span><span class="annot"><a href="#local-6989586621679082363"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-219"></span><span>  </span><span id="local-6989586621679082354"><span class="annot"><span class="annottext">unit :: a -&gt; Rec1 g (Rec1 f a)
+</span><a href="#local-6989586621679082354"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g (Rec1 f a) -&gt; Rec1 g (Rec1 f a)
+forall k (f :: k -&gt; *) (p :: k). f p -&gt; Rec1 f p
+</span><span class="hs-identifier hs-var">Rec1</span></span><span> </span><span class="annot"><span class="annottext">(g (Rec1 f a) -&gt; Rec1 g (Rec1 f a))
+-&gt; (a -&gt; g (Rec1 f a)) -&gt; a -&gt; Rec1 g (Rec1 f a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; Rec1 f a) -&gt; a -&gt; g (Rec1 f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; Rec1 f a
+forall k (f :: k -&gt; *) (p :: k). f p -&gt; Rec1 f p
+</span><span class="hs-identifier hs-var">Rec1</span></span><span>
+</span><span id="line-220"></span><span>  </span><span id="local-6989586621679082352"><span class="annot"><span class="annottext">counit :: Rec1 f (Rec1 g a) -&gt; a
+</span><a href="#local-6989586621679082352"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Rec1 g a -&gt; g a) -&gt; f (Rec1 g a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">Rec1 g a -&gt; g a
+forall k (f :: k -&gt; *) (p :: k). Rec1 f p -&gt; f p
+</span><span class="hs-identifier hs-var hs-var">unRec1</span></span><span> </span><span class="annot"><span class="annottext">(f (Rec1 g a) -&gt; a)
+-&gt; (Rec1 f (Rec1 g a) -&gt; f (Rec1 g a)) -&gt; Rec1 f (Rec1 g a) -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Rec1 f (Rec1 g a) -&gt; f (Rec1 g a)
+forall k (f :: k -&gt; *) (p :: k). Rec1 f p -&gt; f p
+</span><span class="hs-identifier hs-var hs-var">unRec1</span></span></span></span><span>
+</span><span id="line-221"></span><span>
+</span><span id="line-222"></span><span class="hs-comment">-- @i@ and @c@ indexes have to be the same due functional dependency.</span><span>
+</span><span id="line-223"></span><span class="hs-comment">-- But we want them to be different, therefore we rather not define this instance</span><span>
+</span><span id="line-224"></span><span class="hs-comment">{-
+instance Adjunction f g =&gt; Adjunction (M1 i c f) (M1 i c g) where
+  unit   = M1 . leftAdjunct M1
+  counit = rightAdjunct unM1 . unM1
+-}</span><span>
+</span><span id="line-229"></span><span>
+</span><span id="line-230"></span><span id="local-6989586621679082347"><span id="local-6989586621679082348"><span id="local-6989586621679082349"><span id="local-6989586621679082350"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082339"><span id="local-6989586621679082341"><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082350"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082349"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082348"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082347"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082348"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:.:</span></span><span> </span><span class="annot"><a href="#local-6989586621679082350"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082349"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:.:</span></span><span> </span><span class="annot"><a href="#local-6989586621679082347"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-231"></span><span>  </span><span id="local-6989586621679082338"><span class="annot"><span class="annottext">unit :: a -&gt; (:.:) g g' ((:.:) f' f a)
+</span><a href="#local-6989586621679082338"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g (g' ((:.:) f' f a)) -&gt; (:.:) g g' ((:.:) f' f a)
+forall k2 k1 (f :: k2 -&gt; *) (g :: k1 -&gt; k2) (p :: k1).
+f (g p) -&gt; (:.:) f g p
+</span><span class="hs-identifier hs-var">Comp1</span></span><span> </span><span class="annot"><span class="annottext">(g (g' ((:.:) f' f a)) -&gt; (:.:) g g' ((:.:) f' f a))
+-&gt; (a -&gt; g (g' ((:.:) f' f a))) -&gt; a -&gt; (:.:) g g' ((:.:) f' f a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; g' ((:.:) f' f a)) -&gt; a -&gt; g (g' ((:.:) f' f a))
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(f' (f a) -&gt; (:.:) f' f a) -&gt; f a -&gt; g' ((:.:) f' f a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f' (f a) -&gt; (:.:) f' f a
+forall k2 k1 (f :: k2 -&gt; *) (g :: k1 -&gt; k2) (p :: k1).
+f (g p) -&gt; (:.:) f g p
+</span><span class="hs-identifier hs-var">Comp1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-232"></span><span>  </span><span id="local-6989586621679082336"><span class="annot"><span class="annottext">counit :: (:.:) f' f ((:.:) g g' a) -&gt; a
+</span><a href="#local-6989586621679082336"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f ((:.:) g g' a) -&gt; g' a) -&gt; f' (f ((:.:) g g' a)) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((:.:) g g' a -&gt; g (g' a)) -&gt; f ((:.:) g g' a) -&gt; g' a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">(:.:) g g' a -&gt; g (g' a)
+forall k2 (f :: k2 -&gt; *) k1 (g :: k1 -&gt; k2) (p :: k1).
+(:.:) f g p -&gt; f (g p)
+</span><span class="hs-identifier hs-var hs-var">unComp1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f' (f ((:.:) g g' a)) -&gt; a)
+-&gt; ((:.:) f' f ((:.:) g g' a) -&gt; f' (f ((:.:) g g' a)))
+-&gt; (:.:) f' f ((:.:) g g' a)
+-&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(:.:) f' f ((:.:) g g' a) -&gt; f' (f ((:.:) g g' a))
+forall k2 (f :: k2 -&gt; *) k1 (g :: k1 -&gt; k2) (p :: k1).
+(:.:) f g p -&gt; f (g p)
+</span><span class="hs-identifier hs-var hs-var">unComp1</span></span></span></span></span></span><span>
+</span><span id="line-233"></span><span>
+</span><span id="line-234"></span><span id="local-6989586621679082331"><span id="local-6989586621679082332"><span id="local-6989586621679082333"><span id="local-6989586621679082334"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679082323"><span id="local-6989586621679082325"><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082334"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082333"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082332"><span class="hs-identifier hs-type">f'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679082331"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Adjunction.html#Adjunction"><span class="hs-identifier hs-type">Adjunction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082334"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:+:</span></span><span> </span><span class="annot"><a href="#local-6989586621679082332"><span class="hs-identifier hs-type">f'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679082333"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span class="annot"><a href="#local-6989586621679082331"><span class="hs-identifier hs-type">g'</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-235"></span><span>  </span><span id="local-6989586621679082322"><span class="annot"><span class="annottext">unit :: a -&gt; (:*:) g g' ((:+:) f f' a)
+</span><a href="#local-6989586621679082322"><span class="hs-keyword hs-var hs-var hs-var hs-var">unit</span></a></span></span><span> </span><span id="local-6989586621679082321"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082321"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f a -&gt; (:+:) f f' a) -&gt; a -&gt; g ((:+:) f f' a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; (:+:) f f' a
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (p :: k). f p -&gt; (:+:) f g p
+</span><span class="hs-identifier hs-var">L1</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082321"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">g ((:+:) f f' a) -&gt; g' ((:+:) f f' a) -&gt; (:*:) g g' ((:+:) f f' a)
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (p :: k).
+f p -&gt; g p -&gt; (:*:) f g p
+</span><span class="hs-operator hs-var">:*:</span></span><span> </span><span class="annot"><span class="annottext">(f' a -&gt; (:+:) f f' a) -&gt; a -&gt; g' ((:+:) f f' a)
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(f a -&gt; b) -&gt; a -&gt; u b
+</span><a href="Data.Functor.Adjunction.html#leftAdjunct"><span class="hs-identifier hs-var">leftAdjunct</span></a></span><span> </span><span class="annot"><span class="annottext">f' a -&gt; (:+:) f f' a
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (p :: k). g p -&gt; (:+:) f g p
+</span><span class="hs-identifier hs-var">R1</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679082321"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-236"></span><span>  </span><span id="local-6989586621679082317"><span class="annot"><span class="annottext">counit :: (:+:) f f' ((:*:) g g' a) -&gt; a
+</span><a href="#local-6989586621679082317"><span class="hs-identifier hs-var hs-var hs-var hs-var">counit</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">L1</span></span><span> </span><span id="local-6989586621679082316"><span class="annot"><span class="annottext">f ((:*:) g g' a)
+</span><a href="#local-6989586621679082316"><span class="hs-identifier hs-var">l</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((:*:) g g' a -&gt; g a) -&gt; f ((:*:) g g' a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679082315"><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621679082315"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span class="annot"><span class="annottext">g' a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621679082315"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f ((:*:) g g' a)
+</span><a href="#local-6989586621679082316"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-237"></span><span>  </span><span class="annot"><a href="Data.Functor.Adjunction.html#counit"><span class="hs-identifier hs-var">counit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">R1</span></span><span> </span><span id="local-6989586621679082314"><span class="annot"><span class="annottext">f' ((:*:) g g' a)
+</span><a href="#local-6989586621679082314"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((:*:) g g' a -&gt; g' a) -&gt; f' ((:*:) g g' a) -&gt; a
+forall (f :: * -&gt; *) (u :: * -&gt; *) a b.
+Adjunction f u =&gt;
+(a -&gt; u b) -&gt; f a -&gt; b
+</span><a href="Data.Functor.Adjunction.html#rightAdjunct"><span class="hs-identifier hs-var">rightAdjunct</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="annottext">g a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span id="local-6989586621679082313"><span class="annot"><span class="annottext">g' a
+</span><a href="#local-6989586621679082313"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">g' a
+</span><a href="#local-6989586621679082313"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f' ((:*:) g g' a)
+</span><a href="#local-6989586621679082314"><span class="hs-identifier hs-var">r</span></a></span></span></span></span></span><span>
+</span><span id="line-238"></span></pre></body></html>

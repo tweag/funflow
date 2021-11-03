@@ -1,0 +1,192 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 704
+</span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test.SmallCheck.SeriesMonad</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Applicative</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Alternative</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(&lt;$&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadPlus</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Logic</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadLogic</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">LogicT</span></span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Reader</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadTrans</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ReaderT</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">runReaderT</span></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">second</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- | Maximum depth of generated test values.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- For data values, it is the depth of nested constructor applications.</span><span>
+</span><span id="line-17"></span><span class="hs-comment">--</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- For functional values, it is both the depth of nested case analysis</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- and the depth of results.</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">type</span><span> </span><span id="Depth"><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-var">Depth</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- | 'Series' is a `MonadLogic` action that enumerates values of a certain</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- type, up to some depth.</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- The depth bound is tracked in the 'Series' monad and can be extracted using</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- 'Test.SmallCheck.Series.getDepth' and changed using 'Test.SmallCheck.Series.localDepth'.</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- To manipulate series at the lowest level you can use its 'Monad',</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- 'MonadPlus' and 'MonadLogic' instances. This module provides some</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- higher-level combinators which simplify creating series.</span><span>
+</span><span id="line-31"></span><span class="hs-comment">--</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- A proper 'Series' should be monotonic with respect to the depth &#8212; i.e.</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- 'Test.SmallCheck.Series.localDepth' @(+1)@ @s@ should emit all the values that @s@ emits (and</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- possibly some more).</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- It is also desirable that values of smaller depth come before the values</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- of greater depth.</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">newtype</span><span> </span><span id="Series"><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span></span><span> </span><span id="local-6989586621679056279"><span class="annot"><a href="#local-6989586621679056279"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679056278"><span class="annot"><a href="#local-6989586621679056278"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Series"><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ReaderT</span></span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">LogicT</span></span><span> </span><span class="annot"><a href="#local-6989586621679056279"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679056278"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span id="local-6989586621679056176"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679056173"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056176"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-41"></span><span>  </span><span id="local-6989586621679056171"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; Series m a -&gt; Series m b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679056170"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679056170"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056169"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056169"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) b -&gt; Series m b
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b)
+-&gt; ReaderT Depth (LogicT m) a -&gt; ReaderT Depth (LogicT m) b
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679056170"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056169"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span id="local-6989586621679056168"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679056164"><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056168"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-44"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056161"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056161"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679056160"><span class="annot"><span class="annottext">&gt;&gt;= :: Series m a -&gt; (a -&gt; Series m b) -&gt; Series m b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&gt;&gt;=</span></span></span><span> </span><span id="local-6989586621679056159"><span class="annot"><span class="annottext">a -&gt; Series m b
+</span><a href="#local-6989586621679056159"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) b -&gt; Series m b
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056161"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+-&gt; (a -&gt; ReaderT Depth (LogicT m) b) -&gt; ReaderT Depth (LogicT m) b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Series m b -&gt; ReaderT Depth (LogicT m) b
+forall (m :: * -&gt; *) a. Series m a -&gt; ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056158"><span class="hs-identifier hs-var">unSeries</span></a></span><span> </span><span class="annot"><span class="annottext">(Series m b -&gt; ReaderT Depth (LogicT m) b)
+-&gt; (a -&gt; Series m b) -&gt; a -&gt; ReaderT Depth (LogicT m) b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Series m b
+</span><a href="#local-6989586621679056159"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-46"></span><span>      </span><span id="local-6989586621679056158"><span class="annot"><span class="annottext">unSeries :: Series m a -&gt; ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056158"><span class="hs-identifier hs-var hs-var">unSeries</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056156"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056156"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056156"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-47"></span><span>  </span><span id="local-6989586621679056155"><span class="annot"><span class="annottext">return :: a -&gt; Series m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">return</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Series m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span id="local-6989586621679056154"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679056145"><span id="local-6989586621679056147"><span id="local-6989586621679056149"><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056154"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>  </span><span id="local-6989586621679056143"><span class="annot"><span class="annottext">pure :: a -&gt; Series m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">pure</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Series m a
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="annot"><span class="annottext">(ReaderT Depth (LogicT m) a -&gt; Series m a)
+-&gt; (a -&gt; ReaderT Depth (LogicT m) a) -&gt; a -&gt; Series m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; ReaderT Depth (LogicT m) a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-51"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056142"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) (a -&gt; b)
+</span><a href="#local-6989586621679056142"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679056141"><span class="annot"><span class="annottext">&lt;*&gt; :: Series m (a -&gt; b) -&gt; Series m a -&gt; Series m b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;*&gt;</span></span></span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056140"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056140"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) b -&gt; Series m b
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) (a -&gt; b)
+</span><a href="#local-6989586621679056142"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) (a -&gt; b)
+-&gt; ReaderT Depth (LogicT m) a -&gt; ReaderT Depth (LogicT m) b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056140"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span id="local-6989586621679056139"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadPlus</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056139"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>  </span><span id="local-6989586621679056133"><span class="annot"><span class="annottext">mzero :: Series m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mzero</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Series m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span>
+</span><span id="line-55"></span><span>  </span><span id="local-6989586621679056130"><span class="annot"><span class="annottext">mplus :: Series m a -&gt; Series m a -&gt; Series m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mplus</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Series m a -&gt; Series m a -&gt; Series m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">(&lt;|&gt;)</span></span></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span id="local-6989586621679056127"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679056120"><span id="local-6989586621679056122"><span class="annot"><span class="hs-identifier hs-type">Alternative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056127"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>  </span><span id="local-6989586621679056118"><span class="annot"><span class="annottext">empty :: Series m a
+</span><a href="#local-6989586621679056118"><span class="hs-identifier hs-var hs-var hs-var hs-var">empty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Series m a
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span>
+</span><span id="line-59"></span><span>  </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056117"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056117"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679056116"><span class="annot"><span class="annottext">&lt;|&gt; :: Series m a -&gt; Series m a -&gt; Series m a
+</span><a href="#local-6989586621679056116"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;|&gt;</span></a></span></span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056115"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056115"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Series m a
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056117"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+-&gt; ReaderT Depth (LogicT m) a -&gt; ReaderT Depth (LogicT m) a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056115"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- This instance is written manually. Using the GND for it is not safe.</span><span>
+</span><span id="line-62"></span><span id="local-6989586621679056114"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679056101"><span id="local-6989586621679056103"><span id="local-6989586621679056105"><span id="local-6989586621679056107"><span id="local-6989586621679056109"><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679056114"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadLogic</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056114"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>  </span><span id="local-6989586621679056099"><span class="annot"><span class="annottext">msplit :: Series m a -&gt; Series m (Maybe (a, Series m a))
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056097"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056097"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) (Maybe (a, Series m a))
+-&gt; Series m (Maybe (a, Series m a))
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((a, ReaderT Depth (LogicT m) a) -&gt; (a, Series m a))
+-&gt; Maybe (a, ReaderT Depth (LogicT m) a) -&gt; Maybe (a, Series m a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ReaderT Depth (LogicT m) a -&gt; Series m a)
+-&gt; (a, ReaderT Depth (LogicT m) a) -&gt; (a, Series m a)
+forall (a :: * -&gt; * -&gt; *) b c d.
+Arrow a =&gt;
+a b c -&gt; a (d, b) (d, c)
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Series m a
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe (a, ReaderT Depth (LogicT m) a) -&gt; Maybe (a, Series m a))
+-&gt; ReaderT Depth (LogicT m) (Maybe (a, ReaderT Depth (LogicT m) a))
+-&gt; ReaderT Depth (LogicT m) (Maybe (a, Series m a))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+-&gt; ReaderT Depth (LogicT m) (Maybe (a, ReaderT Depth (LogicT m) a))
+forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><span class="hs-identifier hs-var">msplit</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056097"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadTrans</span></span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>  </span><span id="local-6989586621679056094"><span class="annot"><span class="annottext">lift :: m a -&gt; Series m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">lift</span></span></span><span> </span><span id="local-6989586621679056092"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679056092"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Series m a
+forall (m :: * -&gt; *) a. ReaderT Depth (LogicT m) a -&gt; Series m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-var">Series</span></a></span><span> </span><span class="annot"><span class="annottext">(ReaderT Depth (LogicT m) a -&gt; Series m a)
+-&gt; ReaderT Depth (LogicT m) a -&gt; Series m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; ReaderT Depth (LogicT m) a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(LogicT m a -&gt; ReaderT Depth (LogicT m) a)
+-&gt; (m a -&gt; LogicT m a) -&gt; m a -&gt; ReaderT Depth (LogicT m) a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">m a -&gt; LogicT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ReaderT Depth (LogicT m) a)
+-&gt; m a -&gt; ReaderT Depth (LogicT m) a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679056092"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span id="local-6989586621679056090"><span id="local-6989586621679056091"><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#runSeries"><span class="hs-identifier hs-type">runSeries</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Depth"><span class="hs-identifier hs-type">Depth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056091"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056090"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LogicT</span></span><span> </span><span class="annot"><a href="#local-6989586621679056091"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679056090"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-69"></span><span id="runSeries"><span class="annot"><span class="annottext">runSeries :: Depth -&gt; Series m a -&gt; LogicT m a
+</span><a href="Test.SmallCheck.SeriesMonad.html#runSeries"><span class="hs-identifier hs-var hs-var">runSeries</span></a></span></span><span> </span><span id="local-6989586621679056088"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679056088"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.SmallCheck.SeriesMonad.html#Series"><span class="hs-identifier hs-type">Series</span></a></span><span> </span><span id="local-6989586621679056087"><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056087"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a -&gt; Depth -&gt; LogicT m a
+forall r (m :: * -&gt; *) a. ReaderT r m a -&gt; r -&gt; m a
+</span><span class="hs-identifier hs-var hs-var">runReaderT</span></span><span> </span><span class="annot"><span class="annottext">ReaderT Depth (LogicT m) a
+</span><a href="#local-6989586621679056087"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679056088"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-70"></span></pre></body></html>

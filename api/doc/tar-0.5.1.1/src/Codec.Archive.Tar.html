@@ -1,0 +1,334 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      :  Codec.Archive.Tar</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Copyright   :  (c) 2007 Bjorn Bringert,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--                    2008 Andrea Vezzosi,</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--                    2008-2012 Duncan Coutts</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  :  duncan@community.haskell.org</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Reading, writing and manipulating \&quot;@.tar@\&quot; archive files.</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- This module uses common names and so is designed to be imported qualified:</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- &gt; import qualified Codec.Archive.Tar as Tar</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Codec.Archive.Tar</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-comment">-- | Tar archive files are used to store a collection of other files in a</span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-comment">-- single file. They consists of a sequence of entries. Each entry describes</span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-comment">-- a file or directory (or some other special kind of file). The entry stores</span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-comment">-- a little bit of meta-data, in particular the file or directory name.</span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-comment">-- Unlike some other archive formats, a tar file contains no index. The</span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-comment">-- information about each entry is stored next to the entry. Because of this,</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-comment">-- tar files are almost always processed linearly rather than in a</span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-comment">-- random-access fashion.</span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-comment">-- The functions in this package are designed for working on tar files</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-comment">-- linearly and lazily. This makes it possible to do many operations in</span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-comment">-- constant space rather than having to load the entire archive into memory.</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-comment">-- It can read and write standard POSIX tar files and also the GNU and old</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-comment">-- Unix V7 tar formats. The convenience functions that are provided in the</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-comment">-- &quot;Codec.Archive.Tar.Entry&quot; module for creating archive entries are</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-comment">-- primarily designed for standard portable archives. If you need to</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-comment">-- construct GNU format archives or exactly preserve file ownership and</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-comment">-- permissions then you will need to write some extra helper functions.</span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-comment">-- This module contains just the simple high level operations without</span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-comment">-- exposing the all the details of tar files. If you need to inspect tar</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-comment">-- entries in more detail or construct them directly then you also need</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-comment">-- the module &quot;Codec.Archive.Tar.Entry&quot;.</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span>  </span><span class="annot"><span class="hs-comment">-- * High level \&quot;all in one\&quot; operations</span></span><span>
+</span><span id="line-49"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.html#create"><span class="hs-identifier">create</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-50"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.html#extract"><span class="hs-identifier">extract</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-51"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.html#append"><span class="hs-identifier">append</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Notes</span></span><span>
+</span><span id="line-54"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Compressed tar archives</span></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-comment">-- | Tar files are commonly used in conjunction with gzip compression, as in</span><span>
+</span><span id="line-56"></span><span>  </span><span class="hs-comment">-- \&quot;@.tar.gz@\&quot; or \&quot;@.tar.bz2@\&quot; files. This module does not directly</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-comment">-- handle compressed tar files however they can be handled easily by</span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-comment">-- composing functions from this module and the modules</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-comment">-- @Codec.Compression.GZip@ or @Codec.Compression.BZip@</span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-comment">-- (see @zlib@ or @bzlib@ packages).</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-comment">-- Creating a compressed \&quot;@.tar.gz@\&quot; file is just a minor variation on the</span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-comment">-- 'create' function, but where throw compression into the pipeline:</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-comment">-- &gt; BS.writeFile tar . GZip.compress . Tar.write =&lt;&lt; Tar.pack base dir</span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-comment">-- Similarly, extracting a compressed \&quot;@.tar.gz@\&quot; is just a minor variation</span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-comment">-- on the 'extract' function where we use decompression in the pipeline:</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-comment">-- &gt; Tar.unpack dir . Tar.read . GZip.decompress =&lt;&lt; BS.readFile tar</span><span>
+</span><span id="line-71"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Security</span></span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-comment">-- | This is pretty important. A maliciously constructed tar archives could</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-comment">-- contain entries that specify bad file names. It could specify absolute</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-comment">-- file names like \&quot;@\/etc\/passwd@\&quot; or relative files outside of the</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-comment">-- archive like \&quot;..\/..\/..\/something\&quot;. This security problem is commonly</span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-comment">-- called a \&quot;directory traversal vulnerability\&quot;. Historically, such</span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-comment">-- vulnerabilities have been common in packages handling tar archives.</span><span>
+</span><span id="line-80"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-comment">-- The 'extract' and 'unpack' functions check for bad file names. See the</span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-comment">-- 'checkSecurity' function for more details. If you need to do any custom</span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-comment">-- unpacking then you should use this.</span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Tarbombs</span></span><span>
+</span><span id="line-86"></span><span>  </span><span class="hs-comment">-- | A \&quot;tarbomb\&quot; is a @.tar@ file where not all entries are in a</span><span>
+</span><span id="line-87"></span><span>  </span><span class="hs-comment">-- subdirectory but instead files extract into the top level directory. The</span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-comment">-- 'extract' function does not check for these however if you want to do</span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-comment">-- that you can use the 'checkTarbomb' function like so:</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-comment">-- &gt; Tar.unpack dir . Tar.checkTarbomb expectedDir</span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-comment">-- &gt;                . Tar.read =&lt;&lt; BS.readFile tar</span><span>
+</span><span id="line-93"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-94"></span><span>  </span><span class="hs-comment">-- In this case extraction will fail if any file is outside of @expectedDir@.</span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Converting between internal and external representation</span></span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-comment">-- | Note, you cannot expect @write . read@ to give exactly the same output</span><span>
+</span><span id="line-98"></span><span>  </span><span class="hs-comment">-- as input. You can expect the information to be preserved exactly however.</span><span>
+</span><span id="line-99"></span><span>  </span><span class="hs-comment">-- This is because 'read' accepts common format variations while 'write'</span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-comment">-- produces the standard format.</span><span>
+</span><span id="line-101"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#read"><span class="hs-identifier">read</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-102"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier">write</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Packing and unpacking files to\/from internal representation</span></span><span>
+</span><span id="line-105"></span><span>  </span><span class="hs-comment">-- | These functions are for packing and unpacking portable archives. They</span><span>
+</span><span id="line-106"></span><span>  </span><span class="hs-comment">-- are not suitable in cases where it is important to preserve file ownership</span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-comment">-- and permissions or to archive special files like named pipes and Unix</span><span>
+</span><span id="line-108"></span><span>  </span><span class="hs-comment">-- device files.</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Pack.html#pack"><span class="hs-identifier">pack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-110"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Unpack.html#unpack"><span class="hs-identifier">unpack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Types</span></span><span>
+</span><span id="line-113"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Tar entry type</span></span><span>
+</span><span id="line-114"></span><span>  </span><span class="hs-comment">-- | This module provides only very simple and limited read-only access to</span><span>
+</span><span id="line-115"></span><span>  </span><span class="hs-comment">-- the 'Entry' type. If you need access to the details or if you need to</span><span>
+</span><span id="line-116"></span><span>  </span><span class="hs-comment">-- construct your own entries then also import &quot;Codec.Archive.Tar.Entry&quot;.</span><span>
+</span><span id="line-117"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier">Entry</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-118"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#entryPath"><span class="hs-identifier">entryPath</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-119"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#entryContent"><span class="hs-identifier">entryContent</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-120"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#EntryContent"><span class="hs-identifier">EntryContent</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Sequences of tar entries</span></span><span>
+</span><span id="line-123"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entries"><span class="hs-identifier">Entries</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-124"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#mapEntries"><span class="hs-identifier">mapEntries</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-125"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#mapEntriesNoFail"><span class="hs-identifier">mapEntriesNoFail</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-126"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#foldEntries"><span class="hs-identifier">foldEntries</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-127"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#foldlEntries"><span class="hs-identifier">foldlEntries</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-128"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#unfoldEntries"><span class="hs-identifier">unfoldEntries</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span>  </span><span class="annot"><span class="hs-comment">-- * Error handling</span></span><span>
+</span><span id="line-131"></span><span>  </span><span class="hs-comment">-- | Reading tar files can fail if the data does not match the tar file</span><span>
+</span><span id="line-132"></span><span>  </span><span class="hs-comment">-- format correctly.</span><span>
+</span><span id="line-133"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-134"></span><span>  </span><span class="hs-comment">-- The style of error handling by returning structured errors. The pure</span><span>
+</span><span id="line-135"></span><span>  </span><span class="hs-comment">-- functions in the library do not throw exceptions, they return the errors</span><span>
+</span><span id="line-136"></span><span>  </span><span class="hs-comment">-- as data. The IO actions in the library can throw exceptions, in particular</span><span>
+</span><span id="line-137"></span><span>  </span><span class="hs-comment">-- the 'unpack' action does this. All the error types used are an instance of</span><span>
+</span><span id="line-138"></span><span>  </span><span class="hs-comment">-- the standard 'Exception' class so it is possible to 'throw' and 'catch'</span><span>
+</span><span id="line-139"></span><span>  </span><span class="hs-comment">-- them.</span><span>
+</span><span id="line-140"></span><span>
+</span><span id="line-141"></span><span>  </span><span class="annot"><span class="hs-comment">-- ** Errors from reading tar files</span></span><span>
+</span><span id="line-142"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier">FormatError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span class="hs-cpp">
+
+#ifdef TESTS
+</span><span>  </span><span class="hs-identifier">prop_write_read_ustar</span><span class="hs-special">,</span><span>
+</span><span id="line-146"></span><span>  </span><span class="hs-identifier">prop_write_read_gnu</span><span class="hs-special">,</span><span>
+</span><span id="line-147"></span><span>  </span><span class="hs-identifier">prop_write_read_v7</span><span class="hs-special">,</span><span class="hs-cpp">
+#endif
+</span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html"><span class="hs-identifier">Codec.Archive.Tar.Types</span></a></span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html"><span class="hs-identifier">Codec.Archive.Tar.Read</span></a></span><span>
+</span><span id="line-154"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html"><span class="hs-identifier">Codec.Archive.Tar.Write</span></a></span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Pack.html"><span class="hs-identifier">Codec.Archive.Tar.Pack</span></a></span><span>
+</span><span id="line-157"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Unpack.html"><span class="hs-identifier">Codec.Archive.Tar.Unpack</span></a></span><span>
+</span><span id="line-158"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Index.html"><span class="hs-identifier">Codec.Archive.Tar.Index</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Index.html#hSeekEndEntryOffset"><span class="hs-identifier">hSeekEndEntryOffset</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Check.html"><span class="hs-identifier">Codec.Archive.Tar.Check</span></a></span><span>
+</span><span id="line-161"></span><span>
+</span><span id="line-162"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">throw</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">catch</span></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-164"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">withFile</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">IOMode</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">read</span></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- | Create a new @\&quot;.tar\&quot;@ file from a directory of files.</span><span>
+</span><span id="line-168"></span><span class="hs-comment">--</span><span>
+</span><span id="line-169"></span><span class="hs-comment">-- It is equivalent to calling the standard @tar@ program like so:</span><span>
+</span><span id="line-170"></span><span class="hs-comment">--</span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- @$ tar -f tarball.tar -C base -c dir@</span><span>
+</span><span id="line-172"></span><span class="hs-comment">--</span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- This assumes a directory @.\/base\/dir@ with files inside, eg</span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- @.\/base\/dir\/foo.txt@. The file names inside the resulting tar file will be</span><span>
+</span><span id="line-175"></span><span class="hs-comment">-- relative to @dir@, eg @dir\/foo.txt@.</span><span>
+</span><span id="line-176"></span><span class="hs-comment">--</span><span>
+</span><span id="line-177"></span><span class="hs-comment">-- This is a high level \&quot;all in one\&quot; operation. Since you may need variations</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- on this function it is instructive to see how it is written. It is just:</span><span>
+</span><span id="line-179"></span><span class="hs-comment">--</span><span>
+</span><span id="line-180"></span><span class="hs-comment">-- &gt; BS.writeFile tar . Tar.write =&lt;&lt; Tar.pack base paths</span><span>
+</span><span id="line-181"></span><span class="hs-comment">--</span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- Notes:</span><span>
+</span><span id="line-183"></span><span class="hs-comment">--</span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- The files and directories must not change during this operation or the</span><span>
+</span><span id="line-185"></span><span class="hs-comment">-- result is not well defined.</span><span>
+</span><span id="line-186"></span><span class="hs-comment">--</span><span>
+</span><span id="line-187"></span><span class="hs-comment">-- The intention of this function is to create tarballs that are portable</span><span>
+</span><span id="line-188"></span><span class="hs-comment">-- between systems. It is /not/ suitable for doing file system backups because</span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- file ownership and permissions are not fully preserved. File ownership is</span><span>
+</span><span id="line-190"></span><span class="hs-comment">-- not preserved at all. File permissions are set to simple portable values:</span><span>
+</span><span id="line-191"></span><span class="hs-comment">--</span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- * @rw-r--r--@ for normal files</span><span>
+</span><span id="line-193"></span><span class="hs-comment">--</span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- * @rwxr-xr-x@ for executable files</span><span>
+</span><span id="line-195"></span><span class="hs-comment">--</span><span>
+</span><span id="line-196"></span><span class="hs-comment">-- * @rwxr-xr-x@ for directories</span><span>
+</span><span id="line-197"></span><span class="hs-comment">--</span><span>
+</span><span id="line-198"></span><span class="annot"><a href="Codec.Archive.Tar.html#create"><span class="hs-identifier hs-type">create</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>   </span><span class="hs-comment">-- ^ Path of the \&quot;.tar\&quot; file to write.</span><span>
+</span><span id="line-199"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>   </span><span class="hs-comment">-- ^ Base directory</span><span>
+</span><span id="line-200"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Files and directories to archive, relative to base dir</span><span>
+</span><span id="line-201"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-202"></span><span id="create"><span class="annot"><span class="annottext">create :: FilePath -&gt; FilePath -&gt; [FilePath] -&gt; IO ()
+</span><a href="Codec.Archive.Tar.html#create"><span class="hs-identifier hs-var hs-var">create</span></a></span></span><span> </span><span id="local-6989586621679059945"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059945"><span class="hs-identifier hs-var">tar</span></a></span></span><span> </span><span id="local-6989586621679059944"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059944"><span class="hs-identifier hs-var">base</span></a></span></span><span> </span><span id="local-6989586621679059943"><span class="annot"><span class="annottext">[FilePath]
+</span><a href="#local-6989586621679059943"><span class="hs-identifier hs-var">paths</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ByteString -&gt; IO ()
+</span><span class="hs-identifier hs-var">BS.writeFile</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059945"><span class="hs-identifier hs-var">tar</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ())
+-&gt; ([Entry] -&gt; ByteString) -&gt; [Entry] -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Entry] -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier hs-var">write</span></a></span><span> </span><span class="annot"><span class="annottext">([Entry] -&gt; IO ()) -&gt; IO [Entry] -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; [FilePath] -&gt; IO [Entry]
+</span><a href="Codec.Archive.Tar.Pack.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059944"><span class="hs-identifier hs-var">base</span></a></span><span> </span><span class="annot"><span class="annottext">[FilePath]
+</span><a href="#local-6989586621679059943"><span class="hs-identifier hs-var">paths</span></a></span><span>
+</span><span id="line-203"></span><span>
+</span><span id="line-204"></span><span class="hs-comment">-- | Extract all the files contained in a @\&quot;.tar\&quot;@ file.</span><span>
+</span><span id="line-205"></span><span class="hs-comment">--</span><span>
+</span><span id="line-206"></span><span class="hs-comment">-- It is equivalent to calling the standard @tar@ program like so:</span><span>
+</span><span id="line-207"></span><span class="hs-comment">--</span><span>
+</span><span id="line-208"></span><span class="hs-comment">-- @$ tar -x -f tarball.tar -C dir@</span><span>
+</span><span id="line-209"></span><span class="hs-comment">--</span><span>
+</span><span id="line-210"></span><span class="hs-comment">-- So for example if the @tarball.tar@ file contains @foo\/bar.txt@ then this</span><span>
+</span><span id="line-211"></span><span class="hs-comment">-- will extract it to @dir\/foo\/bar.txt@.</span><span>
+</span><span id="line-212"></span><span class="hs-comment">--</span><span>
+</span><span id="line-213"></span><span class="hs-comment">-- This is a high level \&quot;all in one\&quot; operation. Since you may need variations</span><span>
+</span><span id="line-214"></span><span class="hs-comment">-- on this function it is instructive to see how it is written. It is just:</span><span>
+</span><span id="line-215"></span><span class="hs-comment">--</span><span>
+</span><span id="line-216"></span><span class="hs-comment">-- &gt; Tar.unpack dir . Tar.read =&lt;&lt; BS.readFile tar</span><span>
+</span><span id="line-217"></span><span class="hs-comment">--</span><span>
+</span><span id="line-218"></span><span class="hs-comment">-- Notes:</span><span>
+</span><span id="line-219"></span><span class="hs-comment">--</span><span>
+</span><span id="line-220"></span><span class="hs-comment">-- Extracting can fail for a number of reasons. The tarball may be incorrectly</span><span>
+</span><span id="line-221"></span><span class="hs-comment">-- formatted. There may be IO or permission errors. In such cases an exception</span><span>
+</span><span id="line-222"></span><span class="hs-comment">-- will be thrown and extraction will not continue.</span><span>
+</span><span id="line-223"></span><span class="hs-comment">--</span><span>
+</span><span id="line-224"></span><span class="hs-comment">-- Since the extraction may fail part way through it is not atomic. For this</span><span>
+</span><span id="line-225"></span><span class="hs-comment">-- reason you may want to extract into an empty directory and, if the</span><span>
+</span><span id="line-226"></span><span class="hs-comment">-- extraction fails, recursively delete the directory.</span><span>
+</span><span id="line-227"></span><span class="hs-comment">--</span><span>
+</span><span id="line-228"></span><span class="hs-comment">-- Security: only files inside the target directory will be written. Tarballs</span><span>
+</span><span id="line-229"></span><span class="hs-comment">-- containing entries that point outside of the tarball (either absolute paths</span><span>
+</span><span id="line-230"></span><span class="hs-comment">-- or relative paths) will be caught and an exception will be thrown.</span><span>
+</span><span id="line-231"></span><span class="hs-comment">--</span><span>
+</span><span id="line-232"></span><span class="annot"><a href="Codec.Archive.Tar.html#extract"><span class="hs-identifier hs-type">extract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-comment">-- ^ Destination directory</span><span>
+</span><span id="line-233"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-comment">-- ^ Tarball</span><span>
+</span><span id="line-234"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-235"></span><span id="extract"><span class="annot"><span class="annottext">extract :: FilePath -&gt; FilePath -&gt; IO ()
+</span><a href="Codec.Archive.Tar.html#extract"><span class="hs-identifier hs-var hs-var">extract</span></a></span></span><span> </span><span id="local-6989586621679059939"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059939"><span class="hs-identifier hs-var">dir</span></a></span></span><span> </span><span id="local-6989586621679059938"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059938"><span class="hs-identifier hs-var">tar</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Entries FormatError -&gt; IO ()
+forall e. Exception e =&gt; FilePath -&gt; Entries e -&gt; IO ()
+</span><a href="Codec.Archive.Tar.Unpack.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059939"><span class="hs-identifier hs-var">dir</span></a></span><span> </span><span class="annot"><span class="annottext">(Entries FormatError -&gt; IO ())
+-&gt; (ByteString -&gt; Entries FormatError) -&gt; ByteString -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Entries FormatError
+</span><a href="Codec.Archive.Tar.Read.html#read"><span class="hs-identifier hs-var">read</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ()) -&gt; IO ByteString -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO ByteString
+</span><span class="hs-identifier hs-var">BS.readFile</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059938"><span class="hs-identifier hs-var">tar</span></a></span><span>
+</span><span id="line-236"></span><span>
+</span><span id="line-237"></span><span class="hs-comment">-- | Append new entries to a @\&quot;.tar\&quot;@ file from a directory of files.</span><span>
+</span><span id="line-238"></span><span class="hs-comment">--</span><span>
+</span><span id="line-239"></span><span class="hs-comment">-- This is much like 'create', except that all the entries are added to the</span><span>
+</span><span id="line-240"></span><span class="hs-comment">-- end of an existing tar file. Or if the file does not already exists then</span><span>
+</span><span id="line-241"></span><span class="hs-comment">-- it behaves the same as 'create'.</span><span>
+</span><span id="line-242"></span><span class="hs-comment">--</span><span>
+</span><span id="line-243"></span><span class="annot"><a href="Codec.Archive.Tar.html#append"><span class="hs-identifier hs-type">append</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>   </span><span class="hs-comment">-- ^ Path of the \&quot;.tar\&quot; file to write.</span><span>
+</span><span id="line-244"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>   </span><span class="hs-comment">-- ^ Base directory</span><span>
+</span><span id="line-245"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Files and directories to archive, relative to base dir</span><span>
+</span><span id="line-246"></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-247"></span><span id="append"><span class="annot"><span class="annottext">append :: FilePath -&gt; FilePath -&gt; [FilePath] -&gt; IO ()
+</span><a href="Codec.Archive.Tar.html#append"><span class="hs-identifier hs-var hs-var">append</span></a></span></span><span> </span><span id="local-6989586621679059936"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059936"><span class="hs-identifier hs-var">tar</span></a></span></span><span> </span><span id="local-6989586621679059935"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059935"><span class="hs-identifier hs-var">base</span></a></span></span><span> </span><span id="local-6989586621679059934"><span class="annot"><span class="annottext">[FilePath]
+</span><a href="#local-6989586621679059934"><span class="hs-identifier hs-var">paths</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-248"></span><span>    </span><span class="annot"><span class="annottext">FilePath -&gt; IOMode -&gt; (Handle -&gt; IO ()) -&gt; IO ()
+forall r. FilePath -&gt; IOMode -&gt; (Handle -&gt; IO r) -&gt; IO r
+</span><span class="hs-identifier hs-var">withFile</span></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059936"><span class="hs-identifier hs-var">tar</span></a></span><span> </span><span class="annot"><span class="annottext">IOMode
+</span><span class="hs-identifier hs-var">ReadWriteMode</span></span><span> </span><span class="annot"><span class="annottext">((Handle -&gt; IO ()) -&gt; IO ()) -&gt; (Handle -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679059932"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679059932"><span class="hs-identifier hs-var">hnd</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-249"></span><span>      </span><span class="annot"><span class="annottext">TarEntryOffset
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; Maybe TarIndex -&gt; IO TarEntryOffset
+</span><a href="Codec.Archive.Tar.Index.html#hSeekEndEntryOffset"><span class="hs-identifier hs-var">hSeekEndEntryOffset</span></a></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679059932"><span class="hs-identifier hs-var">hnd</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe TarIndex
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-250"></span><span>      </span><span class="annot"><span class="annottext">Handle -&gt; ByteString -&gt; IO ()
+</span><span class="hs-identifier hs-var">BS.hPut</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679059932"><span class="hs-identifier hs-var">hnd</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ())
+-&gt; ([Entry] -&gt; ByteString) -&gt; [Entry] -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Entry] -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier hs-var">write</span></a></span><span> </span><span class="annot"><span class="annottext">([Entry] -&gt; IO ()) -&gt; IO [Entry] -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; [FilePath] -&gt; IO [Entry]
+</span><a href="Codec.Archive.Tar.Pack.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679059935"><span class="hs-identifier hs-var">base</span></a></span><span> </span><span class="annot"><span class="annottext">[FilePath]
+</span><a href="#local-6989586621679059934"><span class="hs-identifier hs-var">paths</span></a></span><span>
+</span><span id="line-251"></span><span>
+</span><span id="line-252"></span><span class="hs-comment">-------------------------</span><span>
+</span><span id="line-253"></span><span class="hs-comment">-- Correctness properties</span><span>
+</span><span id="line-254"></span><span class="hs-comment">--</span><span class="hs-cpp">
+
+#ifdef TESTS
+</span><span>
+</span><span id="line-258"></span><span class="hs-identifier">prop_write_read_ustar</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">Entry</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-259"></span><span class="hs-identifier">prop_write_read_ustar</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-260"></span><span>    </span><span class="hs-identifier">foldr</span><span> </span><span class="hs-identifier">Next</span><span> </span><span class="hs-identifier">Done</span><span> </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">read</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">write</span><span> </span><span class="hs-identifier">entries'</span><span class="hs-special">)</span><span>
+</span><span id="line-261"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-262"></span><span>    </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-special">{</span><span> </span><span class="hs-identifier">entryFormat</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">UstarFormat</span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-263"></span><span>
+</span><span id="line-264"></span><span class="hs-identifier">prop_write_read_gnu</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">Entry</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-265"></span><span class="hs-identifier">prop_write_read_gnu</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-266"></span><span>    </span><span class="hs-identifier">foldr</span><span> </span><span class="hs-identifier">Next</span><span> </span><span class="hs-identifier">Done</span><span> </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">read</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">write</span><span> </span><span class="hs-identifier">entries'</span><span class="hs-special">)</span><span>
+</span><span id="line-267"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-268"></span><span>    </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-special">{</span><span> </span><span class="hs-identifier">entryFormat</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">GnuFormat</span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-269"></span><span>
+</span><span id="line-270"></span><span class="hs-identifier">prop_write_read_v7</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">Entry</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-271"></span><span class="hs-identifier">prop_write_read_v7</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-272"></span><span>    </span><span class="hs-identifier">foldr</span><span> </span><span class="hs-identifier">Next</span><span> </span><span class="hs-identifier">Done</span><span> </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-operator">==</span><span> </span><span class="hs-identifier">read</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">write</span><span> </span><span class="hs-identifier">entries'</span><span class="hs-special">)</span><span>
+</span><span id="line-273"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-274"></span><span>    </span><span class="hs-identifier">entries'</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-identifier">limitToV7FormatCompat</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-special">{</span><span> </span><span class="hs-identifier">entryFormat</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">V7Format</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-275"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="hs-identifier">e</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">entries</span><span> </span><span class="hs-special">]</span><span class="hs-cpp">
+
+#endif
+</span></pre></body></html>

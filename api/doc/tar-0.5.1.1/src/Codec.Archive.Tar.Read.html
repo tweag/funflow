@@ -1,0 +1,919 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP, DeriveDataTypeable, BangPatterns #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      :  Codec.Archive.Tar.Read</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Copyright   :  (c) 2007 Bjorn Bringert,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--                    2008 Andrea Vezzosi,</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--                    2008-2009 Duncan Coutts,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--                    2011 Max Bolingbroke</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Maintainer  :  duncan@community.haskell.org</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Codec.Archive.Tar.Read</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#read"><span class="hs-identifier">read</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier">FormatError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html"><span class="hs-identifier">Codec.Archive.Tar.Types</span></a></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Char</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ord</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Int64</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Bits</span></span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">shiftL</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>        </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span>  </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS.Char8</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Unsafe</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span>   </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS</span></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">read</span></span><span class="hs-special">)</span><span class="hs-cpp">
+
+#if !MIN_VERSION_bytestring(0,10,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data.Monoid</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Monoid</span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-identifier">Data.ByteString.Lazy.Internal</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="hs-identifier">LBS</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- | Errors that can be encountered when parsing a Tar archive.</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">data</span><span> </span><span id="FormatError"><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-var">FormatError</span></a></span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="TruncatedArchive"><span class="annot"><a href="Codec.Archive.Tar.Read.html#TruncatedArchive"><span class="hs-identifier hs-var">TruncatedArchive</span></a></span></span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="ShortTrailer"><span class="annot"><a href="Codec.Archive.Tar.Read.html#ShortTrailer"><span class="hs-identifier hs-var">ShortTrailer</span></a></span></span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BadTrailer"><span class="annot"><a href="Codec.Archive.Tar.Read.html#BadTrailer"><span class="hs-identifier hs-var">BadTrailer</span></a></span></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TrailingJunk"><span class="annot"><a href="Codec.Archive.Tar.Read.html#TrailingJunk"><span class="hs-identifier hs-var">TrailingJunk</span></a></span></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="ChecksumIncorrect"><span class="annot"><a href="Codec.Archive.Tar.Read.html#ChecksumIncorrect"><span class="hs-identifier hs-var">ChecksumIncorrect</span></a></span></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="NotTarFormat"><span class="annot"><a href="Codec.Archive.Tar.Read.html#NotTarFormat"><span class="hs-identifier hs-var">NotTarFormat</span></a></span></span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="UnrecognisedTarFormat"><span class="annot"><a href="Codec.Archive.Tar.Read.html#UnrecognisedTarFormat"><span class="hs-identifier hs-var">UnrecognisedTarFormat</span></a></span></span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="HeaderBadNumericEncoding"><span class="annot"><a href="Codec.Archive.Tar.Read.html#HeaderBadNumericEncoding"><span class="hs-identifier hs-var">HeaderBadNumericEncoding</span></a></span></span><span class="hs-cpp">
+#if MIN_VERSION_base(4,8,0)
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679058793"><span id="local-6989586621679058795"><span class="annot"><span class="annottext">FormatError -&gt; FormatError -&gt; Bool
+(FormatError -&gt; FormatError -&gt; Bool)
+-&gt; (FormatError -&gt; FormatError -&gt; Bool) -&gt; Eq FormatError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: FormatError -&gt; FormatError -&gt; Bool
+$c/= :: FormatError -&gt; FormatError -&gt; Bool
+== :: FormatError -&gt; FormatError -&gt; Bool
+$c== :: FormatError -&gt; FormatError -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679058786"><span id="local-6989586621679058788"><span id="local-6989586621679058790"><span class="annot"><span class="annottext">Int -&gt; FormatError -&gt; ShowS
+[FormatError] -&gt; ShowS
+FormatError -&gt; String
+(Int -&gt; FormatError -&gt; ShowS)
+-&gt; (FormatError -&gt; String)
+-&gt; ([FormatError] -&gt; ShowS)
+-&gt; Show FormatError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FormatError] -&gt; ShowS
+$cshowList :: [FormatError] -&gt; ShowS
+show :: FormatError -&gt; String
+$cshow :: FormatError -&gt; String
+showsPrec :: Int -&gt; FormatError -&gt; ShowS
+$cshowsPrec :: Int -&gt; FormatError -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679058779"><span id="local-6989586621679058781"><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-type">FormatError</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>  </span><span id="local-6989586621679058776"><span class="annot"><span class="annottext">displayException :: FormatError -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">displayException</span></span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#TruncatedArchive"><span class="hs-identifier hs-var">TruncatedArchive</span></a></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;truncated tar archive&quot;</span></span><span>
+</span><span id="line-55"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#ShortTrailer"><span class="hs-identifier hs-var">ShortTrailer</span></a></span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;short tar trailer&quot;</span></span><span>
+</span><span id="line-56"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#BadTrailer"><span class="hs-identifier hs-var">BadTrailer</span></a></span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;bad tar trailer&quot;</span></span><span>
+</span><span id="line-57"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#TrailingJunk"><span class="hs-identifier hs-var">TrailingJunk</span></a></span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;tar file has trailing junk&quot;</span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#ChecksumIncorrect"><span class="hs-identifier hs-var">ChecksumIncorrect</span></a></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;tar checksum error&quot;</span></span><span>
+</span><span id="line-59"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#NotTarFormat"><span class="hs-identifier hs-var">NotTarFormat</span></a></span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;data is not in tar format&quot;</span></span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#UnrecognisedTarFormat"><span class="hs-identifier hs-var">UnrecognisedTarFormat</span></a></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;tar entry not in a recognised format&quot;</span></span><span>
+</span><span id="line-61"></span><span>  </span><span class="annot"><span class="hs-identifier hs-var">displayException</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#HeaderBadNumericEncoding"><span class="hs-identifier hs-var">HeaderBadNumericEncoding</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;tar header is malformed (bad numeric encoding)&quot;</span></span><span class="hs-cpp">
+#else
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Eq</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Typeable</span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Show</span><span> </span><span class="hs-identifier">FormatError</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">TruncatedArchive</span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;truncated tar archive&quot;</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">ShortTrailer</span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;short tar trailer&quot;</span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">BadTrailer</span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;bad tar trailer&quot;</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">TrailingJunk</span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;tar file has trailing junk&quot;</span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">ChecksumIncorrect</span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;tar checksum error&quot;</span><span>
+</span><span id="line-71"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">NotTarFormat</span><span>             </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;data is not in tar format&quot;</span><span>
+</span><span id="line-72"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">UnrecognisedTarFormat</span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;tar entry not in a recognised format&quot;</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-identifier">show</span><span> </span><span class="hs-identifier">HeaderBadNumericEncoding</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-string">&quot;tar header is malformed (bad numeric encoding)&quot;</span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Exception</span><span> </span><span class="hs-identifier">FormatError</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-78"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NFData</span></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-type">FormatError</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-79"></span><span>  </span><span id="local-6989586621679058772"><span class="annot"><span class="annottext">rnf :: FormatError -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">rnf</span></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="annottext">FormatError
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- enumerations are fully strict by construction</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- | Convert a data stream in the tar file format into an internal data</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- structure. Decoding errors are reported by the 'Fail' constructor of the</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- 'Entries' type.</span><span>
+</span><span id="line-84"></span><span class="hs-comment">--</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- * The conversion is done lazily.</span><span>
+</span><span id="line-86"></span><span class="hs-comment">--</span><span>
+</span><span id="line-87"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#read"><span class="hs-identifier hs-type">read</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entries"><span class="hs-identifier hs-type">Entries</span></a></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-type">FormatError</span></a></span><span>
+</span><span id="line-88"></span><span id="read"><span class="annot"><span class="annottext">read :: ByteString -&gt; Entries FormatError
+</span><a href="Codec.Archive.Tar.Read.html#read"><span class="hs-identifier hs-var hs-var">read</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Either FormatError (Maybe (Entry, ByteString)))
+-&gt; ByteString -&gt; Entries FormatError
+forall a e. (a -&gt; Either e (Maybe (Entry, a))) -&gt; a -&gt; Entries e
+</span><a href="Codec.Archive.Tar.Types.html#unfoldEntries"><span class="hs-identifier hs-var">unfoldEntries</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Either FormatError (Maybe (Entry, ByteString))
+</span><a href="Codec.Archive.Tar.Read.html#getEntry"><span class="hs-identifier hs-var">getEntry</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getEntry"><span class="hs-identifier hs-type">getEntry</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-type">FormatError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span id="getEntry"><span class="annot"><span class="annottext">getEntry :: ByteString -&gt; Either FormatError (Maybe (Entry, ByteString))
+</span><a href="Codec.Archive.Tar.Read.html#getEntry"><span class="hs-identifier hs-var hs-var">getEntry</span></a></span></span><span> </span><span id="local-6989586621679058768"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">512</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#TruncatedArchive"><span class="hs-identifier hs-var">TruncatedArchive</span></a></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span>  </span><span class="hs-comment">-- Tar files end with at least two blocks of all '0'. Checking this serves</span><span>
+</span><span id="line-95"></span><span>  </span><span class="hs-comment">-- two purposes. It checks the format but also forces the tail of the data</span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-comment">-- which is necessary to close the file if it came from a lazily read file.</span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Word8
+</span><span class="hs-identifier hs-var">LBS.head</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; (ByteString, ByteString)
+</span><span class="hs-identifier hs-var">LBS.splitAt</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">1024</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-98"></span><span>      </span><span class="hs-special">(</span><span id="local-6989586621679058762"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058762"><span class="hs-identifier hs-var">end</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679058761"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058761"><span class="hs-identifier hs-var">trailing</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int64
+</span><span class="hs-identifier hs-var">LBS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058762"><span class="hs-identifier hs-var">end</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">1024</span></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#ShortTrailer"><span class="hs-identifier hs-var">ShortTrailer</span></a></span><span>
+</span><span id="line-100"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8 -&gt; Bool) -&gt; ByteString -&gt; Bool
+</span><span class="hs-identifier hs-var">LBS.all</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058762"><span class="hs-identifier hs-var">end</span></a></span><span class="hs-special">)</span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#BadTrailer"><span class="hs-identifier hs-var">BadTrailer</span></a></span><span>
+</span><span id="line-101"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Word8 -&gt; Bool) -&gt; ByteString -&gt; Bool
+</span><span class="hs-identifier hs-var">LBS.all</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058761"><span class="hs-identifier hs-var">trailing</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#TrailingJunk"><span class="hs-identifier hs-var">TrailingJunk</span></a></span><span>
+</span><span id="line-102"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>                     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (Entry, ByteString)
+-&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Entry, ByteString)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Partial FormatError (Maybe (Entry, ByteString))
+-&gt; Either FormatError (Maybe (Entry, ByteString))
+forall e a. Partial e a -&gt; Either e a
+</span><a href="Codec.Archive.Tar.Read.html#partial"><span class="hs-identifier hs-var">partial</span></a></span><span> </span><span class="annot"><span class="annottext">(Partial FormatError (Maybe (Entry, ByteString))
+ -&gt; Either FormatError (Maybe (Entry, ByteString)))
+-&gt; Partial FormatError (Maybe (Entry, ByteString))
+-&gt; Either FormatError (Maybe (Entry, ByteString))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Partial FormatError Int
+</span><a href="#local-6989586621679058755"><span class="hs-identifier hs-var">chksum_</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Format
+</span><a href="#local-6989586621679058754"><span class="hs-identifier hs-var">format_</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-type">Ok</span></a></span><span> </span><span id="local-6989586621679058752"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058752"><span class="hs-identifier hs-var">chksum</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Format
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Bool
+</span><a href="Codec.Archive.Tar.Read.html#correctChecksum"><span class="hs-identifier hs-var">correctChecksum</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058752"><span class="hs-identifier hs-var">chksum</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; Partial FormatError ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-type">Ok</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span>      </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-type">Ok</span></a></span><span> </span><span class="annot"><span class="annottext">Format
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Partial FormatError ()
+forall e a. e -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#ChecksumIncorrect"><span class="hs-identifier hs-var">ChecksumIncorrect</span></a></span><span>
+</span><span id="line-109"></span><span>    </span><span class="annot"><span class="annottext">(Partial FormatError Int, Partial FormatError Format)
+</span><span class="hs-identifier">_</span></span><span>                 </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Partial FormatError ()
+forall e a. e -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#NotTarFormat"><span class="hs-identifier hs-var">NotTarFormat</span></a></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span>  </span><span class="hs-comment">-- These fields are partial, have to check them</span><span>
+</span><span id="line-112"></span><span>  </span><span id="local-6989586621679058749"><span class="annot"><span class="annottext">Format
+</span><a href="#local-6989586621679058749"><span class="hs-identifier hs-var">format</span></a></span></span><span>   </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Format
+</span><a href="#local-6989586621679058754"><span class="hs-identifier hs-var">format_</span></a></span><span class="hs-special">;</span><span>   </span><span id="local-6989586621679058748"><span class="annot"><span class="annottext">Permissions
+</span><a href="#local-6989586621679058748"><span class="hs-identifier hs-var">mode</span></a></span></span><span>     </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Permissions
+</span><a href="#local-6989586621679058747"><span class="hs-identifier hs-var">mode_</span></a></span><span class="hs-special">;</span><span>
+</span><span id="line-113"></span><span>  </span><span id="local-6989586621679058746"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058746"><span class="hs-identifier hs-var">uid</span></a></span></span><span>      </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int
+</span><a href="#local-6989586621679058745"><span class="hs-identifier hs-var">uid_</span></a></span><span class="hs-special">;</span><span>      </span><span id="local-6989586621679058744"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058744"><span class="hs-identifier hs-var">gid</span></a></span></span><span>      </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int
+</span><a href="#local-6989586621679058743"><span class="hs-identifier hs-var">gid_</span></a></span><span class="hs-special">;</span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679058742"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span></span><span>     </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int64
+</span><a href="#local-6989586621679058741"><span class="hs-identifier hs-var">size_</span></a></span><span class="hs-special">;</span><span>     </span><span id="local-6989586621679058740"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058740"><span class="hs-identifier hs-var">mtime</span></a></span></span><span>    </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int64
+</span><a href="#local-6989586621679058739"><span class="hs-identifier hs-var">mtime_</span></a></span><span class="hs-special">;</span><span>
+</span><span id="line-115"></span><span>  </span><span id="local-6989586621679058738"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058738"><span class="hs-identifier hs-var">devmajor</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int
+</span><a href="#local-6989586621679058737"><span class="hs-identifier hs-var">devmajor_</span></a></span><span class="hs-special">;</span><span> </span><span id="local-6989586621679058736"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058736"><span class="hs-identifier hs-var">devminor</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Partial FormatError Int
+</span><a href="#local-6989586621679058735"><span class="hs-identifier hs-var">devminor_</span></a></span><span class="hs-special">;</span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679058734"><span class="annot"><span class="annottext">content :: ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var hs-var">content</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.take</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span>      </span><span id="local-6989586621679058731"><span class="annot"><span class="annottext">padding :: Int64
+</span><a href="#local-6989586621679058731"><span class="hs-identifier hs-var hs-var">padding</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`mod`</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span>
+</span><span id="line-119"></span><span>      </span><span id="local-6989586621679058729"><span class="annot"><span class="annottext">bs' :: ByteString
+</span><a href="#local-6989586621679058729"><span class="hs-identifier hs-var hs-var">bs'</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.drop</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058731"><span class="hs-identifier hs-var">padding</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span>      </span><span id="local-6989586621679058727"><span class="annot"><span class="annottext">entry :: Entry
+</span><a href="#local-6989586621679058727"><span class="hs-identifier hs-var hs-var">entry</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Entry :: TarPath
+-&gt; EntryContent
+-&gt; Permissions
+-&gt; Ownership
+-&gt; Int64
+-&gt; Format
+-&gt; Entry
+</span><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-122"></span><span>        </span><span class="annot"><span class="annottext">entryTarPath :: TarPath
+</span><a href="Codec.Archive.Tar.Types.html#entryTarPath"><span class="hs-identifier hs-var">entryTarPath</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; TarPath
+</span><a href="Codec.Archive.Tar.Types.html#TarPath"><span class="hs-identifier hs-var">TarPath</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058723"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058722"><span class="hs-identifier hs-var">prefix</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-123"></span><span>        </span><span class="annot"><span class="annottext">entryContent :: EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#entryContent"><span class="hs-identifier hs-var">entryContent</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058720"><span class="hs-identifier hs-var">typecode</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-124"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\0'</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int64 -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#NormalFile"><span class="hs-identifier hs-var">NormalFile</span></a></span><span>      </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span>
+</span><span id="line-125"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'0'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int64 -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#NormalFile"><span class="hs-identifier hs-var">NormalFile</span></a></span><span>      </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span>
+</span><span id="line-126"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'1'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LinkTarget -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#HardLink"><span class="hs-identifier hs-var">HardLink</span></a></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; LinkTarget
+</span><a href="Codec.Archive.Tar.Types.html#LinkTarget"><span class="hs-identifier hs-var">LinkTarget</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058716"><span class="hs-identifier hs-var">linkname</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'2'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LinkTarget -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#SymbolicLink"><span class="hs-identifier hs-var">SymbolicLink</span></a></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; LinkTarget
+</span><a href="Codec.Archive.Tar.Types.html#LinkTarget"><span class="hs-identifier hs-var">LinkTarget</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058716"><span class="hs-identifier hs-var">linkname</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="#local-6989586621679058749"><span class="hs-identifier hs-var">format</span></a></span><span> </span><span class="annot"><span class="annottext">Format -&gt; Format -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#V7Format"><span class="hs-identifier hs-var">V7Format</span></a></span><span>
+</span><span id="line-129"></span><span>                        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char -&gt; ByteString -&gt; Int64 -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#OtherEntryType"><span class="hs-identifier hs-var">OtherEntryType</span></a></span><span>  </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058720"><span class="hs-identifier hs-var">typecode</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span>
+</span><span id="line-130"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'3'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#CharacterDevice"><span class="hs-identifier hs-var">CharacterDevice</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058738"><span class="hs-identifier hs-var">devmajor</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058736"><span class="hs-identifier hs-var">devminor</span></a></span><span>
+</span><span id="line-131"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'4'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#BlockDevice"><span class="hs-identifier hs-var">BlockDevice</span></a></span><span>     </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058738"><span class="hs-identifier hs-var">devmajor</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058736"><span class="hs-identifier hs-var">devminor</span></a></span><span>
+</span><span id="line-132"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'5'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#Directory"><span class="hs-identifier hs-var">Directory</span></a></span><span>
+</span><span id="line-133"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'6'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#NamedPipe"><span class="hs-identifier hs-var">NamedPipe</span></a></span><span>
+</span><span id="line-134"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'7'</span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int64 -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#NormalFile"><span class="hs-identifier hs-var">NormalFile</span></a></span><span>      </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span>
+</span><span id="line-135"></span><span>                   </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-identifier">_</span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char -&gt; ByteString -&gt; Int64 -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#OtherEntryType"><span class="hs-identifier hs-var">OtherEntryType</span></a></span><span>  </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058720"><span class="hs-identifier hs-var">typecode</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058734"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058742"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-136"></span><span>        </span><span class="annot"><span class="annottext">entryPermissions :: Permissions
+</span><a href="Codec.Archive.Tar.Types.html#entryPermissions"><span class="hs-identifier hs-var">entryPermissions</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Permissions
+</span><a href="#local-6989586621679058748"><span class="hs-identifier hs-var">mode</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-137"></span><span>        </span><span class="annot"><span class="annottext">entryOwnership :: Ownership
+</span><a href="Codec.Archive.Tar.Types.html#entryOwnership"><span class="hs-identifier hs-var">entryOwnership</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; Int -&gt; Int -&gt; Ownership
+</span><a href="Codec.Archive.Tar.Types.html#Ownership"><span class="hs-identifier hs-var">Ownership</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; String
+</span><span class="hs-identifier hs-var">BS.Char8.unpack</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058704"><span class="hs-identifier hs-var">uname</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>                                     </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; String
+</span><span class="hs-identifier hs-var">BS.Char8.unpack</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058703"><span class="hs-identifier hs-var">gname</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058746"><span class="hs-identifier hs-var">uid</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058744"><span class="hs-identifier hs-var">gid</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-139"></span><span>        </span><span class="annot"><span class="annottext">entryTime :: Int64
+</span><a href="Codec.Archive.Tar.Types.html#entryTime"><span class="hs-identifier hs-var">entryTime</span></a></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679058740"><span class="hs-identifier hs-var">mtime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-140"></span><span>        </span><span class="annot"><span class="annottext">entryFormat :: Format
+</span><a href="Codec.Archive.Tar.Types.html#entryFormat"><span class="hs-identifier hs-var">entryFormat</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="#local-6989586621679058749"><span class="hs-identifier hs-var">format</span></a></span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>  </span><span class="annot"><span class="annottext">Maybe (Entry, ByteString)
+-&gt; Partial FormatError (Maybe (Entry, ByteString))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Entry, ByteString) -&gt; Maybe (Entry, ByteString)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679058727"><span class="hs-identifier hs-var">entry</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058729"><span class="hs-identifier hs-var">bs'</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span>  </span><span class="hs-keyword">where</span><span class="hs-cpp">
+#if MIN_VERSION_bytestring(0,10,0)
+</span><span>   </span><span id="local-6989586621679058766"><span class="annot"><span class="annottext">header :: ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var hs-var">header</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.toStrict</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.take</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058768"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+#else
+</span><span>   </span><span class="hs-identifier">header</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">LBS.take</span><span> </span><span class="hs-number">512</span><span> </span><span class="hs-identifier">bs</span><span class="hs-special">)</span><span>
+</span><span id="line-150"></span><span>   </span><span class="hs-identifier">toStrict</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">LBS.foldrChunks</span><span> </span><span class="hs-identifier">mappend</span><span> </span><span class="hs-identifier">mempty</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-153"></span><span>   </span><span id="local-6989586621679058723"><span class="annot"><span class="annottext">name :: ByteString
+</span><a href="#local-6989586621679058723"><span class="hs-identifier hs-var hs-var">name</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var">getString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">100</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-154"></span><span>   </span><span id="local-6989586621679058747"><span class="annot"><span class="annottext">mode_ :: Partial FormatError Permissions
+</span><a href="#local-6989586621679058747"><span class="hs-identifier hs-var hs-var">mode_</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Permissions
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">100</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-155"></span><span>   </span><span id="local-6989586621679058745"><span class="annot"><span class="annottext">uid_ :: Partial FormatError Int
+</span><a href="#local-6989586621679058745"><span class="hs-identifier hs-var hs-var">uid_</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">108</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-156"></span><span>   </span><span id="local-6989586621679058743"><span class="annot"><span class="annottext">gid_ :: Partial FormatError Int
+</span><a href="#local-6989586621679058743"><span class="hs-identifier hs-var hs-var">gid_</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">116</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-157"></span><span>   </span><span id="local-6989586621679058741"><span class="annot"><span class="annottext">size_ :: Partial FormatError Int64
+</span><a href="#local-6989586621679058741"><span class="hs-identifier hs-var hs-var">size_</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int64
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">124</span></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-158"></span><span>   </span><span id="local-6989586621679058739"><span class="annot"><span class="annottext">mtime_ :: Partial FormatError Int64
+</span><a href="#local-6989586621679058739"><span class="hs-identifier hs-var hs-var">mtime_</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int64
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">136</span></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-159"></span><span>   </span><span id="local-6989586621679058755"><span class="annot"><span class="annottext">chksum_ :: Partial FormatError Int
+</span><a href="#local-6989586621679058755"><span class="hs-identifier hs-var hs-var">chksum_</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">148</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-160"></span><span>   </span><span id="local-6989586621679058720"><span class="annot"><span class="annottext">typecode :: Char
+</span><a href="#local-6989586621679058720"><span class="hs-identifier hs-var hs-var">typecode</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; Char
+</span><a href="Codec.Archive.Tar.Read.html#getByte"><span class="hs-identifier hs-var">getByte</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">156</span></span><span>     </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-161"></span><span>   </span><span id="local-6989586621679058716"><span class="annot"><span class="annottext">linkname :: ByteString
+</span><a href="#local-6989586621679058716"><span class="hs-identifier hs-var hs-var">linkname</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var">getString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">157</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">100</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-162"></span><span>   </span><span id="local-6989586621679058696"><span class="annot"><span class="annottext">magic :: ByteString
+</span><a href="#local-6989586621679058696"><span class="hs-identifier hs-var hs-var">magic</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getChars"><span class="hs-identifier hs-var">getChars</span></a></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">257</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-163"></span><span>   </span><span id="local-6989586621679058704"><span class="annot"><span class="annottext">uname :: ByteString
+</span><a href="#local-6989586621679058704"><span class="hs-identifier hs-var hs-var">uname</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var">getString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">265</span></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-164"></span><span>   </span><span id="local-6989586621679058703"><span class="annot"><span class="annottext">gname :: ByteString
+</span><a href="#local-6989586621679058703"><span class="hs-identifier hs-var hs-var">gname</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var">getString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">297</span></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-165"></span><span>   </span><span id="local-6989586621679058737"><span class="annot"><span class="annottext">devmajor_ :: Partial FormatError Int
+</span><a href="#local-6989586621679058737"><span class="hs-identifier hs-var hs-var">devmajor_</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">329</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-166"></span><span>   </span><span id="local-6989586621679058735"><span class="annot"><span class="annottext">devminor_ :: Partial FormatError Int
+</span><a href="#local-6989586621679058735"><span class="hs-identifier hs-var hs-var">devminor_</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError Int
+forall a.
+(Integral a, Bits a) =&gt;
+Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var">getOct</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">337</span></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-167"></span><span>   </span><span id="local-6989586621679058722"><span class="annot"><span class="annottext">prefix :: ByteString
+</span><a href="#local-6989586621679058722"><span class="hs-identifier hs-var hs-var">prefix</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var">getString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">345</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">155</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058766"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- trailing   = getBytes  500  12 header</span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span>   </span><span id="local-6989586621679058754"><span class="annot"><span class="annottext">format_ :: Partial FormatError Format
+</span><a href="#local-6989586621679058754"><span class="hs-identifier hs-var hs-var">format_</span></a></span></span><span>
+</span><span id="line-171"></span><span>     </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058696"><span class="hs-identifier hs-var">magic</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Codec.Archive.Tar.Read.html#ustarMagic"><span class="hs-identifier hs-var">ustarMagic</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Format -&gt; Partial FormatError Format
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#UstarFormat"><span class="hs-identifier hs-var">UstarFormat</span></a></span><span>
+</span><span id="line-172"></span><span>     </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058696"><span class="hs-identifier hs-var">magic</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Codec.Archive.Tar.Read.html#gnuMagic"><span class="hs-identifier hs-var">gnuMagic</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Format -&gt; Partial FormatError Format
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#GnuFormat"><span class="hs-identifier hs-var">GnuFormat</span></a></span><span>
+</span><span id="line-173"></span><span>     </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058696"><span class="hs-identifier hs-var">magic</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Codec.Archive.Tar.Read.html#v7Magic"><span class="hs-identifier hs-var">v7Magic</span></a></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Format -&gt; Partial FormatError Format
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#V7Format"><span class="hs-identifier hs-var">V7Format</span></a></span><span>
+</span><span id="line-174"></span><span>     </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>           </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Partial FormatError Format
+forall e a. e -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#UnrecognisedTarFormat"><span class="hs-identifier hs-var">UnrecognisedTarFormat</span></a></span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#v7Magic"><span class="hs-identifier hs-type">v7Magic</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#ustarMagic"><span class="hs-identifier hs-type">ustarMagic</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#gnuMagic"><span class="hs-identifier hs-type">gnuMagic</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-177"></span><span id="v7Magic"><span class="annot"><span class="annottext">v7Magic :: ByteString
+</span><a href="Codec.Archive.Tar.Read.html#v7Magic"><span class="hs-identifier hs-var hs-var">v7Magic</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;\0\0\0\0\0\0\0\0&quot;</span></span><span>
+</span><span id="line-178"></span><span id="ustarMagic"><span class="annot"><span class="annottext">ustarMagic :: ByteString
+</span><a href="Codec.Archive.Tar.Read.html#ustarMagic"><span class="hs-identifier hs-var hs-var">ustarMagic</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ustar\NUL00&quot;</span></span><span>
+</span><span id="line-179"></span><span id="gnuMagic"><span class="annot"><span class="annottext">gnuMagic :: ByteString
+</span><a href="Codec.Archive.Tar.Read.html#gnuMagic"><span class="hs-identifier hs-var hs-var">gnuMagic</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ustar  \NUL&quot;</span></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#correctChecksum"><span class="hs-identifier hs-type">correctChecksum</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-182"></span><span id="correctChecksum"><span class="annot"><span class="annottext">correctChecksum :: ByteString -&gt; Int -&gt; Bool
+</span><a href="Codec.Archive.Tar.Read.html#correctChecksum"><span class="hs-identifier hs-var hs-var">correctChecksum</span></a></span></span><span> </span><span id="local-6989586621679058688"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058688"><span class="hs-identifier hs-var">header</span></a></span></span><span> </span><span id="local-6989586621679058687"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058687"><span class="hs-identifier hs-var">checksum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058687"><span class="hs-identifier hs-var">checksum</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058686"><span class="hs-identifier hs-var">checksum'</span></a></span><span>
+</span><span id="line-183"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-184"></span><span>    </span><span class="hs-comment">-- sum of all 512 bytes in the header block,</span><span>
+</span><span id="line-185"></span><span>    </span><span class="hs-comment">-- treating each byte as an 8-bit unsigned value</span><span>
+</span><span id="line-186"></span><span>    </span><span id="local-6989586621679058685"><span class="annot"><span class="annottext">sumchars :: ByteString -&gt; Int
+</span><a href="#local-6989586621679058685"><span class="hs-identifier hs-var hs-var">sumchars</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Word8 -&gt; Int) -&gt; Int -&gt; ByteString -&gt; Int
+forall a. (a -&gt; Word8 -&gt; a) -&gt; a -&gt; ByteString -&gt; a
+</span><span class="hs-identifier hs-var">BS.foldl'</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679058683"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058683"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679058682"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058682"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058683"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058682"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-187"></span><span>    </span><span class="hs-comment">-- treating the 8 bytes of chksum as blank characters.</span><span>
+</span><span id="line-188"></span><span>    </span><span id="local-6989586621679058686"><span class="annot"><span class="annottext">checksum' :: Int
+</span><a href="#local-6989586621679058686"><span class="hs-identifier hs-var hs-var">checksum'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><a href="#local-6989586621679058685"><span class="hs-identifier hs-var">sumchars</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">148</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058688"><span class="hs-identifier hs-var">header</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>              </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">256</span></span><span> </span><span class="hs-comment">-- 256 = sumchars (BS.Char8.replicate 8 ' ')</span><span>
+</span><span id="line-190"></span><span>              </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><a href="#local-6989586621679058685"><span class="hs-identifier hs-var">sumchars</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">156</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058688"><span class="hs-identifier hs-var">header</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-191"></span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- * TAR format primitive input</span><span>
+</span><span id="line-193"></span><span>
+</span><span id="line-194"></span><span class="hs-pragma">{-# SPECIALISE</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-pragma hs-type">getOct</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">BS.ByteString</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-pragma hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-pragma hs-type">FormatError</span></a></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span>   </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-195"></span><span class="hs-pragma">{-# SPECIALISE</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-pragma hs-type">getOct</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">BS.ByteString</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-pragma hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-pragma hs-type">FormatError</span></a></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int64</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-196"></span><span id="local-6989586621679058875"><span class="annot"><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-type">getOct</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621679058875"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621679058875"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#FormatError"><span class="hs-identifier hs-type">FormatError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058875"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-197"></span><span id="getOct"><span class="annot"><span class="annottext">getOct :: Int -&gt; Int -&gt; ByteString -&gt; Partial FormatError a
+</span><a href="Codec.Archive.Tar.Read.html#getOct"><span class="hs-identifier hs-var hs-var">getOct</span></a></span></span><span> </span><span id="local-6989586621679058679"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058679"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679058678"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058678"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Partial FormatError a
+forall a.
+(Integral a, Bits a) =&gt;
+ByteString -&gt; Partial FormatError a
+</span><a href="#local-6989586621679058677"><span class="hs-identifier hs-var">parseOct</span></a></span><span>
+</span><span id="line-198"></span><span>               </span><span class="annot"><span class="annottext">(ByteString -&gt; Partial FormatError a)
+-&gt; (ByteString -&gt; ByteString)
+-&gt; ByteString
+-&gt; Partial FormatError a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.takeWhile</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679058674"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058674"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058674"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\NUL'</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679058674"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">' '</span></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>               </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.dropWhile</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">' '</span></span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>               </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getBytes"><span class="hs-identifier hs-var">getBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058679"><span class="hs-identifier hs-var">off</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058678"><span class="hs-identifier hs-var">len</span></a></span><span>
+</span><span id="line-201"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-202"></span><span>    </span><span id="local-6989586621679058677"><span class="annot"><span class="annottext">parseOct :: ByteString -&gt; Partial FormatError a
+</span><a href="#local-6989586621679058677"><span class="hs-identifier hs-var hs-var">parseOct</span></a></span></span><span> </span><span id="local-6989586621679058670"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058670"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Bool
+</span><span class="hs-identifier hs-var">BS.null</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058670"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial FormatError a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-203"></span><span>    </span><span class="hs-comment">-- As a star extension, octal fields can hold a base-256 value if the high</span><span>
+</span><span id="line-204"></span><span>    </span><span class="hs-comment">-- bit of the initial character is set. The initial character can be:</span><span>
+</span><span id="line-205"></span><span>    </span><span class="hs-comment">--   0x80 ==&gt; trailing characters hold a positive base-256 value</span><span>
+</span><span id="line-206"></span><span>    </span><span class="hs-comment">--   0xFF ==&gt; trailing characters hold a negative base-256 value</span><span>
+</span><span id="line-207"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-208"></span><span>    </span><span class="hs-comment">-- In both cases, there won't be a trailing NUL/space.</span><span>
+</span><span id="line-209"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-210"></span><span>    </span><span class="hs-comment">-- GNU tar seems to contain a half-implementation of code that deals with</span><span>
+</span><span id="line-211"></span><span>    </span><span class="hs-comment">-- extra bits in the first character, but I don't think it works and the</span><span>
+</span><span id="line-212"></span><span>    </span><span class="hs-comment">-- docs I can find on star seem to suggest that these will always be 0,</span><span>
+</span><span id="line-213"></span><span>    </span><span class="hs-comment">-- which is what I will assume.</span><span>
+</span><span id="line-214"></span><span>    </span><span class="annot"><a href="#local-6989586621679058677"><span class="hs-identifier hs-var">parseOct</span></a></span><span> </span><span id="local-6989586621679058668"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058668"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.head</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058668"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">128</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial FormatError a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; a
+forall a. (Integral a, Bits a) =&gt; ByteString -&gt; a
+</span><a href="#local-6989586621679058666"><span class="hs-identifier hs-var">readBytes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.tail</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058668"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-215"></span><span>               </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.head</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058668"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">255</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial FormatError a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">negate</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; a
+forall a. (Integral a, Bits a) =&gt; ByteString -&gt; a
+</span><a href="#local-6989586621679058666"><span class="hs-identifier hs-var">readBytes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.tail</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058668"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-216"></span><span>    </span><span class="annot"><a href="#local-6989586621679058677"><span class="hs-identifier hs-var">parseOct</span></a></span><span> </span><span id="local-6989586621679058664"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058664"><span class="hs-identifier hs-var">s</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe a
+forall n. Integral n =&gt; ByteString -&gt; Maybe n
+</span><a href="Codec.Archive.Tar.Read.html#readOct"><span class="hs-identifier hs-var">readOct</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058664"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-217"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679058662"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058662"><span class="hs-identifier hs-var">x</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial FormatError a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058662"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-218"></span><span>      </span><span class="annot"><span class="annottext">Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FormatError -&gt; Partial FormatError a
+forall e a. e -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span> </span><span class="annot"><span class="annottext">FormatError
+</span><a href="Codec.Archive.Tar.Read.html#HeaderBadNumericEncoding"><span class="hs-identifier hs-var">HeaderBadNumericEncoding</span></a></span><span>
+</span><span id="line-219"></span><span>
+</span><span id="line-220"></span><span>    </span><span id="local-6989586621679058865"><span class="annot"><a href="#local-6989586621679058666"><span class="hs-identifier hs-type">readBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621679058865"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621679058865"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679058865"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-221"></span><span>    </span><span id="local-6989586621679058666"><span class="annot"><span class="annottext">readBytes :: ByteString -&gt; a
+</span><a href="#local-6989586621679058666"><span class="hs-identifier hs-var hs-var">readBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; Word8 -&gt; a) -&gt; a -&gt; ByteString -&gt; a
+forall a. (a -&gt; Word8 -&gt; a) -&gt; a -&gt; ByteString -&gt; a
+</span><span class="hs-identifier hs-var">BS.foldl'</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679058661"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058661"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span id="local-6989586621679058660"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058660"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058661"><span class="hs-identifier hs-var">acc</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Int -&gt; a
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">`shiftL`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; a
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058660"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-222"></span><span>
+</span><span id="line-223"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getBytes"><span class="hs-identifier hs-type">getBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-224"></span><span id="getBytes"><span class="annot"><span class="annottext">getBytes :: Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getBytes"><span class="hs-identifier hs-var hs-var">getBytes</span></a></span></span><span> </span><span id="local-6989586621679058659"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058659"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679058658"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058658"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058658"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058659"><span class="hs-identifier hs-var">off</span></a></span><span>
+</span><span id="line-225"></span><span>
+</span><span id="line-226"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getByte"><span class="hs-identifier hs-type">getByte</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span>
+</span><span id="line-227"></span><span id="getByte"><span class="annot"><span class="annottext">getByte :: Int -&gt; ByteString -&gt; Char
+</span><a href="Codec.Archive.Tar.Read.html#getByte"><span class="hs-identifier hs-var hs-var">getByte</span></a></span></span><span> </span><span id="local-6989586621679058657"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058657"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679058656"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058656"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int -&gt; Char
+</span><span class="hs-identifier hs-var">BS.Char8.index</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058656"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058657"><span class="hs-identifier hs-var">off</span></a></span><span>
+</span><span id="line-228"></span><span>
+</span><span id="line-229"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getChars"><span class="hs-identifier hs-type">getChars</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-230"></span><span id="getChars"><span class="annot"><span class="annottext">getChars :: Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getChars"><span class="hs-identifier hs-var hs-var">getChars</span></a></span></span><span> </span><span id="local-6989586621679058654"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058654"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679058653"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058653"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getBytes"><span class="hs-identifier hs-var">getBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058654"><span class="hs-identifier hs-var">off</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058653"><span class="hs-identifier hs-var">len</span></a></span><span>
+</span><span id="line-231"></span><span>
+</span><span id="line-232"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-type">getString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-233"></span><span id="getString"><span class="annot"><span class="annottext">getString :: Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getString"><span class="hs-identifier hs-var hs-var">getString</span></a></span></span><span> </span><span id="local-6989586621679058652"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058652"><span class="hs-identifier hs-var">off</span></a></span></span><span> </span><span id="local-6989586621679058651"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058651"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.copy</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.takeWhile</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\0'</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; ByteString -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Read.html#getBytes"><span class="hs-identifier hs-var">getBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058652"><span class="hs-identifier hs-var">off</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058651"><span class="hs-identifier hs-var">len</span></a></span><span>
+</span><span id="line-234"></span><span>
+</span><span id="line-235"></span><span class="hs-comment">-- These days we'd just use Either, but in older versions of base there was no</span><span>
+</span><span id="line-236"></span><span class="hs-comment">-- Monad instance for Either, it was in mtl with an anoying Error constraint.</span><span>
+</span><span id="line-237"></span><span class="hs-comment">--</span><span>
+</span><span id="line-238"></span><span class="hs-keyword">data</span><span> </span><span id="Partial"><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-var">Partial</span></a></span></span><span> </span><span id="local-6989586621679058884"><span class="annot"><a href="#local-6989586621679058884"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621679058883"><span class="annot"><a href="#local-6989586621679058883"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Error"><span class="annot"><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621679058884"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="Ok"><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-var">Ok</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621679058883"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-239"></span><span>
+</span><span id="line-240"></span><span id="local-6989586621679058891"><span id="local-6989586621679058892"><span class="annot"><a href="Codec.Archive.Tar.Read.html#partial"><span class="hs-identifier hs-type">partial</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058892"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058891"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="#local-6989586621679058892"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058891"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-241"></span><span id="partial"><span class="annot"><span class="annottext">partial :: Partial e a -&gt; Either e a
+</span><a href="Codec.Archive.Tar.Read.html#partial"><span class="hs-identifier hs-var hs-var">partial</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span id="local-6989586621679058649"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679058649"><span class="hs-identifier hs-var">msg</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">e -&gt; Either e a
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679058649"><span class="hs-identifier hs-var">msg</span></a></span><span>
+</span><span id="line-242"></span><span class="annot"><a href="Codec.Archive.Tar.Read.html#partial"><span class="hs-identifier hs-var">partial</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-type">Ok</span></a></span><span> </span><span id="local-6989586621679058648"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058648"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Either e a
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058648"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-243"></span><span>
+</span><span id="line-244"></span><span id="local-6989586621679058647"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679058644"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058647"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-245"></span><span>    </span><span id="local-6989586621679058642"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; Partial e a -&gt; Partial e b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; Partial e a -&gt; Partial e b
+forall (m :: * -&gt; *) a1 r. Monad m =&gt; (a1 -&gt; r) -&gt; m a1 -&gt; m r
+</span><span class="hs-identifier hs-var">liftM</span></span></span><span>
+</span><span id="line-246"></span><span>
+</span><span id="line-247"></span><span id="local-6989586621679058640"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679058631"><span id="local-6989586621679058633"><span id="local-6989586621679058635"><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058640"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-248"></span><span>    </span><span id="local-6989586621679058629"><span class="annot"><span class="annottext">pure :: a -&gt; Partial e a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">pure</span></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial e a
+forall e a. a -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-var">Ok</span></a></span><span>
+</span><span id="line-249"></span><span>    </span><span id="local-6989586621679058628"><span class="annot"><span class="annottext">&lt;*&gt; :: Partial e (a -&gt; b) -&gt; Partial e a -&gt; Partial e b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(&lt;*&gt;)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Partial e (a -&gt; b) -&gt; Partial e a -&gt; Partial e b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m (a -&gt; b) -&gt; m a -&gt; m b
+</span><span class="hs-identifier hs-var">ap</span></span></span><span>
+</span><span id="line-250"></span><span>
+</span><span id="line-251"></span><span id="local-6989586621679058626"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679058622"><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Partial"><span class="hs-identifier hs-type">Partial</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679058626"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-252"></span><span>    </span><span id="local-6989586621679058619"><span class="annot"><span class="annottext">return :: a -&gt; Partial e a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">return</span></span></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial e a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-253"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span id="local-6989586621679058618"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679058618"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span id="local-6989586621679058617"><span class="annot"><span class="annottext">&gt;&gt;= :: Partial e a -&gt; (a -&gt; Partial e b) -&gt; Partial e b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&gt;&gt;=</span></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial e b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">e -&gt; Partial e b
+forall e a. e -&gt; Partial e a
+</span><a href="Codec.Archive.Tar.Read.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679058618"><span class="hs-identifier hs-var">m</span></a></span><span>
+</span><span id="line-254"></span><span>    </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#Ok"><span class="hs-identifier hs-type">Ok</span></a></span><span>    </span><span id="local-6989586621679058616"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058616"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span id="local-6989586621679058615"><span class="annot"><span class="annottext">a -&gt; Partial e b
+</span><a href="#local-6989586621679058615"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Partial e b
+</span><a href="#local-6989586621679058615"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679058616"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-cpp">
+#if !MIN_VERSION_base(4,13,0)
+</span><span>    </span><span class="hs-identifier">fail</span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">error</span><span> </span><span class="hs-string">&quot;fail @(Partial e)&quot;</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-259"></span><span class="hs-pragma">{-# SPECIALISE</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#readOct"><span class="hs-pragma hs-type">readOct</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><span class="hs-pragma hs-type">BS.ByteString</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int</span></span><span>   </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-260"></span><span class="hs-pragma">{-# SPECIALISE</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Read.html#readOct"><span class="hs-pragma hs-type">readOct</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><span class="hs-pragma hs-type">BS.ByteString</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int64</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-261"></span><span id="local-6989586621679058864"><span class="annot"><a href="Codec.Archive.Tar.Read.html#readOct"><span class="hs-identifier hs-type">readOct</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621679058864"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679058864"><span class="hs-identifier hs-type">n</span></a></span></span><span>
+</span><span id="line-262"></span><span id="readOct"><span class="annot"><span class="annottext">readOct :: ByteString -&gt; Maybe n
+</span><a href="Codec.Archive.Tar.Read.html#readOct"><span class="hs-identifier hs-var hs-var">readOct</span></a></span></span><span> </span><span id="local-6989586621679058614"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058614"><span class="hs-identifier hs-var">bs0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Int -&gt; n -&gt; ByteString -&gt; n
+forall n. Integral n =&gt; Int -&gt; n -&gt; ByteString -&gt; n
+</span><a href="#local-6989586621679058613"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">n
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058614"><span class="hs-identifier hs-var">bs0</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-263"></span><span>                </span><span class="hs-glyph">-</span><span class="hs-number">1</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe n
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-264"></span><span>                </span><span id="local-6989586621679058612"><span class="annot"><span class="annottext">n
+</span><a href="#local-6989586621679058612"><span class="hs-identifier hs-var">n</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">n -&gt; Maybe n
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">n
+</span><a href="#local-6989586621679058612"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-265"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-266"></span><span>    </span><span id="local-6989586621679058810"><span class="annot"><a href="#local-6989586621679058613"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621679058810"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679058810"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679058810"><span class="hs-identifier hs-type">n</span></a></span></span><span>
+</span><span id="line-267"></span><span>    </span><span id="local-6989586621679058613"><span class="annot"><span class="annottext">go :: Int -&gt; n -&gt; ByteString -&gt; n
+</span><a href="#local-6989586621679058613"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058611"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058611"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058610"><span class="annot"><span class="annottext">n
+</span><a href="#local-6989586621679058610"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679058609"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058609"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-268"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Bool
+</span><span class="hs-identifier hs-var">BS.null</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058609"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058611"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">n
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">n
+</span><a href="#local-6989586621679058610"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-269"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>  </span><span class="hs-glyph">=</span><span>
+</span><span id="line-270"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Word8
+</span><span class="hs-identifier hs-var">BS.unsafeHead</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058609"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-271"></span><span>            </span><span id="local-6989586621679058607"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058607"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058607"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0x30</span></span><span>
+</span><span id="line-272"></span><span>             </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058607"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0x39</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; n -&gt; ByteString -&gt; n
+forall n. Integral n =&gt; Int -&gt; n -&gt; ByteString -&gt; n
+</span><a href="#local-6989586621679058613"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679058611"><span class="hs-identifier hs-var">i</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-273"></span><span>                                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">n
+</span><a href="#local-6989586621679058610"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">n -&gt; n -&gt; n
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">n
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">n -&gt; n -&gt; n
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; n
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679058607"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">n -&gt; n -&gt; n
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">n
+</span><span class="hs-number">0x30</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-274"></span><span>                                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.unsafeTail</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679058609"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-275"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">n
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-276"></span></pre></body></html>

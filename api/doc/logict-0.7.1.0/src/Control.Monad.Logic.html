@@ -1,0 +1,943 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module      : Control.Monad.Logic</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright   : (c) 2007-2014 Dan Doel,</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--               (c) 2011-2013 Edward Kmett,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--               (c) 2014      Roman Cheplyaka,</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--               (c) 2020-2021 Andrew Lelechenko,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--               (c) 2020-2021 Kevin Quick</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     : BSD3</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  : Andrew Lelechenko &lt;andrew.lelechenko@gmail.com&gt;</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Adapted from the paper</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- &lt;http://okmij.org/ftp/papers/LogicT.pdf Backtracking, Interleaving, and Terminating Monad Transformers&gt;</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- by Oleg Kiselyov, Chung-chieh Shan, Daniel P. Friedman, Amr Sabry.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Note that the paper uses 'MonadPlus' vocabulary</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- ('mzero' and 'mplus'),</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- while examples below prefer 'empty' and '&lt;|&gt;'</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- from 'Alternative'.</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-pragma">{-# LANGUAGE CPP                   #-}</span><span>
+</span><span id="line-22"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances     #-}</span><span>
+</span><span id="line-23"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-24"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes            #-}</span><span>
+</span><span id="line-25"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances  #-}</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 704
+</span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Monad.Logic</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html"><span class="hs-identifier">Control.Monad.Logic.Class</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>    </span><span class="annot"><span class="hs-comment">-- * The Logic monad</span></span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier">Logic</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-35"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#logic"><span class="hs-identifier">logic</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-36"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#runLogic"><span class="hs-identifier">runLogic</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observe"><span class="hs-identifier">observe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-38"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observeMany"><span class="hs-identifier">observeMany</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-39"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observeAll"><span class="hs-identifier">observeAll</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-40"></span><span>    </span><span class="annot"><span class="hs-comment">-- * The LogicT monad transformer</span></span><span>
+</span><span id="line-41"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier">LogicT</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#runLogicT"><span class="hs-identifier">runLogicT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-43"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observeT"><span class="hs-identifier">observeT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observeManyT"><span class="hs-identifier">observeManyT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.html#observeAllT"><span class="hs-identifier">observeAllT</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-keyword">module</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span class="hs-special">,</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-keyword">module</span><span> </span><span class="annot"><span class="hs-identifier">Trans</span></span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Fail</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Fail</span></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Identity</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Identity</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadIO</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadTrans</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Trans</span></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Reader.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadReader</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.State.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadState</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Error.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadError</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+
+#if !MIN_VERSION_base(4,8,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Data.Monoid</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Monoid</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if MIN_VERSION_base(4,9,0)
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Semigroup</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Semigroup</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Foldable</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">F</span></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Traversable</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html"><span class="hs-identifier">Control.Monad.Logic.Class</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- | A monad transformer for performing backtracking computations</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- layered over another monad @m@.</span><span>
+</span><span id="line-79"></span><span class="hs-keyword">newtype</span><span> </span><span id="LogicT"><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span></span><span> </span><span id="local-6989586621679039958"><span class="annot"><a href="#local-6989586621679039958"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679039957"><span class="annot"><a href="#local-6989586621679039957"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-80"></span><span>    </span><span id="LogicT"><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unLogicT"><span class="annot"><span class="annottext">LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679039961"><span class="annot"><a href="#local-6989586621679039961"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039957"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039958"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039961"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039958"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039961"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039958"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039961"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039958"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039961"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- | Extracts the first result from a 'LogicT' computation,</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- failing if there are no results at all.</span><span class="hs-cpp">
+#if !MIN_VERSION_base(4,13,0)
+</span><span class="hs-identifier">observeT</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Monad</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">LogicT</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-identifier">a</span><span class="hs-cpp">
+#else
+</span><span id="local-6989586621679039656"><span id="local-6989586621679039657"><span class="annot"><a href="Control.Monad.Logic.html#observeT"><span class="hs-identifier hs-type">observeT</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadFail</span></span><span> </span><span class="annot"><a href="#local-6989586621679039657"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039657"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039656"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039657"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039656"><span class="hs-identifier hs-type">a</span></a></span></span></span><span class="hs-cpp">
+#endif
+</span><span id="observeT"><span class="annot"><span class="annottext">observeT :: LogicT m a -&gt; m a
+</span><a href="Control.Monad.Logic.html#observeT"><span class="hs-identifier hs-var hs-var">observeT</span></a></span></span><span> </span><span id="local-6989586621679039655"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039655"><span class="hs-identifier hs-var">lt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m a -&gt; m a) -&gt; m a -&gt; m a
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039655"><span class="hs-identifier hs-var">lt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m a -&gt; m a -&gt; m a
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; m a -&gt; m a) -&gt; (a -&gt; m a) -&gt; a -&gt; m a -&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; m a
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;No answer.&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- | Extracts all results from a 'LogicT' computation, unless blocked by the</span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- underlying monad.</span><span>
+</span><span id="line-95"></span><span class="hs-comment">--</span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- For example, given</span><span>
+</span><span id="line-97"></span><span class="hs-comment">--</span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- &gt;&gt;&gt; let nats = pure 0 &lt;|&gt; fmap (+ 1) nats</span><span>
+</span><span id="line-99"></span><span class="hs-comment">--</span><span>
+</span><span id="line-100"></span><span class="hs-comment">-- some monads (like 'Identity', 'Control.Monad.Reader.Reader',</span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- 'Control.Monad.Writer.Writer', and 'Control.Monad.State.State')</span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- will be productive:</span><span>
+</span><span id="line-103"></span><span class="hs-comment">--</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- &gt;&gt;&gt; take 5 $ runIdentity (observeAllT nats)</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- [0,1,2,3,4]</span><span>
+</span><span id="line-106"></span><span class="hs-comment">--</span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- but others (like 'Control.Monad.Except.ExceptT',</span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- and 'Control.Monad.Cont.ContT') will not:</span><span>
+</span><span id="line-109"></span><span class="hs-comment">--</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- &gt;&gt;&gt; take 20 &lt;$&gt; runExcept (observeAllT nats)</span><span>
+</span><span id="line-111"></span><span class="hs-comment">--</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- In general, if the underlying monad manages control flow then</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- 'observeAllT' may be unproductive under infinite branching,</span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- and 'observeManyT' should be used instead.</span><span>
+</span><span id="line-115"></span><span id="local-6989586621679039903"><span id="local-6989586621679039904"><span class="annot"><a href="Control.Monad.Logic.html#observeAllT"><span class="hs-identifier hs-type">observeAllT</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679039904"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039904"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039903"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039904"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679039903"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span></span></span><span>
+</span><span id="line-116"></span><span id="observeAllT"><span class="annot"><span class="annottext">observeAllT :: LogicT m a -&gt; m [a]
+</span><a href="Control.Monad.Logic.html#observeAllT"><span class="hs-identifier hs-var hs-var">observeAllT</span></a></span></span><span> </span><span id="local-6989586621679039652"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039652"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m [a] -&gt; m [a]) -&gt; m [a] -&gt; m [a]
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039652"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; m [a] -&gt; m [a]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">(([a] -&gt; [a]) -&gt; m [a] -&gt; m [a])
+-&gt; (a -&gt; [a] -&gt; [a]) -&gt; a -&gt; m [a] -&gt; m [a]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-119"></span><span class="hs-comment">-- | Extracts up to a given number of results from a 'LogicT' computation.</span><span>
+</span><span id="line-120"></span><span id="local-6989586621679039924"><span id="local-6989586621679039925"><span class="annot"><a href="Control.Monad.Logic.html#observeManyT"><span class="hs-identifier hs-type">observeManyT</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679039925"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039925"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039924"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039925"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679039924"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span></span></span><span>
+</span><span id="line-121"></span><span id="observeManyT"><span class="annot"><span class="annottext">observeManyT :: Int -&gt; LogicT m a -&gt; m [a]
+</span><a href="Control.Monad.Logic.html#observeManyT"><span class="hs-identifier hs-var hs-var">observeManyT</span></a></span></span><span> </span><span id="local-6989586621679039651"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039651"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679039650"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039650"><span class="hs-identifier hs-var">m</span></a></span></span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039651"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039651"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m [a] -&gt; m [a]) -&gt; m [a] -&gt; m [a]
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039650"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039648"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039648"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">m [a]
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039648"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m (Maybe (a, LogicT m a))
+-&gt; (Maybe (a, LogicT m a) -&gt; m [a] -&gt; m [a]) -&gt; m [a] -&gt; m [a]
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LogicT m a -&gt; LogicT m (Maybe (a, LogicT m a))
+forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039650"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe (a, LogicT m a) -&gt; m [a] -&gt; m [a]
+forall (m :: * -&gt; *) a p.
+Monad m =&gt;
+Maybe (a, LogicT m a) -&gt; p -&gt; m [a]
+</span><a href="#local-6989586621679039646"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-126"></span><span> </span><span id="local-6989586621679039646"><span class="annot"><span class="annottext">sk :: Maybe (a, LogicT m a) -&gt; p -&gt; m [a]
+</span><a href="#local-6989586621679039646"><span class="hs-identifier hs-var hs-var">sk</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe (a, LogicT m a)
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">p
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[a] -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-127"></span><span> </span><span class="annot"><a href="#local-6989586621679039646"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679039645"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039645"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679039644"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039644"><span class="hs-identifier hs-var">m'</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">p
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039645"><span class="hs-identifier hs-var">a</span></a></span><span class="annot"><span class="annottext">a -&gt; [a] -&gt; [a]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; m [a] -&gt; m [a]
+forall (m :: * -&gt; *) a1 r. Monad m =&gt; (a1 -&gt; r) -&gt; m a1 -&gt; m r
+</span><span class="hs-operator hs-var">`liftM`</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; LogicT m a -&gt; m [a]
+forall (m :: * -&gt; *) a. Monad m =&gt; Int -&gt; LogicT m a -&gt; m [a]
+</span><a href="Control.Monad.Logic.html#observeManyT"><span class="hs-identifier hs-var">observeManyT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039651"><span class="hs-identifier hs-var">n</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039644"><span class="hs-identifier hs-var">m'</span></a></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-130"></span><span class="hs-comment">-- | Runs a 'LogicT' computation with the specified initial success and</span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- failure continuations.</span><span>
+</span><span id="line-132"></span><span class="hs-comment">--</span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- The second argument (&quot;success continuation&quot;) takes one result of</span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- the 'LogicT' computation and the monad to run for any subsequent</span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- matches.</span><span>
+</span><span id="line-136"></span><span class="hs-comment">--</span><span>
+</span><span id="line-137"></span><span class="hs-comment">-- The third argument (&quot;failure continuation&quot;) is called when the</span><span>
+</span><span id="line-138"></span><span class="hs-comment">-- 'LogicT' cannot produce any more results.</span><span>
+</span><span id="line-139"></span><span class="hs-comment">--</span><span>
+</span><span id="line-140"></span><span class="hs-comment">-- For example:</span><span>
+</span><span id="line-141"></span><span class="hs-comment">--</span><span>
+</span><span id="line-142"></span><span class="hs-comment">-- &gt;&gt;&gt; yieldWords = foldr ((&lt;|&gt;) . pure) empty</span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- &gt;&gt;&gt; showEach wrd nxt = putStrLn wrd &gt;&gt; nxt</span><span>
+</span><span id="line-144"></span><span class="hs-comment">-- &gt;&gt;&gt; runLogicT (yieldWords [&quot;foo&quot;, &quot;bar&quot;]) showEach (putStrLn &quot;none!&quot;)</span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- foo</span><span>
+</span><span id="line-146"></span><span class="hs-comment">-- bar</span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- none!</span><span>
+</span><span id="line-148"></span><span class="hs-comment">-- &gt;&gt;&gt; runLogicT (yieldWords []) showEach (putStrLn &quot;none!&quot;)</span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- none!</span><span>
+</span><span id="line-150"></span><span class="hs-comment">-- &gt;&gt;&gt; showFirst wrd _ = putStrLn wrd</span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- &gt;&gt;&gt; runLogicT (yieldWords [&quot;foo&quot;, &quot;bar&quot;]) showFirst (putStrLn &quot;none!&quot;)</span><span>
+</span><span id="line-152"></span><span class="hs-comment">-- foo</span><span>
+</span><span id="line-153"></span><span class="hs-comment">--</span><span>
+</span><span id="line-154"></span><span id="local-6989586621679039640"><span id="local-6989586621679039641"><span id="local-6989586621679039642"><span class="annot"><a href="Control.Monad.Logic.html#runLogicT"><span class="hs-identifier hs-type">runLogicT</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039642"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039641"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039641"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039642"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039640"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039642"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039640"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039642"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039640"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039642"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039640"><span class="hs-identifier hs-type">r</span></a></span></span></span></span><span>
+</span><span id="line-155"></span><span id="runLogicT"><span class="annot"><span class="annottext">runLogicT :: LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#runLogicT"><span class="hs-identifier hs-var hs-var">runLogicT</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span id="local-6989586621679039639"><span class="annot"><span class="annottext">forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039639"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039639"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-158"></span><span class="hs-comment">-- | The basic 'Logic' monad, for performing backtracking computations</span><span>
+</span><span id="line-159"></span><span class="hs-comment">-- returning values (e.g. 'Logic' @a@ will return values of type @a@).</span><span>
+</span><span id="line-160"></span><span class="hs-keyword">type</span><span> </span><span id="Logic"><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-var">Logic</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Identity</span></span><span>
+</span><span id="line-161"></span><span>
+</span><span id="line-162"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- | A smart constructor for 'Logic' computations.</span><span>
+</span><span id="line-164"></span><span id="local-6989586621679039638"><span class="annot"><a href="Control.Monad.Logic.html#logic"><span class="hs-identifier hs-type">logic</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679039918"><span class="annot"><a href="#local-6989586621679039918"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039638"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039918"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039918"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039918"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039918"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-type">Logic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039638"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-165"></span><span id="logic"><span class="annot"><span class="annottext">logic :: (forall r. (a -&gt; r -&gt; r) -&gt; r -&gt; r) -&gt; Logic a
+</span><a href="Control.Monad.Logic.html#logic"><span class="hs-identifier hs-var hs-var">logic</span></a></span></span><span> </span><span id="local-6989586621679039637"><span class="annot"><span class="annottext">forall r. (a -&gt; r -&gt; r) -&gt; r -&gt; r
+</span><a href="#local-6989586621679039637"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r.
+ (a -&gt; Identity r -&gt; Identity r) -&gt; Identity r -&gt; Identity r)
+-&gt; Logic a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r.
+  (a -&gt; Identity r -&gt; Identity r) -&gt; Identity r -&gt; Identity r)
+ -&gt; Logic a)
+-&gt; (forall r.
+    (a -&gt; Identity r -&gt; Identity r) -&gt; Identity r -&gt; Identity r)
+-&gt; Logic a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039636"><span class="annot"><span class="annottext">a -&gt; Identity r -&gt; Identity r
+</span><a href="#local-6989586621679039636"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">r -&gt; Identity r
+forall a. a -&gt; Identity a
+</span><span class="hs-identifier hs-var">Identity</span></span><span> </span><span class="annot"><span class="annottext">(r -&gt; Identity r) -&gt; (Identity r -&gt; r) -&gt; Identity r -&gt; Identity r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span>
+</span><span id="line-166"></span><span>                         </span><span class="annot"><span class="annottext">(a -&gt; r -&gt; r) -&gt; r -&gt; r
+forall r. (a -&gt; r -&gt; r) -&gt; r -&gt; r
+</span><a href="#local-6989586621679039637"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039634"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039634"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Identity r -&gt; r
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span> </span><span class="annot"><span class="annottext">(Identity r -&gt; r) -&gt; (r -&gt; Identity r) -&gt; r -&gt; r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Identity r -&gt; Identity r
+</span><a href="#local-6989586621679039636"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039634"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">(Identity r -&gt; Identity r) -&gt; (r -&gt; Identity r) -&gt; r -&gt; Identity r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; Identity r
+forall a. a -&gt; Identity a
+</span><span class="hs-identifier hs-var">Identity</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(r -&gt; r) -&gt; (Identity r -&gt; r) -&gt; Identity r -&gt; r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span>
+</span><span id="line-167"></span><span>                         </span><span class="annot"><span class="annottext">Identity r -&gt; r
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-170"></span><span class="hs-comment">-- | Extracts the first result from a 'Logic' computation, failing if</span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- there are no results.</span><span>
+</span><span id="line-172"></span><span class="hs-comment">--</span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- &gt;&gt;&gt; observe (pure 5 &lt;|&gt; pure 3 &lt;|&gt; empty)</span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- 5</span><span>
+</span><span id="line-175"></span><span class="hs-comment">--</span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- &gt;&gt;&gt; observe empty</span><span>
+</span><span id="line-177"></span><span class="hs-comment">-- *** Exception: No answer.</span><span>
+</span><span id="line-178"></span><span class="hs-comment">--</span><span>
+</span><span id="line-179"></span><span id="local-6989586621679039632"><span class="annot"><a href="Control.Monad.Logic.html#observe"><span class="hs-identifier hs-type">observe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-type">Logic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039632"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039632"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-180"></span><span id="observe"><span class="annot"><span class="annottext">observe :: Logic a -&gt; a
+</span><a href="Control.Monad.Logic.html#observe"><span class="hs-identifier hs-var hs-var">observe</span></a></span></span><span> </span><span id="local-6989586621679039631"><span class="annot"><span class="annottext">Logic a
+</span><a href="#local-6989586621679039631"><span class="hs-identifier hs-var">lt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Identity a -&gt; a
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span> </span><span class="annot"><span class="annottext">(Identity a -&gt; a) -&gt; Identity a -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Logic a
+-&gt; (a -&gt; Identity a -&gt; Identity a) -&gt; Identity a -&gt; Identity a
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">Logic a
+</span><a href="#local-6989586621679039631"><span class="hs-identifier hs-var">lt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Identity a -&gt; Identity a -&gt; Identity a
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">(Identity a -&gt; Identity a -&gt; Identity a)
+-&gt; (a -&gt; Identity a) -&gt; a -&gt; Identity a -&gt; Identity a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Identity a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; Identity a
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;No answer.&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-183"></span><span class="hs-comment">-- | Extracts all results from a 'Logic' computation.</span><span>
+</span><span id="line-184"></span><span class="hs-comment">--</span><span>
+</span><span id="line-185"></span><span class="hs-comment">-- &gt;&gt;&gt; observe (pure 5 &lt;|&gt; empty &lt;|&gt; empty &lt;|&gt; pure 3 &lt;|&gt; empty)</span><span>
+</span><span id="line-186"></span><span class="hs-comment">-- [5,3]</span><span>
+</span><span id="line-187"></span><span class="hs-comment">--</span><span>
+</span><span id="line-188"></span><span id="local-6989586621679039900"><span class="annot"><a href="Control.Monad.Logic.html#observeAll"><span class="hs-identifier hs-type">observeAll</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-type">Logic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039900"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679039900"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span></span><span>
+</span><span id="line-189"></span><span id="observeAll"><span class="annot"><span class="annottext">observeAll :: Logic a -&gt; [a]
+</span><a href="Control.Monad.Logic.html#observeAll"><span class="hs-identifier hs-var hs-var">observeAll</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Identity [a] -&gt; [a]
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span> </span><span class="annot"><span class="annottext">(Identity [a] -&gt; [a])
+-&gt; (Logic a -&gt; Identity [a]) -&gt; Logic a -&gt; [a]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Logic a -&gt; Identity [a]
+forall (m :: * -&gt; *) a. Applicative m =&gt; LogicT m a -&gt; m [a]
+</span><a href="Control.Monad.Logic.html#observeAllT"><span class="hs-identifier hs-var">observeAllT</span></a></span><span>
+</span><span id="line-190"></span><span>
+</span><span id="line-191"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- | Extracts up to a given number of results from a 'Logic' computation.</span><span>
+</span><span id="line-193"></span><span class="hs-comment">--</span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- &gt;&gt;&gt; let nats = pure 0 &lt;|&gt; fmap (+ 1) nats</span><span>
+</span><span id="line-195"></span><span class="hs-comment">-- &gt;&gt;&gt; observeMany 5 nats</span><span>
+</span><span id="line-196"></span><span class="hs-comment">-- [0,1,2,3,4]</span><span>
+</span><span id="line-197"></span><span class="hs-comment">--</span><span>
+</span><span id="line-198"></span><span id="local-6989586621679039629"><span class="annot"><a href="Control.Monad.Logic.html#observeMany"><span class="hs-identifier hs-type">observeMany</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-type">Logic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039629"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679039629"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span></span><span>
+</span><span id="line-199"></span><span id="observeMany"><span class="annot"><span class="annottext">observeMany :: Int -&gt; Logic a -&gt; [a]
+</span><a href="Control.Monad.Logic.html#observeMany"><span class="hs-identifier hs-var hs-var">observeMany</span></a></span></span><span> </span><span id="local-6989586621679039628"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039628"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [a] -&gt; [a]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039628"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; (Logic a -&gt; [a]) -&gt; Logic a -&gt; [a]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Logic a -&gt; [a]
+forall a. Logic a -&gt; [a]
+</span><a href="Control.Monad.Logic.html#observeAll"><span class="hs-identifier hs-var">observeAll</span></a></span><span>
+</span><span id="line-200"></span><span class="hs-comment">-- Implementing 'observeMany' using 'observeManyT' is quite costly,</span><span>
+</span><span id="line-201"></span><span class="hs-comment">-- because it calls 'msplit' multiple times.</span><span>
+</span><span id="line-202"></span><span>
+</span><span id="line-203"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-204"></span><span class="hs-comment">-- | Runs a 'Logic' computation with the specified initial success and</span><span>
+</span><span id="line-205"></span><span class="hs-comment">-- failure continuations.</span><span>
+</span><span id="line-206"></span><span class="hs-comment">--</span><span>
+</span><span id="line-207"></span><span class="hs-comment">-- &gt;&gt;&gt; runLogic empty (+) 0</span><span>
+</span><span id="line-208"></span><span class="hs-comment">-- 0</span><span>
+</span><span id="line-209"></span><span class="hs-comment">--</span><span>
+</span><span id="line-210"></span><span class="hs-comment">-- &gt;&gt;&gt; runLogic (pure 5 &lt;|&gt; pure 3 &lt;|&gt; empty) (+) 0</span><span>
+</span><span id="line-211"></span><span class="hs-comment">-- 8</span><span>
+</span><span id="line-212"></span><span class="hs-comment">--</span><span>
+</span><span id="line-213"></span><span id="local-6989586621679039722"><span id="local-6989586621679039723"><span class="annot"><a href="Control.Monad.Logic.html#runLogic"><span class="hs-identifier hs-type">runLogic</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#Logic"><span class="hs-identifier hs-type">Logic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039723"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039723"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039722"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039722"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039722"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039722"><span class="hs-identifier hs-type">r</span></a></span></span></span><span>
+</span><span id="line-214"></span><span id="runLogic"><span class="annot"><span class="annottext">runLogic :: Logic a -&gt; (a -&gt; r -&gt; r) -&gt; r -&gt; r
+</span><a href="Control.Monad.Logic.html#runLogic"><span class="hs-identifier hs-var hs-var">runLogic</span></a></span></span><span> </span><span id="local-6989586621679039626"><span class="annot"><span class="annottext">Logic a
+</span><a href="#local-6989586621679039626"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span id="local-6989586621679039625"><span class="annot"><span class="annottext">a -&gt; r -&gt; r
+</span><a href="#local-6989586621679039625"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679039624"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679039624"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Identity r -&gt; r
+forall a. Identity a -&gt; a
+</span><span class="hs-identifier hs-var hs-var">runIdentity</span></span><span> </span><span class="annot"><span class="annottext">(Identity r -&gt; r) -&gt; Identity r -&gt; r
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Logic a
+-&gt; (a -&gt; Identity r -&gt; Identity r) -&gt; Identity r -&gt; Identity r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">Logic a
+</span><a href="#local-6989586621679039626"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Identity r -&gt; Identity r
+</span><a href="#local-6989586621679039623"><span class="hs-identifier hs-var">si</span></a></span><span> </span><span class="annot"><span class="annottext">Identity r
+</span><a href="#local-6989586621679039622"><span class="hs-identifier hs-var">fi</span></a></span><span>
+</span><span id="line-215"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-216"></span><span> </span><span id="local-6989586621679039623"><span class="annot"><span class="annottext">si :: a -&gt; Identity r -&gt; Identity r
+</span><a href="#local-6989586621679039623"><span class="hs-identifier hs-var hs-var">si</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(r -&gt; r) -&gt; Identity r -&gt; Identity r
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">((r -&gt; r) -&gt; Identity r -&gt; Identity r)
+-&gt; (a -&gt; r -&gt; r) -&gt; a -&gt; Identity r -&gt; Identity r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; r -&gt; r
+</span><a href="#local-6989586621679039625"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-217"></span><span> </span><span id="local-6989586621679039622"><span class="annot"><span class="annottext">fi :: Identity r
+</span><a href="#local-6989586621679039622"><span class="hs-identifier hs-var hs-var">fi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">r -&gt; Identity r
+forall a. a -&gt; Identity a
+</span><span class="hs-identifier hs-var">Identity</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679039624"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-218"></span><span>
+</span><span id="line-219"></span><span id="local-6989586621679039621"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039618"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039621"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-220"></span><span>    </span><span id="local-6989586621679039616"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; LogicT f a -&gt; LogicT f b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679039615"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679039615"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679039614"><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039614"><span class="hs-identifier hs-var">lt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b)
+-&gt; (forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039613"><span class="annot"><span class="annottext">b -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039613"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039612"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039612"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT f a -&gt; (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039614"><span class="hs-identifier hs-var">lt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039613"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; f r -&gt; f r) -&gt; (a -&gt; b) -&gt; a -&gt; f r -&gt; f r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679039615"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039612"><span class="hs-identifier hs-var">fk</span></a></span></span><span>
+</span><span id="line-221"></span><span>
+</span><span id="line-222"></span><span id="local-6989586621679039611"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039602"><span id="local-6989586621679039604"><span id="local-6989586621679039606"><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039611"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-223"></span><span>    </span><span id="local-6989586621679039600"><span class="annot"><span class="annottext">pure :: a -&gt; LogicT f a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">pure</span></span></span><span> </span><span id="local-6989586621679039599"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039599"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a)
+-&gt; (forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039598"><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039598"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039597"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039597"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039598"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039599"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039597"><span class="hs-identifier hs-var">fk</span></a></span><span>
+</span><span id="line-224"></span><span>    </span><span id="local-6989586621679039596"><span class="annot"><span class="annottext">LogicT f (a -&gt; b)
+</span><a href="#local-6989586621679039596"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679039595"><span class="annot"><span class="annottext">&lt;*&gt; :: LogicT f (a -&gt; b) -&gt; LogicT f a -&gt; LogicT f b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;*&gt;</span></span></span><span> </span><span id="local-6989586621679039594"><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039594"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b)
+-&gt; (forall r. (b -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039593"><span class="annot"><span class="annottext">b -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039593"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039592"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039592"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT f (a -&gt; b) -&gt; ((a -&gt; b) -&gt; f r -&gt; f r) -&gt; f r -&gt; f r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT f (a -&gt; b)
+</span><a href="#local-6989586621679039596"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039591"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679039591"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679039590"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039590"><span class="hs-identifier hs-var">fk'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT f a -&gt; (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039594"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039593"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; f r -&gt; f r) -&gt; (a -&gt; b) -&gt; a -&gt; f r -&gt; f r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679039591"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039590"><span class="hs-identifier hs-var">fk'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039592"><span class="hs-identifier hs-var">fk</span></a></span></span><span>
+</span><span id="line-225"></span><span>
+</span><span id="line-226"></span><span id="local-6989586621679039589"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039582"><span id="local-6989586621679039584"><span class="annot"><span class="hs-identifier hs-type">Alternative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039589"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-227"></span><span>    </span><span id="local-6989586621679039580"><span class="annot"><span class="annottext">empty :: LogicT f a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">empty</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a)
+-&gt; (forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679039578"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039578"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039578"><span class="hs-identifier hs-var">fk</span></a></span><span>
+</span><span id="line-228"></span><span>    </span><span id="local-6989586621679039577"><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039577"><span class="hs-identifier hs-var">f1</span></a></span></span><span> </span><span id="local-6989586621679039576"><span class="annot"><span class="annottext">&lt;|&gt; :: LogicT f a -&gt; LogicT f a -&gt; LogicT f a
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;|&gt;</span></span></span><span> </span><span id="local-6989586621679039574"><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039574"><span class="hs-identifier hs-var">f2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a)
+-&gt; (forall r. (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r) -&gt; LogicT f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039573"><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039573"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039572"><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039572"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT f a -&gt; (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039577"><span class="hs-identifier hs-var">f1</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039573"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LogicT f a -&gt; (a -&gt; f r -&gt; f r) -&gt; f r -&gt; f r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT f a
+</span><a href="#local-6989586621679039574"><span class="hs-identifier hs-var">f2</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f r -&gt; f r
+</span><a href="#local-6989586621679039573"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">f r
+</span><a href="#local-6989586621679039572"><span class="hs-identifier hs-var">fk</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-229"></span><span>
+</span><span id="line-230"></span><span id="local-6989586621679039571"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039567"><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039571"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-231"></span><span>    </span><span id="local-6989586621679039564"><span class="annot"><span class="annottext">return :: a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">return</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; LogicT m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-232"></span><span>    </span><span id="local-6989586621679039563"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039563"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span id="local-6989586621679039562"><span class="annot"><span class="annottext">&gt;&gt;= :: LogicT m a -&gt; (a -&gt; LogicT m b) -&gt; LogicT m b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&gt;&gt;=</span></span></span><span> </span><span id="local-6989586621679039561"><span class="annot"><span class="annottext">a -&gt; LogicT m b
+</span><a href="#local-6989586621679039561"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (b -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m b
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (b -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m b)
+-&gt; (forall r. (b -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039560"><span class="annot"><span class="annottext">b -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039560"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039559"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039559"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039563"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039558"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039558"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679039557"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039557"><span class="hs-identifier hs-var">fk'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT m b -&gt; (b -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; LogicT m b
+</span><a href="#local-6989586621679039561"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039558"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">b -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039560"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039557"><span class="hs-identifier hs-var">fk'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039559"><span class="hs-identifier hs-var">fk</span></a></span></span><span class="hs-cpp">
+#if !MIN_VERSION_base(4,13,0)
+</span><span>    </span><span class="hs-identifier">fail</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">Fail.fail</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-237"></span><span id="local-6989586621679039556"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Fail.MonadFail</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039556"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-238"></span><span>    </span><span id="local-6989586621679039552"><span class="annot"><span class="annottext">fail :: String -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fail</span></span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a)
+-&gt; (forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679039551"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039551"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039551"><span class="hs-identifier hs-var">fk</span></a></span></span><span>
+</span><span id="line-239"></span><span>
+</span><span id="line-240"></span><span id="local-6989586621679039550"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadPlus</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039550"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-241"></span><span>  </span><span id="local-6989586621679039544"><span class="annot"><span class="annottext">mzero :: LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mzero</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span>
+</span><span id="line-242"></span><span>  </span><span id="local-6989586621679039542"><span class="annot"><span class="annottext">mplus :: LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mplus</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">(&lt;|&gt;)</span></span></span><span class="hs-cpp">
+
+#if MIN_VERSION_base(4,9,0)
+</span><span id="local-6989586621679039539"><span id="local-6989586621679039540"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039535"><span class="annot"><span class="hs-identifier hs-type">Semigroup</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039540"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039539"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-246"></span><span>  </span><span id="local-6989586621679039533"><span class="annot"><span class="annottext">&lt;&gt; :: LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(&lt;&gt;)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">mplus</span></span><span>
+</span><span id="line-247"></span><span>  </span><span id="local-6989586621679039532"><span class="annot"><span class="annottext">sconcat :: NonEmpty (LogicT m a) -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">sconcat</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(LogicT m a -&gt; LogicT m a -&gt; LogicT m a)
+-&gt; NonEmpty (LogicT m a) -&gt; LogicT m a
+forall (t :: * -&gt; *) a. Foldable t =&gt; (a -&gt; a -&gt; a) -&gt; t a -&gt; a
+</span><span class="hs-identifier hs-var">foldr1</span></span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">mplus</span></span></span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-250"></span><span id="local-6989586621679039528"><span id="local-6989586621679039529"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039529"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039528"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-251"></span><span>  </span><span id="local-6989586621679039522"><span class="annot"><span class="annottext">mempty :: LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span>
+</span><span id="line-252"></span><span>  </span><span id="local-6989586621679039521"><span class="annot"><span class="annottext">mappend :: LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; LogicT m a -&gt; LogicT m a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">(&lt;|&gt;)</span></span><span>
+</span><span id="line-253"></span><span>  </span><span id="local-6989586621679039520"><span class="annot"><span class="annottext">mconcat :: [LogicT m a] -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mconcat</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[LogicT m a] -&gt; LogicT m a
+forall (t :: * -&gt; *) (f :: * -&gt; *) a.
+(Foldable t, Alternative f) =&gt;
+t (f a) -&gt; f a
+</span><span class="hs-identifier hs-var">F.asum</span></span></span></span><span>
+</span><span id="line-254"></span><span>
+</span><span id="line-255"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadTrans</span></span><span> </span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-256"></span><span>    </span><span id="local-6989586621679039516"><span class="annot"><span class="annottext">lift :: m a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">lift</span></span></span><span> </span><span id="local-6989586621679039514"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679039514"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a)
+-&gt; (forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039513"><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039513"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039512"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039512"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679039514"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">m a -&gt; (a -&gt; m r) -&gt; m r
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039511"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039511"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039513"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039511"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039512"><span class="hs-identifier hs-var">fk</span></a></span><span>
+</span><span id="line-257"></span><span>
+</span><span id="line-258"></span><span id="local-6989586621679039510"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679039510"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039510"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-259"></span><span>    </span><span id="local-6989586621679039506"><span class="annot"><span class="annottext">liftIO :: IO a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">liftIO</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; LogicT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; LogicT m a) -&gt; (IO a -&gt; m a) -&gt; IO a -&gt; LogicT m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">IO a -&gt; m a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span></span><span>
+</span><span id="line-260"></span><span>
+</span><span id="line-261"></span><span id="local-6989586621679039504"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039493"><span id="local-6989586621679039497"><span id="local-6989586621679039499"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621679039504"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039504"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-262"></span><span>    </span><span class="hs-comment">-- 'msplit' is quite costly even if the base 'Monad' is 'Identity'.</span><span>
+</span><span id="line-263"></span><span>    </span><span class="hs-comment">-- Try to avoid it.</span><span>
+</span><span id="line-264"></span><span>    </span><span id="local-6989586621679039491"><span class="annot"><span class="annottext">msplit :: LogicT m a -&gt; LogicT m (Maybe (a, LogicT m a))
+</span><a href="#local-6989586621679039491"><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></a></span></span><span> </span><span id="local-6989586621679039490"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039490"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m (Maybe (a, LogicT m a)) -&gt; LogicT m (Maybe (a, LogicT m a))
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(m (Maybe (a, LogicT m a)) -&gt; LogicT m (Maybe (a, LogicT m a)))
+-&gt; m (Maybe (a, LogicT m a)) -&gt; LogicT m (Maybe (a, LogicT m a))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+-&gt; (a -&gt; m (Maybe (a, LogicT m a)) -&gt; m (Maybe (a, LogicT m a)))
+-&gt; m (Maybe (a, LogicT m a))
+-&gt; m (Maybe (a, LogicT m a))
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039490"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; m (Maybe (a, LogicT m a)) -&gt; m (Maybe (a, LogicT m a))
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) (m :: * -&gt; *) a b.
+(MonadTrans t, Monad m, Monad m, Monad (t m), Alternative (t m)) =&gt;
+a -&gt; m (Maybe (b, t m b)) -&gt; m (Maybe (a, t m b))
+</span><a href="#local-6989586621679039489"><span class="hs-identifier hs-var">ssk</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe (a, LogicT m a) -&gt; m (Maybe (a, LogicT m a))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe (a, LogicT m a)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span class="hs-special">)</span><span>
+</span><span id="line-265"></span><span>     </span><span class="hs-keyword">where</span><span>
+</span><span id="line-266"></span><span>     </span><span id="local-6989586621679039489"><span class="annot"><span class="annottext">ssk :: a -&gt; m (Maybe (b, t m b)) -&gt; m (Maybe (a, t m b))
+</span><a href="#local-6989586621679039489"><span class="hs-identifier hs-var hs-var">ssk</span></a></span></span><span> </span><span id="local-6989586621679039488"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039488"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679039487"><span class="annot"><span class="annottext">m (Maybe (b, t m b))
+</span><a href="#local-6989586621679039487"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (a, t m b) -&gt; m (Maybe (a, t m b))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Maybe (a, t m b) -&gt; m (Maybe (a, t m b)))
+-&gt; Maybe (a, t m b) -&gt; m (Maybe (a, t m b))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(a, t m b) -&gt; Maybe (a, t m b)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039488"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">m (Maybe (b, t m b)) -&gt; t m (Maybe (b, t m b))
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">m (Maybe (b, t m b))
+</span><a href="#local-6989586621679039487"><span class="hs-identifier hs-var">fk</span></a></span><span> </span><span class="annot"><span class="annottext">t m (Maybe (b, t m b)) -&gt; (Maybe (b, t m b) -&gt; t m b) -&gt; t m b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Maybe (b, t m b) -&gt; t m b
+forall (m :: * -&gt; *) a. Alternative m =&gt; Maybe (a, m a) -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#reflect"><span class="hs-identifier hs-var">reflect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-267"></span><span>    </span><span id="local-6989586621679039485"><span class="annot"><span class="annottext">once :: LogicT m a -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.Class.html#once"><span class="hs-identifier hs-var hs-var hs-var hs-var">once</span></a></span></span><span> </span><span id="local-6989586621679039483"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039483"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a)
+-&gt; (forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039482"><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039482"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039481"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039481"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039483"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039480"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039480"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">m r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039482"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039480"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039481"><span class="hs-identifier hs-var">fk</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039481"><span class="hs-identifier hs-var">fk</span></a></span><span>
+</span><span id="line-268"></span><span>    </span><span id="local-6989586621679039479"><span class="annot"><span class="annottext">lnot :: LogicT m a -&gt; LogicT m ()
+</span><a href="Control.Monad.Logic.Class.html#lnot"><span class="hs-identifier hs-var hs-var hs-var hs-var">lnot</span></a></span></span><span> </span><span id="local-6989586621679039477"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039477"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (() -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m ()
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (() -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m ())
+-&gt; (forall r. (() -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039476"><span class="annot"><span class="annottext">() -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039476"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039475"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039475"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039477"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">m r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039475"><span class="hs-identifier hs-var">fk</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039476"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039475"><span class="hs-identifier hs-var">fk</span></a></span><span class="hs-special">)</span></span><span class="hs-cpp">
+
+#if MIN_VERSION_base(4,8,0)
+</span><span>
+</span><span id="line-272"></span><span id="local-6989586621679039474"><span class="hs-keyword">instance</span><span> </span><span class="hs-pragma">{-# OVERLAPPABLE</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span id="local-6989586621679039441"><span id="local-6989586621679039443"><span id="local-6989586621679039445"><span id="local-6989586621679039447"><span id="local-6989586621679039449"><span id="local-6989586621679039451"><span id="local-6989586621679039453"><span id="local-6989586621679039455"><span id="local-6989586621679039457"><span id="local-6989586621679039459"><span id="local-6989586621679039461"><span id="local-6989586621679039463"><span id="local-6989586621679039465"><span id="local-6989586621679039467"><span id="local-6989586621679039469"><span id="local-6989586621679039472"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679039474"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">F.Foldable</span></span><span> </span><span class="annot"><a href="#local-6989586621679039474"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">F.Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039474"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-273"></span><span>    </span><span id="local-6989586621679039439"><span class="annot"><span class="annottext">foldMap :: (a -&gt; m) -&gt; LogicT m a -&gt; m
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">foldMap</span></span></span><span> </span><span id="local-6989586621679039437"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679039437"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679039436"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039436"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m m -&gt; m
+forall (t :: * -&gt; *) m. (Foldable t, Monoid m) =&gt; t m -&gt; m
+</span><span class="hs-identifier hs-var">F.fold</span></span><span> </span><span class="annot"><span class="annottext">(m m -&gt; m) -&gt; m m -&gt; m
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m m -&gt; m m) -&gt; m m -&gt; m m
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039436"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(m -&gt; m) -&gt; m m -&gt; m m
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">((m -&gt; m) -&gt; m m -&gt; m m) -&gt; (a -&gt; m -&gt; m) -&gt; a -&gt; m m -&gt; m m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">m -&gt; m -&gt; m
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">mappend</span></span><span> </span><span class="annot"><span class="annottext">(m -&gt; m -&gt; m) -&gt; (a -&gt; m) -&gt; a -&gt; m -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679039437"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m -&gt; m m
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">m
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">)</span></span><span>
+</span><span id="line-274"></span><span>
+</span><span id="line-275"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-pragma">{-# OVERLAPPING</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span id="local-6989586621679039402"><span id="local-6989586621679039404"><span id="local-6989586621679039406"><span id="local-6989586621679039408"><span id="local-6989586621679039410"><span id="local-6989586621679039412"><span id="local-6989586621679039414"><span id="local-6989586621679039416"><span id="local-6989586621679039418"><span id="local-6989586621679039420"><span id="local-6989586621679039422"><span id="local-6989586621679039424"><span id="local-6989586621679039426"><span id="local-6989586621679039429"><span id="local-6989586621679039431"><span id="local-6989586621679039433"><span class="annot"><span class="hs-identifier hs-type">F.Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Identity</span></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-276"></span><span>    </span><span id="local-6989586621679039401"><span class="annot"><span class="annottext">foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; LogicT Identity a -&gt; b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">foldr</span></span></span><span> </span><span id="local-6989586621679039399"><span class="annot"><span class="annottext">a -&gt; b -&gt; b
+</span><a href="#local-6989586621679039399"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679039398"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679039398"><span class="hs-identifier hs-var">z</span></a></span></span><span> </span><span id="local-6989586621679039397"><span class="annot"><span class="annottext">LogicT Identity a
+</span><a href="#local-6989586621679039397"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT Identity a -&gt; (a -&gt; b -&gt; b) -&gt; b -&gt; b
+forall a r. Logic a -&gt; (a -&gt; r -&gt; r) -&gt; r -&gt; r
+</span><a href="Control.Monad.Logic.html#runLogic"><span class="hs-identifier hs-var">runLogic</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT Identity a
+</span><a href="#local-6989586621679039397"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b -&gt; b
+</span><a href="#local-6989586621679039399"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679039398"><span class="hs-identifier hs-var">z</span></a></span><span class="hs-cpp">
+
+#else
+</span><span>
+</span><span id="line-280"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Applicative</span><span> </span><span class="hs-identifier">m</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">F.Foldable</span><span> </span><span class="hs-identifier">m</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">F.Foldable</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">LogicT</span><span> </span><span class="hs-identifier">m</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-281"></span><span>    </span><span class="hs-identifier">foldMap</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">F.fold</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">unLogicT</span><span> </span><span class="hs-identifier">m</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">fmap</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">mappend</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">f</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">pure</span><span> </span><span class="hs-identifier">mempty</span><span class="hs-special">)</span><span class="hs-cpp">
+
+#endif
+</span><span>
+</span><span id="line-285"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039388"><span id="local-6989586621679039390"><span id="local-6989586621679039392"><span class="annot"><span class="hs-identifier hs-type">T.Traversable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Identity</span></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-286"></span><span>  </span><span id="local-6989586621679039386"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; LogicT Identity a -&gt; f (LogicT Identity b)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></span></span><span> </span><span id="local-6989586621679039384"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679039384"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679039383"><span class="annot"><span class="annottext">LogicT Identity a
+</span><a href="#local-6989586621679039383"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LogicT Identity a
+-&gt; (a -&gt; f (LogicT Identity b) -&gt; f (LogicT Identity b))
+-&gt; f (LogicT Identity b)
+-&gt; f (LogicT Identity b)
+forall a r. Logic a -&gt; (a -&gt; r -&gt; r) -&gt; r -&gt; r
+</span><a href="Control.Monad.Logic.html#runLogic"><span class="hs-identifier hs-var">runLogic</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT Identity a
+</span><a href="#local-6989586621679039383"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039382"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039382"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679039381"><span class="annot"><span class="annottext">f (LogicT Identity b)
+</span><a href="#local-6989586621679039381"><span class="hs-identifier hs-var">ft</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">b -&gt; LogicT Identity b -&gt; LogicT Identity b
+forall (f :: * -&gt; *) a. Alternative f =&gt; a -&gt; f a -&gt; f a
+</span><a href="#local-6989586621679039380"><span class="hs-identifier hs-var">cons</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; LogicT Identity b -&gt; LogicT Identity b)
+-&gt; f b -&gt; f (LogicT Identity b -&gt; LogicT Identity b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679039384"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039382"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">f (LogicT Identity b -&gt; LogicT Identity b)
+-&gt; f (LogicT Identity b) -&gt; f (LogicT Identity b)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">f (LogicT Identity b)
+</span><a href="#local-6989586621679039381"><span class="hs-identifier hs-var">ft</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LogicT Identity b -&gt; f (LogicT Identity b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">LogicT Identity b
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span class="hs-special">)</span><span>
+</span><span id="line-287"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-288"></span><span>      </span><span id="local-6989586621679039380"><span class="annot"><span class="annottext">cons :: a -&gt; f a -&gt; f a
+</span><a href="#local-6989586621679039380"><span class="hs-identifier hs-var hs-var">cons</span></a></span></span><span> </span><span id="local-6989586621679039378"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039378"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679039377"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679039377"><span class="hs-identifier hs-var">l'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039378"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; f a -&gt; f a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679039377"><span class="hs-identifier hs-var">l'</span></a></span><span>
+</span><span id="line-289"></span><span>
+</span><span id="line-290"></span><span class="hs-comment">-- Needs undecidable instances</span><span>
+</span><span id="line-291"></span><span id="local-6989586621679039375"><span id="local-6989586621679039376"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039370"><span class="annot"><span class="hs-identifier hs-type">MonadReader</span></span><span> </span><span class="annot"><a href="#local-6989586621679039376"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039375"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadReader</span></span><span> </span><span class="annot"><a href="#local-6989586621679039376"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039375"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-292"></span><span>    </span><span id="local-6989586621679039368"><span class="annot"><span class="annottext">ask :: LogicT m r
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ask</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m r -&gt; LogicT m r
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">m r
+forall r (m :: * -&gt; *). MonadReader r m =&gt; m r
+</span><span class="hs-identifier hs-var">ask</span></span><span>
+</span><span id="line-293"></span><span>    </span><span id="local-6989586621679039366"><span class="annot"><span class="annottext">local :: (r -&gt; r) -&gt; LogicT m a -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">local</span></span></span><span> </span><span id="local-6989586621679039364"><span class="annot"><span class="annottext">r -&gt; r
+</span><a href="#local-6989586621679039364"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span id="local-6989586621679039363"><span class="annot"><span class="annottext">forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039363"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a)
+-&gt; (forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039362"><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039362"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039361"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039361"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-294"></span><span>        </span><span id="local-6989586621679039360"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679039360"><span class="hs-identifier hs-var">env</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m r
+forall r (m :: * -&gt; *). MonadReader r m =&gt; m r
+</span><span class="hs-identifier hs-var">ask</span></span><span>
+</span><span id="line-295"></span><span>        </span><span class="annot"><span class="annottext">(r -&gt; r) -&gt; m r -&gt; m r
+forall r (m :: * -&gt; *) a. MonadReader r m =&gt; (r -&gt; r) -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">local</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; r
+</span><a href="#local-6989586621679039364"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(m r -&gt; m r) -&gt; m r -&gt; m r
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039363"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">(r -&gt; r) -&gt; m r -&gt; m r
+forall r (m :: * -&gt; *) a. MonadReader r m =&gt; (r -&gt; r) -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">local</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679039360"><span class="hs-identifier hs-var">env</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(m r -&gt; m r) -&gt; (m r -&gt; m r) -&gt; m r -&gt; m r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((m r -&gt; m r) -&gt; m r -&gt; m r)
+-&gt; (a -&gt; m r -&gt; m r) -&gt; a -&gt; m r -&gt; m r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039362"><span class="hs-identifier hs-var">sk</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(r -&gt; r) -&gt; m r -&gt; m r
+forall r (m :: * -&gt; *) a. MonadReader r m =&gt; (r -&gt; r) -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">local</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">r -&gt; r -&gt; r
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621679039360"><span class="hs-identifier hs-var">env</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039361"><span class="hs-identifier hs-var">fk</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-296"></span><span>
+</span><span id="line-297"></span><span class="hs-comment">-- Needs undecidable instances</span><span>
+</span><span id="line-298"></span><span id="local-6989586621679039358"><span id="local-6989586621679039359"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039353"><span class="annot"><span class="hs-identifier hs-type">MonadState</span></span><span> </span><span class="annot"><a href="#local-6989586621679039359"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039358"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadState</span></span><span> </span><span class="annot"><a href="#local-6989586621679039359"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039358"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-299"></span><span>    </span><span id="local-6989586621679039351"><span class="annot"><span class="annottext">get :: LogicT m s
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; LogicT m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><span class="hs-identifier hs-var">get</span></span><span>
+</span><span id="line-300"></span><span>    </span><span id="local-6989586621679039349"><span class="annot"><span class="annottext">put :: s -&gt; LogicT m ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; LogicT m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; LogicT m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; LogicT m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><span class="hs-identifier hs-var">put</span></span></span></span><span>
+</span><span id="line-301"></span><span>
+</span><span id="line-302"></span><span class="hs-comment">-- Needs undecidable instances</span><span>
+</span><span id="line-303"></span><span id="local-6989586621679039346"><span id="local-6989586621679039347"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadError</span></span><span> </span><span class="annot"><a href="#local-6989586621679039347"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039346"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadError</span></span><span> </span><span class="annot"><a href="#local-6989586621679039347"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-type">LogicT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039346"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-304"></span><span>  </span><span id="local-6989586621679039341"><span class="annot"><span class="annottext">throwError :: e -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">throwError</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; LogicT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><span class="hs-identifier hs-var">lift</span></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; LogicT m a) -&gt; (e -&gt; m a) -&gt; e -&gt; LogicT m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">e -&gt; m a
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwError</span></span><span>
+</span><span id="line-305"></span><span>  </span><span id="local-6989586621679039339"><span class="annot"><span class="annottext">catchError :: LogicT m a -&gt; (e -&gt; LogicT m a) -&gt; LogicT m a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">catchError</span></span></span><span> </span><span id="local-6989586621679039337"><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039337"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span id="local-6989586621679039336"><span class="annot"><span class="annottext">e -&gt; LogicT m a
+</span><a href="#local-6989586621679039336"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall (m :: * -&gt; *) a.
+(forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+</span><a href="Control.Monad.Logic.html#LogicT"><span class="hs-identifier hs-var">LogicT</span></a></span><span> </span><span class="annot"><span class="annottext">((forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a)
+-&gt; (forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r) -&gt; LogicT m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039335"><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039335"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621679039334"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039334"><span class="hs-identifier hs-var">fk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">let</span><span>
+</span><span id="line-306"></span><span>      </span><span id="local-6989586621679039333"><span class="annot"><span class="annottext">handle :: m r -&gt; m r
+</span><a href="#local-6989586621679039333"><span class="hs-identifier hs-var hs-var">handle</span></a></span></span><span> </span><span id="local-6989586621679039332"><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039332"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039332"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">m r -&gt; (e -&gt; m r) -&gt; m r
+forall e (m :: * -&gt; *) a.
+MonadError e m =&gt;
+m a -&gt; (e -&gt; m a) -&gt; m a
+</span><span class="hs-operator hs-var">`catchError`</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679039331"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679039331"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">e -&gt; LogicT m a
+</span><a href="#local-6989586621679039336"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679039331"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039335"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039334"><span class="hs-identifier hs-var">fk</span></a></span><span>
+</span><span id="line-307"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">m r -&gt; m r
+</span><a href="#local-6989586621679039333"><span class="hs-identifier hs-var">handle</span></a></span><span> </span><span class="annot"><span class="annottext">(m r -&gt; m r) -&gt; m r -&gt; m r
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">LogicT m a -&gt; (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+forall (m :: * -&gt; *) a.
+LogicT m a -&gt; forall r. (a -&gt; m r -&gt; m r) -&gt; m r -&gt; m r
+</span><a href="Control.Monad.Logic.html#unLogicT"><span class="hs-identifier hs-var hs-var">unLogicT</span></a></span><span> </span><span class="annot"><span class="annottext">LogicT m a
+</span><a href="#local-6989586621679039337"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679039330"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039330"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; m r -&gt; m r
+</span><a href="#local-6989586621679039335"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039330"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">(m r -&gt; m r) -&gt; (m r -&gt; m r) -&gt; m r -&gt; m r
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">m r -&gt; m r
+</span><a href="#local-6989586621679039333"><span class="hs-identifier hs-var">handle</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">m r
+</span><a href="#local-6989586621679039334"><span class="hs-identifier hs-var">fk</span></a></span></span></span><span>
+</span><span id="line-308"></span></pre></body></html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE PackageImports #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      : Crypto.Hash.Tiger</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Portability : unknown</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- A module containing Tiger bindings</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Crypto.Hash.Tiger</span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier">Ctx</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Incremental hashing Functions</span></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#init"><span class="hs-identifier">init</span></a></span><span>     </span><span class="hs-comment">-- :: Ctx</span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#update"><span class="hs-identifier">update</span></a></span><span>   </span><span class="hs-comment">-- :: Ctx -&gt; ByteString -&gt; Ctx</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#updates"><span class="hs-identifier">updates</span></a></span><span>  </span><span class="hs-comment">-- :: Ctx -&gt; [ByteString] -&gt; Ctx</span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#finalize"><span class="hs-identifier">finalize</span></a></span><span> </span><span class="hs-comment">-- :: Ctx -&gt; ByteString</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Single Pass hashing</span></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#hash"><span class="hs-identifier">hash</span></a></span><span>     </span><span class="hs-comment">-- :: ByteString -&gt; ByteString</span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#hashlazy"><span class="hs-identifier">hashlazy</span></a></span><span> </span><span class="hs-comment">-- :: ByteString -&gt; ByteString</span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">init</span></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Crypto.Hash.Internal.html"><span class="hs-identifier">Crypto.Hash.Internal</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteString"><span class="hs-identifier">digestToByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier">digestToByteStringWitness</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-string">&quot;cryptonite&quot;</span><span> </span><span class="annot"><a href="Crypto.Hash.html"><span class="hs-identifier">Crypto.Hash</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">H</span></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- | Tiger Context</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">newtype</span><span> </span><span id="Ctx"><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-var">Ctx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Ctx"><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-var">Ctx</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">H.Context</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">H.Tiger</span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | init a context</span><span>
+</span><span id="line-37"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#init"><span class="hs-identifier hs-type">init</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span>
+</span><span id="line-38"></span><span id="init"><span class="annot"><span class="annottext">init :: Ctx
+</span><a href="Crypto.Hash.Tiger.html#init"><span class="hs-identifier hs-var hs-var">init</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context Tiger -&gt; Ctx
+</span><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-var">Ctx</span></a></span><span> </span><span class="annot"><span class="annottext">Context Tiger
+forall a. HashAlgorithm a =&gt; Context a
+</span><span class="hs-identifier hs-var">H.hashInit</span></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- | update a context with a bytestring</span><span>
+</span><span id="line-41"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#update"><span class="hs-identifier hs-type">update</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span>
+</span><span id="line-42"></span><span id="update"><span class="annot"><span class="annottext">update :: Ctx -&gt; ByteString -&gt; Ctx
+</span><a href="Crypto.Hash.Tiger.html#update"><span class="hs-identifier hs-var hs-var">update</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span id="local-6989586621679047182"><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047182"><span class="hs-identifier hs-var">ctx</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679047181"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047181"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context Tiger -&gt; Ctx
+</span><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-var">Ctx</span></a></span><span> </span><span class="annot"><span class="annottext">(Context Tiger -&gt; Ctx) -&gt; Context Tiger -&gt; Ctx
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger -&gt; ByteString -&gt; Context Tiger
+forall ba a.
+(ByteArrayAccess ba, HashAlgorithm a) =&gt;
+Context a -&gt; ba -&gt; Context a
+</span><span class="hs-identifier hs-var">H.hashUpdate</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047182"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047181"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- | updates a context with multiples bytestring</span><span>
+</span><span id="line-45"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#updates"><span class="hs-identifier hs-type">updates</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span>
+</span><span id="line-46"></span><span id="updates"><span class="annot"><span class="annottext">updates :: Ctx -&gt; [ByteString] -&gt; Ctx
+</span><a href="Crypto.Hash.Tiger.html#updates"><span class="hs-identifier hs-var hs-var">updates</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span id="local-6989586621679047179"><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047179"><span class="hs-identifier hs-var">ctx</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679047178"><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679047178"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><span class="annottext">Context Tiger -&gt; Ctx
+</span><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-var">Ctx</span></a></span><span> </span><span class="annot"><span class="annottext">(Context Tiger -&gt; Ctx) -&gt; Context Tiger -&gt; Ctx
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger -&gt; [ByteString] -&gt; Context Tiger
+forall a ba.
+(HashAlgorithm a, ByteArrayAccess ba) =&gt;
+Context a -&gt; [ba] -&gt; Context a
+</span><span class="hs-identifier hs-var">H.hashUpdates</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047179"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">[ByteString]
+</span><a href="#local-6989586621679047178"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- | finalize the context into a digest bytestring</span><span>
+</span><span id="line-50"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#finalize"><span class="hs-identifier hs-type">finalize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-51"></span><span id="finalize"><span class="annot"><span class="annottext">finalize :: Ctx -&gt; ByteString
+</span><a href="Crypto.Hash.Tiger.html#finalize"><span class="hs-identifier hs-var hs-var">finalize</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.Tiger.html#Ctx"><span class="hs-identifier hs-type">Ctx</span></a></span><span> </span><span id="local-6989586621679047176"><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047176"><span class="hs-identifier hs-var">ctx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Digest Tiger -&gt; ByteString
+forall h. HashAlgorithm h =&gt; Digest h -&gt; ByteString
+</span><a href="Crypto.Hash.Internal.html#digestToByteString"><span class="hs-identifier hs-var">digestToByteString</span></a></span><span> </span><span class="annot"><span class="annottext">(Digest Tiger -&gt; ByteString) -&gt; Digest Tiger -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger -&gt; Digest Tiger
+forall a. HashAlgorithm a =&gt; Context a -&gt; Digest a
+</span><span class="hs-identifier hs-var">H.hashFinalize</span></span><span> </span><span class="annot"><span class="annottext">Context Tiger
+</span><a href="#local-6989586621679047176"><span class="hs-identifier hs-var">ctx</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- | hash a strict bytestring into a digest bytestring</span><span>
+</span><span id="line-54"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#hash"><span class="hs-identifier hs-type">hash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-55"></span><span id="hash"><span class="annot"><span class="annottext">hash :: ByteString -&gt; ByteString
+</span><a href="Crypto.Hash.Tiger.html#hash"><span class="hs-identifier hs-var hs-var">hash</span></a></span></span><span> </span><span id="local-6989586621679047174"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047174"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tiger -&gt; Digest Tiger -&gt; ByteString
+forall h. HashAlgorithm h =&gt; h -&gt; Digest h -&gt; ByteString
+</span><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier hs-var">digestToByteStringWitness</span></a></span><span> </span><span class="annot"><span class="annottext">Tiger
+</span><span class="hs-identifier hs-var">H.Tiger</span></span><span> </span><span class="annot"><span class="annottext">(Digest Tiger -&gt; ByteString) -&gt; Digest Tiger -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Digest Tiger
+forall ba a.
+(ByteArrayAccess ba, HashAlgorithm a) =&gt;
+ba -&gt; Digest a
+</span><span class="hs-identifier hs-var">H.hash</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047174"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- | hash a lazy bytestring into a digest bytestring</span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Crypto.Hash.Tiger.html#hashlazy"><span class="hs-identifier hs-type">hashlazy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-59"></span><span id="hashlazy"><span class="annot"><span class="annottext">hashlazy :: ByteString -&gt; ByteString
+</span><a href="Crypto.Hash.Tiger.html#hashlazy"><span class="hs-identifier hs-var hs-var">hashlazy</span></a></span></span><span> </span><span id="local-6989586621679047171"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047171"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tiger -&gt; Digest Tiger -&gt; ByteString
+forall h. HashAlgorithm h =&gt; h -&gt; Digest h -&gt; ByteString
+</span><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier hs-var">digestToByteStringWitness</span></a></span><span> </span><span class="annot"><span class="annottext">Tiger
+</span><span class="hs-identifier hs-var">H.Tiger</span></span><span> </span><span class="annot"><span class="annottext">(Digest Tiger -&gt; ByteString) -&gt; Digest Tiger -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Digest Tiger
+forall a. HashAlgorithm a =&gt; ByteString -&gt; Digest a
+</span><span class="hs-identifier hs-var">H.hashlazy</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047171"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-60"></span></pre></body></html>

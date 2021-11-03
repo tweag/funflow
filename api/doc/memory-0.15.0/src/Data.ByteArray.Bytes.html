@@ -1,0 +1,710 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module      : Data.ByteArray.Bytes</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Stability   : stable</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Portability : Good</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Simple and efficient byte array types</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE BangPatterns #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE MagicHash #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE UnboxedTuples #-}</span><span>
+</span><span id="line-14"></span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.ByteArray.Bytes</span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier">Bytes</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Types</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Prim</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Ptr</span></span><span class="hs-cpp">
+#if MIN_VERSION_base(4,9,0)
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Semigroup</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">toList</span></span><span class="hs-special">)</span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Data.Monoid</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Memory.PtrMethods.html"><span class="hs-identifier">Data.Memory.PtrMethods</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Memory.Internal.Imports.html"><span class="hs-identifier">Data.Memory.Internal.Imports</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Memory.Internal.CompatPrim.html"><span class="hs-identifier">Data.Memory.Internal.CompatPrim</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Memory.Internal.Compat.html"><span class="hs-identifier">Data.Memory.Internal.Compat</span></a></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier">unsafeDoIO</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.ByteArray.Types.html"><span class="hs-identifier">Data.ByteArray.Types</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span class="hs-cpp">
+
+#ifdef MIN_VERSION_basement
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Basement.NormalForm</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- | Simplest Byte Array</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="Bytes"><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-var">Bytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Bytes"><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-var">Bytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MutableByteArray#</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RealWorld</span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070962"><span id="local-6989586621679070964"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621679070960"><span class="annot"><span class="annottext">showsPrec :: Int -&gt; Bytes -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">showsPrec</span></span></span><span> </span><span id="local-6989586621679070958"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070958"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679070957"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070957"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679070956"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070956"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; String -&gt; ShowS
+forall a. Show a =&gt; Int -&gt; a -&gt; ShowS
+</span><span class="hs-identifier hs-var">showsPrec</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070958"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bytes -&gt; ShowS
+</span><a href="Data.ByteArray.Bytes.html#bytesUnpackChars"><span class="hs-identifier hs-var">bytesUnpackChars</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070957"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070956"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-45"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070952"><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-46"></span><span>    </span><span id="local-6989586621679070950"><span class="annot"><span class="annottext">== :: Bytes -&gt; Bytes -&gt; Bool
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(==)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Bytes -&gt; Bool
+</span><a href="Data.ByteArray.Bytes.html#bytesEq"><span class="hs-identifier hs-var">bytesEq</span></a></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070935"><span id="local-6989586621679070937"><span id="local-6989586621679070939"><span id="local-6989586621679070941"><span id="local-6989586621679070943"><span id="local-6989586621679070945"><span class="annot"><span class="hs-identifier hs-type">Ord</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621679070933"><span class="annot"><span class="annottext">compare :: Bytes -&gt; Bytes -&gt; Ordering
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">compare</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Bytes -&gt; Ordering
+</span><a href="Data.ByteArray.Bytes.html#bytesCompare"><span class="hs-identifier hs-var">bytesCompare</span></a></span><span class="hs-cpp">
+#if MIN_VERSION_base(4,9,0)
+</span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070927"><span class="annot"><span class="hs-identifier hs-type">Semigroup</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-51"></span><span>    </span><span id="local-6989586621679070925"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070925"><span class="hs-identifier hs-var">b1</span></a></span></span><span> </span><span id="local-6989586621679070924"><span class="annot"><span class="annottext">&lt;&gt; :: Bytes -&gt; Bytes -&gt; Bytes
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></span></span><span> </span><span id="local-6989586621679070923"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070923"><span class="hs-identifier hs-var">b2</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Bytes -&gt; Bytes
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO Bytes -&gt; Bytes) -&gt; IO Bytes -&gt; Bytes
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Bytes -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesAppend"><span class="hs-identifier hs-var">bytesAppend</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070925"><span class="hs-identifier hs-var">b1</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070923"><span class="hs-identifier hs-var">b2</span></a></span><span>
+</span><span id="line-52"></span><span>    </span><span id="local-6989586621679070921"><span class="annot"><span class="annottext">sconcat :: NonEmpty Bytes -&gt; Bytes
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">sconcat</span></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Bytes -&gt; Bytes
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO Bytes -&gt; Bytes)
+-&gt; (NonEmpty Bytes -&gt; IO Bytes) -&gt; NonEmpty Bytes -&gt; Bytes
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Bytes] -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesConcat"><span class="hs-identifier hs-var">bytesConcat</span></a></span><span> </span><span class="annot"><span class="annottext">([Bytes] -&gt; IO Bytes)
+-&gt; (NonEmpty Bytes -&gt; [Bytes]) -&gt; NonEmpty Bytes -&gt; IO Bytes
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">NonEmpty Bytes -&gt; [Bytes]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; [a]
+</span><span class="hs-identifier hs-var">toList</span></span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070912"><span id="local-6989586621679070914"><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>    </span><span id="local-6989586621679070910"><span class="annot"><span class="annottext">mempty :: Bytes
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></span></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Bytes -&gt; Bytes
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#newBytes"><span class="hs-identifier hs-var">newBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span class="hs-cpp">
+#if !(MIN_VERSION_base(4,11,0))
+</span><span>    </span><span class="hs-identifier">mappend</span><span> </span><span class="hs-identifier">b1</span><span> </span><span class="hs-identifier">b2</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">unsafeDoIO</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">bytesAppend</span><span> </span><span class="hs-identifier">b1</span><span> </span><span class="hs-identifier">b2</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-identifier">mconcat</span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">unsafeDoIO</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">bytesConcat</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NFData</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span id="local-6989586621679070906"><span class="annot"><span class="annottext">rnf :: Bytes -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">rnf</span></span></span><span> </span><span id="local-6989586621679070904"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070904"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070904"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; () -&gt; ()
+</span><span class="hs-operator hs-var">`seq`</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-cpp">
+#ifdef MIN_VERSION_basement
+</span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NormalForm</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-64"></span><span>    </span><span id="local-6989586621679070901"><span class="annot"><span class="annottext">toNormalForm :: Bytes -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toNormalForm</span></span></span><span> </span><span id="local-6989586621679070899"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070899"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070899"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; () -&gt; ()
+</span><span class="hs-operator hs-var">`seq`</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679070895"><span class="annot"><a href="Data.ByteArray.Types.html#ByteArrayAccess"><span class="hs-identifier hs-type">ByteArrayAccess</span></a></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679070893"><span class="annot"><span class="annottext">length :: Bytes -&gt; Int
+</span><a href="Data.ByteArray.Types.html#length"><span class="hs-identifier hs-var hs-var hs-var hs-var">length</span></a></span></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span id="local-6989586621679070890"><span class="annot"><span class="annottext">withByteArray :: Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Types.html#withByteArray"><span class="hs-identifier hs-var hs-var hs-var hs-var">withByteArray</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withBytes"><span class="hs-identifier hs-var">withBytes</span></a></span><span>
+</span><span id="line-69"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.ByteArray.Types.html#ByteArray"><span class="hs-identifier hs-type">ByteArray</span></a></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621679070881"><span class="annot"><span class="annottext">allocRet :: Int -&gt; (Ptr p -&gt; IO a) -&gt; IO (a, Bytes)
+</span><a href="Data.ByteArray.Types.html#allocRet"><span class="hs-identifier hs-var hs-var hs-var hs-var">allocRet</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Ptr p -&gt; IO a) -&gt; IO (a, Bytes)
+forall p a. Int -&gt; (Ptr p -&gt; IO a) -&gt; IO (a, Bytes)
+</span><a href="Data.ByteArray.Bytes.html#bytesAllocRet"><span class="hs-identifier hs-var">bytesAllocRet</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-comment">------------------------------------------------------------------------</span><span>
+</span><span id="line-73"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#newBytes"><span class="hs-identifier hs-type">newBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span>
+</span><span id="line-74"></span><span id="newBytes"><span class="annot"><span class="annottext">newBytes :: Int -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#newBytes"><span class="hs-identifier hs-var hs-var">newBytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">I#</span></span><span> </span><span id="local-6989586621679070878"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070878"><span class="hs-identifier hs-var">sz</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070878"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">&lt;#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO Bytes
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Bytes: size must be &gt;= 0&quot;</span></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>              </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(State# RealWorld -&gt; (# State# RealWorld, Bytes #)) -&gt; IO Bytes
+forall a. (State# RealWorld -&gt; (# State# RealWorld, a #)) -&gt; IO a
+</span><span class="hs-identifier hs-var">IO</span></span><span> </span><span class="annot"><span class="annottext">((State# RealWorld -&gt; (# State# RealWorld, Bytes #)) -&gt; IO Bytes)
+-&gt; (State# RealWorld -&gt; (# State# RealWorld, Bytes #)) -&gt; IO Bytes
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070875"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070875"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-77"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Int#
+-&gt; Int#
+-&gt; State# RealWorld
+-&gt; (# State# RealWorld, MutableByteArray# RealWorld #)
+forall d.
+Int# -&gt; Int# -&gt; State# d -&gt; (# State# d, MutableByteArray# d #)
+</span><span class="hs-identifier hs-var">newAlignedPinnedByteArray#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070878"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">8#</span></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070875"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-78"></span><span>            </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070874"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070874"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070873"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070873"><span class="hs-identifier hs-var">mbarr</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070874"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld -&gt; Bytes
+</span><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-var">Bytes</span></a></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070873"><span class="hs-identifier hs-var">mbarr</span></a></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#touchBytes"><span class="hs-identifier hs-type">touchBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span id="touchBytes"><span class="annot"><span class="annottext">touchBytes :: Bytes -&gt; IO ()
+</span><a href="Data.ByteArray.Bytes.html#touchBytes"><span class="hs-identifier hs-var hs-var">touchBytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070871"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070871"><span class="hs-identifier hs-var">mba</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(State# RealWorld -&gt; (# State# RealWorld, () #)) -&gt; IO ()
+forall a. (State# RealWorld -&gt; (# State# RealWorld, a #)) -&gt; IO a
+</span><span class="hs-identifier hs-var">IO</span></span><span> </span><span class="annot"><span class="annottext">((State# RealWorld -&gt; (# State# RealWorld, () #)) -&gt; IO ())
+-&gt; (State# RealWorld -&gt; (# State# RealWorld, () #)) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070870"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070870"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld -&gt; State# RealWorld -&gt; State# RealWorld
+forall a. a -&gt; State# RealWorld -&gt; State# RealWorld
+</span><span class="hs-identifier hs-var">touch#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070871"><span class="hs-identifier hs-var">mba</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070870"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span id="local-6989586621679070869"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070869"><span class="hs-identifier hs-var">s'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070869"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-82"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#touchBytes"><span class="hs-pragma hs-type">touchBytes</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#sizeofBytes"><span class="hs-identifier hs-type">sizeofBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-85"></span><span id="sizeofBytes"><span class="annot"><span class="annottext">sizeofBytes :: Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#sizeofBytes"><span class="hs-identifier hs-var hs-var">sizeofBytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070867"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070867"><span class="hs-identifier hs-var">mba</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><span class="hs-identifier hs-var">I#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">MutableByteArray# RealWorld -&gt; Int#
+forall d. MutableByteArray# d -&gt; Int#
+</span><span class="hs-identifier hs-var">sizeofMutableByteArray#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070867"><span class="hs-identifier hs-var">mba</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#sizeofBytes"><span class="hs-pragma hs-type">sizeofBytes</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span id="local-6989586621679070865"><span id="local-6989586621679070866"><span class="annot"><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-type">withPtr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679070866"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679070865"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679070865"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-89"></span><span id="withPtr"><span class="annot"><span class="annottext">withPtr :: Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var hs-var">withPtr</span></a></span></span><span> </span><span id="local-6989586621679070863"><span class="annot"><span class="annottext">b :: Bytes
+</span><a href="#local-6989586621679070863"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070862"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070862"><span class="hs-identifier hs-var">mba</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679070861"><span class="annot"><span class="annottext">Ptr p -&gt; IO a
+</span><a href="#local-6989586621679070861"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621679070860"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679070860"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr p -&gt; IO a
+</span><a href="#local-6989586621679070861"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Addr# -&gt; Ptr p
+forall a. Addr# -&gt; Ptr a
+</span><span class="hs-identifier hs-var">Ptr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteArray# -&gt; Addr#
+</span><span class="hs-identifier hs-var">byteArrayContents#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">MutableByteArray# RealWorld -&gt; ByteArray#
+</span><span class="hs-identifier hs-var">unsafeCoerce#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070862"><span class="hs-identifier hs-var">mba</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>    </span><span class="annot"><span class="annottext">Bytes -&gt; IO ()
+</span><a href="Data.ByteArray.Bytes.html#touchBytes"><span class="hs-identifier hs-var">touchBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070863"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-92"></span><span>    </span><span class="annot"><span class="annottext">a -&gt; IO a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679070860"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-93"></span><span class="hs-comment">------------------------------------------------------------------------</span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span id="local-6989586621679070980"><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesAlloc"><span class="hs-identifier hs-type">bytesAlloc</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679070980"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span></span><span>
+</span><span id="line-96"></span><span id="bytesAlloc"><span class="annot"><span class="annottext">bytesAlloc :: Int -&gt; (Ptr p -&gt; IO ()) -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesAlloc"><span class="hs-identifier hs-var hs-var">bytesAlloc</span></a></span></span><span> </span><span id="local-6989586621679070857"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070857"><span class="hs-identifier hs-var">sz</span></a></span></span><span> </span><span id="local-6989586621679070856"><span class="annot"><span class="annottext">Ptr p -&gt; IO ()
+</span><a href="#local-6989586621679070856"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621679070855"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070855"><span class="hs-identifier hs-var">ba</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#newBytes"><span class="hs-identifier hs-var">newBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070857"><span class="hs-identifier hs-var">sz</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr p -&gt; IO ()) -&gt; IO ()
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070855"><span class="hs-identifier hs-var">ba</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr p -&gt; IO ()
+</span><a href="#local-6989586621679070856"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><span class="annottext">Bytes -&gt; IO Bytes
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070855"><span class="hs-identifier hs-var">ba</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesConcat"><span class="hs-identifier hs-type">bytesConcat</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span>
+</span><span id="line-102"></span><span id="bytesConcat"><span class="annot"><span class="annottext">bytesConcat :: [Bytes] -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesConcat"><span class="hs-identifier hs-var hs-var">bytesConcat</span></a></span></span><span> </span><span id="local-6989586621679070854"><span class="annot"><span class="annottext">[Bytes]
+</span><a href="#local-6989586621679070854"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO Bytes
+forall p. Int -&gt; (Ptr p -&gt; IO ()) -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesAlloc"><span class="hs-identifier hs-var">bytesAlloc</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070853"><span class="hs-identifier hs-var">retLen</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Bytes] -&gt; Ptr Word8 -&gt; IO ()
+</span><a href="#local-6989586621679070852"><span class="hs-identifier hs-var">copy</span></a></span><span> </span><span class="annot"><span class="annottext">[Bytes]
+</span><a href="#local-6989586621679070854"><span class="hs-identifier hs-var">l</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070853"><span class="annot"><span class="annottext">retLen :: Int
+</span><a href="#local-6989586621679070853"><span class="hs-identifier hs-var hs-var">retLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; Int
+forall (t :: * -&gt; *) a. (Foldable t, Num a) =&gt; t a -&gt; a
+</span><span class="hs-identifier hs-var">sum</span></span><span> </span><span class="annot"><span class="annottext">([Int] -&gt; Int) -&gt; [Int] -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(Bytes -&gt; Int) -&gt; [Bytes] -&gt; [Int]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">[Bytes]
+</span><a href="#local-6989586621679070854"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621679070852"><span class="annot"><span class="annottext">copy :: [Bytes] -&gt; Ptr Word8 -&gt; IO ()
+</span><a href="#local-6989586621679070852"><span class="hs-identifier hs-var hs-var">copy</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="annot"><span class="annottext">Ptr Word8
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>    </span><span class="annot"><a href="#local-6989586621679070852"><span class="hs-identifier hs-var">copy</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679070850"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070850"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span id="local-6989586621679070849"><span class="annot"><span class="annottext">[Bytes]
+</span><a href="#local-6989586621679070849"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679070848"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070848"><span class="hs-identifier hs-var">dst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-108"></span><span>        </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070850"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr Word8 -&gt; IO ()) -&gt; IO ()) -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070847"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070847"><span class="hs-identifier hs-var">src</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word8 -&gt; Int -&gt; IO ()
+</span><a href="Data.Memory.PtrMethods.html#memCopy"><span class="hs-identifier hs-var">memCopy</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070848"><span class="hs-identifier hs-var">dst</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070847"><span class="hs-identifier hs-var">src</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070845"><span class="hs-identifier hs-var">chunkLen</span></a></span><span>
+</span><span id="line-109"></span><span>        </span><span class="annot"><span class="annottext">[Bytes] -&gt; Ptr Word8 -&gt; IO ()
+</span><a href="#local-6989586621679070852"><span class="hs-identifier hs-var">copy</span></a></span><span> </span><span class="annot"><span class="annottext">[Bytes]
+</span><a href="#local-6989586621679070849"><span class="hs-identifier hs-var">xs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070848"><span class="hs-identifier hs-var">dst</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Word8
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070845"><span class="hs-identifier hs-var">chunkLen</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-110"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-111"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679070845"><span class="annot"><span class="annottext">chunkLen :: Int
+</span><a href="#local-6989586621679070845"><span class="hs-identifier hs-var hs-var">chunkLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070850"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesAppend"><span class="hs-identifier hs-type">bytesAppend</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span>
+</span><span id="line-114"></span><span id="bytesAppend"><span class="annot"><span class="annottext">bytesAppend :: Bytes -&gt; Bytes -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesAppend"><span class="hs-identifier hs-var hs-var">bytesAppend</span></a></span></span><span> </span><span id="local-6989586621679070843"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070843"><span class="hs-identifier hs-var">b1</span></a></span></span><span> </span><span id="local-6989586621679070842"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070842"><span class="hs-identifier hs-var">b2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO Bytes
+forall p. Int -&gt; (Ptr p -&gt; IO ()) -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#bytesAlloc"><span class="hs-identifier hs-var">bytesAlloc</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070841"><span class="hs-identifier hs-var">retLen</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr Word8 -&gt; IO ()) -&gt; IO Bytes)
+-&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO Bytes
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070840"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070840"><span class="hs-identifier hs-var">dst</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-115"></span><span>    </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070843"><span class="hs-identifier hs-var">b1</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr Word8 -&gt; IO ()) -&gt; IO ()) -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070839"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070839"><span class="hs-identifier hs-var">s1</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word8 -&gt; Int -&gt; IO ()
+</span><a href="Data.Memory.PtrMethods.html#memCopy"><span class="hs-identifier hs-var">memCopy</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070840"><span class="hs-identifier hs-var">dst</span></a></span><span>                  </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070839"><span class="hs-identifier hs-var">s1</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070838"><span class="hs-identifier hs-var">len1</span></a></span><span>
+</span><span id="line-116"></span><span>    </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070842"><span class="hs-identifier hs-var">b2</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr Word8 -&gt; IO ()) -&gt; IO ()) -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070837"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070837"><span class="hs-identifier hs-var">s2</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word8 -&gt; Int -&gt; IO ()
+</span><a href="Data.Memory.PtrMethods.html#memCopy"><span class="hs-identifier hs-var">memCopy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070840"><span class="hs-identifier hs-var">dst</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Word8
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070838"><span class="hs-identifier hs-var">len1</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679070837"><span class="hs-identifier hs-var">s2</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070836"><span class="hs-identifier hs-var">len2</span></a></span><span>
+</span><span id="line-117"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070838"><span class="annot"><span class="annottext">len1 :: Int
+</span><a href="#local-6989586621679070838"><span class="hs-identifier hs-var hs-var">len1</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070843"><span class="hs-identifier hs-var">b1</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070836"><span class="annot"><span class="annottext">len2 :: Int
+</span><a href="#local-6989586621679070836"><span class="hs-identifier hs-var hs-var">len2</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070842"><span class="hs-identifier hs-var">b2</span></a></span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070841"><span class="annot"><span class="annottext">retLen :: Int
+</span><a href="#local-6989586621679070841"><span class="hs-identifier hs-var hs-var">retLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070838"><span class="hs-identifier hs-var">len1</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070836"><span class="hs-identifier hs-var">len2</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span id="local-6989586621679070833"><span id="local-6989586621679070834"><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesAllocRet"><span class="hs-identifier hs-type">bytesAllocRet</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679070834"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679070833"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679070833"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-123"></span><span id="bytesAllocRet"><span class="annot"><span class="annottext">bytesAllocRet :: Int -&gt; (Ptr p -&gt; IO a) -&gt; IO (a, Bytes)
+</span><a href="Data.ByteArray.Bytes.html#bytesAllocRet"><span class="hs-identifier hs-var hs-var">bytesAllocRet</span></a></span></span><span> </span><span id="local-6989586621679070832"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070832"><span class="hs-identifier hs-var">sz</span></a></span></span><span> </span><span id="local-6989586621679070831"><span class="annot"><span class="annottext">Ptr p -&gt; IO a
+</span><a href="#local-6989586621679070831"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-124"></span><span>    </span><span id="local-6989586621679070830"><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070830"><span class="hs-identifier hs-var">ba</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Bytes
+</span><a href="Data.ByteArray.Bytes.html#newBytes"><span class="hs-identifier hs-var">newBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070832"><span class="hs-identifier hs-var">sz</span></a></span><span>
+</span><span id="line-125"></span><span>    </span><span id="local-6989586621679070829"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679070829"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070830"><span class="hs-identifier hs-var">ba</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr p -&gt; IO a
+</span><a href="#local-6989586621679070831"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-126"></span><span>    </span><span class="annot"><span class="annottext">(a, Bytes) -&gt; IO (a, Bytes)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679070829"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070830"><span class="hs-identifier hs-var">ba</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-type">bytesLength</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-129"></span><span id="bytesLength"><span class="annot"><span class="annottext">bytesLength :: Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var hs-var">bytesLength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#sizeofBytes"><span class="hs-identifier hs-var">sizeofBytes</span></a></span><span>
+</span><span id="line-130"></span><span class="hs-pragma">{-# LANGUAGE bytesLength #-}</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span id="local-6989586621679070827"><span id="local-6989586621679070828"><span class="annot"><a href="Data.ByteArray.Bytes.html#withBytes"><span class="hs-identifier hs-type">withBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><a href="#local-6989586621679070828"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679070827"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679070827"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-133"></span><span id="withBytes"><span class="annot"><span class="annottext">withBytes :: Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withBytes"><span class="hs-identifier hs-var hs-var">withBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+forall p a. Bytes -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+</span><a href="Data.ByteArray.Bytes.html#withPtr"><span class="hs-identifier hs-var">withPtr</span></a></span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesEq"><span class="hs-identifier hs-type">bytesEq</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-136"></span><span id="bytesEq"><span class="annot"><span class="annottext">bytesEq :: Bytes -&gt; Bytes -&gt; Bool
+</span><a href="Data.ByteArray.Bytes.html#bytesEq"><span class="hs-identifier hs-var hs-var">bytesEq</span></a></span></span><span> </span><span id="local-6989586621679070826"><span class="annot"><span class="annottext">b1 :: Bytes
+</span><a href="#local-6989586621679070826"><span class="hs-identifier hs-var">b1</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070825"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070825"><span class="hs-identifier hs-var">m1</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679070824"><span class="annot"><span class="annottext">b2 :: Bytes
+</span><a href="#local-6989586621679070824"><span class="hs-identifier hs-var">b2</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070823"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070823"><span class="hs-identifier hs-var">m2</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070822"><span class="hs-identifier hs-var">l1</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070820"><span class="hs-identifier hs-var">l2</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Bool -&gt; Bool
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO Bool -&gt; Bool) -&gt; IO Bool -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(State# RealWorld -&gt; (# State# RealWorld, Bool #)) -&gt; IO Bool
+forall a. (State# RealWorld -&gt; (# State# RealWorld, a #)) -&gt; IO a
+</span><span class="hs-identifier hs-var">IO</span></span><span> </span><span class="annot"><span class="annottext">((State# RealWorld -&gt; (# State# RealWorld, Bool #)) -&gt; IO Bool)
+-&gt; (State# RealWorld -&gt; (# State# RealWorld, Bool #)) -&gt; IO Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070819"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070819"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Bool #)
+</span><a href="#local-6989586621679070818"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070819"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-139"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070822"><span class="annot"><span class="annottext">l1 :: Int
+</span><a href="#local-6989586621679070822"><span class="hs-identifier hs-var">l1</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">I#</span></span><span> </span><span id="local-6989586621679070817"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070817"><span class="hs-identifier hs-var">len</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070826"><span class="hs-identifier hs-var">b1</span></a></span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070820"><span class="annot"><span class="annottext">l2 :: Int
+</span><a href="#local-6989586621679070820"><span class="hs-identifier hs-var hs-var">l2</span></a></span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070824"><span class="hs-identifier hs-var">b2</span></a></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>    </span><span id="local-6989586621679070818"><span class="annot"><span class="annottext">loop :: Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Bool #)
+</span><a href="#local-6989586621679070818"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679070816"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070816"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621679070815"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070815"><span class="hs-identifier hs-var">s</span></a></span></span><span>
+</span><span id="line-144"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070816"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070817"><span class="hs-identifier hs-var">len</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070815"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-145"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>               </span><span class="hs-glyph">=</span><span>
+</span><span id="line-146"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+-&gt; Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Word# #)
+forall d.
+MutableByteArray# d -&gt; Int# -&gt; State# d -&gt; (# State# d, Word# #)
+</span><span class="hs-identifier hs-var">readWord8Array#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070825"><span class="hs-identifier hs-var">m1</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070816"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070815"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-147"></span><span>                </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070814"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070814"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070813"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070813"><span class="hs-identifier hs-var">e1</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+-&gt; Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Word# #)
+forall d.
+MutableByteArray# d -&gt; Int# -&gt; State# d -&gt; (# State# d, Word# #)
+</span><span class="hs-identifier hs-var">readWord8Array#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070823"><span class="hs-identifier hs-var">m2</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070816"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070814"><span class="hs-identifier hs-var">s'</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-148"></span><span>                    </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070812"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070812"><span class="hs-identifier hs-var">s''</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070811"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070811"><span class="hs-identifier hs-var">e2</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-149"></span><span>                        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">eqWord#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070813"><span class="hs-identifier hs-var">e1</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070811"><span class="hs-identifier hs-var">e2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-150"></span><span>                            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Bool #)
+</span><a href="#local-6989586621679070818"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070816"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">+#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070812"><span class="hs-identifier hs-var">s''</span></a></span><span>
+</span><span id="line-151"></span><span>                            </span><span class="hs-keyword">else</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070812"><span class="hs-identifier hs-var">s''</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621679070818"><span class="hs-pragma hs-type">loop</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesCompare"><span class="hs-identifier hs-type">bytesCompare</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ordering</span></span><span>
+</span><span id="line-155"></span><span id="bytesCompare"><span class="annot"><span class="annottext">bytesCompare :: Bytes -&gt; Bytes -&gt; Ordering
+</span><a href="Data.ByteArray.Bytes.html#bytesCompare"><span class="hs-identifier hs-var hs-var">bytesCompare</span></a></span></span><span> </span><span id="local-6989586621679070810"><span class="annot"><span class="annottext">b1 :: Bytes
+</span><a href="#local-6989586621679070810"><span class="hs-identifier hs-var">b1</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070809"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070809"><span class="hs-identifier hs-var">m1</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679070808"><span class="annot"><span class="annottext">b2 :: Bytes
+</span><a href="#local-6989586621679070808"><span class="hs-identifier hs-var">b2</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070807"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070807"><span class="hs-identifier hs-var">m2</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Ordering -&gt; Ordering
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO Ordering -&gt; Ordering) -&gt; IO Ordering -&gt; Ordering
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(State# RealWorld -&gt; (# State# RealWorld, Ordering #))
+-&gt; IO Ordering
+forall a. (State# RealWorld -&gt; (# State# RealWorld, a #)) -&gt; IO a
+</span><span class="hs-identifier hs-var">IO</span></span><span> </span><span class="annot"><span class="annottext">((State# RealWorld -&gt; (# State# RealWorld, Ordering #))
+ -&gt; IO Ordering)
+-&gt; (State# RealWorld -&gt; (# State# RealWorld, Ordering #))
+-&gt; IO Ordering
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070806"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070806"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Ordering #)
+</span><a href="#local-6989586621679070805"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070806"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-156"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070804"><span class="annot"><span class="annottext">l1 :: Int
+</span><a href="#local-6989586621679070804"><span class="hs-identifier hs-var hs-var">l1</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070810"><span class="hs-identifier hs-var">b1</span></a></span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070803"><span class="annot"><span class="annottext">l2 :: Int
+</span><a href="#local-6989586621679070803"><span class="hs-identifier hs-var hs-var">l2</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bytes -&gt; Int
+</span><a href="Data.ByteArray.Bytes.html#bytesLength"><span class="hs-identifier hs-var">bytesLength</span></a></span><span> </span><span class="annot"><span class="annottext">Bytes
+</span><a href="#local-6989586621679070808"><span class="hs-identifier hs-var">b2</span></a></span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">I#</span></span><span> </span><span id="local-6989586621679070802"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070802"><span class="hs-identifier hs-var">len</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">min</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070804"><span class="hs-identifier hs-var">l1</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070803"><span class="hs-identifier hs-var">l2</span></a></span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span>    </span><span id="local-6989586621679070805"><span class="annot"><span class="annottext">loop :: Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Ordering #)
+</span><a href="#local-6989586621679070805"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679070800"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070800"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621679070799"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070799"><span class="hs-identifier hs-var">s1</span></a></span></span><span>
+</span><span id="line-162"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070800"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070802"><span class="hs-identifier hs-var">len</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-163"></span><span>            </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070804"><span class="hs-identifier hs-var">l1</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070803"><span class="hs-identifier hs-var">l2</span></a></span><span>
+</span><span id="line-164"></span><span>                </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070799"><span class="hs-identifier hs-var">s1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">EQ</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-165"></span><span>                </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070804"><span class="hs-identifier hs-var">l1</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070803"><span class="hs-identifier hs-var">l2</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070799"><span class="hs-identifier hs-var">s1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">GT</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-166"></span><span>                                </span><span class="hs-keyword">else</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070799"><span class="hs-identifier hs-var">s1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">LT</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-167"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span>               </span><span class="hs-glyph">=</span><span>
+</span><span id="line-168"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+-&gt; Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Word# #)
+forall d.
+MutableByteArray# d -&gt; Int# -&gt; State# d -&gt; (# State# d, Word# #)
+</span><span class="hs-identifier hs-var">readWord8Array#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070809"><span class="hs-identifier hs-var">m1</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070800"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070799"><span class="hs-identifier hs-var">s1</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-169"></span><span>                </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070797"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070797"><span class="hs-identifier hs-var">s2</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070796"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070796"><span class="hs-identifier hs-var">e1</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+-&gt; Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Word# #)
+forall d.
+MutableByteArray# d -&gt; Int# -&gt; State# d -&gt; (# State# d, Word# #)
+</span><span class="hs-identifier hs-var">readWord8Array#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070807"><span class="hs-identifier hs-var">m2</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070800"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070797"><span class="hs-identifier hs-var">s2</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-170"></span><span>                    </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070795"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070795"><span class="hs-identifier hs-var">s3</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070794"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070794"><span class="hs-identifier hs-var">e2</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-171"></span><span>                        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">eqWord#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070796"><span class="hs-identifier hs-var">e1</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070794"><span class="hs-identifier hs-var">e2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>                            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Ordering #)
+</span><a href="#local-6989586621679070805"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070800"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">+#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070795"><span class="hs-identifier hs-var">s3</span></a></span><span>
+</span><span id="line-173"></span><span>                            </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">ltWord#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070796"><span class="hs-identifier hs-var">e1</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070794"><span class="hs-identifier hs-var">e2</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">then</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070795"><span class="hs-identifier hs-var">s3</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">LT</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-174"></span><span>                                                                </span><span class="hs-keyword">else</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070795"><span class="hs-identifier hs-var">s3</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ordering
+</span><span class="hs-identifier hs-var">GT</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span class="annot"><a href="Data.ByteArray.Bytes.html#bytesUnpackChars"><span class="hs-identifier hs-type">bytesUnpackChars</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-177"></span><span id="bytesUnpackChars"><span class="annot"><span class="annottext">bytesUnpackChars :: Bytes -&gt; ShowS
+</span><a href="Data.ByteArray.Bytes.html#bytesUnpackChars"><span class="hs-identifier hs-var hs-var">bytesUnpackChars</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteArray.Bytes.html#Bytes"><span class="hs-identifier hs-type">Bytes</span></a></span><span> </span><span id="local-6989586621679070793"><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070793"><span class="hs-identifier hs-var">mba</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679070792"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070792"><span class="hs-identifier hs-var">xs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; String
+</span><a href="#local-6989586621679070791"><span class="hs-identifier hs-var">chunkLoop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span>
+</span><span id="line-178"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-179"></span><span>    </span><span class="hs-glyph">!</span><span id="local-6989586621679070790"><span class="annot"><span class="annottext">len :: Int#
+</span><a href="#local-6989586621679070790"><span class="hs-identifier hs-var hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld -&gt; Int#
+forall d. MutableByteArray# d -&gt; Int#
+</span><span class="hs-identifier hs-var">sizeofMutableByteArray#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070793"><span class="hs-identifier hs-var">mba</span></a></span><span>
+</span><span id="line-180"></span><span>    </span><span class="hs-comment">-- chunk 64 bytes at a time</span><span>
+</span><span id="line-181"></span><span>    </span><span class="annot"><a href="#local-6989586621679070791"><span class="hs-identifier hs-type">chunkLoop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span class="hs-special">]</span><span>
+</span><span id="line-182"></span><span>    </span><span id="local-6989586621679070791"><span class="annot"><span class="annottext">chunkLoop :: Int# -&gt; String
+</span><a href="#local-6989586621679070791"><span class="hs-identifier hs-var hs-var">chunkLoop</span></a></span></span><span> </span><span id="local-6989586621679070789"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span></span><span>
+</span><span id="line-183"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070790"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-184"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070790"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">-#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">&gt;#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">63#</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-185"></span><span>            </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; ShowS
+</span><a href="#local-6989586621679070788"><span class="hs-identifier hs-var">bytesLoop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">64#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; String
+</span><a href="#local-6989586621679070791"><span class="hs-identifier hs-var">chunkLoop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">+#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">64#</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-186"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-187"></span><span>            </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; ShowS
+</span><a href="#local-6989586621679070788"><span class="hs-identifier hs-var">bytesLoop</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070790"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">-#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070789"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070792"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-188"></span><span>
+</span><span id="line-189"></span><span>    </span><span id="local-6989586621679070788"><span class="annot"><span class="annottext">bytesLoop :: Int# -&gt; Int# -&gt; ShowS
+</span><a href="#local-6989586621679070788"><span class="hs-identifier hs-var hs-var">bytesLoop</span></a></span></span><span> </span><span id="local-6989586621679070787"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070787"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span id="local-6989586621679070786"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070786"><span class="hs-identifier hs-var">chunkLenM1</span></a></span></span><span> </span><span id="local-6989586621679070785"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070785"><span class="hs-identifier hs-var">paramAcc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO String -&gt; String
+forall a. IO a -&gt; a
+</span><a href="Data.Memory.Internal.Compat.html#unsafeDoIO"><span class="hs-identifier hs-var">unsafeDoIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO String -&gt; String) -&gt; IO String -&gt; String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-190"></span><span>        </span><span class="annot"><span class="annottext">Int# -&gt; String -&gt; IO String
+</span><a href="#local-6989586621679070784"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070787"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">+#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070786"><span class="hs-identifier hs-var">chunkLenM1</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">-#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070785"><span class="hs-identifier hs-var">paramAcc</span></a></span><span>
+</span><span id="line-191"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679070784"><span class="annot"><span class="annottext">loop :: Int# -&gt; String -&gt; IO String
+</span><a href="#local-6989586621679070784"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679070783"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070783"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621679070782"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070782"><span class="hs-identifier hs-var">acc</span></a></span></span><span>
+</span><span id="line-192"></span><span>                </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Bool
+</span><a href="Data.Memory.Internal.CompatPrim.html#booleanPrim"><span class="hs-identifier hs-var">booleanPrim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070783"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">==#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070787"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-193"></span><span>                    </span><span id="local-6989586621679070781"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679070781"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; IO Char
+</span><a href="#local-6989586621679070780"><span class="hs-identifier hs-var">rChar</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070783"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-194"></span><span>                    </span><span class="annot"><span class="annottext">String -&gt; IO String
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679070781"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; ShowS
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070782"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-195"></span><span>                </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-196"></span><span>                    </span><span id="local-6989586621679070779"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679070779"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; IO Char
+</span><a href="#local-6989586621679070780"><span class="hs-identifier hs-var">rChar</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070783"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-197"></span><span>                    </span><span class="annot"><span class="annottext">Int# -&gt; String -&gt; IO String
+</span><a href="#local-6989586621679070784"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070783"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><span class="hs-operator hs-var">-#</span></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679070779"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; ShowS
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679070782"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span>    </span><span class="annot"><a href="#local-6989586621679070780"><span class="hs-identifier hs-type">rChar</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int#</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span>
+</span><span id="line-200"></span><span>    </span><span id="local-6989586621679070780"><span class="annot"><span class="annottext">rChar :: Int# -&gt; IO Char
+</span><a href="#local-6989586621679070780"><span class="hs-identifier hs-var hs-var">rChar</span></a></span></span><span> </span><span id="local-6989586621679070778"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070778"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(State# RealWorld -&gt; (# State# RealWorld, Char #)) -&gt; IO Char
+forall a. (State# RealWorld -&gt; (# State# RealWorld, a #)) -&gt; IO a
+</span><span class="hs-identifier hs-var">IO</span></span><span> </span><span class="annot"><span class="annottext">((State# RealWorld -&gt; (# State# RealWorld, Char #)) -&gt; IO Char)
+-&gt; (State# RealWorld -&gt; (# State# RealWorld, Char #)) -&gt; IO Char
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679070777"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070777"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-201"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+-&gt; Int# -&gt; State# RealWorld -&gt; (# State# RealWorld, Word# #)
+forall d.
+MutableByteArray# d -&gt; Int# -&gt; State# d -&gt; (# State# d, Word# #)
+</span><span class="hs-identifier hs-var">readWord8Array#</span></span><span> </span><span class="annot"><span class="annottext">MutableByteArray# RealWorld
+</span><a href="#local-6989586621679070793"><span class="hs-identifier hs-var">mba</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679070778"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070777"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-202"></span><span>            </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679070776"><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070776"><span class="hs-identifier hs-var">s2</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070775"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070775"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">State# RealWorld
+</span><a href="#local-6989586621679070776"><span class="hs-identifier hs-var">s2</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Char# -&gt; Char
+</span><span class="hs-identifier hs-var">C#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Char#
+</span><span class="hs-identifier hs-var">chr#</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><span class="hs-identifier hs-var">word2Int#</span></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679070775"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-203"></span><span>
+</span><span id="line-204"></span><span class="hs-comment">{-
+bytesShowHex :: Bytes -&gt; String
+bytesShowHex b = showHexadecimal (withPtr b) (bytesLength b)
+{-# NOINLINE bytesShowHex #-}
+-}</span><span>
+</span><span id="line-209"></span></pre></body></html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE PackageImports #-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      : Crypto.Hash</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Portability : unknown</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Generalized cryptographic hash interface, that you can use with cryptographic hash</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- algorithm that belong to the HashAlgorithm type class.</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- &gt; import Crypto.Hash</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- &gt; sha1 :: ByteString -&gt; Digest SHA1</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- &gt; sha1 = hash</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- &gt; hexSha3_512 :: ByteString -&gt; String</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- &gt; hexSha3_512 bs = show (hash bs :: Digest SHA3_512)</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Crypto.Hash</span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">(</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Types</span></span><span>
+</span><span id="line-24"></span><span>      </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier">HashAlgorithm</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashFunctionBS"><span class="hs-identifier">HashFunctionBS</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashFunctionLBS"><span class="hs-identifier">HashFunctionLBS</span></a></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier">Context</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier">Digest</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Functions</span></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#digestToByteString"><span class="hs-identifier">digestToByteString</span></a></span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#digestToHexByteString"><span class="hs-identifier">digestToHexByteString</span></a></span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hash"><span class="hs-identifier">hash</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hashlazy"><span class="hs-identifier">hashlazy</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hashUpdate"><span class="hs-identifier">hashUpdate</span></a></span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hashInitAlg"><span class="hs-identifier">hashInitAlg</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="annot"><span class="hs-comment">-- * hash algorithms</span></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.MD2</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.MD4</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.MD5</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA1</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA224</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA256</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA384</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA512</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.RIPEMD160</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Tiger</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA3_224</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA3_256</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA3_384</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.SHA3_512</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein256_224</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein256_256</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein512_224</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein512_256</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein512_384</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Skein512_512</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">H.Whirlpool</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><span class="hs-comment">-- * MAC algorithms</span></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier">HMAC</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hmac"><span class="hs-identifier">hmac</span></a></span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.html#hmacAlg"><span class="hs-identifier">hmacAlg</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html"><span class="hs-identifier">Crypto.Hash.Types</span></a></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Byteable</span></span><span>
+</span><span id="line-67"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">xor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteArray.Encoding</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-70"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-string">&quot;cryptonite&quot;</span><span> </span><span class="annot"><a href="Crypto.Hash.html"><span class="hs-identifier">Crypto.Hash</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">H</span></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- | Alias to a single pass hash function that operate on a strict bytestring</span><span>
+</span><span id="line-75"></span><span class="hs-keyword">type</span><span> </span><span id="HashFunctionBS"><span class="annot"><a href="Crypto.Hash.html#HashFunctionBS"><span class="hs-identifier hs-var">HashFunctionBS</span></a></span></span><span> </span><span id="local-6989586621679047680"><span class="annot"><a href="#local-6989586621679047680"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047680"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- | Alias to a single pass hash function that operate on a lazy bytestring</span><span>
+</span><span id="line-78"></span><span class="hs-keyword">type</span><span> </span><span id="HashFunctionLBS"><span class="annot"><a href="Crypto.Hash.html#HashFunctionLBS"><span class="hs-identifier hs-var">HashFunctionLBS</span></a></span></span><span> </span><span id="local-6989586621679047679"><span class="annot"><a href="#local-6989586621679047679"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047679"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- | run hashUpdates on one single bytestring and return the updated context.</span><span>
+</span><span id="line-81"></span><span id="local-6989586621679047761"><span class="annot"><a href="Crypto.Hash.html#hashUpdate"><span class="hs-identifier hs-type">hashUpdate</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047761"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047761"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047761"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-82"></span><span id="hashUpdate"><span class="annot"><span class="annottext">hashUpdate :: Context a -&gt; ByteString -&gt; Context a
+</span><a href="Crypto.Hash.html#hashUpdate"><span class="hs-identifier hs-var hs-var">hashUpdate</span></a></span></span><span> </span><span id="local-6989586621679047678"><span class="annot"><span class="annottext">Context a
+</span><a href="#local-6989586621679047678"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span id="local-6989586621679047677"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047677"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; [ByteString] -&gt; Context a
+forall a. HashAlgorithm a =&gt; Context a -&gt; [ByteString] -&gt; Context a
+</span><a href="Crypto.Hash.html#hashUpdates"><span class="hs-identifier hs-var">hashUpdates</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+</span><a href="#local-6989586621679047678"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047677"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- | Hash a strict bytestring into a digest.</span><span>
+</span><span id="line-85"></span><span id="local-6989586621679047675"><span class="annot"><a href="Crypto.Hash.html#hash"><span class="hs-identifier hs-type">hash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047675"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047675"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-86"></span><span id="hash"><span class="annot"><span class="annottext">hash :: ByteString -&gt; Digest a
+</span><a href="Crypto.Hash.html#hash"><span class="hs-identifier hs-var hs-var">hash</span></a></span></span><span> </span><span id="local-6989586621679047674"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047674"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; Digest a
+forall a. HashAlgorithm a =&gt; Context a -&gt; Digest a
+</span><a href="Crypto.Hash.html#hashFinalize"><span class="hs-identifier hs-var">hashFinalize</span></a></span><span> </span><span class="annot"><span class="annottext">(Context a -&gt; Digest a) -&gt; Context a -&gt; Digest a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Context a -&gt; ByteString -&gt; Context a
+forall a. HashAlgorithm a =&gt; Context a -&gt; ByteString -&gt; Context a
+</span><a href="Crypto.Hash.html#hashUpdate"><span class="hs-identifier hs-var">hashUpdate</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+forall a. HashAlgorithm a =&gt; Context a
+</span><a href="Crypto.Hash.html#hashInit"><span class="hs-identifier hs-var">hashInit</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047674"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- | Hash a lazy bytestring into a digest.</span><span>
+</span><span id="line-89"></span><span id="local-6989586621679047671"><span class="annot"><a href="Crypto.Hash.html#hashlazy"><span class="hs-identifier hs-type">hashlazy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047671"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047671"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-90"></span><span id="hashlazy"><span class="annot"><span class="annottext">hashlazy :: ByteString -&gt; Digest a
+</span><a href="Crypto.Hash.html#hashlazy"><span class="hs-identifier hs-var hs-var">hashlazy</span></a></span></span><span> </span><span id="local-6989586621679047670"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047670"><span class="hs-identifier hs-var">lbs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; Digest a
+forall a. HashAlgorithm a =&gt; Context a -&gt; Digest a
+</span><a href="Crypto.Hash.html#hashFinalize"><span class="hs-identifier hs-var">hashFinalize</span></a></span><span> </span><span class="annot"><span class="annottext">(Context a -&gt; Digest a) -&gt; Context a -&gt; Digest a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Context a -&gt; [ByteString] -&gt; Context a
+forall a. HashAlgorithm a =&gt; Context a -&gt; [ByteString] -&gt; Context a
+</span><a href="Crypto.Hash.html#hashUpdates"><span class="hs-identifier hs-var">hashUpdates</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+forall a. HashAlgorithm a =&gt; Context a
+</span><a href="Crypto.Hash.html#hashInit"><span class="hs-identifier hs-var">hashInit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; [ByteString]
+</span><span class="hs-identifier hs-var">L.toChunks</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047670"><span class="hs-identifier hs-var">lbs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- | Return the hexadecimal (base16) bytestring of the digest</span><span>
+</span><span id="line-93"></span><span id="local-6989586621679047668"><span class="annot"><a href="Crypto.Hash.html#digestToHexByteString"><span class="hs-identifier hs-type">digestToHexByteString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047668"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span></span><span>
+</span><span id="line-94"></span><span id="digestToHexByteString"><span class="annot"><span class="annottext">digestToHexByteString :: Digest a -&gt; ByteString
+</span><a href="Crypto.Hash.html#digestToHexByteString"><span class="hs-identifier hs-var hs-var">digestToHexByteString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Base -&gt; ByteString -&gt; ByteString
+forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+Base -&gt; bin -&gt; bout
+</span><span class="hs-identifier hs-var">B.convertToBase</span></span><span> </span><span class="annot"><span class="annottext">Base
+</span><span class="hs-identifier hs-var">B.Base16</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (Digest a -&gt; ByteString) -&gt; Digest a -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- | Class representing hashing algorithms.</span><span>
+</span><span id="line-97"></span><span class="hs-comment">--</span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- The hash algorithm is built over 3 primitives:</span><span>
+</span><span id="line-99"></span><span class="hs-comment">--</span><span>
+</span><span id="line-100"></span><span class="hs-comment">-- * init     : create a new hashing context</span><span>
+</span><span id="line-101"></span><span class="hs-comment">--</span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- * updates  : update the hashing context with some strict bytestrings</span><span>
+</span><span id="line-103"></span><span class="hs-comment">--              and return the new context</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- * finalize : finalize the context into a digest</span><span>
+</span><span id="line-106"></span><span class="hs-comment">--</span><span>
+</span><span id="line-107"></span><span class="hs-keyword">class</span><span> </span><span id="HashAlgorithm"><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-var">HashAlgorithm</span></a></span></span><span> </span><span id="local-6989586621679047768"><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-comment">-- | Block size in bytes the hash algorithm operates on</span><span>
+</span><span id="line-109"></span><span>    </span><span id="hashBlockSize"><span class="annot"><a href="Crypto.Hash.html#hashBlockSize"><span class="hs-identifier hs-type">hashBlockSize</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-comment">-- | Initialize a new context for this hash algorithm</span><span>
+</span><span id="line-112"></span><span>    </span><span id="hashInit"><span class="annot"><a href="Crypto.Hash.html#hashInit"><span class="hs-identifier hs-type">hashInit</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-comment">-- | Update the context with a list of strict bytestring,</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-comment">-- and return a new context with the updates.</span><span>
+</span><span id="line-116"></span><span>    </span><span id="hashUpdates"><span class="annot"><a href="Crypto.Hash.html#hashUpdates"><span class="hs-identifier hs-type">hashUpdates</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-comment">-- | Finalize a context and return a digest.</span><span>
+</span><span id="line-119"></span><span>    </span><span id="hashFinalize"><span class="annot"><a href="Crypto.Hash.html#hashFinalize"><span class="hs-identifier hs-type">hashFinalize</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-comment">-- | Try to convert a binary digest bytestring to a digest.</span><span>
+</span><span id="line-122"></span><span>    </span><span id="digestFromByteString"><span class="annot"><a href="Crypto.Hash.html#digestFromByteString"><span class="hs-identifier hs-type">digestFromByteString</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047768"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+
+
+#define DEFINE_INSTANCE(NAME, MODULENAME, BLOCKSIZE) \
+instance HashAlgorithm H.NAME where \
+    { hashInit = Context $ H.hashInit \
+    ; hashBlockSize ~(Context _) = BLOCKSIZE \
+    ; hashUpdates (Context c) bs = Context $ H.hashUpdates c bs \
+    ; hashFinalize (Context c) = Digest $ H.hashFinalize c \
+    ; digestFromByteString bs = Digest `fmap` H.digestFromByteString bs \
+    };
+</span><span class="hs-cpp">
+#define DEFINE_INSTANCE_LEN(NAME, MODULENAME, LEN, BLOCKSIZE) \
+instance HashAlgorithm H.NAME where \
+    { hashInit = Context $ H.hashInit \
+    ; hashBlockSize ~(Context _) = BLOCKSIZE \
+    ; hashUpdates (Context c) bs = Context $ H.hashUpdates c bs \
+    ; hashFinalize (Context c) = Digest $ H.hashFinalize c \
+    ; digestFromByteString bs = Digest `fmap` H.digestFromByteString bs \
+    };
+</span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- | MD2 cryptographic hash</span><span>
+</span><span id="line-144"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">MD2</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">MD2</span><span class="hs-special">,</span><span> </span><span class="hs-number">16</span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- | MD4 cryptographic hash</span><span>
+</span><span id="line-146"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">MD4</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">MD4</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- | MD5 cryptographic hash</span><span>
+</span><span id="line-148"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">MD5</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">MD5</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- | SHA1 cryptographic hash</span><span>
+</span><span id="line-150"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">SHA1</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA1</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- | SHA224 cryptographic hash</span><span>
+</span><span id="line-152"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">SHA224</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA224</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-153"></span><span class="hs-comment">-- | SHA256 cryptographic hash</span><span>
+</span><span id="line-154"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">SHA256</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA256</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-155"></span><span class="hs-comment">-- | SHA384 cryptographic hash</span><span>
+</span><span id="line-156"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">SHA384</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA384</span><span class="hs-special">,</span><span> </span><span class="hs-number">128</span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span class="hs-comment">-- | SHA512 cryptographic hash</span><span>
+</span><span id="line-158"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">SHA512</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA512</span><span class="hs-special">,</span><span> </span><span class="hs-number">128</span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- | RIPEMD160 cryptographic hash</span><span>
+</span><span id="line-161"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">RIPEMD160</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">RIPEMD160</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-162"></span><span class="hs-comment">-- | Whirlpool cryptographic hash</span><span>
+</span><span id="line-163"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">Whirlpool</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Whirlpool</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- | Tiger cryptographic hash</span><span>
+</span><span id="line-165"></span><span class="hs-identifier">DEFINE_INSTANCE</span><span class="hs-special">(</span><span class="hs-identifier">Tiger</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Tiger</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- | SHA3 (224 bits version) cryptographic hash</span><span>
+</span><span id="line-168"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">SHA3_224</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA3</span><span class="hs-special">,</span><span> </span><span class="hs-number">224</span><span class="hs-special">,</span><span> </span><span class="hs-number">144</span><span class="hs-special">)</span><span>
+</span><span id="line-169"></span><span class="hs-comment">-- | SHA3 (256 bits version) cryptographic hash</span><span>
+</span><span id="line-170"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">SHA3_256</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA3</span><span class="hs-special">,</span><span> </span><span class="hs-number">256</span><span class="hs-special">,</span><span> </span><span class="hs-number">136</span><span class="hs-special">)</span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- | SHA3 (384 bits version) cryptographic hash</span><span>
+</span><span id="line-172"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">SHA3_384</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA3</span><span class="hs-special">,</span><span> </span><span class="hs-number">384</span><span class="hs-special">,</span><span> </span><span class="hs-number">104</span><span class="hs-special">)</span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- | SHA3 (512 bits version) cryptographic hash</span><span>
+</span><span id="line-174"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">SHA3_512</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">SHA3</span><span class="hs-special">,</span><span> </span><span class="hs-number">512</span><span class="hs-special">,</span><span> </span><span class="hs-number">72</span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- | Skein256 (224 bits version) cryptographic hash</span><span>
+</span><span id="line-177"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein256_224</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein256</span><span class="hs-special">,</span><span> </span><span class="hs-number">224</span><span class="hs-special">,</span><span> </span><span class="hs-number">32</span><span class="hs-special">)</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- | Skein256 (256 bits version) cryptographic hash</span><span>
+</span><span id="line-179"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein256_256</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein256</span><span class="hs-special">,</span><span> </span><span class="hs-number">256</span><span class="hs-special">,</span><span> </span><span class="hs-number">32</span><span class="hs-special">)</span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span class="hs-comment">-- | Skein512 (224 bits version) cryptographic hash</span><span>
+</span><span id="line-182"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein512_224</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein512</span><span class="hs-special">,</span><span> </span><span class="hs-number">224</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span class="hs-comment">-- | Skein512 (256 bits version) cryptographic hash</span><span>
+</span><span id="line-184"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein512_256</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein512</span><span class="hs-special">,</span><span> </span><span class="hs-number">256</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span class="hs-comment">-- | Skein512 (384 bits version) cryptographic hash</span><span>
+</span><span id="line-186"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein512_384</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein512</span><span class="hs-special">,</span><span> </span><span class="hs-number">384</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span class="hs-comment">-- | Skein512 (512 bits version) cryptographic hash</span><span>
+</span><span id="line-188"></span><span class="hs-identifier">DEFINE_INSTANCE_LEN</span><span class="hs-special">(</span><span class="hs-identifier">Skein512_512</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Skein512</span><span class="hs-special">,</span><span> </span><span class="hs-number">512</span><span class="hs-special">,</span><span> </span><span class="hs-number">64</span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>
+</span><span id="line-190"></span><span class="hs-comment">-- | Initialize a new context for a specified hash algorithm</span><span>
+</span><span id="line-191"></span><span id="local-6989586621679047360"><span class="annot"><a href="Crypto.Hash.html#hashInitAlg"><span class="hs-identifier hs-type">hashInitAlg</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047360"><span class="hs-identifier hs-type">alg</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679047360"><span class="hs-identifier hs-type">alg</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047360"><span class="hs-identifier hs-type">alg</span></a></span></span><span>
+</span><span id="line-192"></span><span id="hashInitAlg"><span class="annot"><span class="annottext">hashInitAlg :: alg -&gt; Context alg
+</span><a href="Crypto.Hash.html#hashInitAlg"><span class="hs-identifier hs-var hs-var">hashInitAlg</span></a></span></span><span> </span><span class="annot"><span class="annottext">alg
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context alg
+forall a. HashAlgorithm a =&gt; Context a
+</span><a href="Crypto.Hash.html#hashInit"><span class="hs-identifier hs-var">hashInit</span></a></span><span>
+</span><span id="line-193"></span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- | Represent an HMAC that is a phantom type with the hash used to produce the mac.</span><span>
+</span><span id="line-195"></span><span class="hs-comment">--</span><span>
+</span><span id="line-196"></span><span class="hs-comment">-- The Eq instance is constant time.</span><span>
+</span><span id="line-197"></span><span class="hs-keyword">newtype</span><span> </span><span id="HMAC"><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-var">HMAC</span></a></span></span><span> </span><span id="local-6989586621679047700"><span class="annot"><a href="#local-6989586621679047700"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="HMAC"><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-var">HMAC</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="hmacGetDigest"><span class="annot"><span class="annottext">HMAC a -&gt; Digest a
+</span><a href="Crypto.Hash.html#hmacGetDigest"><span class="hs-identifier hs-var hs-var">hmacGetDigest</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Digest"><span class="hs-identifier hs-type">Digest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047700"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span id="local-6989586621679047357"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679047352"><span id="local-6989586621679047354"><span class="annot"><span class="hs-identifier hs-type">Byteable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047357"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-200"></span><span>    </span><span id="local-6989586621679047350"><span class="annot"><span class="annottext">toBytes :: HMAC a -&gt; ByteString
+</span><a href="#local-6989586621679047350"><span class="hs-identifier hs-var hs-var hs-var hs-var">toBytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span id="local-6989586621679047349"><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047349"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span> </span><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047349"><span class="hs-identifier hs-var">b</span></a></span></span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span id="local-6989586621679047348"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679047345"><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047348"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-203"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span id="local-6989586621679047343"><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047343"><span class="hs-identifier hs-var">b1</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679047342"><span class="annot"><span class="annottext">== :: HMAC a -&gt; HMAC a -&gt; Bool
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">==</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span id="local-6989586621679047341"><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047341"><span class="hs-identifier hs-var">b2</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; Bool
+forall a. Byteable a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-identifier hs-var">constEqBytes</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span> </span><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047343"><span class="hs-identifier hs-var">b1</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span> </span><span class="annot"><span class="annottext">Digest a
+</span><a href="#local-6989586621679047341"><span class="hs-identifier hs-var">b2</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-204"></span><span>
+</span><span id="line-205"></span><span class="hs-comment">-- | compute a MAC using the supplied hashing function</span><span>
+</span><span id="line-206"></span><span id="local-6989586621679047692"><span class="annot"><a href="Crypto.Hash.html#hmac"><span class="hs-identifier hs-type">hmac</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047692"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-207"></span><span>     </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>       </span><span class="hs-comment">-- ^ Secret key</span><span>
+</span><span id="line-208"></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>       </span><span class="hs-comment">-- ^ Message to MAC</span><span>
+</span><span id="line-209"></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047692"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-210"></span><span id="hmac"><span class="annot"><span class="annottext">hmac :: ByteString -&gt; ByteString -&gt; HMAC a
+</span><a href="Crypto.Hash.html#hmac"><span class="hs-identifier hs-var hs-var">hmac</span></a></span></span><span> </span><span id="local-6989586621679047339"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047339"><span class="hs-identifier hs-var">secret</span></a></span></span><span> </span><span id="local-6989586621679047338"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047338"><span class="hs-identifier hs-var">msg</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; HMAC a
+forall a. HashAlgorithm a =&gt; Context a -&gt; HMAC a
+</span><a href="#local-6989586621679047337"><span class="hs-identifier hs-var">doHMAC</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+forall a. HashAlgorithm a =&gt; Context a
+</span><a href="Crypto.Hash.html#hashInit"><span class="hs-identifier hs-var">hashInit</span></a></span><span>
+</span><span id="line-211"></span><span>  </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679047702"><span class="annot"><a href="#local-6989586621679047337"><span class="hs-identifier hs-type">doHMAC</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047702"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.Types.html#Context"><span class="hs-identifier hs-type">Context</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047702"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047702"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-212"></span><span>        </span><span id="local-6989586621679047337"><span class="annot"><span class="annottext">doHMAC :: Context a -&gt; HMAC a
+</span><a href="#local-6989586621679047337"><span class="hs-identifier hs-var hs-var">doHMAC</span></a></span></span><span> </span><span id="local-6989586621679047336"><span class="annot"><span class="annottext">Context a
+</span><a href="#local-6989586621679047336"><span class="hs-identifier hs-var">ctxInit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Digest a -&gt; HMAC a
+forall a. Digest a -&gt; HMAC a
+</span><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-var">HMAC</span></a></span><span> </span><span class="annot"><span class="annottext">(Digest a -&gt; HMAC a) -&gt; Digest a -&gt; HMAC a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Digest a
+</span><a href="#local-6989586621679047335"><span class="hs-identifier hs-var">hashF</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Digest a) -&gt; ByteString -&gt; Digest a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.append</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047333"><span class="hs-identifier hs-var">opad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span> </span><span class="annot"><span class="annottext">(Digest a -&gt; ByteString) -&gt; Digest a -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Digest a
+</span><a href="#local-6989586621679047335"><span class="hs-identifier hs-var">hashF</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Digest a) -&gt; ByteString -&gt; Digest a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.append</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047332"><span class="hs-identifier hs-var">ipad</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047338"><span class="hs-identifier hs-var">msg</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-213"></span><span>          </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679047333"><span class="annot"><span class="annottext">opad :: ByteString
+</span><a href="#local-6989586621679047333"><span class="hs-identifier hs-var hs-var">opad</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Word8 -&gt; Word8) -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Word8
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">xor</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0x5c</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047330"><span class="hs-identifier hs-var">k'</span></a></span><span>
+</span><span id="line-214"></span><span>                </span><span id="local-6989586621679047332"><span class="annot"><span class="annottext">ipad :: ByteString
+</span><a href="#local-6989586621679047332"><span class="hs-identifier hs-var hs-var">ipad</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Word8 -&gt; Word8) -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Word8 -&gt; Word8
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">xor</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0x36</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047330"><span class="hs-identifier hs-var">k'</span></a></span><span>
+</span><span id="line-215"></span><span>
+</span><span id="line-216"></span><span>                </span><span id="local-6989586621679047330"><span class="annot"><span class="annottext">k' :: ByteString
+</span><a href="#local-6989586621679047330"><span class="hs-identifier hs-var hs-var">k'</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.append</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047329"><span class="hs-identifier hs-var">kt</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047328"><span class="hs-identifier hs-var">pad</span></a></span><span>
+</span><span id="line-217"></span><span>                </span><span id="local-6989586621679047329"><span class="annot"><span class="annottext">kt :: ByteString
+</span><a href="#local-6989586621679047329"><span class="hs-identifier hs-var hs-var">kt</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047339"><span class="hs-identifier hs-var">secret</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679047325"><span class="hs-identifier hs-var">blockSize</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Digest a -&gt; ByteString
+forall a. Byteable a =&gt; a -&gt; ByteString
+</span><span class="hs-identifier hs-var">toBytes</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Digest a
+</span><a href="#local-6989586621679047335"><span class="hs-identifier hs-var">hashF</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047339"><span class="hs-identifier hs-var">secret</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047339"><span class="hs-identifier hs-var">secret</span></a></span><span>
+</span><span id="line-218"></span><span>                </span><span id="local-6989586621679047328"><span class="annot"><span class="annottext">pad :: ByteString
+</span><a href="#local-6989586621679047328"><span class="hs-identifier hs-var hs-var">pad</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Word8 -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.replicate</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679047325"><span class="hs-identifier hs-var">blockSize</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047329"><span class="hs-identifier hs-var">kt</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-219"></span><span>                </span><span id="local-6989586621679047335"><span class="annot"><span class="annottext">hashF :: ByteString -&gt; Digest a
+</span><a href="#local-6989586621679047335"><span class="hs-identifier hs-var hs-var">hashF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; Digest a
+forall a. HashAlgorithm a =&gt; Context a -&gt; Digest a
+</span><a href="Crypto.Hash.html#hashFinalize"><span class="hs-identifier hs-var">hashFinalize</span></a></span><span> </span><span class="annot"><span class="annottext">(Context a -&gt; Digest a)
+-&gt; (ByteString -&gt; Context a) -&gt; ByteString -&gt; Digest a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Context a -&gt; ByteString -&gt; Context a
+forall a. HashAlgorithm a =&gt; Context a -&gt; ByteString -&gt; Context a
+</span><a href="Crypto.Hash.html#hashUpdate"><span class="hs-identifier hs-var">hashUpdate</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+</span><a href="#local-6989586621679047336"><span class="hs-identifier hs-var">ctxInit</span></a></span><span>
+</span><span id="line-220"></span><span>                </span><span id="local-6989586621679047325"><span class="annot"><span class="annottext">blockSize :: Int
+</span><a href="#local-6989586621679047325"><span class="hs-identifier hs-var hs-var">blockSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Context a -&gt; Int
+forall a. HashAlgorithm a =&gt; Context a -&gt; Int
+</span><a href="Crypto.Hash.html#hashBlockSize"><span class="hs-identifier hs-var">hashBlockSize</span></a></span><span> </span><span class="annot"><span class="annottext">Context a
+</span><a href="#local-6989586621679047336"><span class="hs-identifier hs-var">ctxInit</span></a></span><span>
+</span><span id="line-221"></span><span>
+</span><span id="line-222"></span><span class="hs-comment">-- | compute a HMAC using a specified algorithm</span><span>
+</span><span id="line-223"></span><span id="local-6989586621679047323"><span class="annot"><a href="Crypto.Hash.html#hmacAlg"><span class="hs-identifier hs-type">hmacAlg</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047323"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-224"></span><span>        </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679047323"><span class="hs-identifier hs-type">a</span></a></span><span>           </span><span class="hs-comment">-- ^ the hash algorithm the actual value is unused.</span><span>
+</span><span id="line-225"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>  </span><span class="hs-comment">-- ^ Secret key</span><span>
+</span><span id="line-226"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>  </span><span class="hs-comment">-- ^ Message to MAC</span><span>
+</span><span id="line-227"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Crypto.Hash.html#HMAC"><span class="hs-identifier hs-type">HMAC</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679047323"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-228"></span><span id="hmacAlg"><span class="annot"><span class="annottext">hmacAlg :: a -&gt; ByteString -&gt; ByteString -&gt; HMAC a
+</span><a href="Crypto.Hash.html#hmacAlg"><span class="hs-identifier hs-var hs-var">hmacAlg</span></a></span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679047322"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047322"><span class="hs-identifier hs-var">secret</span></a></span></span><span> </span><span id="local-6989586621679047321"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047321"><span class="hs-identifier hs-var">msg</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; HMAC a
+forall a. HashAlgorithm a =&gt; ByteString -&gt; ByteString -&gt; HMAC a
+</span><a href="Crypto.Hash.html#hmac"><span class="hs-identifier hs-var">hmac</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047322"><span class="hs-identifier hs-var">secret</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679047321"><span class="hs-identifier hs-var">msg</span></a></span><span>
+</span><span id="line-229"></span></pre></body></html>

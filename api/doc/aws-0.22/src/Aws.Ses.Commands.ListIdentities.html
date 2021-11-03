@@ -1,0 +1,375 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_1HyTQxC4TvgJuvHv4XLCsl"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Ses.Commands.ListIdentities</span><span>
+</span><span id="line-2"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier">ListIdentities</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-3"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier">ListIdentitiesResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-4"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#IdentityType"><span class="hs-identifier">IdentityType</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-5"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>  </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">catMaybes</span></span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&lt;$&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">encodeUtf8</span></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">($//)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(&amp;/)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">laxElement</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html"><span class="hs-identifier">Aws.Ses.Core</span></a></span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- | List email addresses and/or domains</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">data</span><span> </span><span id="ListIdentities"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-var">ListIdentities</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-20"></span><span>    </span><span id="ListIdentities"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-var">ListIdentities</span></a></span></span><span>
+</span><span id="line-21"></span><span>      </span><span class="hs-special">{</span><span> </span><span id="liIdentityType"><span class="annot"><span class="annottext">ListIdentities -&gt; Maybe IdentityType
+</span><a href="Aws.Ses.Commands.ListIdentities.html#liIdentityType"><span class="hs-identifier hs-var hs-var">liIdentityType</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#IdentityType"><span class="hs-identifier hs-type">IdentityType</span></a></span><span>
+</span><span id="line-22"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="liMaxItems"><span class="annot"><span class="annottext">ListIdentities -&gt; Maybe Int
+</span><a href="Aws.Ses.Commands.ListIdentities.html#liMaxItems"><span class="hs-identifier hs-var hs-var">liMaxItems</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-comment">-- valid range is 1..100</span><span>
+</span><span id="line-23"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="liNextToken"><span class="annot"><span class="annottext">ListIdentities -&gt; Maybe Text
+</span><a href="Aws.Ses.Commands.ListIdentities.html#liNextToken"><span class="hs-identifier hs-var hs-var">liNextToken</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-24"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679234566"><span id="local-6989586621679234568"><span class="annot"><span class="annottext">ListIdentities -&gt; ListIdentities -&gt; Bool
+(ListIdentities -&gt; ListIdentities -&gt; Bool)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Bool) -&gt; Eq ListIdentities
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c/= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+== :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c== :: ListIdentities -&gt; ListIdentities -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234550"><span id="local-6989586621679234552"><span id="local-6989586621679234554"><span id="local-6989586621679234556"><span id="local-6989586621679234558"><span id="local-6989586621679234560"><span id="local-6989586621679234562"><span class="annot"><span class="annottext">Eq ListIdentities
+Eq ListIdentities
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Ordering)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Bool)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Bool)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Bool)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; Bool)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; ListIdentities)
+-&gt; (ListIdentities -&gt; ListIdentities -&gt; ListIdentities)
+-&gt; Ord ListIdentities
+ListIdentities -&gt; ListIdentities -&gt; Bool
+ListIdentities -&gt; ListIdentities -&gt; Ordering
+ListIdentities -&gt; ListIdentities -&gt; ListIdentities
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ListIdentities -&gt; ListIdentities -&gt; ListIdentities
+$cmin :: ListIdentities -&gt; ListIdentities -&gt; ListIdentities
+max :: ListIdentities -&gt; ListIdentities -&gt; ListIdentities
+$cmax :: ListIdentities -&gt; ListIdentities -&gt; ListIdentities
+&gt;= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c&gt;= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+&gt; :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c&gt; :: ListIdentities -&gt; ListIdentities -&gt; Bool
+&lt;= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c&lt;= :: ListIdentities -&gt; ListIdentities -&gt; Bool
+&lt; :: ListIdentities -&gt; ListIdentities -&gt; Bool
+$c&lt; :: ListIdentities -&gt; ListIdentities -&gt; Bool
+compare :: ListIdentities -&gt; ListIdentities -&gt; Ordering
+$ccompare :: ListIdentities -&gt; ListIdentities -&gt; Ordering
+$cp1Ord :: Eq ListIdentities
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234543"><span id="local-6989586621679234545"><span id="local-6989586621679234547"><span class="annot"><span class="annottext">Int -&gt; ListIdentities -&gt; ShowS
+[ListIdentities] -&gt; ShowS
+ListIdentities -&gt; String
+(Int -&gt; ListIdentities -&gt; ShowS)
+-&gt; (ListIdentities -&gt; String)
+-&gt; ([ListIdentities] -&gt; ShowS)
+-&gt; Show ListIdentities
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ListIdentities] -&gt; ShowS
+$cshowList :: [ListIdentities] -&gt; ShowS
+show :: ListIdentities -&gt; String
+$cshow :: ListIdentities -&gt; String
+showsPrec :: Int -&gt; ListIdentities -&gt; ShowS
+$cshowsPrec :: Int -&gt; ListIdentities -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">data</span><span> </span><span id="IdentityType"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#IdentityType"><span class="hs-identifier hs-var">IdentityType</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EmailAddress"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#EmailAddress"><span class="hs-identifier hs-var">EmailAddress</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="Domain"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#Domain"><span class="hs-identifier hs-var">Domain</span></a></span></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679234536"><span id="local-6989586621679234538"><span class="annot"><span class="annottext">IdentityType -&gt; IdentityType -&gt; Bool
+(IdentityType -&gt; IdentityType -&gt; Bool)
+-&gt; (IdentityType -&gt; IdentityType -&gt; Bool) -&gt; Eq IdentityType
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: IdentityType -&gt; IdentityType -&gt; Bool
+$c/= :: IdentityType -&gt; IdentityType -&gt; Bool
+== :: IdentityType -&gt; IdentityType -&gt; Bool
+$c== :: IdentityType -&gt; IdentityType -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234521"><span id="local-6989586621679234523"><span id="local-6989586621679234525"><span id="local-6989586621679234527"><span id="local-6989586621679234529"><span id="local-6989586621679234531"><span id="local-6989586621679234533"><span class="annot"><span class="annottext">Eq IdentityType
+Eq IdentityType
+-&gt; (IdentityType -&gt; IdentityType -&gt; Ordering)
+-&gt; (IdentityType -&gt; IdentityType -&gt; Bool)
+-&gt; (IdentityType -&gt; IdentityType -&gt; Bool)
+-&gt; (IdentityType -&gt; IdentityType -&gt; Bool)
+-&gt; (IdentityType -&gt; IdentityType -&gt; Bool)
+-&gt; (IdentityType -&gt; IdentityType -&gt; IdentityType)
+-&gt; (IdentityType -&gt; IdentityType -&gt; IdentityType)
+-&gt; Ord IdentityType
+IdentityType -&gt; IdentityType -&gt; Bool
+IdentityType -&gt; IdentityType -&gt; Ordering
+IdentityType -&gt; IdentityType -&gt; IdentityType
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: IdentityType -&gt; IdentityType -&gt; IdentityType
+$cmin :: IdentityType -&gt; IdentityType -&gt; IdentityType
+max :: IdentityType -&gt; IdentityType -&gt; IdentityType
+$cmax :: IdentityType -&gt; IdentityType -&gt; IdentityType
+&gt;= :: IdentityType -&gt; IdentityType -&gt; Bool
+$c&gt;= :: IdentityType -&gt; IdentityType -&gt; Bool
+&gt; :: IdentityType -&gt; IdentityType -&gt; Bool
+$c&gt; :: IdentityType -&gt; IdentityType -&gt; Bool
+&lt;= :: IdentityType -&gt; IdentityType -&gt; Bool
+$c&lt;= :: IdentityType -&gt; IdentityType -&gt; Bool
+&lt; :: IdentityType -&gt; IdentityType -&gt; Bool
+$c&lt; :: IdentityType -&gt; IdentityType -&gt; Bool
+compare :: IdentityType -&gt; IdentityType -&gt; Ordering
+$ccompare :: IdentityType -&gt; IdentityType -&gt; Ordering
+$cp1Ord :: Eq IdentityType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234515"><span id="local-6989586621679234517"><span id="local-6989586621679234519"><span class="annot"><span class="annottext">Int -&gt; IdentityType -&gt; ShowS
+[IdentityType] -&gt; ShowS
+IdentityType -&gt; String
+(Int -&gt; IdentityType -&gt; ShowS)
+-&gt; (IdentityType -&gt; String)
+-&gt; ([IdentityType] -&gt; ShowS)
+-&gt; Show IdentityType
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [IdentityType] -&gt; ShowS
+$cshowList :: [IdentityType] -&gt; ShowS
+show :: IdentityType -&gt; String
+$cshow :: IdentityType -&gt; String
+showsPrec :: Int -&gt; IdentityType -&gt; ShowS
+$cshowsPrec :: Int -&gt; IdentityType -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- | ServiceConfiguration: 'SesConfiguration'</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-type">ListIdentities</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-type">ListIdentities</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span id="local-6989586621679234512"><span class="annot"><span class="annottext">signQuery :: ListIdentities
+-&gt; ServiceConfiguration ListIdentities queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-type">ListIdentities</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679234508"><span id="local-6989586621679234509"><span id="local-6989586621679234510"><span class="annot"><span class="annottext">Maybe Int
+Maybe Text
+Maybe IdentityType
+liNextToken :: Maybe Text
+liMaxItems :: Maybe Int
+liIdentityType :: Maybe IdentityType
+liNextToken :: ListIdentities -&gt; Maybe Text
+liMaxItems :: ListIdentities -&gt; Maybe Int
+liIdentityType :: ListIdentities -&gt; Maybe IdentityType
+</span><a href="#local-6989586621679234508"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-34"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679234507"><span class="annot"><span class="annottext">it :: Maybe ByteString
+</span><a href="#local-6989586621679234507"><span class="hs-identifier hs-var hs-var">it</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe IdentityType
+</span><a href="#local-6989586621679234510"><span class="hs-identifier hs-var">liIdentityType</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-35"></span><span>                     </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="annot"><span class="annottext">IdentityType
+</span><a href="Aws.Ses.Commands.ListIdentities.html#EmailAddress"><span class="hs-identifier hs-var">EmailAddress</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;EmailAddress&quot;</span></span><span>
+</span><span id="line-36"></span><span>                     </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="annot"><span class="annottext">IdentityType
+</span><a href="Aws.Ses.Commands.ListIdentities.html#Domain"><span class="hs-identifier hs-var">Domain</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Domain&quot;</span></span><span>
+</span><span id="line-37"></span><span>                     </span><span class="annot"><span class="annottext">Maybe IdentityType
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-38"></span><span>        </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">[(ByteString, ByteString)]
+-&gt; SesConfiguration queryType -&gt; SignatureData -&gt; SignedQuery
+forall qt.
+[(ByteString, ByteString)]
+-&gt; SesConfiguration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.Ses.Core.html#sesSignQuery"><span class="hs-identifier hs-var">sesSignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">([(ByteString, ByteString)]
+ -&gt; SesConfiguration queryType -&gt; SignatureData -&gt; SignedQuery)
+-&gt; [(ByteString, ByteString)]
+-&gt; SesConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Action&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;ListIdentities&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>                          </span><span class="annot"><span class="annottext">(ByteString, ByteString)
+-&gt; [(ByteString, ByteString)] -&gt; [(ByteString, ByteString)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[Maybe (ByteString, ByteString)] -&gt; [(ByteString, ByteString)]
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span>
+</span><span id="line-40"></span><span>                          </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;IdentityType&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; Maybe ByteString -&gt; Maybe (ByteString, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621679234507"><span class="hs-identifier hs-var">it</span></a></span><span>
+</span><span id="line-41"></span><span>                          </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;MaxItems&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; (Int -&gt; ByteString) -&gt; Int -&gt; (ByteString, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.pack</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; ByteString) -&gt; (Int -&gt; String) -&gt; Int -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; (ByteString, ByteString))
+-&gt; Maybe Int -&gt; Maybe (ByteString, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679234509"><span class="hs-identifier hs-var">liMaxItems</span></a></span><span>
+</span><span id="line-42"></span><span>                          </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;NextToken&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; (Text -&gt; ByteString) -&gt; Text -&gt; (ByteString, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; (ByteString, ByteString))
+-&gt; Maybe Text -&gt; Maybe (ByteString, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679234508"><span class="hs-identifier hs-var">liNextToken</span></a></span><span>
+</span><span id="line-43"></span><span>                          </span><span class="hs-special">]</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- | The response sent back by Amazon SES after a</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- 'ListIdentities' command.</span><span>
+</span><span id="line-47"></span><span class="hs-keyword">data</span><span> </span><span id="ListIdentitiesResponse"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-var">ListIdentitiesResponse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ListIdentitiesResponse"><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-var">ListIdentitiesResponse</span></a></span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">]</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679234498"><span id="local-6989586621679234500"><span class="annot"><span class="annottext">ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+(ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; Eq ListIdentitiesResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c/= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+== :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c== :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234483"><span id="local-6989586621679234485"><span id="local-6989586621679234487"><span id="local-6989586621679234489"><span id="local-6989586621679234491"><span id="local-6989586621679234493"><span id="local-6989586621679234495"><span class="annot"><span class="annottext">Eq ListIdentitiesResponse
+Eq ListIdentitiesResponse
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Ordering)
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; (ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool)
+-&gt; (ListIdentitiesResponse
+    -&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse)
+-&gt; (ListIdentitiesResponse
+    -&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse)
+-&gt; Ord ListIdentitiesResponse
+ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Ordering
+ListIdentitiesResponse
+-&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ListIdentitiesResponse
+-&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse
+$cmin :: ListIdentitiesResponse
+-&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse
+max :: ListIdentitiesResponse
+-&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse
+$cmax :: ListIdentitiesResponse
+-&gt; ListIdentitiesResponse -&gt; ListIdentitiesResponse
+&gt;= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c&gt;= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+&gt; :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c&gt; :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+&lt;= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c&lt;= :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+&lt; :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+$c&lt; :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Bool
+compare :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Ordering
+$ccompare :: ListIdentitiesResponse -&gt; ListIdentitiesResponse -&gt; Ordering
+$cp1Ord :: Eq ListIdentitiesResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679234477"><span id="local-6989586621679234479"><span id="local-6989586621679234481"><span class="annot"><span class="annottext">Int -&gt; ListIdentitiesResponse -&gt; ShowS
+[ListIdentitiesResponse] -&gt; ShowS
+ListIdentitiesResponse -&gt; String
+(Int -&gt; ListIdentitiesResponse -&gt; ShowS)
+-&gt; (ListIdentitiesResponse -&gt; String)
+-&gt; ([ListIdentitiesResponse] -&gt; ShowS)
+-&gt; Show ListIdentitiesResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ListIdentitiesResponse] -&gt; ShowS
+$cshowList :: [ListIdentitiesResponse] -&gt; ShowS
+show :: ListIdentitiesResponse -&gt; String
+$cshow :: ListIdentitiesResponse -&gt; String
+showsPrec :: Int -&gt; ListIdentitiesResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; ListIdentitiesResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-type">ListIdentities</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621679234473"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; ListIdentities
+-&gt; IORef (ResponseMetadata ListIdentitiesResponse)
+-&gt; HTTPResponseConsumer ListIdentitiesResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ListIdentities
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>      </span><span class="annot"><span class="annottext">(Cursor -&gt; Response SesMetadata ListIdentitiesResponse)
+-&gt; IORef SesMetadata -&gt; HTTPResponseConsumer ListIdentitiesResponse
+forall a.
+(Cursor -&gt; Response SesMetadata a)
+-&gt; IORef SesMetadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Ses.Core.html#sesResponseConsumer"><span class="hs-identifier hs-var">sesResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">((Cursor -&gt; Response SesMetadata ListIdentitiesResponse)
+ -&gt; IORef SesMetadata
+ -&gt; HTTPResponseConsumer ListIdentitiesResponse)
+-&gt; (Cursor -&gt; Response SesMetadata ListIdentitiesResponse)
+-&gt; IORef SesMetadata
+-&gt; HTTPResponseConsumer ListIdentitiesResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679234470"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679234470"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-55"></span><span>         </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679234469"><span class="annot"><span class="annottext">ids :: [Text]
+</span><a href="#local-6989586621679234469"><span class="hs-identifier hs-var hs-var">ids</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679234470"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Text]) -&gt; [Text]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Axis
+</span><span class="hs-identifier hs-var">laxElement</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Identities&quot;</span></span><span> </span><span class="annot"><span class="annottext">Axis -&gt; (Cursor -&gt; [Text]) -&gt; Cursor -&gt; [Text]
+forall node a.
+Axis node -&gt; (Cursor node -&gt; [a]) -&gt; Cursor node -&gt; [a]
+</span><span class="hs-operator hs-var">&amp;/</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Text]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;member&quot;</span></span><span>
+</span><span id="line-56"></span><span>         </span><span class="annot"><span class="annottext">ListIdentitiesResponse
+-&gt; Response SesMetadata ListIdentitiesResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(ListIdentitiesResponse
+ -&gt; Response SesMetadata ListIdentitiesResponse)
+-&gt; ListIdentitiesResponse
+-&gt; Response SesMetadata ListIdentitiesResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; ListIdentitiesResponse
+</span><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-var">ListIdentitiesResponse</span></a></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679234469"><span class="hs-identifier hs-var">ids</span></a></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentities"><span class="hs-identifier hs-type">ListIdentities</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Ses.Commands.ListIdentities.html#ListIdentitiesResponse"><span class="hs-identifier hs-type">ListIdentitiesResponse</span></a></span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621679234461"><span class="annot"><span class="annottext">loadToMemory :: ListIdentitiesResponse
+-&gt; ResourceT IO (MemoryResponse ListIdentitiesResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ListIdentitiesResponse
+-&gt; ResourceT IO (MemoryResponse ListIdentitiesResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-64"></span></pre></body></html>

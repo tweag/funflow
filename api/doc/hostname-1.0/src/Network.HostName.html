@@ -1,0 +1,71 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Network.HostName</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-2"></span><span>    </span><span class="annot"><a href="Network.HostName.html#HostName"><span class="hs-identifier">HostName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Network.HostName.html#getHostName"><span class="hs-identifier">getHostName</span></a></span><span>
+</span><span id="line-3"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.C.Error</span></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.C.String</span></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.C.Types</span></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.Marshal.Array</span></span><span class="hs-cpp">
+
+#ifdef WINDOWS
+</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.Marshal.Utils</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.Ptr</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.Storable</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">System.Win32.Types</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">stdcall</span><span> </span><span class="hs-keyword">unsafe</span><span> </span><span class="hs-string">&quot;windows.h GetComputerNameExW&quot;</span><span> </span><span class="hs-identifier">getComputerNameEx</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">COMPUTER_NAME_FORMAT</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">LPTSTR</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">LPDWORD</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">IO</span><span> </span><span class="hs-identifier">BOOL</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">type</span><span> </span><span class="hs-identifier">COMPUTER_NAME_FORMAT</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">CInt</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-identifier">computerNamePhysicalDnsHostname</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">COMPUTER_NAME_FORMAT</span><span>
+</span><span id="line-23"></span><span class="hs-identifier">computerNamePhysicalDnsHostname</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-number">5</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-identifier">getHostName</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">IO</span><span> </span><span class="hs-identifier">HostName</span><span>
+</span><span id="line-26"></span><span class="hs-identifier">getHostName</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">with</span><span> </span><span class="hs-number">0</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">p_charcount</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-comment">-- On the first run, determine the character count and ignore any error we get</span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">getComputerNameEx</span><span> </span><span class="hs-identifier">computerNamePhysicalDnsHostname</span><span> </span><span class="hs-identifier">nullPtr</span><span> </span><span class="hs-identifier">p_charcount</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-identifier">charcount</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">peek</span><span> </span><span class="hs-identifier">p_charcount</span><span>
+</span><span id="line-30"></span><span>    </span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-comment">-- The second time around, use the correct character count to retrieve the data</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-identifier">withTString</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">replicate</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">fromIntegral</span><span> </span><span class="hs-identifier">charcount</span><span class="hs-special">)</span><span> </span><span class="hs-char">' '</span><span class="hs-special">)</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">name</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-33"></span><span>        </span><span class="hs-identifier">failIfFalse_</span><span> </span><span class="hs-string">&quot;GetComputerNameExW&quot;</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-identifier">getComputerNameEx</span><span> </span><span class="hs-identifier">computerNamePhysicalDnsHostname</span><span> </span><span class="hs-identifier">name</span><span> </span><span class="hs-identifier">p_charcount</span><span>
+</span><span id="line-34"></span><span>        </span><span class="hs-identifier">peekTString</span><span> </span><span class="hs-identifier">name</span><span class="hs-cpp">
+
+#else
+</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-keyword">ccall</span></span><span> </span><span class="annot"><span class="hs-keyword">unsafe</span></span><span> </span><span class="annot"><span class="hs-string">&quot;gethostname&quot;</span></span><span> </span><span id="gethostname"><span class="annot"><a href="Network.HostName.html#gethostname"><span class="hs-identifier hs-var">gethostname</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CSize</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="annot"><a href="Network.HostName.html#getHostName"><span class="hs-identifier hs-type">getHostName</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="Network.HostName.html#HostName"><span class="hs-identifier hs-type">HostName</span></a></span><span>
+</span><span id="line-41"></span><span id="getHostName"><span class="annot"><span class="annottext">getHostName :: IO HostName
+</span><a href="Network.HostName.html#getHostName"><span class="hs-identifier hs-var hs-var">getHostName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Ptr CChar -&gt; IO HostName) -&gt; IO HostName
+forall a b. Storable a =&gt; Int -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><span class="hs-identifier hs-var">allocaArray0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679028604"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr CChar -&gt; IO HostName) -&gt; IO HostName)
+-&gt; (Ptr CChar -&gt; IO HostName) -&gt; IO HostName
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679028603"><span class="annot"><span class="annottext">Ptr CChar
+</span><a href="#local-6989586621679028603"><span class="hs-identifier hs-var">cstr</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-42"></span><span>        </span><span class="annot"><span class="annottext">HostName -&gt; IO CInt -&gt; IO ()
+forall a. (Eq a, Num a) =&gt; HostName -&gt; IO a -&gt; IO ()
+</span><span class="hs-identifier hs-var">throwErrnoIfMinus1_</span></span><span> </span><span class="annot"><span class="annottext">HostName
+</span><span class="hs-string">&quot;getHostName&quot;</span></span><span> </span><span class="annot"><span class="annottext">(IO CInt -&gt; IO ()) -&gt; IO CInt -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ptr CChar -&gt; CSize -&gt; IO CInt
+</span><a href="Network.HostName.html#gethostname"><span class="hs-identifier hs-var">gethostname</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CChar
+</span><a href="#local-6989586621679028603"><span class="hs-identifier hs-var">cstr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679028604"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>        </span><span class="annot"><span class="annottext">Ptr CChar -&gt; IO HostName
+</span><span class="hs-identifier hs-var">peekCString</span></span><span> </span><span class="annot"><span class="annottext">Ptr CChar
+</span><a href="#local-6989586621679028603"><span class="hs-identifier hs-var">cstr</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679028604"><span class="annot"><span class="annottext">size :: Int
+</span><a href="#local-6989586621679028604"><span class="hs-identifier hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">256</span></span><span class="hs-cpp">
+
+#endif
+</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">type</span><span> </span><span id="HostName"><span class="annot"><a href="Network.HostName.html#HostName"><span class="hs-identifier hs-var">HostName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-49"></span></pre></body></html>

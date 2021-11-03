@@ -1,0 +1,1165 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">{-@ LIQUID &quot;--no-termination&quot; @-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">{-@ LIQUID &quot;--short-names&quot;    @-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-9"></span><span class="hs-comment">{-|
+Module: System.IO.ByteBuffer
+Description: Provides an efficient buffering abstraction.
+
+A 'ByteBuffer' is a simple buffer for bytes.  It supports two
+operations: refilling with the contents of a 'ByteString', and
+consuming a fixed number of bytes.
+
+It is implemented as a pointer, together with counters that keep track
+of the offset and the number of bytes in the buffer.  Note that the
+counters are simple 'IORef's, so 'ByteBuffer's are not thread-safe!
+
+A 'ByteBuffer' is constructed by 'new' with a given starting length,
+and will grow (by repeatedly multiplying its size by 1.5) whenever it
+is being fed a 'ByteString' that is too large.
+-}</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">System.IO.ByteBuffer</span><span>
+</span><span id="line-27"></span><span>       </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier">ByteBuffer</span></a></span><span>
+</span><span id="line-28"></span><span>         </span><span class="annot"><span class="hs-comment">-- * Allocation and Deallocation</span></span><span>
+</span><span id="line-29"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#new"><span class="hs-identifier">new</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#free"><span class="hs-identifier">free</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#with"><span class="hs-identifier">with</span></a></span><span>
+</span><span id="line-30"></span><span>         </span><span class="annot"><span class="hs-comment">-- * Query for number of available bytes</span></span><span>
+</span><span id="line-31"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#totalSize"><span class="hs-identifier">totalSize</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#isEmpty"><span class="hs-identifier">isEmpty</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#availableBytes"><span class="hs-identifier">availableBytes</span></a></span><span>
+</span><span id="line-32"></span><span>         </span><span class="annot"><span class="hs-comment">-- * Feeding new input</span></span><span>
+</span><span id="line-33"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#copyByteString"><span class="hs-identifier">copyByteString</span></a></span><span class="hs-cpp">
+#ifndef mingw32_HOST_OS
+</span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#fillFromFd"><span class="hs-identifier">fillFromFd</span></a></span><span class="hs-cpp">
+#endif
+</span><span>         </span><span class="annot"><span class="hs-comment">-- * Consuming bytes from the buffer</span></span><span>
+</span><span id="line-38"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#consume"><span class="hs-identifier">consume</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#unsafeConsume"><span class="hs-identifier">unsafeConsume</span></a></span><span>
+</span><span id="line-39"></span><span>         </span><span class="annot"><span class="hs-comment">-- * Exceptions</span></span><span>
+</span><span id="line-40"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier">ByteBufferException</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>       </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">SomeException</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">throwIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception.Lifted</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">bracket</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">catch</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Fail</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Fail</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadIO</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">liftIO</span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Control</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadBaseControl</span></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Internal</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.IORef</span></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">fromMaybe</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Foreign.ForeignPtr</span></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.Marshal.Alloc</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Alloc</span></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Foreign.Marshal.Utils</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">copyBytes</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">moveBytes</span></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Ptr</span></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Foreign.C.Error</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CE</span></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Foreign.C.Types</span></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">System.Posix.Types</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Fd</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- | A buffer into which bytes can be written.</span><span>
+</span><span id="line-65"></span><span class="hs-comment">--</span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- Invariants:</span><span>
+</span><span id="line-67"></span><span class="hs-comment">--</span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- * @size &gt;= containedBytes &gt;= consumedBytes &gt;= 0@</span><span>
+</span><span id="line-69"></span><span class="hs-comment">--</span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- * The range from @ptr@ to @ptr `plusPtr` size@ will be allocated</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- * The range from @ptr@ to @ptr `plusPtr` containedBytes@ will</span><span>
+</span><span id="line-73"></span><span class="hs-comment">--   contain bytes previously copied to the buffer</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- * The buffer contains @containedBytes - consumedBytes@ bytes of</span><span>
+</span><span id="line-76"></span><span class="hs-comment">--   data that have been copied to it, but not yet read.  They are in</span><span>
+</span><span id="line-77"></span><span class="hs-comment">--   the range from @ptr `plusPtr` consumedBytes@ to @ptr `plusPtr`</span><span>
+</span><span id="line-78"></span><span class="hs-comment">--   containedBytes@.</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- The first two invariants are encoded in Liquid Haskell, and can</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- be statically checked.</span><span>
+</span><span id="line-82"></span><span class="hs-comment">--</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- If an Exception occurs during an operation that modifies a</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- 'ByteBuffer', the 'ByteBuffer' is invalidated and can no longer be</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- used.  Trying to access the 'ByteBuffer' subsequently will result</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- in a 'ByteBufferException' being thrown.</span><span>
+</span><span id="line-87"></span><span class="hs-comment">{-@
+data BBRef = BBRef
+    { size :: {v: Int | v &gt;= 0 }
+    , contained :: { v: Int | v &gt;= 0 &amp;&amp; v &lt;= size }
+    , consumed :: { v: Int | v &gt;= 0 &amp;&amp; v &lt;= contained }
+    , ptr :: { v: Ptr Word8 | (plen v) = size }
+    }
+@-}</span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span class="hs-keyword">data</span><span> </span><span id="BBRef"><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-var">BBRef</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="BBRef"><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-var">BBRef</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-97"></span><span>      </span><span id="size"><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-98"></span><span>      </span><span class="hs-comment">-- ^ The amount of memory allocated.</span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="contained"><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-100"></span><span>      </span><span class="hs-comment">-- ^ The number of bytes that the 'ByteBuffer' currently holds.</span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="consumed"><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-102"></span><span>      </span><span class="hs-comment">-- ^ The number of bytes that have already been consumed.</span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="ptr"><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="hs-pragma">{-# UNPACK</span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>      </span><span class="hs-comment">-- ^ This points to the beginning of the memory allocated for</span><span>
+</span><span id="line-105"></span><span>      </span><span class="hs-comment">-- the 'ByteBuffer'</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- | Exception that is thrown when an invalid 'ByteBuffer' is being used that is no longer valid.</span><span>
+</span><span id="line-109"></span><span class="hs-comment">--</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- A 'ByteBuffer' is considered to be invalid if</span><span>
+</span><span id="line-111"></span><span class="hs-comment">--</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- - it has explicitly been freed</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- - an Exception has occured during an operation that modified it</span><span>
+</span><span id="line-114"></span><span class="hs-keyword">data</span><span> </span><span id="ByteBufferException"><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-var">ByteBufferException</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ByteBufferException"><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-var">ByteBufferException</span></a></span></span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="_bbeLocation"><span class="annot"><span class="annottext">ByteBufferException -&gt; String
+</span><a href="System.IO.ByteBuffer.html#_bbeLocation"><span class="hs-identifier hs-var hs-var">_bbeLocation</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-116"></span><span>      </span><span class="hs-comment">-- ^ function name that caused the exception</span><span>
+</span><span id="line-117"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="_bbeException"><span class="annot"><span class="annottext">ByteBufferException -&gt; String
+</span><a href="System.IO.ByteBuffer.html#_bbeException"><span class="hs-identifier hs-var hs-var">_bbeException</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-118"></span><span>      </span><span class="hs-comment">-- ^ printed representation of the exception</span><span>
+</span><span id="line-119"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679542040"><span id="local-6989586621679542042"><span class="annot"><span class="annottext">ByteBufferException -&gt; ByteBufferException -&gt; Bool
+(ByteBufferException -&gt; ByteBufferException -&gt; Bool)
+-&gt; (ByteBufferException -&gt; ByteBufferException -&gt; Bool)
+-&gt; Eq ByteBufferException
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ByteBufferException -&gt; ByteBufferException -&gt; Bool
+$c/= :: ByteBufferException -&gt; ByteBufferException -&gt; Bool
+== :: ByteBufferException -&gt; ByteBufferException -&gt; Bool
+$c== :: ByteBufferException -&gt; ByteBufferException -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679542034"><span id="local-6989586621679542037"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-type">ByteBufferException</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679542032"><span class="annot"><span class="annottext">show :: ByteBufferException -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-type">ByteBufferException</span></a></span><span> </span><span id="local-6989586621679542030"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542030"><span class="hs-identifier hs-var">loc</span></a></span></span><span> </span><span id="local-6989586621679542029"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542029"><span class="hs-identifier hs-var">e</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; String
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span>
+</span><span id="line-123"></span><span>        </span><span class="hs-special">[</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ByteBufferException: ByteBuffer was invalidated because of Exception thrown in &quot;</span></span><span>
+</span><span id="line-124"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542030"><span class="hs-identifier hs-var">loc</span></a></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;: &quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542029"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-125"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679542020"><span id="local-6989586621679542022"><span id="local-6989586621679542024"><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-type">ByteBufferException</span></a></span></span></span></span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="hs-keyword">type</span><span> </span><span id="ByteBuffer"><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-var">ByteBuffer</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IORef</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-type">ByteBufferException</span></a></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- | On any Exception, this will invalidate the ByteBuffer and re-throw the Exception.</span><span>
+</span><span id="line-130"></span><span class="hs-comment">--</span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- Invalidating the 'ByteBuffer' includes freeing the underlying pointer.</span><span>
+</span><span id="line-132"></span><span id="local-6989586621679542103"><span id="local-6989586621679542104"><span class="annot"><a href="System.IO.ByteBuffer.html#bbHandler"><span class="hs-identifier hs-type">bbHandler</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542104"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-133"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-134"></span><span>       </span><span class="hs-comment">-- ^ location information: function from which the exception was thrown</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span>
+</span><span id="line-136"></span><span>       </span><span class="hs-comment">-- ^ this 'ByteBuffer' will be invalidated when an Exception occurs</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542103"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542104"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679542103"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-139"></span><span id="bbHandler"><span class="annot"><span class="annottext">bbHandler :: String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO a) -&gt; m a
+</span><a href="System.IO.ByteBuffer.html#bbHandler"><span class="hs-identifier hs-var hs-var">bbHandler</span></a></span></span><span> </span><span id="local-6989586621679542017"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542017"><span class="hs-identifier hs-var">loc</span></a></span></span><span> </span><span id="local-6989586621679542016"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542016"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span id="local-6989586621679542015"><span class="annot"><span class="annottext">BBRef -&gt; IO a
+</span><a href="#local-6989586621679542015"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO a -&gt; m a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO a -&gt; m a) -&gt; IO a -&gt; m a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(BBRef -&gt; IO a) -&gt; ByteBuffer -&gt; IO a
+forall a. (BBRef -&gt; IO a) -&gt; ByteBuffer -&gt; IO a
+</span><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-identifier hs-var">useBBRef</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO a
+</span><a href="#local-6989586621679542015"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542016"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">IO a -&gt; (SomeException -&gt; IO a) -&gt; IO a
+forall (m :: * -&gt; *) e a.
+(MonadBaseControl IO m, Exception e) =&gt;
+m a -&gt; (e -&gt; m a) -&gt; m a
+</span><span class="hs-operator hs-var">`catch`</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679542013"><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679542013"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">SomeException</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-140"></span><span>    </span><span class="annot"><span class="annottext">ByteBuffer -&gt; IO (Either ByteBufferException BBRef)
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542016"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Either ByteBufferException BBRef)
+-&gt; (Either ByteBufferException BBRef -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-141"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679542011"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679542011"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-142"></span><span>            </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; IO ()
+forall a. Ptr a -&gt; IO ()
+</span><span class="hs-identifier hs-var">Alloc.free</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679542011"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-143"></span><span>            </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542016"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteBufferException -&gt; Either ByteBufferException BBRef
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">(ByteBufferException -&gt; Either ByteBufferException BBRef)
+-&gt; ByteBufferException -&gt; Either ByteBufferException BBRef
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; ByteBufferException
+</span><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-var">ByteBufferException</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679542017"><span class="hs-identifier hs-var">loc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SomeException -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679542013"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-144"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span class="annot"><span class="annottext">ByteBufferException
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span>    </span><span class="annot"><span class="annottext">SomeException -&gt; IO a
+forall e a. Exception e =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679542013"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- | Try to use the 'BBRef' of a 'ByteBuffer', or throw a 'ByteBufferException' if it's invalid.</span><span>
+</span><span id="line-148"></span><span id="local-6989586621679542160"><span class="annot"><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-identifier hs-type">useBBRef</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542160"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542160"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-149"></span><span id="useBBRef"><span class="annot"><span class="annottext">useBBRef :: (BBRef -&gt; IO a) -&gt; ByteBuffer -&gt; IO a
+</span><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-identifier hs-var hs-var">useBBRef</span></a></span></span><span> </span><span id="local-6989586621679542008"><span class="annot"><span class="annottext">BBRef -&gt; IO a
+</span><a href="#local-6989586621679542008"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679542007"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542007"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteBuffer -&gt; IO (Either ByteBufferException BBRef)
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542007"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Either ByteBufferException BBRef)
+-&gt; (Either ByteBufferException BBRef -&gt; IO a) -&gt; IO a
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">(ByteBufferException -&gt; IO a)
+-&gt; (BBRef -&gt; IO a) -&gt; Either ByteBufferException BBRef -&gt; IO a
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><span class="hs-identifier hs-var">either</span></span><span> </span><span class="annot"><span class="annottext">ByteBufferException -&gt; IO a
+forall e a. Exception e =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO a
+</span><a href="#local-6989586621679542008"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-150"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-pragma hs-type">useBBRef</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-151"></span><span>
+</span><span id="line-152"></span><span id="local-6989586621679542005"><span class="annot"><a href="System.IO.ByteBuffer.html#totalSize"><span class="hs-identifier hs-type">totalSize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542005"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542005"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-153"></span><span id="totalSize"><span class="annot"><span class="annottext">totalSize :: ByteBuffer -&gt; m Int
+</span><a href="System.IO.ByteBuffer.html#totalSize"><span class="hs-identifier hs-var hs-var">totalSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Int -&gt; m Int
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO Int -&gt; m Int) -&gt; (ByteBuffer -&gt; IO Int) -&gt; ByteBuffer -&gt; m Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(BBRef -&gt; IO Int) -&gt; ByteBuffer -&gt; IO Int
+forall a. (BBRef -&gt; IO a) -&gt; ByteBuffer -&gt; IO a
+</span><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-identifier hs-var">useBBRef</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; IO Int) -&gt; (BBRef -&gt; Int) -&gt; BBRef -&gt; IO Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-154"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#totalSize"><span class="hs-pragma hs-type">totalSize</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span id="local-6989586621679542003"><span class="annot"><a href="System.IO.ByteBuffer.html#isEmpty"><span class="hs-identifier hs-type">isEmpty</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542003"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542003"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span></span><span>
+</span><span id="line-157"></span><span id="isEmpty"><span class="annot"><span class="annottext">isEmpty :: ByteBuffer -&gt; m Bool
+</span><a href="System.IO.ByteBuffer.html#isEmpty"><span class="hs-identifier hs-var hs-var">isEmpty</span></a></span></span><span> </span><span id="local-6989586621679542002"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542002"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Bool -&gt; m Bool
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO Bool -&gt; m Bool) -&gt; IO Bool -&gt; m Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Bool) -&gt; IO Int -&gt; IO Bool
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer -&gt; IO Int
+forall (m :: * -&gt; *). MonadIO m =&gt; ByteBuffer -&gt; m Int
+</span><a href="System.IO.ByteBuffer.html#availableBytes"><span class="hs-identifier hs-var">availableBytes</span></a></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679542002"><span class="hs-identifier hs-var">bb</span></a></span><span>
+</span><span id="line-158"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#isEmpty"><span class="hs-pragma hs-type">isEmpty</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- | Number of available bytes in a 'ByteBuffer' (that is, bytes that</span><span>
+</span><span id="line-161"></span><span class="hs-comment">-- have been copied to, but not yet read from the 'ByteBuffer'.</span><span>
+</span><span id="line-162"></span><span class="hs-comment">{-@ availableBytes :: MonadIO m =&gt; ByteBuffer -&gt; m {v: Int | v &gt;= 0} @-}</span><span>
+</span><span id="line-163"></span><span id="local-6989586621679542131"><span class="annot"><a href="System.IO.ByteBuffer.html#availableBytes"><span class="hs-identifier hs-type">availableBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542131"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542131"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-164"></span><span id="availableBytes"><span class="annot"><span class="annottext">availableBytes :: ByteBuffer -&gt; m Int
+</span><a href="System.IO.ByteBuffer.html#availableBytes"><span class="hs-identifier hs-var hs-var">availableBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO Int -&gt; m Int
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO Int -&gt; m Int) -&gt; (ByteBuffer -&gt; IO Int) -&gt; ByteBuffer -&gt; m Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(BBRef -&gt; IO Int) -&gt; ByteBuffer -&gt; IO Int
+forall a. (BBRef -&gt; IO a) -&gt; ByteBuffer -&gt; IO a
+</span><a href="System.IO.ByteBuffer.html#useBBRef"><span class="hs-identifier hs-var">useBBRef</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span class="hs-special">{</span><span id="local-6989586621679541997"><span id="local-6989586621679541998"><span id="local-6989586621679541999"><span id="local-6989586621679542000"><span class="annot"><span class="annottext">Int
+Ptr Word8
+ptr :: Ptr Word8
+consumed :: Int
+contained :: Int
+size :: Int
+ptr :: BBRef -&gt; Ptr Word8
+consumed :: BBRef -&gt; Int
+contained :: BBRef -&gt; Int
+size :: BBRef -&gt; Int
+</span><a href="#local-6989586621679541997"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541999"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541998"><span class="hs-identifier hs-var">consumed</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#availableBytes"><span class="hs-pragma hs-type">availableBytes</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- | Allocates a new ByteBuffer with a given buffer size filling from</span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- the given FillBuffer.</span><span>
+</span><span id="line-169"></span><span class="hs-comment">--</span><span>
+</span><span id="line-170"></span><span class="hs-comment">-- Note that 'ByteBuffer's created with 'new' have to be deallocated</span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- explicitly using 'free'.  For automatic deallocation, consider</span><span>
+</span><span id="line-172"></span><span class="hs-comment">-- using 'with' instead.</span><span>
+</span><span id="line-173"></span><span id="local-6989586621679542116"><span class="annot"><a href="System.IO.ByteBuffer.html#new"><span class="hs-identifier hs-type">new</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542116"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-174"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-175"></span><span>    </span><span class="hs-comment">-- ^ Size of buffer to allocate.  If 'Nothing', use the default</span><span>
+</span><span id="line-176"></span><span>    </span><span class="hs-comment">-- value of 4MB</span><span>
+</span><span id="line-177"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542116"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span>
+</span><span id="line-178"></span><span>    </span><span class="hs-comment">-- ^ The byte buffer.</span></span><span>
+</span><span id="line-179"></span><span id="new"><span class="annot"><span class="annottext">new :: Maybe Int -&gt; m ByteBuffer
+</span><a href="System.IO.ByteBuffer.html#new"><span class="hs-identifier hs-var hs-var">new</span></a></span></span><span> </span><span id="local-6989586621679541996"><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679541996"><span class="hs-identifier hs-var">ml</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO ByteBuffer -&gt; m ByteBuffer
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ByteBuffer -&gt; m ByteBuffer) -&gt; IO ByteBuffer -&gt; m ByteBuffer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-180"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541995"><span class="annot"><span class="annottext">l :: Int
+</span><a href="#local-6989586621679541995"><span class="hs-identifier hs-var hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">max</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; (Maybe Int -&gt; Int) -&gt; Maybe Int -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Maybe Int -&gt; Int
+forall a. a -&gt; Maybe a -&gt; a
+</span><span class="hs-identifier hs-var">fromMaybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4</span></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1024</span></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1024</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe Int -&gt; Int) -&gt; Maybe Int -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679541996"><span class="hs-identifier hs-var">ml</span></a></span><span>
+</span><span id="line-181"></span><span>    </span><span id="local-6989586621679541992"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541992"><span class="hs-identifier hs-var">newPtr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO (Ptr Word8)
+forall a. Int -&gt; IO (Ptr a)
+</span><span class="hs-identifier hs-var">Alloc.mallocBytes</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541995"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-182"></span><span>    </span><span class="annot"><span class="annottext">Either ByteBufferException BBRef -&gt; IO ByteBuffer
+forall a. a -&gt; IO (IORef a)
+</span><span class="hs-identifier hs-var">newIORef</span></span><span> </span><span class="annot"><span class="annottext">(Either ByteBufferException BBRef -&gt; IO ByteBuffer)
+-&gt; Either ByteBufferException BBRef -&gt; IO ByteBuffer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Either ByteBufferException BBRef
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">BBRef :: Int -&gt; Int -&gt; Int -&gt; Ptr Word8 -&gt; BBRef
+</span><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span>
+</span><span id="line-183"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">ptr :: Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541992"><span class="hs-identifier hs-var">newPtr</span></a></span><span>
+</span><span id="line-184"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">size :: Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541995"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-185"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">contained :: Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-186"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">consumed :: Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var">consumed</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-187"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-188"></span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- | Free a byte buffer.</span><span>
+</span><span id="line-190"></span><span id="local-6989586621679542115"><span class="annot"><a href="System.IO.ByteBuffer.html#free"><span class="hs-identifier hs-type">free</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542115"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542115"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-191"></span><span id="free"><span class="annot"><span class="annottext">free :: ByteBuffer -&gt; m ()
+</span><a href="System.IO.ByteBuffer.html#free"><span class="hs-identifier hs-var hs-var">free</span></a></span></span><span> </span><span id="local-6989586621679541989"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541989"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; m ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; m ()) -&gt; IO () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer -&gt; IO (Either ByteBufferException BBRef)
+forall a. IORef a -&gt; IO a
+</span><span class="hs-identifier hs-var">readIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541989"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Either ByteBufferException BBRef)
+-&gt; (Either ByteBufferException BBRef -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-192"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679541988"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541988"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-193"></span><span>        </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; IO ()
+forall a. Ptr a -&gt; IO ()
+</span><span class="hs-identifier hs-var">Alloc.free</span></span><span> </span><span class="annot"><span class="annottext">(Ptr Word8 -&gt; IO ()) -&gt; Ptr Word8 -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541988"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-194"></span><span>        </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541989"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ByteBufferException BBRef -&gt; IO ())
+-&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-195"></span><span>            </span><span class="annot"><span class="annottext">ByteBufferException -&gt; Either ByteBufferException BBRef
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; String -&gt; ByteBufferException
+</span><a href="System.IO.ByteBuffer.html#ByteBufferException"><span class="hs-identifier hs-var">ByteBufferException</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;free&quot;</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ByteBuffer has explicitly been freed and is no longer valid.&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-196"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span class="annot"><span class="annottext">ByteBufferException
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- the ByteBuffer is either invalid or has already been freed.</span><span>
+</span><span id="line-197"></span><span>
+</span><span id="line-198"></span><span class="hs-comment">-- | Perform some action with a bytebuffer, with automatic allocation</span><span>
+</span><span id="line-199"></span><span class="hs-comment">-- and deallocation.</span><span>
+</span><span id="line-200"></span><span id="local-6989586621679541986"><span id="local-6989586621679541987"><span class="annot"><a href="System.IO.ByteBuffer.html#with"><span class="hs-identifier hs-type">with</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679541987"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadBaseControl</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679541987"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-201"></span><span>     </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-202"></span><span>     </span><span class="hs-comment">-- ^ Initial length of the 'ByteBuffer'.  If 'Nothing', use the</span><span>
+</span><span id="line-203"></span><span>     </span><span class="hs-comment">-- default value of 4MB.</span><span>
+</span><span id="line-204"></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541987"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541986"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-205"></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541987"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541986"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-206"></span><span id="with"><span class="annot"><span class="annottext">with :: Maybe Int -&gt; (ByteBuffer -&gt; m a) -&gt; m a
+</span><a href="System.IO.ByteBuffer.html#with"><span class="hs-identifier hs-var hs-var">with</span></a></span></span><span> </span><span id="local-6989586621679541985"><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679541985"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span id="local-6989586621679541984"><span class="annot"><span class="annottext">ByteBuffer -&gt; m a
+</span><a href="#local-6989586621679541984"><span class="hs-identifier hs-var">action</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-207"></span><span>  </span><span class="annot"><span class="annottext">m ByteBuffer -&gt; (ByteBuffer -&gt; m ()) -&gt; (ByteBuffer -&gt; m a) -&gt; m a
+forall (m :: * -&gt; *) a b c.
+MonadBaseControl IO m =&gt;
+m a -&gt; (a -&gt; m b) -&gt; (a -&gt; m c) -&gt; m c
+</span><span class="hs-identifier hs-var">bracket</span></span><span>
+</span><span id="line-208"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe Int -&gt; m ByteBuffer
+forall (m :: * -&gt; *). MonadIO m =&gt; Maybe Int -&gt; m ByteBuffer
+</span><a href="System.IO.ByteBuffer.html#new"><span class="hs-identifier hs-var">new</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Int
+</span><a href="#local-6989586621679541985"><span class="hs-identifier hs-var">l</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-209"></span><span>    </span><span class="annot"><span class="annottext">ByteBuffer -&gt; m ()
+forall (m :: * -&gt; *). MonadIO m =&gt; ByteBuffer -&gt; m ()
+</span><a href="System.IO.ByteBuffer.html#free"><span class="hs-identifier hs-var">free</span></a></span><span>
+</span><span id="line-210"></span><span>    </span><span class="annot"><span class="annottext">ByteBuffer -&gt; m a
+</span><a href="#local-6989586621679541984"><span class="hs-identifier hs-var">action</span></a></span><span>
+</span><span id="line-211"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#with"><span class="hs-pragma hs-type">with</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-212"></span><span>
+</span><span id="line-213"></span><span class="hs-comment">-- | Reset a 'BBRef', i.e. copy all the bytes that have not yet</span><span>
+</span><span id="line-214"></span><span class="hs-comment">-- been consumed to the front of the buffer.</span><span>
+</span><span id="line-215"></span><span class="hs-comment">{-@ resetBBRef :: b:BBRef -&gt; IO {v:BBRef | consumed v == 0 &amp;&amp; contained v == contained b - consumed b &amp;&amp; size v == size b} @-}</span><span>
+</span><span id="line-216"></span><span class="annot"><a href="System.IO.ByteBuffer.html#resetBBRef"><span class="hs-identifier hs-type">resetBBRef</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span>
+</span><span id="line-217"></span><span id="resetBBRef"><span class="annot"><span class="annottext">resetBBRef :: BBRef -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#resetBBRef"><span class="hs-identifier hs-var hs-var">resetBBRef</span></a></span></span><span> </span><span id="local-6989586621679541982"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-218"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541981"><span class="annot"><span class="annottext">available :: Int
+</span><a href="#local-6989586621679541981"><span class="hs-identifier hs-var hs-var">available</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-219"></span><span>    </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word8 -&gt; Int -&gt; IO ()
+forall a. Ptr a -&gt; Ptr a -&gt; Int -&gt; IO ()
+</span><span class="hs-identifier hs-var">moveBytes</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Word8
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541981"><span class="hs-identifier hs-var">available</span></a></span><span>
+</span><span id="line-220"></span><span>    </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">BBRef :: Int -&gt; Int -&gt; Int -&gt; Ptr Word8 -&gt; BBRef
+</span><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">size :: Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-221"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">contained :: Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541981"><span class="hs-identifier hs-var">available</span></a></span><span>
+</span><span id="line-222"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">consumed :: Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var">consumed</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-223"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ptr :: Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541982"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-224"></span><span>                 </span><span class="hs-special">}</span><span>
+</span><span id="line-225"></span><span>
+</span><span id="line-226"></span><span class="hs-comment">-- | Make sure the buffer is at least @minSize@ bytes long.</span><span>
+</span><span id="line-227"></span><span class="hs-comment">--</span><span>
+</span><span id="line-228"></span><span class="hs-comment">-- In order to avoid having to enlarge the buffer too often, we</span><span>
+</span><span id="line-229"></span><span class="hs-comment">-- multiply its size by a factor of 1.5 until it is at least @minSize@</span><span>
+</span><span id="line-230"></span><span class="hs-comment">-- bytes long.</span><span>
+</span><span id="line-231"></span><span class="hs-comment">{-@ enlargeBBRef :: b:BBRef -&gt; i:Nat -&gt; IO {v:BBRef | size v &gt;= i &amp;&amp; contained v == contained b &amp;&amp; consumed v == consumed b} @-}</span><span>
+</span><span id="line-232"></span><span class="annot"><a href="System.IO.ByteBuffer.html#enlargeBBRef"><span class="hs-identifier hs-type">enlargeBBRef</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span>
+</span><span id="line-233"></span><span id="enlargeBBRef"><span class="annot"><span class="annottext">enlargeBBRef :: BBRef -&gt; Int -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#enlargeBBRef"><span class="hs-identifier hs-var hs-var">enlargeBBRef</span></a></span></span><span> </span><span id="local-6989586621679541978"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541978"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span id="local-6989586621679541977"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541977"><span class="hs-identifier hs-var">minSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-234"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541976"><span class="annot"><span class="annottext">getNewSize :: Int -&gt; Int
+</span><a href="#local-6989586621679541976"><span class="hs-identifier hs-var hs-var">getNewSize</span></a></span></span><span> </span><span id="local-6989586621679541975"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541975"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541975"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541977"><span class="hs-identifier hs-var">minSize</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541975"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-235"></span><span>            </span><span class="annot"><a href="#local-6989586621679541976"><span class="hs-identifier hs-var">getNewSize</span></a></span><span> </span><span id="local-6989586621679541974"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541974"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+</span><a href="#local-6989586621679541976"><span class="hs-identifier hs-var">getNewSize</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Int) -&gt; Int -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double -&gt; Int
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">ceiling</span></span><span> </span><span class="annot"><span class="annottext">(Double -&gt; Int) -&gt; (Int -&gt; Double) -&gt; Int -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">1.5</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Double -&gt; Double) -&gt; (Int -&gt; Double) -&gt; Int -&gt; Double
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">max</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541974"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-236"></span><span>            </span><span id="local-6989586621679541972"><span class="annot"><span class="annottext">newSize :: Int
+</span><a href="#local-6989586621679541972"><span class="hs-identifier hs-var hs-var">newSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+</span><a href="#local-6989586621679541976"><span class="hs-identifier hs-var">getNewSize</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541978"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-237"></span><span>        </span><span class="hs-comment">-- possible optimisation: since reallocation might copy the</span><span>
+</span><span id="line-238"></span><span>        </span><span class="hs-comment">-- bytes anyway, we could discard the consumed bytes,</span><span>
+</span><span id="line-239"></span><span>        </span><span class="hs-comment">-- basically 'reset'ting the buffer on the fly.</span><span>
+</span><span id="line-240"></span><span>        </span><span id="local-6989586621679541971"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541971"><span class="hs-identifier hs-var">ptr'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; IO (Ptr Word8)
+forall a. Ptr a -&gt; Int -&gt; IO (Ptr a)
+</span><span class="hs-identifier hs-var">Alloc.reallocBytes</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541978"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541972"><span class="hs-identifier hs-var">newSize</span></a></span><span>
+</span><span id="line-241"></span><span>        </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">BBRef :: Int -&gt; Int -&gt; Int -&gt; Ptr Word8 -&gt; BBRef
+</span><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">size :: Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541972"><span class="hs-identifier hs-var">newSize</span></a></span><span>
+</span><span id="line-242"></span><span>                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">contained :: Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541978"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-243"></span><span>                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">consumed :: Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var">consumed</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541978"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-244"></span><span>                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ptr :: Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541971"><span class="hs-identifier hs-var">ptr'</span></a></span><span>
+</span><span id="line-245"></span><span>                     </span><span class="hs-special">}</span><span>
+</span><span id="line-246"></span><span>
+</span><span id="line-247"></span><span class="hs-comment">-- | Copy the contents of a 'ByteString' to a 'ByteBuffer'.</span><span>
+</span><span id="line-248"></span><span class="hs-comment">--</span><span>
+</span><span id="line-249"></span><span class="hs-comment">-- If necessary, the 'ByteBuffer' is enlarged and/or already consumed</span><span>
+</span><span id="line-250"></span><span class="hs-comment">-- bytes are dropped.</span><span>
+</span><span id="line-251"></span><span id="local-6989586621679541969"><span class="annot"><a href="System.IO.ByteBuffer.html#copyByteString"><span class="hs-identifier hs-type">copyByteString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679541969"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541969"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-252"></span><span id="copyByteString"><span class="annot"><span class="annottext">copyByteString :: ByteBuffer -&gt; ByteString -&gt; m ()
+</span><a href="System.IO.ByteBuffer.html#copyByteString"><span class="hs-identifier hs-var hs-var">copyByteString</span></a></span></span><span> </span><span id="local-6989586621679541968"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541968"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span id="local-6989586621679541967"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679541967"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-253"></span><span>    </span><span class="annot"><span class="annottext">String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO ()) -&gt; m ()
+forall (m :: * -&gt; *) a.
+MonadIO m =&gt;
+String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO a) -&gt; m a
+</span><a href="System.IO.ByteBuffer.html#bbHandler"><span class="hs-identifier hs-var">bbHandler</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;copyByteString&quot;</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541968"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO ()
+</span><a href="#local-6989586621679541966"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-254"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-255"></span><span>    </span><span id="local-6989586621679541966"><span class="annot"><span class="annottext">go :: BBRef -&gt; IO ()
+</span><a href="#local-6989586621679541966"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679541965"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-256"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679541964"><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679541964"><span class="hs-identifier hs-var">bsFptr</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541963"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541963"><span class="hs-identifier hs-var">bsOffset</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541962"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; (ForeignPtr Word8, Int, Int)
+</span><span class="hs-identifier hs-var">BS.toForeignPtr</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679541967"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-257"></span><span>        </span><span class="hs-comment">-- if the byteBuffer is too small, resize it.</span><span>
+</span><span id="line-258"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541960"><span class="annot"><span class="annottext">available :: Int
+</span><a href="#local-6989586621679541960"><span class="hs-identifier hs-var hs-var">available</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="hs-comment">-- bytes not yet consumed</span><span>
+</span><span id="line-259"></span><span>        </span><span id="local-6989586621679541959"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541959"><span class="hs-identifier hs-var">bbref'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541960"><span class="hs-identifier hs-var">available</span></a></span><span>
+</span><span id="line-260"></span><span>                  </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#enlargeBBRef"><span class="hs-identifier hs-var">enlargeBBRef</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541960"><span class="hs-identifier hs-var">available</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-261"></span><span>                  </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541965"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-262"></span><span>        </span><span class="hs-comment">-- if it is currently too full, reset it</span><span>
+</span><span id="line-263"></span><span>        </span><span id="local-6989586621679541956"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541959"><span class="hs-identifier hs-var">bbref'</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541959"><span class="hs-identifier hs-var">bbref'</span></a></span><span>
+</span><span id="line-264"></span><span>                   </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#resetBBRef"><span class="hs-identifier hs-var">resetBBRef</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541959"><span class="hs-identifier hs-var">bbref'</span></a></span><span>
+</span><span id="line-265"></span><span>                   </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541959"><span class="hs-identifier hs-var">bbref'</span></a></span><span>
+</span><span id="line-266"></span><span>        </span><span class="hs-comment">-- now we can safely copy.</span><span>
+</span><span id="line-267"></span><span>        </span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><span class="hs-identifier hs-var">withForeignPtr</span></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679541964"><span class="hs-identifier hs-var">bsFptr</span></a></span><span> </span><span class="annot"><span class="annottext">((Ptr Word8 -&gt; IO ()) -&gt; IO ()) -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span> </span><span id="local-6989586621679541953"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541953"><span class="hs-identifier hs-var">bsPtr</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-268"></span><span>            </span><span class="annot"><span class="annottext">Ptr Any -&gt; Ptr Any -&gt; Int -&gt; IO ()
+forall a. Ptr a -&gt; Ptr a -&gt; Int -&gt; IO ()
+</span><span class="hs-identifier hs-var">copyBytes</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Any
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-269"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541953"><span class="hs-identifier hs-var">bsPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Any
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541963"><span class="hs-identifier hs-var">bsOffset</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-270"></span><span>            </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span><span>
+</span><span id="line-271"></span><span>        </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541968"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ByteBufferException BBRef -&gt; IO ())
+-&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Either ByteBufferException BBRef
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">BBRef :: Int -&gt; Int -&gt; Int -&gt; Ptr Word8 -&gt; BBRef
+</span><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-272"></span><span>            </span><span class="annot"><span class="annottext">size :: Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span>
+</span><span id="line-273"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">contained :: Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541962"><span class="hs-identifier hs-var">bsSize</span></a></span><span>
+</span><span id="line-274"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">consumed :: Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var">consumed</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span>
+</span><span id="line-275"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ptr :: Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541956"><span class="hs-identifier hs-var">bbref''</span></a></span><span class="hs-special">}</span><span class="hs-cpp">
+
+#ifndef mingw32_HOST_OS
+</span><span>
+</span><span id="line-279"></span><span class="hs-comment">-- | Will read at most n bytes from the given 'Fd', in a non-blocking</span><span>
+</span><span id="line-280"></span><span class="hs-comment">-- fashion. This function is intended to be used with non-blocking 'Socket's,</span><span>
+</span><span id="line-281"></span><span class="hs-comment">-- such the ones created by the @network@ package.</span><span>
+</span><span id="line-282"></span><span class="hs-comment">--</span><span>
+</span><span id="line-283"></span><span class="hs-comment">-- Returns how many bytes could be read non-blockingly.</span><span>
+</span><span id="line-284"></span><span id="local-6989586621679541952"><span class="annot"><a href="System.IO.ByteBuffer.html#fillFromFd"><span class="hs-identifier hs-type">fillFromFd</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679541952"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Fail.MonadFail</span></span><span> </span><span class="annot"><a href="#local-6989586621679541952"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Fd</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541952"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span><span>
+</span><span id="line-285"></span><span id="fillFromFd"><span class="annot"><span class="annottext">fillFromFd :: ByteBuffer -&gt; Fd -&gt; Int -&gt; m Int
+</span><a href="System.IO.ByteBuffer.html#fillFromFd"><span class="hs-identifier hs-var hs-var">fillFromFd</span></a></span></span><span> </span><span id="local-6989586621679541951"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541951"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span id="local-6989586621679541950"><span class="annot"><span class="annottext">Fd
+</span><a href="#local-6989586621679541950"><span class="hs-identifier hs-var">sock</span></a></span></span><span> </span><span id="local-6989586621679541949"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541949"><span class="hs-identifier hs-var">maxBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541949"><span class="hs-identifier hs-var">maxBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-286"></span><span>    </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">String -&gt; m Int
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;fillFromFd: negative argument (&quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541949"><span class="hs-identifier hs-var">maxBytes</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;)&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-287"></span><span>    </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO Int) -&gt; m Int
+forall (m :: * -&gt; *) a.
+MonadIO m =&gt;
+String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO a) -&gt; m a
+</span><a href="System.IO.ByteBuffer.html#bbHandler"><span class="hs-identifier hs-var">bbHandler</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;fillFromFd&quot;</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541951"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO Int
+</span><a href="#local-6989586621679541948"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-288"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-289"></span><span>    </span><span id="local-6989586621679541948"><span class="annot"><span class="annottext">go :: BBRef -&gt; IO Int
+</span><a href="#local-6989586621679541948"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679541947"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541947"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-290"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621679541946"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541946"><span class="hs-identifier hs-var">bbref'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541945"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541945"><span class="hs-identifier hs-var">readBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Fd -&gt; BBRef -&gt; Int -&gt; IO (BBRef, Int)
+</span><a href="System.IO.ByteBuffer.html#fillBBRefFromFd"><span class="hs-identifier hs-var">fillBBRefFromFd</span></a></span><span> </span><span class="annot"><span class="annottext">Fd
+</span><a href="#local-6989586621679541950"><span class="hs-identifier hs-var">sock</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541947"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541949"><span class="hs-identifier hs-var">maxBytes</span></a></span><span>
+</span><span id="line-291"></span><span>        </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541951"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ByteBufferException BBRef -&gt; IO ())
+-&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Either ByteBufferException BBRef
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541946"><span class="hs-identifier hs-var">bbref'</span></a></span><span>
+</span><span id="line-292"></span><span>        </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541945"><span class="hs-identifier hs-var">readBytes</span></a></span><span>
+</span><span id="line-293"></span><span>
+</span><span id="line-294"></span><span class="hs-comment">{-
+Note: I'd like to use these two definitions:
+
+{-@ measure _available @-}
+_available :: BBRef -&gt; Int
+_available BBRef{..} = contained - consumed
+
+{-@ measure _free @-}
+_free :: BBRef -&gt; Int
+_free BBRef{..} = size - contained
+
+but for some reason when I try to do so it does not work.
+-}</span><span>
+</span><span id="line-307"></span><span>
+</span><span id="line-308"></span><span class="hs-comment">{-@ fillBBRefFromFd ::
+       Fd -&gt; b0: BBRef
+    -&gt; maxBytes: Nat -&gt; IO {v: (BBRef, Nat) | maxBytes &gt;= snd v &amp;&amp; contained (fst v) - consumed (fst v) == contained b0 - consumed b0 + snd v}
+  @-}</span><span>
+</span><span id="line-312"></span><span class="annot"><a href="System.IO.ByteBuffer.html#fillBBRefFromFd"><span class="hs-identifier hs-type">fillBBRefFromFd</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Fd</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span><span>
+</span><span id="line-313"></span><span id="fillBBRefFromFd"><span class="annot"><span class="annottext">fillBBRefFromFd :: Fd -&gt; BBRef -&gt; Int -&gt; IO (BBRef, Int)
+</span><a href="System.IO.ByteBuffer.html#fillBBRefFromFd"><span class="hs-identifier hs-var hs-var">fillBBRefFromFd</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Fd</span></span><span> </span><span id="local-6989586621679541942"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679541942"><span class="hs-identifier hs-var">sock</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679541941"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541941"><span class="hs-identifier hs-var">bbref0</span></a></span></span><span> </span><span id="local-6989586621679541940"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541940"><span class="hs-identifier hs-var">maxBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-314"></span><span>  </span><span id="local-6989586621679541939"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541939"><span class="hs-identifier hs-var">bbref1</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+</span><a href="#local-6989586621679541938"><span class="hs-identifier hs-var">prepareSpace</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541941"><span class="hs-identifier hs-var">bbref0</span></a></span><span>
+</span><span id="line-315"></span><span>  </span><span class="annot"><span class="annottext">Int -&gt; BBRef -&gt; IO (BBRef, Int)
+</span><a href="#local-6989586621679541937"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541939"><span class="hs-identifier hs-var">bbref1</span></a></span><span>
+</span><span id="line-316"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-317"></span><span>    </span><span class="hs-comment">-- We enlarge the buffer directly to be able to contain the maximum number</span><span>
+</span><span id="line-318"></span><span>    </span><span class="hs-comment">-- of bytes since the common pattern for this function is to know how many</span><span>
+</span><span id="line-319"></span><span>    </span><span class="hs-comment">-- bytes we need to read -- so we'll eventually fill the enlarged buffer.</span><span>
+</span><span id="line-320"></span><span>    </span><span class="hs-comment">{-@ prepareSpace :: b: BBRef -&gt; IO {v: BBRef | size v - contained v &gt;= maxBytes &amp;&amp; contained b - consumed b == contained v - consumed v} @-}</span><span>
+</span><span id="line-321"></span><span>    </span><span class="annot"><a href="#local-6989586621679541938"><span class="hs-identifier hs-type">prepareSpace</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span>
+</span><span id="line-322"></span><span>    </span><span id="local-6989586621679541938"><span class="annot"><span class="annottext">prepareSpace :: BBRef -&gt; IO BBRef
+</span><a href="#local-6989586621679541938"><span class="hs-identifier hs-var hs-var">prepareSpace</span></a></span></span><span> </span><span id="local-6989586621679541936"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-323"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541935"><span class="annot"><span class="annottext">space :: Int
+</span><a href="#local-6989586621679541935"><span class="hs-identifier hs-var hs-var">space</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#size"><span class="hs-identifier hs-var hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-324"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541935"><span class="hs-identifier hs-var">space</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541940"><span class="hs-identifier hs-var">maxBytes</span></a></span><span>
+</span><span id="line-325"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-326"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+</span><a href="#local-6989586621679541938"><span class="hs-identifier hs-var">prepareSpace</span></a></span><span> </span><span class="annot"><span class="annottext">(BBRef -&gt; IO BBRef) -&gt; IO BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#resetBBRef"><span class="hs-identifier hs-var">resetBBRef</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-327"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int -&gt; IO BBRef
+</span><a href="System.IO.ByteBuffer.html#enlargeBBRef"><span class="hs-identifier hs-var">enlargeBBRef</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541940"><span class="hs-identifier hs-var">maxBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-328"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO BBRef
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541936"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-329"></span><span>
+</span><span id="line-330"></span><span>    </span><span class="hs-comment">{-@ go ::
+           readBytes: {v: Nat | v &lt;= maxBytes}
+        -&gt; b: {b: BBRef | size b - contained b &gt;= maxBytes - readBytes}
+        -&gt; IO {v: (BBRef, Nat) | maxBytes &gt;= snd v &amp;&amp; snd v &gt;= readBytes &amp;&amp; size (fst v) - contained (fst v) &gt;= maxBytes - snd v &amp;&amp; contained (fst v) - consumed (fst v) == (contained b - consumed b) + (snd v - readBytes)}
+      @-}</span><span>
+</span><span id="line-335"></span><span>    </span><span class="annot"><a href="#local-6989586621679541937"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span><span>
+</span><span id="line-336"></span><span>    </span><span id="local-6989586621679541937"><span class="annot"><span class="annottext">go :: Int -&gt; BBRef -&gt; IO (BBRef, Int)
+</span><a href="#local-6989586621679541937"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679541933"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span></span><span> </span><span id="local-6989586621679541932"><span class="annot"><span class="annottext">bbref :: BBRef
+</span><a href="#local-6989586621679541932"><span class="hs-identifier hs-var">bbref</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="System.IO.ByteBuffer.html#BBRef"><span class="hs-identifier hs-type">BBRef</span></a></span><span class="hs-special">{</span><span id="local-6989586621679541928"><span id="local-6989586621679541929"><span id="local-6989586621679541930"><span id="local-6989586621679541931"><span class="annot"><span class="annottext">Int
+Ptr Word8
+ptr :: Ptr Word8
+consumed :: Int
+contained :: Int
+size :: Int
+ptr :: BBRef -&gt; Ptr Word8
+consumed :: BBRef -&gt; Int
+contained :: BBRef -&gt; Int
+size :: BBRef -&gt; Int
+</span><a href="#local-6989586621679541928"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541940"><span class="hs-identifier hs-var">maxBytes</span></a></span><span>
+</span><span id="line-337"></span><span>      </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">(BBRef, Int) -&gt; IO (BBRef, Int)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541932"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-338"></span><span>      </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-339"></span><span>        </span><span id="local-6989586621679541927"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541927"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(CInt -&gt; Int) -&gt; IO CInt -&gt; IO Int
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Ptr CChar -&gt; CSize -&gt; CInt -&gt; IO CInt
+</span><a href="System.IO.ByteBuffer.html#c_recv"><span class="hs-identifier hs-var">c_recv</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679541942"><span class="hs-identifier hs-var">sock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Any -&gt; Ptr CChar
+forall a b. Ptr a -&gt; Ptr b
+</span><span class="hs-identifier hs-var">castPtr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541928"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr Any
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541930"><span class="hs-identifier hs-var">contained</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; CSize
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541940"><span class="hs-identifier hs-var">maxBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-340"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541927"><span class="hs-identifier hs-var">bytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-341"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-342"></span><span>            </span><span id="local-6989586621679541924"><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679541924"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Errno
+</span><span class="hs-identifier hs-var">CE.getErrno</span></span><span>
+</span><span id="line-343"></span><span>            </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679541924"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Errno -&gt; Errno -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><span class="hs-identifier hs-var">CE.eAGAIN</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">||</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679541924"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Errno -&gt; Errno -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><span class="hs-identifier hs-var">CE.eWOULDBLOCK</span></span><span>
+</span><span id="line-344"></span><span>              </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">(BBRef, Int) -&gt; IO (BBRef, Int)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541932"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-345"></span><span>              </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">IOError -&gt; IO (BBRef, Int)
+forall e a. Exception e =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">(IOError -&gt; IO (BBRef, Int)) -&gt; IOError -&gt; IO (BBRef, Int)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Errno -&gt; Maybe Handle -&gt; Maybe String -&gt; IOError
+</span><span class="hs-identifier hs-var">CE.errnoToIOError</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ByteBuffer.fillBBRefFromFd: &quot;</span></span><span> </span><span class="annot"><span class="annottext">Errno
+</span><a href="#local-6989586621679541924"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Handle
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="annot"><span class="annottext">Maybe String
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-346"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-347"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541918"><span class="annot"><span class="annottext">bbref' :: BBRef
+</span><a href="#local-6989586621679541918"><span class="hs-identifier hs-var hs-var">bbref'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541932"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">contained :: Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541930"><span class="hs-identifier hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541927"><span class="hs-identifier hs-var">bytes</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-348"></span><span>            </span><span class="annot"><span class="annottext">Int -&gt; BBRef -&gt; IO (BBRef, Int)
+</span><a href="#local-6989586621679541937"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541933"><span class="hs-identifier hs-var">readBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541927"><span class="hs-identifier hs-var">bytes</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541918"><span class="hs-identifier hs-var">bbref'</span></a></span><span>
+</span><span id="line-349"></span><span>
+</span><span id="line-350"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-keyword">ccall</span></span><span> </span><span class="annot"><span class="hs-keyword">unsafe</span></span><span> </span><span class="annot"><span class="hs-string">&quot;recv&quot;</span></span><span>
+</span><span id="line-351"></span><span>  </span><span class="hs-comment">-- c_recv returns -1 in the case of errors.</span><span>
+</span><span id="line-352"></span><span>  </span><span class="hs-comment">{-@ assume c_recv :: CInt -&gt; Ptr CChar -&gt; size: {v: CSize | v &gt;= 0} -&gt; flags: CInt -&gt; IO {read: CInt | read &gt;= -1 &amp;&amp; size &gt;= read} @-}</span><span>
+</span><span id="line-353"></span><span>  </span><span id="c_recv"><span class="annot"><a href="System.IO.ByteBuffer.html#c_recv"><span class="hs-identifier hs-var">c_recv</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CChar</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CSize</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">CInt</span></span><span class="hs-cpp">
+
+#endif
+</span><span>
+</span><span id="line-357"></span><span class="hs-comment">-- | Try to get a pointer to @n@ bytes from the 'ByteBuffer'.</span><span>
+</span><span id="line-358"></span><span class="hs-comment">--</span><span>
+</span><span id="line-359"></span><span class="hs-comment">-- Note that the pointer should be used before any other actions are</span><span>
+</span><span id="line-360"></span><span class="hs-comment">-- performed on the 'ByteBuffer'. It points to some address within the</span><span>
+</span><span id="line-361"></span><span class="hs-comment">-- buffer, so operations such as enlarging the buffer or feeding it</span><span>
+</span><span id="line-362"></span><span class="hs-comment">-- new data will change the data the pointer points to.  This is why</span><span>
+</span><span id="line-363"></span><span class="hs-comment">-- this function is called unsafe.</span><span>
+</span><span id="line-364"></span><span class="hs-comment">{-@ unsafeConsume :: MonadIO m =&gt; ByteBuffer -&gt; n:Nat -&gt; m (Either Int ({v:Ptr Word8 | plen v &gt;= n})) @-}</span><span>
+</span><span id="line-365"></span><span id="local-6989586621679542079"><span class="annot"><a href="System.IO.ByteBuffer.html#unsafeConsume"><span class="hs-identifier hs-type">unsafeConsume</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679542079"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-366"></span><span>        </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span>
+</span><span id="line-367"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-368"></span><span>        </span><span class="hs-comment">-- ^ n</span><span>
+</span><span id="line-369"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679542079"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-370"></span><span>        </span><span class="hs-comment">-- ^ Will be @Left missing@ when there are only @n-missing@</span><span>
+</span><span id="line-371"></span><span>        </span><span class="hs-comment">-- bytes left in the 'ByteBuffer'.</span></span><span>
+</span><span id="line-372"></span><span id="unsafeConsume"><span class="annot"><span class="annottext">unsafeConsume :: ByteBuffer -&gt; Int -&gt; m (Either Int (Ptr Word8))
+</span><a href="System.IO.ByteBuffer.html#unsafeConsume"><span class="hs-identifier hs-var hs-var">unsafeConsume</span></a></span></span><span> </span><span id="local-6989586621679541917"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541917"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span id="local-6989586621679541916"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541916"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-373"></span><span>    </span><span class="annot"><span class="annottext">String
+-&gt; ByteBuffer
+-&gt; (BBRef -&gt; IO (Either Int (Ptr Word8)))
+-&gt; m (Either Int (Ptr Word8))
+forall (m :: * -&gt; *) a.
+MonadIO m =&gt;
+String -&gt; ByteBuffer -&gt; (BBRef -&gt; IO a) -&gt; m a
+</span><a href="System.IO.ByteBuffer.html#bbHandler"><span class="hs-identifier hs-var">bbHandler</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;unsafeConsume&quot;</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541917"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; IO (Either Int (Ptr Word8))
+forall b. BBRef -&gt; IO (Either Int (Ptr b))
+</span><a href="#local-6989586621679541915"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-374"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-375"></span><span>    </span><span id="local-6989586621679541915"><span class="annot"><span class="annottext">go :: BBRef -&gt; IO (Either Int (Ptr b))
+</span><a href="#local-6989586621679541915"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679541914"><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-376"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541913"><span class="annot"><span class="annottext">available :: Int
+</span><a href="#local-6989586621679541913"><span class="hs-identifier hs-var hs-var">available</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#contained"><span class="hs-identifier hs-var hs-var">contained</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span>
+</span><span id="line-377"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541913"><span class="hs-identifier hs-var">available</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541916"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-378"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Either Int (Ptr b) -&gt; IO (Either Int (Ptr b))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Either Int (Ptr b) -&gt; IO (Either Int (Ptr b)))
+-&gt; Either Int (Ptr b) -&gt; IO (Either Int (Ptr b))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Either Int (Ptr b)
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541916"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541913"><span class="hs-identifier hs-var">available</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-379"></span><span>            </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-380"></span><span>                </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a. IORef a -&gt; a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeIORef</span></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541917"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ByteBufferException BBRef -&gt; IO ())
+-&gt; Either ByteBufferException BBRef -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Either ByteBufferException BBRef
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">consumed :: Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var">consumed</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541916"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-381"></span><span>                </span><span class="annot"><span class="annottext">Either Int (Ptr b) -&gt; IO (Either Int (Ptr b))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Either Int (Ptr b) -&gt; IO (Either Int (Ptr b)))
+-&gt; Either Int (Ptr b) -&gt; IO (Either Int (Ptr b))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ptr b -&gt; Either Int (Ptr b)
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BBRef -&gt; Ptr Word8
+</span><a href="System.IO.ByteBuffer.html#ptr"><span class="hs-identifier hs-var hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; Ptr b
+forall a b. Ptr a -&gt; Int -&gt; Ptr b
+</span><span class="hs-operator hs-var">`plusPtr`</span></span><span> </span><span class="annot"><span class="annottext">BBRef -&gt; Int
+</span><a href="System.IO.ByteBuffer.html#consumed"><span class="hs-identifier hs-var hs-var">consumed</span></a></span><span> </span><span class="annot"><span class="annottext">BBRef
+</span><a href="#local-6989586621679541914"><span class="hs-identifier hs-var">bbref</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-382"></span><span>
+</span><span id="line-383"></span><span class="hs-comment">-- | As `unsafeConsume`, but instead of returning a `Ptr` into the</span><span>
+</span><span id="line-384"></span><span class="hs-comment">-- contents of the `ByteBuffer`, it returns a `ByteString` containing</span><span>
+</span><span id="line-385"></span><span class="hs-comment">-- the next @n@ bytes in the buffer.  This involves allocating a new</span><span>
+</span><span id="line-386"></span><span class="hs-comment">-- 'ByteString' and copying the @n@ bytes to it.</span><span>
+</span><span id="line-387"></span><span class="hs-comment">{-@ consume :: MonadIO m =&gt; ByteBuffer -&gt; Nat -&gt; m (Either Int ByteString) @-}</span><span>
+</span><span id="line-388"></span><span id="local-6989586621679541912"><span class="annot"><a href="System.IO.ByteBuffer.html#consume"><span class="hs-identifier hs-type">consume</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621679541912"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-389"></span><span>        </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="System.IO.ByteBuffer.html#ByteBuffer"><span class="hs-identifier hs-type">ByteBuffer</span></a></span><span>
+</span><span id="line-390"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-391"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541912"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span></span><span>
+</span><span id="line-392"></span><span id="consume"><span class="annot"><span class="annottext">consume :: ByteBuffer -&gt; Int -&gt; m (Either Int ByteString)
+</span><a href="System.IO.ByteBuffer.html#consume"><span class="hs-identifier hs-var hs-var">consume</span></a></span></span><span> </span><span id="local-6989586621679541911"><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541911"><span class="hs-identifier hs-var">bb</span></a></span></span><span> </span><span id="local-6989586621679541910"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541910"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-393"></span><span>    </span><span id="local-6989586621679541909"><span class="annot"><span class="annottext">Either Int (Ptr Word8)
+</span><a href="#local-6989586621679541909"><span class="hs-identifier hs-var">mPtr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ByteBuffer -&gt; Int -&gt; m (Either Int (Ptr Word8))
+forall (m :: * -&gt; *).
+MonadIO m =&gt;
+ByteBuffer -&gt; Int -&gt; m (Either Int (Ptr Word8))
+</span><a href="System.IO.ByteBuffer.html#unsafeConsume"><span class="hs-identifier hs-var">unsafeConsume</span></a></span><span> </span><span class="annot"><span class="annottext">ByteBuffer
+</span><a href="#local-6989586621679541911"><span class="hs-identifier hs-var">bb</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541910"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-394"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either Int (Ptr Word8)
+</span><a href="#local-6989586621679541909"><span class="hs-identifier hs-var">mPtr</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-395"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679541908"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541908"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-396"></span><span>            </span><span id="local-6989586621679541907"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679541907"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO ByteString -&gt; m ByteString
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO ByteString -&gt; m ByteString) -&gt; IO ByteString -&gt; m ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; IO ByteString
+</span><a href="System.IO.ByteBuffer.html#createBS"><span class="hs-identifier hs-var">createBS</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541908"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541910"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-397"></span><span>            </span><span class="annot"><span class="annottext">Either Int ByteString -&gt; m (Either Int ByteString)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Either Int ByteString
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679541907"><span class="hs-identifier hs-var">bs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-398"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679541905"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541905"><span class="hs-identifier hs-var">missing</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Either Int ByteString -&gt; m (Either Int ByteString)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Either Int ByteString
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541905"><span class="hs-identifier hs-var">missing</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-399"></span><span>
+</span><span id="line-400"></span><span class="hs-comment">{-@ createBS :: p:(Ptr Word8) -&gt; {v:Nat | v &lt;= plen p} -&gt; IO ByteString @-}</span><span>
+</span><span id="line-401"></span><span class="annot"><a href="System.IO.ByteBuffer.html#createBS"><span class="hs-identifier hs-type">createBS</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ptr</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-402"></span><span id="createBS"><span class="annot"><span class="annottext">createBS :: Ptr Word8 -&gt; Int -&gt; IO ByteString
+</span><a href="System.IO.ByteBuffer.html#createBS"><span class="hs-identifier hs-var hs-var">createBS</span></a></span></span><span> </span><span id="local-6989586621679541904"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541904"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679541903"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541903"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-403"></span><span>  </span><span id="local-6989586621679541902"><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679541902"><span class="hs-identifier hs-var">fp</span></a></span></span><span>  </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO (ForeignPtr Word8)
+forall a. Int -&gt; IO (ForeignPtr a)
+</span><span class="hs-identifier hs-var">mallocForeignPtrBytes</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541903"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-404"></span><span>  </span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; (Ptr Word8 -&gt; IO ()) -&gt; IO ()
+forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><span class="hs-identifier hs-var">withForeignPtr</span></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679541902"><span class="hs-identifier hs-var">fp</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679541900"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541900"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word8 -&gt; Int -&gt; IO ()
+forall a. Ptr a -&gt; Ptr a -&gt; Int -&gt; IO ()
+</span><span class="hs-identifier hs-var">copyBytes</span></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541900"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679541904"><span class="hs-identifier hs-var">ptr</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541903"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-405"></span><span>  </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; Int -&gt; Int -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.PS</span></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679541902"><span class="hs-identifier hs-var">fp</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679541903"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-406"></span><span>
+</span><span id="line-407"></span><span class="hs-comment">-- below are liquid haskell qualifiers, and specifications for external functions.</span><span>
+</span><span id="line-408"></span><span>
+</span><span id="line-409"></span><span class="hs-comment">{-@ qualif FPLenPLen(v:Ptr a, fp:ForeignPtr a): fplen fp = plen v @-}</span><span>
+</span><span id="line-410"></span><span>
+</span><span id="line-411"></span><span class="hs-comment">{-@ Foreign.Marshal.Alloc.mallocBytes :: l:Nat -&gt; IO (PtrN a l) @-}</span><span>
+</span><span id="line-412"></span><span class="hs-comment">{-@ Foreign.Marshal.Alloc.reallocBytes :: Ptr a -&gt; l:Nat -&gt; IO (PtrN a l) @-}</span><span>
+</span><span id="line-413"></span><span class="hs-comment">{-@ assume mallocForeignPtrBytes :: n:Nat -&gt; IO (ForeignPtrN a n) @-}</span><span>
+</span><span id="line-414"></span><span class="hs-comment">{-@ type ForeignPtrN a N = {v:ForeignPtr a | fplen v = N} @-}</span><span>
+</span><span id="line-415"></span><span class="hs-comment">{-@ Foreign.Marshal.Utils.copyBytes :: p:Ptr a -&gt; q:Ptr a -&gt; {v:Nat | v &lt;= plen p &amp;&amp; v &lt;= plen q} -&gt; IO ()@-}</span><span>
+</span><span id="line-416"></span><span class="hs-comment">{-@ Foreign.Marshal.Utils.moveBytes :: p:Ptr a -&gt; q:Ptr a -&gt; {v:Nat | v &lt;= plen p &amp;&amp; v &lt;= plen q} -&gt; IO ()@-}</span><span>
+</span><span id="line-417"></span><span class="hs-comment">{-@ Foreign.Ptr.plusPtr :: p:Ptr a -&gt; n:Nat -&gt; {v:Ptr b | plen v == (plen p) - n} @-}</span><span>
+</span><span id="line-418"></span><span>
+</span><span id="line-419"></span><span class="hs-comment">-- writing down the specification for ByteString is not as straightforward as it seems at first: the constructor</span><span>
+</span><span id="line-420"></span><span class="hs-comment">--</span><span>
+</span><span id="line-421"></span><span class="hs-comment">-- PS (ForeignPtr Word8) Int Int</span><span>
+</span><span id="line-422"></span><span class="hs-comment">--</span><span>
+</span><span id="line-423"></span><span class="hs-comment">-- has actually four arguments after unboxing (the ForeignPtr is an</span><span>
+</span><span id="line-424"></span><span class="hs-comment">-- Addr# and ForeignPtrContents), so restriciting the length of the</span><span>
+</span><span id="line-425"></span><span class="hs-comment">-- ForeignPtr directly in the specification of the datatype does not</span><span>
+</span><span id="line-426"></span><span class="hs-comment">-- work.  Instead, I chose to write a specification for toForeignPtr.</span><span>
+</span><span id="line-427"></span><span class="hs-comment">-- It seems that the liquidhaskell parser has problems with variables</span><span>
+</span><span id="line-428"></span><span class="hs-comment">-- declared in a tuple, so I have to define the following measures to</span><span>
+</span><span id="line-429"></span><span class="hs-comment">-- get at the ForeignPtr, offset, and length.</span><span>
+</span><span id="line-430"></span><span class="hs-comment">--</span><span>
+</span><span id="line-431"></span><span class="hs-comment">-- This is a bit awkward, maybe there is an easier way.</span><span>
+</span><span id="line-432"></span><span>
+</span><span id="line-433"></span><span id="local-6989586621679541896"><span id="local-6989586621679541897"><span id="local-6989586621679541898"><span class="annot"><a href="System.IO.ByteBuffer.html#_get1"><span class="hs-identifier hs-type">_get1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679541898"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541897"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541896"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541898"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-434"></span><span id="_get1"><span class="annot"><span class="annottext">_get1 :: (a, b, c) -&gt; a
+</span><a href="System.IO.ByteBuffer.html#_get1"><span class="hs-identifier hs-var hs-var">_get1</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679541894"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679541894"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">b
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">c
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679541894"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-435"></span><span class="hs-comment">{-@ measure _get1 @-}</span><span>
+</span><span id="line-436"></span><span id="local-6989586621679541891"><span id="local-6989586621679541892"><span id="local-6989586621679541893"><span class="annot"><a href="System.IO.ByteBuffer.html#_get2"><span class="hs-identifier hs-type">_get2</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679541893"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541892"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541891"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541892"><span class="hs-identifier hs-type">b</span></a></span></span></span></span><span>
+</span><span id="line-437"></span><span id="_get2"><span class="annot"><span class="annottext">_get2 :: (a, b, c) -&gt; b
+</span><a href="System.IO.ByteBuffer.html#_get2"><span class="hs-identifier hs-var hs-var">_get2</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span id="local-6989586621679541889"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679541889"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">c
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679541889"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-438"></span><span class="hs-comment">{-@ measure _get2 @-}</span><span>
+</span><span id="line-439"></span><span id="local-6989586621679541886"><span id="local-6989586621679541887"><span id="local-6989586621679541888"><span class="annot"><a href="System.IO.ByteBuffer.html#_get3"><span class="hs-identifier hs-type">_get3</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679541888"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541887"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679541886"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541886"><span class="hs-identifier hs-type">c</span></a></span></span></span></span><span>
+</span><span id="line-440"></span><span id="_get3"><span class="annot"><span class="annottext">_get3 :: (a, b, c) -&gt; c
+</span><a href="System.IO.ByteBuffer.html#_get3"><span class="hs-identifier hs-var hs-var">_get3</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">b
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span id="local-6989586621679541884"><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621679541884"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621679541884"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-441"></span><span class="hs-comment">{-@ measure _get3 @-}</span><span>
+</span><span id="line-442"></span><span>
+</span><span id="line-443"></span><span class="hs-comment">{-@ Data.ByteString.Internal.toForeignPtr :: ByteString -&gt;
+  {v:(ForeignPtr Word8, Int, Int) | _get2 v &gt;= 0
+                                 &amp;&amp; _get2 v &lt;= (fplen (_get1 v))
+                                 &amp;&amp; _get3 v &gt;= 0
+                                 &amp;&amp; ((_get3 v) + (_get2 v)) &lt;= (fplen (_get1 v))} @-}</span><span>
+</span><span id="line-448"></span></pre></body></html>

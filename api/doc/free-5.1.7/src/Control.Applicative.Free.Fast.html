@@ -1,0 +1,511 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP                #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE GADTs              #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes         #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 707
+</span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#else
+</span><span class="hs-comment">-- Manual Typeable instances</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">#include &quot;free-common.h&quot;
+</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- A faster free applicative.</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Based on &lt;https://www.eyrie.org/~zednenem/2013/05/27/freeapp Dave Menendez's work&gt;.</span><span>
+</span><span id="line-17"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Applicative.Free.Fast</span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-special">(</span><span>
+</span><span id="line-20"></span><span>  </span><span class="annot"><span class="hs-comment">-- * The Sequence of Effects</span></span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier">ASeq</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier">reduceASeq</span></a></span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-identifier">hoistASeq</span></a></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#traverseASeq"><span class="hs-identifier">traverseASeq</span></a></span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier">rebaseASeq</span></a></span><span>
+</span><span id="line-26"></span><span>  </span><span class="annot"><span class="hs-comment">-- * The Faster Free Applicative</span></span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier">Ap</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#liftAp"><span class="hs-identifier">liftAp</span></a></span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#retractAp"><span class="hs-identifier">retractAp</span></a></span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#runAp"><span class="hs-identifier">runAp</span></a></span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#runAp_"><span class="hs-identifier">runAp_</span></a></span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#hoistAp"><span class="hs-identifier">hoistAp</span></a></span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Functor.Apply</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span class="hs-cpp">
+
+#if !(MIN_VERSION_base(4,8,0))
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Data.Monoid</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- | The free applicative is composed of a sequence of effects,</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- and a pure function to apply that sequence to.</span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- The fast free applicative separates these from each other,</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- so that the sequence may be built up independently,</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- and so that 'fmap' can run in constant time by having immediate access to the pure function.</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">data</span><span> </span><span id="ASeq"><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-var">ASeq</span></a></span></span><span> </span><span id="local-6989586621679116967"><span class="annot"><a href="#local-6989586621679116967"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679116966"><span class="annot"><a href="#local-6989586621679116966"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-49"></span><span>  </span><span id="local-6989586621679117124"><span id="ANil"><span class="annot"><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117124"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-50"></span><span>  </span><span id="local-6989586621679116963"><span id="local-6989586621679116964"><span id="local-6989586621679117121"><span id="ACons"><span class="annot"><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-var">ACons</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679117121"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116964"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117121"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116963"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117121"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679116964"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span class="annot"><a href="#local-6989586621679116963"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span></span></span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 707
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | Interprets the sequence of effects using the semantics for</span><span>
+</span><span id="line-56"></span><span class="hs-comment">--   `pure` and `&lt;*&gt;` given by the Applicative instance for 'f'.</span><span>
+</span><span id="line-57"></span><span id="local-6989586621679117129"><span id="local-6989586621679117130"><span class="annot"><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier hs-type">reduceASeq</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679117130"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117130"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117129"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117130"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117129"><span class="hs-identifier hs-type">u</span></a></span></span></span><span>
+</span><span id="line-58"></span><span id="reduceASeq"><span class="annot"><span class="annottext">reduceASeq :: ASeq f u -&gt; f u
+</span><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier hs-var hs-var">reduceASeq</span></a></span></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; f ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span class="annot"><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier hs-var">reduceASeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-type">ACons</span></a></span><span> </span><span id="local-6989586621679116961"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116961"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679116960"><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116960"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(a -&gt; u -&gt; (a, u)) -&gt; f a -&gt; f (u -&gt; (a, u))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116961"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">f (u -&gt; (a, u)) -&gt; f u -&gt; f (a, u)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ASeq f u -&gt; f u
+forall (f :: * -&gt; *) u. Applicative f =&gt; ASeq f u -&gt; f u
+</span><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier hs-var">reduceASeq</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116960"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- | Given a natural transformation from @f@ to @g@ this gives a natural transformation from @ASeq f@ to @ASeq g@.</span><span>
+</span><span id="line-62"></span><span id="local-6989586621679117116"><span id="local-6989586621679117117"><span id="local-6989586621679117118"><span class="annot"><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-identifier hs-type">hoistASeq</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117127"><span class="annot"><a href="#local-6989586621679117127"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679117118"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117127"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117117"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117127"><span class="hs-identifier hs-type">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117118"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117116"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117117"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117116"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-63"></span><span id="hoistASeq"><span class="annot"><span class="annottext">hoistASeq :: (forall x. f x -&gt; g x) -&gt; ASeq f a -&gt; ASeq g a
+</span><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-identifier hs-var hs-var">hoistASeq</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ASeq f a
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASeq g a
+forall (f :: * -&gt; *). ASeq f ()
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span>
+</span><span id="line-64"></span><span class="annot"><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-identifier hs-var">hoistASeq</span></a></span><span> </span><span id="local-6989586621679116958"><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116958"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-type">ACons</span></a></span><span> </span><span id="local-6989586621679116957"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116957"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679116956"><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116956"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g a -&gt; ASeq g u -&gt; ASeq g (a, u)
+forall (f :: * -&gt; *) a u. f a -&gt; ASeq f u -&gt; ASeq f (a, u)
+</span><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-var">ACons</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f a -&gt; g a
+forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116958"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116957"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116958"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">(forall x. f x -&gt; g x) -&gt; ASeq f u -&gt; ASeq g u
+forall (f :: * -&gt; *) (g :: * -&gt; *) a.
+(forall x. f x -&gt; g x) -&gt; ASeq f a -&gt; ASeq g a
+</span><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-operator hs-var">`hoistASeq`</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116956"><span class="hs-identifier hs-var">xs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- | Traverse a sequence with resepect to its interpretation type 'f'.</span><span>
+</span><span id="line-67"></span><span id="local-6989586621679117105"><span id="local-6989586621679117106"><span id="local-6989586621679117107"><span id="local-6989586621679117108"><span class="annot"><a href="Control.Applicative.Free.Fast.html#traverseASeq"><span class="hs-identifier hs-type">traverseASeq</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679117108"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117114"><span class="annot"><a href="#local-6989586621679117114"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679117107"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117114"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117108"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679117106"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117114"><span class="hs-identifier hs-type">x</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117107"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117105"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117108"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117106"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117105"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-68"></span><span id="traverseASeq"><span class="annot"><span class="annottext">traverseASeq :: (forall x. f x -&gt; h (g x)) -&gt; ASeq f a -&gt; h (ASeq g a)
+</span><a href="Control.Applicative.Free.Fast.html#traverseASeq"><span class="hs-identifier hs-var hs-var">traverseASeq</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall x. f x -&gt; h (g x)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ASeq f a
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASeq g () -&gt; h (ASeq g ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">ASeq g ()
+forall (f :: * -&gt; *). ASeq f ()
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span>
+</span><span id="line-69"></span><span class="annot"><a href="Control.Applicative.Free.Fast.html#traverseASeq"><span class="hs-identifier hs-var">traverseASeq</span></a></span><span> </span><span id="local-6989586621679116955"><span class="annot"><span class="annottext">forall x. f x -&gt; h (g x)
+</span><a href="#local-6989586621679116955"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-type">ACons</span></a></span><span> </span><span id="local-6989586621679116954"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116954"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679116953"><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116953"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">g a -&gt; ASeq g u -&gt; ASeq g (a, u)
+forall (f :: * -&gt; *) a u. f a -&gt; ASeq f u -&gt; ASeq f (a, u)
+</span><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-var">ACons</span></a></span><span> </span><span class="annot"><span class="annottext">(g a -&gt; ASeq g u -&gt; ASeq g (a, u))
+-&gt; h (g a) -&gt; h (ASeq g u -&gt; ASeq g (a, u))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">f a -&gt; h (g a)
+forall x. f x -&gt; h (g x)
+</span><a href="#local-6989586621679116955"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116954"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">h (ASeq g u -&gt; ASeq g (a, u)) -&gt; h (ASeq g u) -&gt; h (ASeq g (a, u))
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">(forall x. f x -&gt; h (g x)) -&gt; ASeq f u -&gt; h (ASeq g u)
+forall (h :: * -&gt; *) (f :: * -&gt; *) (g :: * -&gt; *) a.
+Applicative h =&gt;
+(forall x. f x -&gt; h (g x)) -&gt; ASeq f a -&gt; h (ASeq g a)
+</span><a href="Control.Applicative.Free.Fast.html#traverseASeq"><span class="hs-identifier hs-var">traverseASeq</span></a></span><span> </span><span class="annot"><span class="annottext">forall x. f x -&gt; h (g x)
+</span><a href="#local-6989586621679116955"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116953"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- | It may not be obvious, but this essentially acts like ++,</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- traversing the first sequence and creating a new one by appending the second sequence.</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- The difference is that this also has to modify the return functions and that the return type depends on the input types.</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- See the source of 'hoistAp' as an example usage.</span><span>
+</span><span id="line-76"></span><span id="local-6989586621679117092"><span id="local-6989586621679117093"><span id="local-6989586621679117094"><span id="local-6989586621679117095"><span id="local-6989586621679117096"><span class="annot"><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier hs-type">rebaseASeq</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117096"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117095"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117102"><span class="annot"><a href="#local-6989586621679117102"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679117102"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117094"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117096"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117102"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117093"><span class="hs-identifier hs-type">z</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679117092"><span class="hs-identifier hs-type">v</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117095"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117094"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117096"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117092"><span class="hs-identifier hs-type">v</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117093"><span class="hs-identifier hs-type">z</span></a></span></span></span></span></span></span><span>
+</span><span id="line-78"></span><span id="rebaseASeq"><span class="annot"><span class="annottext">rebaseASeq :: ASeq f u
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (v -&gt; u -&gt; y)
+-&gt; ASeq f v
+-&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier hs-var hs-var">rebaseASeq</span></a></span></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span>         </span><span id="local-6989586621679116952"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116952"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116951"><span class="annot"><span class="annottext">v -&gt; u -&gt; y
+</span><a href="#local-6989586621679116951"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(v -&gt; y) -&gt; ASeq f v -&gt; z
+forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116952"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116950"><span class="annot"><span class="annottext">v
+</span><a href="#local-6989586621679116950"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">v -&gt; u -&gt; y
+</span><a href="#local-6989586621679116951"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">v
+</span><a href="#local-6989586621679116950"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span class="annot"><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier hs-var">rebaseASeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-type">ACons</span></a></span><span> </span><span id="local-6989586621679116949"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116949"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679116948"><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116948"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679116947"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116947"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116946"><span class="annot"><span class="annottext">v -&gt; u -&gt; y
+</span><a href="#local-6989586621679116946"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><span class="annottext">ASeq f u
+-&gt; (forall x. (x -&gt; a -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (v -&gt; u -&gt; a -&gt; y)
+-&gt; ASeq f v
+-&gt; z
+forall (f :: * -&gt; *) u y z v.
+ASeq f u
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (v -&gt; u -&gt; y)
+-&gt; ASeq f v
+-&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier hs-var">rebaseASeq</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116948"><span class="hs-identifier hs-var">xs</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116945"><span class="annot"><span class="annottext">x -&gt; a -&gt; y
+</span><a href="#local-6989586621679116945"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679116944"><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116944"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">((a, x) -&gt; y) -&gt; ASeq f (a, x) -&gt; z
+forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116947"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679116943"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116943"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679116942"><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679116942"><span class="hs-identifier hs-var">u</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">x -&gt; a -&gt; y
+</span><a href="#local-6989586621679116945"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679116942"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116943"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f a -&gt; ASeq f x -&gt; ASeq f (a, x)
+forall (f :: * -&gt; *) a u. f a -&gt; ASeq f u -&gt; ASeq f (a, u)
+</span><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-var">ACons</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116949"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116944"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116941"><span class="annot"><span class="annottext">v
+</span><a href="#local-6989586621679116941"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621679116940"><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116940"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span id="local-6989586621679116939"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116939"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">v -&gt; u -&gt; y
+</span><a href="#local-6989586621679116946"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">v
+</span><a href="#local-6989586621679116941"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116939"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116940"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- | The faster free 'Applicative'.</span><span>
+</span><span id="line-85"></span><span class="hs-keyword">newtype</span><span> </span><span id="Ap"><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span></span><span> </span><span id="local-6989586621679117045"><span class="annot"><a href="#local-6989586621679117045"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679117044"><span class="annot"><a href="#local-6989586621679117044"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Ap"><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span></span><span>
+</span><span id="line-86"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="unAp"><span class="annot"><span class="annottext">Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117084"><span class="annot"><a href="#local-6989586621679117084"><span class="hs-identifier hs-type">u</span></a></span></span><span> </span><span id="local-6989586621679117086"><span class="annot"><a href="#local-6989586621679117086"><span class="hs-identifier hs-type">y</span></a></span></span><span> </span><span id="local-6989586621679117085"><span class="annot"><a href="#local-6989586621679117085"><span class="hs-identifier hs-type">z</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117087"><span class="annot"><a href="#local-6989586621679117087"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679117087"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117086"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117045"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117087"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117085"><span class="hs-identifier hs-type">z</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679117084"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117044"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117086"><span class="hs-identifier hs-type">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#ASeq"><span class="hs-identifier hs-type">ASeq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117045"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117084"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117085"><span class="hs-identifier hs-type">z</span></a></span><span> </span><span class="hs-special">}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 707
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- | Given a natural transformation from @f@ to @g@, this gives a canonical monoidal natural transformation from @'Ap' f@ to @g@.</span><span>
+</span><span id="line-94"></span><span class="hs-comment">--</span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- prop&gt; runAp t == retractApp . hoistApp t</span><span>
+</span><span id="line-96"></span><span id="local-6989586621679117060"><span id="local-6989586621679117061"><span id="local-6989586621679117062"><span class="annot"><a href="Control.Applicative.Free.Fast.html#runAp"><span class="hs-identifier hs-type">runAp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679117062"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117082"><span class="annot"><a href="#local-6989586621679117082"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679117061"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117082"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117062"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117082"><span class="hs-identifier hs-type">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117061"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117060"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117062"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117060"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-97"></span><span id="runAp"><span class="annot"><span class="annottext">runAp :: (forall x. f x -&gt; g x) -&gt; Ap f a -&gt; g a
+</span><a href="Control.Applicative.Free.Fast.html#runAp"><span class="hs-identifier hs-var hs-var">runAp</span></a></span></span><span> </span><span id="local-6989586621679116936"><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116936"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ap g a -&gt; g a
+forall (f :: * -&gt; *) a. Applicative f =&gt; Ap f a -&gt; f a
+</span><a href="Control.Applicative.Free.Fast.html#retractAp"><span class="hs-identifier hs-var">retractAp</span></a></span><span> </span><span class="annot"><span class="annottext">(Ap g a -&gt; g a) -&gt; (Ap f a -&gt; Ap g a) -&gt; Ap f a -&gt; g a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall x. f x -&gt; g x) -&gt; Ap f a -&gt; Ap g a
+forall (f :: * -&gt; *) (g :: * -&gt; *) a.
+(forall x. f x -&gt; g x) -&gt; Ap f a -&gt; Ap g a
+</span><a href="Control.Applicative.Free.Fast.html#hoistAp"><span class="hs-identifier hs-var">hoistAp</span></a></span><span> </span><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116936"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- | Perform a monoidal analysis over free applicative value.</span><span>
+</span><span id="line-100"></span><span class="hs-comment">--</span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- Example:</span><span>
+</span><span id="line-102"></span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- count :: Ap f a -&gt; Int</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- count = getSum . runAp_ (\\_ -&gt; Sum 1)</span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-107"></span><span id="local-6989586621679116932"><span id="local-6989586621679116933"><span id="local-6989586621679116934"><span class="annot"><a href="Control.Applicative.Free.Fast.html#runAp_"><span class="hs-identifier hs-type">runAp_</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="annot"><a href="#local-6989586621679116934"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117069"><span class="annot"><a href="#local-6989586621679117069"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679116933"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117069"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679116934"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116933"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116932"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679116934"><span class="hs-identifier hs-type">m</span></a></span></span></span></span><span>
+</span><span id="line-108"></span><span id="runAp_"><span class="annot"><span class="annottext">runAp_ :: (forall a. f a -&gt; m) -&gt; Ap f b -&gt; m
+</span><a href="Control.Applicative.Free.Fast.html#runAp_"><span class="hs-identifier hs-var hs-var">runAp_</span></a></span></span><span> </span><span id="local-6989586621679116931"><span class="annot"><span class="annottext">forall a. f a -&gt; m
+</span><a href="#local-6989586621679116931"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Const m b -&gt; m
+forall a k (b :: k). Const a b -&gt; a
+</span><span class="hs-identifier hs-var hs-var">getConst</span></span><span> </span><span class="annot"><span class="annottext">(Const m b -&gt; m) -&gt; (Ap f b -&gt; Const m b) -&gt; Ap f b -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall x. f x -&gt; Const m x) -&gt; Ap f b -&gt; Const m b
+forall (g :: * -&gt; *) (f :: * -&gt; *) a.
+Applicative g =&gt;
+(forall x. f x -&gt; g x) -&gt; Ap f a -&gt; g a
+</span><a href="Control.Applicative.Free.Fast.html#runAp"><span class="hs-identifier hs-var">runAp</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m -&gt; Const m x
+forall k a (b :: k). a -&gt; Const a b
+</span><span class="hs-identifier hs-var">Const</span></span><span> </span><span class="annot"><span class="annottext">(m -&gt; Const m x) -&gt; (f x -&gt; m) -&gt; f x -&gt; Const m x
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">f x -&gt; m
+forall a. f a -&gt; m
+</span><a href="#local-6989586621679116931"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span id="local-6989586621679116928"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679116925"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116928"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679116923"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; Ap f a -&gt; Ap f b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679116922"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679116922"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679116921"><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116921"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; b -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f b
+forall (f :: * -&gt; *) a.
+(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116920"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116920"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116919"><span class="annot"><span class="annottext">u -&gt; b -&gt; y
+</span><a href="#local-6989586621679116919"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ap f a
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (u -&gt; a -&gt; y)
+-&gt; ASeq f u
+-&gt; z
+forall (f :: * -&gt; *) a.
+Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span><span> </span><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116921"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116920"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116918"><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116918"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">u -&gt; b -&gt; y
+</span><a href="#local-6989586621679116919"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116918"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; y) -&gt; (a -&gt; b) -&gt; a -&gt; y
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679116922"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span id="local-6989586621679116917"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679116909"><span id="local-6989586621679116911"><span id="local-6989586621679116913"><span class="annot"><span class="hs-identifier hs-type">Apply</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116917"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679116907"><span class="annot"><span class="annottext">&lt;.&gt; :: Ap f (a -&gt; b) -&gt; Ap f a -&gt; Ap f b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">(&lt;.&gt;)</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ap f (a -&gt; b) -&gt; Ap f a -&gt; Ap f b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">(&lt;*&gt;)</span></span></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span id="local-6989586621679116905"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679116896"><span id="local-6989586621679116898"><span id="local-6989586621679116900"><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116905"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-117"></span><span>  </span><span id="local-6989586621679116894"><span class="annot"><span class="annottext">pure :: a -&gt; Ap f a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">pure</span></span></span><span> </span><span id="local-6989586621679116893"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116893"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+forall (f :: * -&gt; *) a.
+(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116892"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116892"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116891"><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116891"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(u -&gt; y) -&gt; ASeq f u -&gt; z
+forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116892"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116891"><span class="hs-operator hs-var">`f`</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116893"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span>  </span><span id="local-6989586621679116890"><span class="annot"><span class="annottext">Ap f (a -&gt; b)
+</span><a href="#local-6989586621679116890"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679116889"><span class="annot"><span class="annottext">&lt;*&gt; :: Ap f (a -&gt; b) -&gt; Ap f a -&gt; Ap f b
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;*&gt;</span></span></span><span> </span><span id="local-6989586621679116888"><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116888"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; b -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f b
+forall (f :: * -&gt; *) a.
+(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116887"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116887"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116886"><span class="annot"><span class="annottext">u -&gt; b -&gt; y
+</span><a href="#local-6989586621679116886"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Ap f a
+-&gt; (forall x. (x -&gt; (a -&gt; b) -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (u -&gt; a -&gt; (a -&gt; b) -&gt; y)
+-&gt; ASeq f u
+-&gt; z
+forall (f :: * -&gt; *) a.
+Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span><span> </span><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116888"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ap f (a -&gt; b)
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (x -&gt; (a -&gt; b) -&gt; y)
+-&gt; ASeq f x
+-&gt; z
+forall (f :: * -&gt; *) a.
+Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span><span> </span><span class="annot"><span class="annottext">Ap f (a -&gt; b)
+</span><a href="#local-6989586621679116890"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116887"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116885"><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116885"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679116884"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116884"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679116883"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679116883"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">u -&gt; b -&gt; y
+</span><a href="#local-6989586621679116886"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116885"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679116883"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116884"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- | A version of 'lift' that can be used with just a 'Functor' for @f@.</span><span>
+</span><span id="line-121"></span><span id="local-6989586621679116881"><span id="local-6989586621679116882"><span class="annot"><a href="Control.Applicative.Free.Fast.html#liftAp"><span class="hs-identifier hs-type">liftAp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679116882"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116881"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116882"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679116881"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-122"></span><span id="liftAp"><span class="annot"><span class="annottext">liftAp :: f a -&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#liftAp"><span class="hs-identifier hs-var hs-var">liftAp</span></a></span></span><span> </span><span id="local-6989586621679116880"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116880"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+forall (f :: * -&gt; *) a.
+(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116879"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116879"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116878"><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116878"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679116877"><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116877"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">((a, u) -&gt; y) -&gt; ASeq f (a, u) -&gt; z
+forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z
+</span><a href="#local-6989586621679116879"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679116876"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116876"><span class="hs-identifier hs-var">a'</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679116875"><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116875"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116878"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116875"><span class="hs-identifier hs-var">s'</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679116876"><span class="hs-identifier hs-var">a'</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f a -&gt; ASeq f u -&gt; ASeq f (a, u)
+forall (f :: * -&gt; *) a u. f a -&gt; ASeq f u -&gt; ASeq f (a, u)
+</span><a href="Control.Applicative.Free.Fast.html#ACons"><span class="hs-identifier hs-var">ACons</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679116880"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f u
+</span><a href="#local-6989586621679116877"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#liftAp"><span class="hs-pragma hs-type">liftAp</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | Given a natural transformation from @f@ to @g@ this gives a monoidal natural transformation from @Ap f@ to @Ap g@.</span><span>
+</span><span id="line-126"></span><span id="local-6989586621679117071"><span id="local-6989586621679117072"><span id="local-6989586621679117074"><span class="annot"><a href="Control.Applicative.Free.Fast.html#hoistAp"><span class="hs-identifier hs-type">hoistAp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679117073"><span class="annot"><a href="#local-6989586621679117073"><span class="hs-identifier hs-type">x</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="#local-6989586621679117074"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117073"><span class="hs-identifier hs-type">x</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117072"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117073"><span class="hs-identifier hs-type">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117074"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117071"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117072"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117071"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-127"></span><span id="hoistAp"><span class="annot"><span class="annottext">hoistAp :: (forall x. f x -&gt; g x) -&gt; Ap f a -&gt; Ap g a
+</span><a href="Control.Applicative.Free.Fast.html#hoistAp"><span class="hs-identifier hs-var hs-var">hoistAp</span></a></span></span><span> </span><span id="local-6989586621679116874"><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116874"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621679116873"><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116873"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq g x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq g u -&gt; z)
+-&gt; Ap g a
+forall (f :: * -&gt; *) a.
+(forall u y z.
+ (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+ -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z)
+-&gt; Ap f a
+</span><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116872"><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq g x -&gt; z
+</span><a href="#local-6989586621679116872"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span id="local-6989586621679116871"><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116871"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679116870"><span class="annot"><span class="annottext">ASeq g u
+</span><a href="#local-6989586621679116870"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-128"></span><span>  </span><span class="annot"><span class="annottext">Ap f a
+-&gt; (forall x. (x -&gt; a) -&gt; ASeq f x -&gt; z)
+-&gt; (() -&gt; a -&gt; a)
+-&gt; ASeq f ()
+-&gt; z
+forall (f :: * -&gt; *) a.
+Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span><span> </span><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116873"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-129"></span><span>    </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116869"><span class="annot"><span class="annottext">x -&gt; a
+</span><a href="#local-6989586621679116869"><span class="hs-identifier hs-var">f'</span></a></span></span><span> </span><span id="local-6989586621679116868"><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116868"><span class="hs-identifier hs-var">s'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-130"></span><span>      </span><span class="annot"><span class="annottext">ASeq g x
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq g x -&gt; z)
+-&gt; (u -&gt; x -&gt; y)
+-&gt; ASeq g u
+-&gt; z
+forall (f :: * -&gt; *) u y z v.
+ASeq f u
+-&gt; (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+-&gt; (v -&gt; u -&gt; y)
+-&gt; ASeq f v
+-&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#rebaseASeq"><span class="hs-identifier hs-var">rebaseASeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. f x -&gt; g x) -&gt; ASeq f x -&gt; ASeq g x
+forall (f :: * -&gt; *) (g :: * -&gt; *) a.
+(forall x. f x -&gt; g x) -&gt; ASeq f a -&gt; ASeq g a
+</span><a href="Control.Applicative.Free.Fast.html#hoistASeq"><span class="hs-identifier hs-var">hoistASeq</span></a></span><span> </span><span class="annot"><span class="annottext">forall x. f x -&gt; g x
+</span><a href="#local-6989586621679116874"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116868"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall x. (x -&gt; y) -&gt; ASeq g x -&gt; z
+</span><a href="#local-6989586621679116872"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-131"></span><span>        </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116867"><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116867"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621679116866"><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679116866"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">u -&gt; a -&gt; y
+</span><a href="#local-6989586621679116871"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">u
+</span><a href="#local-6989586621679116867"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">x -&gt; a
+</span><a href="#local-6989586621679116869"><span class="hs-identifier hs-var">f'</span></a></span><span> </span><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679116866"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ASeq g u
+</span><a href="#local-6989586621679116870"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; () -&gt; a -&gt; a
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span><span class="hs-special">)</span><span>
+</span><span id="line-133"></span><span>    </span><span class="annot"><span class="annottext">ASeq f ()
+forall (f :: * -&gt; *). ASeq f ()
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- | Interprets the free applicative functor over f using the semantics for</span><span>
+</span><span id="line-136"></span><span class="hs-comment">--   `pure` and `&lt;*&gt;` given by the Applicative instance for f.</span><span>
+</span><span id="line-137"></span><span class="hs-comment">--</span><span>
+</span><span id="line-138"></span><span class="hs-comment">--   prop&gt; retractApp == runAp id</span><span>
+</span><span id="line-139"></span><span id="local-6989586621679117078"><span id="local-6989586621679117079"><span class="annot"><a href="Control.Applicative.Free.Fast.html#retractAp"><span class="hs-identifier hs-type">retractAp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679117079"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Applicative.Free.Fast.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117079"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117078"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679117079"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679117078"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-140"></span><span id="retractAp"><span class="annot"><span class="annottext">retractAp :: Ap f a -&gt; f a
+</span><a href="Control.Applicative.Free.Fast.html#retractAp"><span class="hs-identifier hs-var hs-var">retractAp</span></a></span></span><span> </span><span id="local-6989586621679116863"><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116863"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ap f a
+-&gt; (forall x. (x -&gt; a) -&gt; ASeq f x -&gt; f a)
+-&gt; (() -&gt; a -&gt; a)
+-&gt; ASeq f ()
+-&gt; f a
+forall (f :: * -&gt; *) a.
+Ap f a
+-&gt; forall u y z.
+   (forall x. (x -&gt; y) -&gt; ASeq f x -&gt; z)
+   -&gt; (u -&gt; a -&gt; y) -&gt; ASeq f u -&gt; z
+</span><a href="Control.Applicative.Free.Fast.html#unAp"><span class="hs-identifier hs-var hs-var">unAp</span></a></span><span> </span><span class="annot"><span class="annottext">Ap f a
+</span><a href="#local-6989586621679116863"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679116862"><span class="annot"><span class="annottext">x -&gt; a
+</span><a href="#local-6989586621679116862"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679116861"><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116861"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">x -&gt; a
+</span><a href="#local-6989586621679116862"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(x -&gt; a) -&gt; f x -&gt; f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ASeq f x -&gt; f x
+forall (f :: * -&gt; *) u. Applicative f =&gt; ASeq f u -&gt; f u
+</span><a href="Control.Applicative.Free.Fast.html#reduceASeq"><span class="hs-identifier hs-var">reduceASeq</span></a></span><span> </span><span class="annot"><span class="annottext">ASeq f x
+</span><a href="#local-6989586621679116861"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ASeq f ()
+forall (f :: * -&gt; *). ASeq f ()
+</span><a href="Control.Applicative.Free.Fast.html#ANil"><span class="hs-identifier hs-var">ANil</span></a></span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &lt; 707
+</span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Typeable1</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">Typeable1</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Ap</span><span> </span><span class="hs-identifier">f</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-144"></span><span>  </span><span class="hs-identifier">typeOf1</span><span> </span><span class="hs-identifier">t</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyConApp</span><span> </span><span class="hs-identifier">apTyCon</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">typeOf1</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">t</span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Ap</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">a</span><span>
+</span><span id="line-146"></span><span>    </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">undefined</span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span class="hs-identifier">apTyCon</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">TyCon</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &lt; 704
+</span><span class="hs-identifier">apTyCon</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyCon</span><span> </span><span class="hs-string">&quot;Control.Applicative.Free.Fast.Ap&quot;</span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">apTyCon</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyCon3</span><span> </span><span class="hs-string">&quot;free&quot;</span><span> </span><span class="hs-string">&quot;Control.Applicative.Free.Fast&quot;</span><span> </span><span class="hs-string">&quot;Ap&quot;</span><span class="hs-cpp">
+#endif
+</span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="hs-pragma">apTyCon</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Typeable1</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">Typeable1</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">ASeq</span><span> </span><span class="hs-identifier">f</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-157"></span><span>  </span><span class="hs-identifier">typeOf1</span><span> </span><span class="hs-identifier">t</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyConApp</span><span> </span><span class="hs-identifier">apTyCon</span><span> </span><span class="hs-special">[</span><span class="hs-identifier">typeOf1</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">t</span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">ASeq</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">f</span><span> </span><span class="hs-identifier">a</span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-identifier">f</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">undefined</span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="hs-identifier">apSeqTyCon</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">TyCon</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &lt; 704
+</span><span class="hs-identifier">apSeqTyCon</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyCon</span><span> </span><span class="hs-string">&quot;Control.Applicative.Free.Fast.ASeq&quot;</span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">apSeqTyCon</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkTyCon3</span><span> </span><span class="hs-string">&quot;free&quot;</span><span> </span><span class="hs-string">&quot;Control.Applicative.Free.Fast&quot;</span><span> </span><span class="hs-string">&quot;ASeq&quot;</span><span class="hs-cpp">
+#endif
+</span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="hs-pragma">apSeqTyCon</span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+
+#endif
+</span></pre></body></html>

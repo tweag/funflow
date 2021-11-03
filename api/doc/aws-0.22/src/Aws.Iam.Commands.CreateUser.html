@@ -1,0 +1,245 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TupleSections         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies          #-}</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Iam.Commands.CreateUser</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier">CreateUser</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier">CreateUserResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#User"><span class="hs-identifier">User</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Core.html"><span class="hs-identifier">Aws.Iam.Core</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Iam.Internal.html"><span class="hs-identifier">Aws.Iam.Internal</span></a></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- | Creates a new user.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- &lt;http://docs.aws.amazon.com/IAM/latest/APIReference/API_CreateUser.html&gt;</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">data</span><span> </span><span id="CreateUser"><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-var">CreateUser</span></a></span></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="CreateUser"><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-var">CreateUser</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-24"></span><span>        </span><span id="cuUserName"><span class="annot"><span class="annottext">CreateUser -&gt; Text
+</span><a href="Aws.Iam.Commands.CreateUser.html#cuUserName"><span class="hs-identifier hs-var hs-var">cuUserName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-25"></span><span>      </span><span class="hs-comment">-- ^ Name of the new user</span><span>
+</span><span id="line-26"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="cuPath"><span class="annot"><span class="annottext">CreateUser -&gt; Maybe Text
+</span><a href="Aws.Iam.Commands.CreateUser.html#cuPath"><span class="hs-identifier hs-var hs-var">cuPath</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-27"></span><span>      </span><span class="hs-comment">-- ^ Path under which the user will be created. Defaults to @/@ if</span><span>
+</span><span id="line-28"></span><span>      </span><span class="hs-comment">-- omitted.</span><span>
+</span><span id="line-29"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679223183"><span id="local-6989586621679223185"><span class="annot"><span class="annottext">CreateUser -&gt; CreateUser -&gt; Bool
+(CreateUser -&gt; CreateUser -&gt; Bool)
+-&gt; (CreateUser -&gt; CreateUser -&gt; Bool) -&gt; Eq CreateUser
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CreateUser -&gt; CreateUser -&gt; Bool
+$c/= :: CreateUser -&gt; CreateUser -&gt; Bool
+== :: CreateUser -&gt; CreateUser -&gt; Bool
+$c== :: CreateUser -&gt; CreateUser -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223167"><span id="local-6989586621679223169"><span id="local-6989586621679223171"><span id="local-6989586621679223173"><span id="local-6989586621679223175"><span id="local-6989586621679223177"><span id="local-6989586621679223179"><span class="annot"><span class="annottext">Eq CreateUser
+Eq CreateUser
+-&gt; (CreateUser -&gt; CreateUser -&gt; Ordering)
+-&gt; (CreateUser -&gt; CreateUser -&gt; Bool)
+-&gt; (CreateUser -&gt; CreateUser -&gt; Bool)
+-&gt; (CreateUser -&gt; CreateUser -&gt; Bool)
+-&gt; (CreateUser -&gt; CreateUser -&gt; Bool)
+-&gt; (CreateUser -&gt; CreateUser -&gt; CreateUser)
+-&gt; (CreateUser -&gt; CreateUser -&gt; CreateUser)
+-&gt; Ord CreateUser
+CreateUser -&gt; CreateUser -&gt; Bool
+CreateUser -&gt; CreateUser -&gt; Ordering
+CreateUser -&gt; CreateUser -&gt; CreateUser
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: CreateUser -&gt; CreateUser -&gt; CreateUser
+$cmin :: CreateUser -&gt; CreateUser -&gt; CreateUser
+max :: CreateUser -&gt; CreateUser -&gt; CreateUser
+$cmax :: CreateUser -&gt; CreateUser -&gt; CreateUser
+&gt;= :: CreateUser -&gt; CreateUser -&gt; Bool
+$c&gt;= :: CreateUser -&gt; CreateUser -&gt; Bool
+&gt; :: CreateUser -&gt; CreateUser -&gt; Bool
+$c&gt; :: CreateUser -&gt; CreateUser -&gt; Bool
+&lt;= :: CreateUser -&gt; CreateUser -&gt; Bool
+$c&lt;= :: CreateUser -&gt; CreateUser -&gt; Bool
+&lt; :: CreateUser -&gt; CreateUser -&gt; Bool
+$c&lt; :: CreateUser -&gt; CreateUser -&gt; Bool
+compare :: CreateUser -&gt; CreateUser -&gt; Ordering
+$ccompare :: CreateUser -&gt; CreateUser -&gt; Ordering
+$cp1Ord :: Eq CreateUser
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223160"><span id="local-6989586621679223162"><span id="local-6989586621679223164"><span class="annot"><span class="annottext">Int -&gt; CreateUser -&gt; ShowS
+[CreateUser] -&gt; ShowS
+CreateUser -&gt; String
+(Int -&gt; CreateUser -&gt; ShowS)
+-&gt; (CreateUser -&gt; String)
+-&gt; ([CreateUser] -&gt; ShowS)
+-&gt; Show CreateUser
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CreateUser] -&gt; ShowS
+$cshowList :: [CreateUser] -&gt; ShowS
+show :: CreateUser -&gt; String
+$cshow :: CreateUser -&gt; String
+showsPrec :: Int -&gt; CreateUser -&gt; ShowS
+$cshowsPrec :: Int -&gt; CreateUser -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-type">CreateUser</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-type">CreateUser</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamConfiguration"><span class="hs-identifier hs-type">IamConfiguration</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span id="local-6989586621679223156"><span class="annot"><span class="annottext">signQuery :: CreateUser
+-&gt; ServiceConfiguration CreateUser queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-type">CreateUser</span></a></span><span class="hs-special">{</span><span id="local-6989586621679223153"><span id="local-6989586621679223154"><span class="annot"><span class="annottext">Maybe Text
+Text
+cuPath :: Maybe Text
+cuUserName :: Text
+cuPath :: CreateUser -&gt; Maybe Text
+cuUserName :: CreateUser -&gt; Text
+</span><a href="#local-6989586621679223153"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall qt.
+ByteString
+-&gt; [Maybe (ByteString, Text)]
+-&gt; IamConfiguration qt
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Iam.Internal.html#iamAction%27"><span class="hs-identifier hs-var">iamAction'</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;CreateUser&quot;</span></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-36"></span><span>              </span><span class="annot"><span class="annottext">(ByteString, Text) -&gt; Maybe (ByteString, Text)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;UserName&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679223154"><span class="hs-identifier hs-var">cuUserName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Path&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; (ByteString, Text))
+-&gt; Maybe Text -&gt; Maybe (ByteString, Text)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679223153"><span class="hs-identifier hs-var">cuPath</span></a></span><span>
+</span><span id="line-38"></span><span>            </span><span class="hs-special">]</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="CreateUserResponse"><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-var">CreateUserResponse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="CreateUserResponse"><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-var">CreateUserResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#User"><span class="hs-identifier hs-type">User</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679223146"><span id="local-6989586621679223148"><span class="annot"><span class="annottext">CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+(CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; Eq CreateUserResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c/= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+== :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c== :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223131"><span id="local-6989586621679223133"><span id="local-6989586621679223135"><span id="local-6989586621679223137"><span id="local-6989586621679223139"><span id="local-6989586621679223141"><span id="local-6989586621679223143"><span class="annot"><span class="annottext">Eq CreateUserResponse
+Eq CreateUserResponse
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Ordering)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; Bool)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse)
+-&gt; (CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse)
+-&gt; Ord CreateUserResponse
+CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+CreateUserResponse -&gt; CreateUserResponse -&gt; Ordering
+CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse
+$cmin :: CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse
+max :: CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse
+$cmax :: CreateUserResponse -&gt; CreateUserResponse -&gt; CreateUserResponse
+&gt;= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c&gt;= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+&gt; :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c&gt; :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+&lt;= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c&lt;= :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+&lt; :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+$c&lt; :: CreateUserResponse -&gt; CreateUserResponse -&gt; Bool
+compare :: CreateUserResponse -&gt; CreateUserResponse -&gt; Ordering
+$ccompare :: CreateUserResponse -&gt; CreateUserResponse -&gt; Ordering
+$cp1Ord :: Eq CreateUserResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679223125"><span id="local-6989586621679223127"><span id="local-6989586621679223129"><span class="annot"><span class="annottext">Int -&gt; CreateUserResponse -&gt; ShowS
+[CreateUserResponse] -&gt; ShowS
+CreateUserResponse -&gt; String
+(Int -&gt; CreateUserResponse -&gt; ShowS)
+-&gt; (CreateUserResponse -&gt; String)
+-&gt; ([CreateUserResponse] -&gt; ShowS)
+-&gt; Show CreateUserResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CreateUserResponse] -&gt; ShowS
+$cshowList :: [CreateUserResponse] -&gt; ShowS
+show :: CreateUserResponse -&gt; String
+$cshow :: CreateUserResponse -&gt; String
+showsPrec :: Int -&gt; CreateUserResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; CreateUserResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-type">CreateUser</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Core.html#IamMetadata"><span class="hs-identifier hs-type">IamMetadata</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621679223121"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; CreateUser
+-&gt; IORef (ResponseMetadata CreateUserResponse)
+-&gt; HTTPResponseConsumer CreateUserResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">CreateUser
+</span><span class="hs-identifier">_</span></span><span>
+</span><span id="line-46"></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; Response IamMetadata CreateUserResponse)
+-&gt; IORef IamMetadata -&gt; HTTPResponseConsumer CreateUserResponse
+forall a.
+(Cursor -&gt; Response IamMetadata a)
+-&gt; IORef IamMetadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Iam.Core.html#iamResponseConsumer"><span class="hs-identifier hs-var">iamResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">((Cursor -&gt; Response IamMetadata CreateUserResponse)
+ -&gt; IORef IamMetadata -&gt; HTTPResponseConsumer CreateUserResponse)
+-&gt; (Cursor -&gt; Response IamMetadata CreateUserResponse)
+-&gt; IORef IamMetadata
+-&gt; HTTPResponseConsumer CreateUserResponse
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-47"></span><span>          </span><span class="annot"><span class="annottext">(User -&gt; CreateUserResponse)
+-&gt; Response IamMetadata User
+-&gt; Response IamMetadata CreateUserResponse
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">User -&gt; CreateUserResponse
+</span><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-var">CreateUserResponse</span></a></span><span> </span><span class="annot"><span class="annottext">(Response IamMetadata User
+ -&gt; Response IamMetadata CreateUserResponse)
+-&gt; (Cursor -&gt; Response IamMetadata User)
+-&gt; Cursor
+-&gt; Response IamMetadata CreateUserResponse
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response IamMetadata User
+forall (m :: * -&gt; *). MonadThrow m =&gt; Cursor -&gt; m User
+</span><a href="Aws.Iam.Core.html#parseUser"><span class="hs-identifier hs-var">parseUser</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUser"><span class="hs-identifier hs-type">CreateUser</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.Iam.Commands.CreateUser.html#CreateUserResponse"><span class="hs-identifier hs-type">CreateUserResponse</span></a></span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621679223110"><span class="annot"><span class="annottext">loadToMemory :: CreateUserResponse
+-&gt; ResourceT IO (MemoryResponse CreateUserResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CreateUserResponse
+-&gt; ResourceT IO (MemoryResponse CreateUserResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-54"></span></pre></body></html>

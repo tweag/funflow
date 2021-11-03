@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE PackageImports #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Module      : Crypto.Hash.Internal</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Portability : unknown</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Crypto.Hash.Internal</span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Crypto.Hash.Internal.html#unsafeDoIO"><span class="hs-identifier">unsafeDoIO</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteString"><span class="hs-identifier">digestToByteString</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier">digestToByteStringWitness</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Unsafe</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteArray</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">convert</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="hs-string">&quot;cryptonite&quot;</span><span> </span><span class="annot"><a href="Crypto.Hash.html"><span class="hs-identifier">Crypto.Hash</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- | perform io for hashes that do allocation and ffi.</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- unsafeDupablePerformIO is used when possible as the</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- computation is pure and the output is directly linked</span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- to the input. we also do not modify anything after it has</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- been returned to the user.</span><span>
+</span><span id="line-26"></span><span id="local-6989586621679046219"><span class="annot"><a href="Crypto.Hash.Internal.html#unsafeDoIO"><span class="hs-identifier hs-type">unsafeDoIO</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679046219"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679046219"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt; 704
+</span><span id="unsafeDoIO"><span class="annot"><span class="annottext">unsafeDoIO :: IO a -&gt; a
+</span><a href="Crypto.Hash.Internal.html#unsafeDoIO"><span class="hs-identifier hs-var hs-var">unsafeDoIO</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO a -&gt; a
+forall a. IO a -&gt; a
+</span><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">unsafeDoIO</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">unsafePerformIO</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-33"></span><span id="local-6989586621679046217"><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteString"><span class="hs-identifier hs-type">digestToByteString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HashAlgorithm</span></span><span> </span><span class="annot"><a href="#local-6989586621679046217"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Digest</span></span><span> </span><span class="annot"><a href="#local-6989586621679046217"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span></span><span>
+</span><span id="line-34"></span><span id="digestToByteString"><span class="annot"><span class="annottext">digestToByteString :: Digest h -&gt; ByteString
+</span><a href="Crypto.Hash.Internal.html#digestToByteString"><span class="hs-identifier hs-var hs-var">digestToByteString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Digest h -&gt; ByteString
+forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><span class="hs-identifier hs-var">convert</span></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span id="local-6989586621679046215"><span class="annot"><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier hs-type">digestToByteStringWitness</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HashAlgorithm</span></span><span> </span><span class="annot"><a href="#local-6989586621679046215"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679046215"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Digest</span></span><span> </span><span class="annot"><a href="#local-6989586621679046215"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span></span><span>
+</span><span id="line-37"></span><span id="digestToByteStringWitness"><span class="annot"><span class="annottext">digestToByteStringWitness :: h -&gt; Digest h -&gt; ByteString
+</span><a href="Crypto.Hash.Internal.html#digestToByteStringWitness"><span class="hs-identifier hs-var hs-var">digestToByteStringWitness</span></a></span></span><span> </span><span class="annot"><span class="annottext">h
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Digest h -&gt; ByteString
+forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><span class="hs-identifier hs-var">convert</span></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span></pre></body></html>

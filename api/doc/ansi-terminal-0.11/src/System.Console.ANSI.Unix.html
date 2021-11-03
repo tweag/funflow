@@ -1,0 +1,481 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-cpp">#include &quot;Common-Safe-Haskell.hs&quot;
+</span><span class="hs-pragma">{-# OPTIONS_HADDOCK hide #-}</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">System.Console.ANSI.Unix</span><span>
+</span><span id="line-5"></span><span>  </span><span class="hs-special">(</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- This file contains code that is common to modules</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- System.Console.ANSI.Unix and System.Console.ANSI.Windows, namely the module</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- exports and the associated Haddock documentation.</span><span class="hs-cpp">
+#include &quot;Exports-Include.hs&quot;
+</span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">fromMaybe</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception.Base</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">bracket</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">when</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">BufferMode</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Handle</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hGetBuffering</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hGetEcho</span></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>  </span><span class="annot"><span class="hs-identifier">hIsTerminalDevice</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hIsWritable</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hPutStr</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hReady</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hSetBuffering</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">hSetEcho</span></span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>  </span><span class="annot"><span class="hs-identifier">stdin</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Timeout</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">timeout</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.ParserCombinators.ReadP</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">readP_to_S</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="System.Console.ANSI.Codes.html"><span class="hs-identifier">System.Console.ANSI.Codes</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="System.Console.ANSI.Types.html"><span class="hs-identifier">System.Console.ANSI.Types</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- This file contains code that is common to modules System.Console.ANSI.Unix,</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- System.Console.ANSI.Windows and System.Console.ANSI.Windows.Emulator, such as</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- type signatures and the definition of functions specific to stdout in terms</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- of the corresponding more general functions, inclduding the related Haddock</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- documentation.</span><span class="hs-cpp">
+#include &quot;Common-Include.hs&quot;
+</span><span class="hs-comment">-- This file contains code that is common save that different code is required</span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- in the case of the module System.Console.ANSI.Windows.Emulator (see the file</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- Common-Include-Emulator.hs in respect of the latter).</span><span class="hs-cpp">
+#include &quot;Common-Include-Enabled.hs&quot;
+</span><span>
+</span><span id="line-35"></span><span id="hCursorUp"><span class="annot"><span class="annottext">hCursorUp :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorUp"><span class="hs-identifier hs-var hs-var">hCursorUp</span></a></span></span><span> </span><span id="local-6989586621679036134"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036134"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036133"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036133"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036134"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorUpCode"><span class="hs-identifier hs-var">cursorUpCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036133"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-36"></span><span id="hCursorDown"><span class="annot"><span class="annottext">hCursorDown :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorDown"><span class="hs-identifier hs-var hs-var">hCursorDown</span></a></span></span><span> </span><span id="local-6989586621679036130"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036130"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036129"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036129"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036130"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorDownCode"><span class="hs-identifier hs-var">cursorDownCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036129"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-37"></span><span id="hCursorForward"><span class="annot"><span class="annottext">hCursorForward :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorForward"><span class="hs-identifier hs-var hs-var">hCursorForward</span></a></span></span><span> </span><span id="local-6989586621679036126"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036126"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036125"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036125"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036126"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorForwardCode"><span class="hs-identifier hs-var">cursorForwardCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036125"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-38"></span><span id="hCursorBackward"><span class="annot"><span class="annottext">hCursorBackward :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorBackward"><span class="hs-identifier hs-var hs-var">hCursorBackward</span></a></span></span><span> </span><span id="local-6989586621679036122"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036122"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036121"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036121"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036122"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorBackwardCode"><span class="hs-identifier hs-var">cursorBackwardCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036121"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span id="hCursorDownLine"><span class="annot"><span class="annottext">hCursorDownLine :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorDownLine"><span class="hs-identifier hs-var hs-var">hCursorDownLine</span></a></span></span><span> </span><span id="local-6989586621679036118"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036118"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036117"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036117"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036118"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorDownLineCode"><span class="hs-identifier hs-var">cursorDownLineCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036117"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-41"></span><span id="hCursorUpLine"><span class="annot"><span class="annottext">hCursorUpLine :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hCursorUpLine"><span class="hs-identifier hs-var hs-var">hCursorUpLine</span></a></span></span><span> </span><span id="local-6989586621679036114"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036114"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036113"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036113"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036114"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#cursorUpLineCode"><span class="hs-identifier hs-var">cursorUpLineCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036113"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span id="hSetCursorColumn"><span class="annot"><span class="annottext">hSetCursorColumn :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hSetCursorColumn"><span class="hs-identifier hs-var hs-var">hSetCursorColumn</span></a></span></span><span> </span><span id="local-6989586621679036110"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036110"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036109"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036109"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036110"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#setCursorColumnCode"><span class="hs-identifier hs-var">setCursorColumnCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036109"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-44"></span><span id="hSetCursorPosition"><span class="annot"><span class="annottext">hSetCursorPosition :: Handle -&gt; Int -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hSetCursorPosition"><span class="hs-identifier hs-var hs-var">hSetCursorPosition</span></a></span></span><span> </span><span id="local-6989586621679036106"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036106"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036105"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036105"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679036104"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036104"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036106"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#setCursorPositionCode"><span class="hs-identifier hs-var">setCursorPositionCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036105"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036104"><span class="hs-identifier hs-var">m</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span id="hSaveCursor"><span class="annot"><span class="annottext">hSaveCursor :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hSaveCursor"><span class="hs-identifier hs-var hs-var">hSaveCursor</span></a></span></span><span> </span><span id="local-6989586621679036101"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036101"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036101"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#saveCursorCode"><span class="hs-identifier hs-var">saveCursorCode</span></a></span><span>
+</span><span id="line-47"></span><span id="hRestoreCursor"><span class="annot"><span class="annottext">hRestoreCursor :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hRestoreCursor"><span class="hs-identifier hs-var hs-var">hRestoreCursor</span></a></span></span><span> </span><span id="local-6989586621679036098"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036098"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036098"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#restoreCursorCode"><span class="hs-identifier hs-var">restoreCursorCode</span></a></span><span>
+</span><span id="line-48"></span><span id="hReportCursorPosition"><span class="annot"><span class="annottext">hReportCursorPosition :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hReportCursorPosition"><span class="hs-identifier hs-var hs-var">hReportCursorPosition</span></a></span></span><span> </span><span id="local-6989586621679036095"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036095"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036095"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#reportCursorPositionCode"><span class="hs-identifier hs-var">reportCursorPositionCode</span></a></span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span id="hClearFromCursorToScreenEnd"><span class="annot"><span class="annottext">hClearFromCursorToScreenEnd :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearFromCursorToScreenEnd"><span class="hs-identifier hs-var hs-var">hClearFromCursorToScreenEnd</span></a></span></span><span> </span><span id="local-6989586621679036092"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036092"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036092"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearFromCursorToScreenEndCode"><span class="hs-identifier hs-var">clearFromCursorToScreenEndCode</span></a></span><span>
+</span><span id="line-51"></span><span id="hClearFromCursorToScreenBeginning"><span class="annot"><span class="annottext">hClearFromCursorToScreenBeginning :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearFromCursorToScreenBeginning"><span class="hs-identifier hs-var hs-var">hClearFromCursorToScreenBeginning</span></a></span></span><span> </span><span id="local-6989586621679036089"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036089"><span class="hs-identifier hs-var">h</span></a></span></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036089"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearFromCursorToScreenBeginningCode"><span class="hs-identifier hs-var">clearFromCursorToScreenBeginningCode</span></a></span><span>
+</span><span id="line-53"></span><span id="hClearScreen"><span class="annot"><span class="annottext">hClearScreen :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearScreen"><span class="hs-identifier hs-var hs-var">hClearScreen</span></a></span></span><span> </span><span id="local-6989586621679036086"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036086"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036086"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearScreenCode"><span class="hs-identifier hs-var">clearScreenCode</span></a></span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span id="hClearFromCursorToLineEnd"><span class="annot"><span class="annottext">hClearFromCursorToLineEnd :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearFromCursorToLineEnd"><span class="hs-identifier hs-var hs-var">hClearFromCursorToLineEnd</span></a></span></span><span> </span><span id="local-6989586621679036083"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036083"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036083"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearFromCursorToLineEndCode"><span class="hs-identifier hs-var">clearFromCursorToLineEndCode</span></a></span><span>
+</span><span id="line-56"></span><span id="hClearFromCursorToLineBeginning"><span class="annot"><span class="annottext">hClearFromCursorToLineBeginning :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearFromCursorToLineBeginning"><span class="hs-identifier hs-var hs-var">hClearFromCursorToLineBeginning</span></a></span></span><span> </span><span id="local-6989586621679036080"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036080"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036080"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearFromCursorToLineBeginningCode"><span class="hs-identifier hs-var">clearFromCursorToLineBeginningCode</span></a></span><span>
+</span><span id="line-57"></span><span id="hClearLine"><span class="annot"><span class="annottext">hClearLine :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hClearLine"><span class="hs-identifier hs-var hs-var">hClearLine</span></a></span></span><span> </span><span id="local-6989586621679036077"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036077"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036077"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#clearLineCode"><span class="hs-identifier hs-var">clearLineCode</span></a></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span id="hScrollPageUp"><span class="annot"><span class="annottext">hScrollPageUp :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hScrollPageUp"><span class="hs-identifier hs-var hs-var">hScrollPageUp</span></a></span></span><span> </span><span id="local-6989586621679036074"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036074"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036073"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036073"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036074"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#scrollPageUpCode"><span class="hs-identifier hs-var">scrollPageUpCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036073"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-60"></span><span id="hScrollPageDown"><span class="annot"><span class="annottext">hScrollPageDown :: Handle -&gt; Int -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hScrollPageDown"><span class="hs-identifier hs-var hs-var">hScrollPageDown</span></a></span></span><span> </span><span id="local-6989586621679036070"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036070"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036069"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036069"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036070"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#scrollPageDownCode"><span class="hs-identifier hs-var">scrollPageDownCode</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036069"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span id="hSetSGR"><span class="annot"><span class="annottext">hSetSGR :: Handle -&gt; [SGR] -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hSetSGR"><span class="hs-identifier hs-var hs-var">hSetSGR</span></a></span></span><span> </span><span id="local-6989586621679036066"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036066"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036065"><span class="annot"><span class="annottext">[SGR]
+</span><a href="#local-6989586621679036065"><span class="hs-identifier hs-var">sgrs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036066"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[SGR] -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#setSGRCode"><span class="hs-identifier hs-var">setSGRCode</span></a></span><span> </span><span class="annot"><span class="annottext">[SGR]
+</span><a href="#local-6989586621679036065"><span class="hs-identifier hs-var">sgrs</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span id="hHideCursor"><span class="annot"><span class="annottext">hHideCursor :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hHideCursor"><span class="hs-identifier hs-var hs-var">hHideCursor</span></a></span></span><span> </span><span id="local-6989586621679036062"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036062"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036062"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#hideCursorCode"><span class="hs-identifier hs-var">hideCursorCode</span></a></span><span>
+</span><span id="line-65"></span><span id="hShowCursor"><span class="annot"><span class="annottext">hShowCursor :: Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hShowCursor"><span class="hs-identifier hs-var hs-var">hShowCursor</span></a></span></span><span> </span><span id="local-6989586621679036059"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036059"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036059"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="System.Console.ANSI.Codes.html#showCursorCode"><span class="hs-identifier hs-var">showCursorCode</span></a></span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span id="hSetTitle"><span class="annot"><span class="annottext">hSetTitle :: Handle -&gt; String -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hSetTitle"><span class="hs-identifier hs-var hs-var">hSetTitle</span></a></span></span><span> </span><span id="local-6989586621679036056"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036056"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621679036055"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036055"><span class="hs-identifier hs-var">title</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; String -&gt; IO ()
+</span><span class="hs-identifier hs-var">hPutStr</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036056"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO ()) -&gt; String -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String
+</span><a href="System.Console.ANSI.Codes.html#setTitleCode"><span class="hs-identifier hs-var">setTitleCode</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036055"><span class="hs-identifier hs-var">title</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- hSupportsANSI :: Handle -&gt; IO Bool</span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- (See Common-Include.hs for Haddock documentation)</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- Borrowed from an HSpec patch by Simon Hengel</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- (https://github.com/hspec/hspec/commit/d932f03317e0e2bd08c85b23903fb8616ae642bd)</span><span>
+</span><span id="line-74"></span><span id="hSupportsANSI"><span class="annot"><span class="annottext">hSupportsANSI :: Handle -&gt; IO Bool
+</span><a href="System.Console.ANSI.Unix.html#hSupportsANSI"><span class="hs-identifier hs-var hs-var">hSupportsANSI</span></a></span></span><span> </span><span id="local-6989586621679036052"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036052"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">(&amp;&amp;)</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool -&gt; Bool) -&gt; IO Bool -&gt; IO (Bool -&gt; Bool)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Handle -&gt; IO Bool
+</span><span class="hs-identifier hs-var">hIsTerminalDevice</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036052"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Bool -&gt; Bool) -&gt; IO Bool -&gt; IO Bool
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">IO Bool
+</span><a href="#local-6989586621679036049"><span class="hs-identifier hs-var">isNotDumb</span></a></span><span>
+</span><span id="line-75"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-comment">-- cannot use lookupEnv since it only appeared in GHC 7.6</span><span>
+</span><span id="line-77"></span><span>  </span><span id="local-6989586621679036049"><span class="annot"><span class="annottext">isNotDumb :: IO Bool
+</span><a href="#local-6989586621679036049"><span class="hs-identifier hs-var hs-var">isNotDumb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe String -&gt; Maybe String -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Maybe String
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;dumb&quot;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe String -&gt; Bool)
+-&gt; ([(String, String)] -&gt; Maybe String)
+-&gt; [(String, String)]
+-&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; [(String, String)] -&gt; Maybe String
+forall a b. Eq a =&gt; a -&gt; [(a, b)] -&gt; Maybe b
+</span><span class="hs-identifier hs-var">lookup</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;TERM&quot;</span></span><span> </span><span class="annot"><span class="annottext">([(String, String)] -&gt; Bool) -&gt; IO [(String, String)] -&gt; IO Bool
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">IO [(String, String)]
+</span><span class="hs-identifier hs-var">getEnvironment</span></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- hSupportsANSIWithoutEmulation :: Handle -&gt; IO (Maybe Bool)</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- (See Common-Include.hs for Haddock documentation)</span><span>
+</span><span id="line-81"></span><span id="hSupportsANSIWithoutEmulation"><span class="annot"><span class="annottext">hSupportsANSIWithoutEmulation :: Handle -&gt; IO (Maybe Bool)
+</span><a href="System.Console.ANSI.Unix.html#hSupportsANSIWithoutEmulation"><span class="hs-identifier hs-var hs-var">hSupportsANSIWithoutEmulation</span></a></span></span><span> </span><span id="local-6989586621679036043"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036043"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-82"></span><span>  </span><span class="annot"><span class="annottext">Bool -&gt; Maybe Bool
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Maybe Bool) -&gt; IO Bool -&gt; IO (Maybe Bool)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">(&amp;&amp;)</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool -&gt; Bool) -&gt; IO Bool -&gt; IO (Bool -&gt; Bool)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Handle -&gt; IO Bool
+</span><span class="hs-identifier hs-var">hIsWritable</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036043"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Bool -&gt; Bool) -&gt; IO Bool -&gt; IO Bool
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Handle -&gt; IO Bool
+</span><a href="System.Console.ANSI.Unix.html#hSupportsANSI"><span class="hs-identifier hs-var">hSupportsANSI</span></a></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036043"><span class="hs-identifier hs-var">h</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- getReportedCursorPosition :: IO String</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- (See Common-Include.hs for Haddock documentation)</span><span>
+</span><span id="line-86"></span><span id="getReportedCursorPosition"><span class="annot"><span class="annottext">getReportedCursorPosition :: IO String
+</span><a href="System.Console.ANSI.Unix.html#getReportedCursorPosition"><span class="hs-identifier hs-var hs-var">getReportedCursorPosition</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-87"></span><span>  </span><span class="hs-comment">-- If, unexpectedly, no data is available on the console input stream then</span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-comment">-- the timeout will prevent the getChar blocking. For consistency with the</span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-comment">-- Windows equivalent, returns &quot;&quot; if the expected information is unavailable.</span><span>
+</span><span id="line-90"></span><span>  </span><span class="annot"><span class="annottext">String -&gt; Maybe String -&gt; String
+forall a. a -&gt; Maybe a -&gt; a
+</span><span class="hs-identifier hs-var">fromMaybe</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">(Maybe String -&gt; String) -&gt; IO (Maybe String) -&gt; IO String
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO String -&gt; IO (Maybe String)
+forall a. Int -&gt; IO a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">timeout</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">500000</span></span><span> </span><span class="annot"><span class="annottext">IO String
+</span><a href="#local-6989586621679036041"><span class="hs-identifier hs-var">get</span></a></span><span> </span><span class="hs-comment">-- 500 milliseconds</span><span>
+</span><span id="line-91"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-92"></span><span>  </span><span id="local-6989586621679036041"><span class="annot"><span class="annottext">get :: IO String
+</span><a href="#local-6989586621679036041"><span class="hs-identifier hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-93"></span><span>    </span><span id="local-6989586621679036040"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036040"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Char
+</span><span class="hs-identifier hs-var">getChar</span></span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036040"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\ESC'</span></span><span>
+</span><span id="line-95"></span><span>      </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+</span><a href="#local-6989586621679036038"><span class="hs-identifier hs-var">get'</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036040"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-96"></span><span>      </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036040"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- If the first character is not the expected \ESC then</span><span>
+</span><span id="line-97"></span><span>                      </span><span class="hs-comment">-- give up. This provides a modicom of protection against</span><span>
+</span><span id="line-98"></span><span>                      </span><span class="hs-comment">-- unexpected data in the input stream.</span><span>
+</span><span id="line-99"></span><span>  </span><span id="local-6989586621679036038"><span class="annot"><span class="annottext">get' :: String -&gt; IO String
+</span><a href="#local-6989586621679036038"><span class="hs-identifier hs-var hs-var">get'</span></a></span></span><span> </span><span id="local-6989586621679036037"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036037"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-100"></span><span>    </span><span id="local-6989586621679036036"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036036"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Char
+</span><span class="hs-identifier hs-var">getChar</span></span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036036"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'R'</span></span><span>
+</span><span id="line-102"></span><span>      </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+</span><a href="#local-6989586621679036038"><span class="hs-identifier hs-var">get'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036036"><span class="hs-identifier hs-var">c</span></a></span><span class="annot"><span class="annottext">Char -&gt; String -&gt; String
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036037"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- Continue building the list, until the expected 'R'</span><span>
+</span><span id="line-103"></span><span>                      </span><span class="hs-comment">-- character is obtained. Build the list in reverse order,</span><span>
+</span><span id="line-104"></span><span>                      </span><span class="hs-comment">-- in order to avoid O(n^2) complexity.</span><span>
+</span><span id="line-105"></span><span>      </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO String) -&gt; String -&gt; IO String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String
+forall a. [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">reverse</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679036036"><span class="hs-identifier hs-var">c</span></a></span><span class="annot"><span class="annottext">Char -&gt; String -&gt; String
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036037"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- Reverse the order of the built list.</span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- hGetCursorPosition :: Handle -&gt; IO (Maybe (Int, Int))</span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- (See Common-Include.hs for Haddock documentation)</span><span>
+</span><span id="line-109"></span><span id="hGetCursorPosition"><span class="annot"><span class="annottext">hGetCursorPosition :: Handle -&gt; IO (Maybe (Int, Int))
+</span><a href="System.Console.ANSI.Unix.html#hGetCursorPosition"><span class="hs-identifier hs-var hs-var">hGetCursorPosition</span></a></span></span><span> </span><span id="local-6989586621679036033"><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036033"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((Int, Int) -&gt; (Int, Int)) -&gt; Maybe (Int, Int) -&gt; Maybe (Int, Int)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">(Int, Int) -&gt; (Int, Int)
+forall a b. (Num a, Num b) =&gt; (a, b) -&gt; (a, b)
+</span><a href="#local-6989586621679036032"><span class="hs-identifier hs-var">to0base</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe (Int, Int) -&gt; Maybe (Int, Int))
+-&gt; IO (Maybe (Int, Int)) -&gt; IO (Maybe (Int, Int))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">IO (Maybe (Int, Int))
+</span><a href="#local-6989586621679036031"><span class="hs-identifier hs-var">getCursorPosition'</span></a></span><span>
+</span><span id="line-110"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679036032"><span class="annot"><span class="annottext">to0base :: (a, b) -&gt; (a, b)
+</span><a href="#local-6989586621679036032"><span class="hs-identifier hs-var hs-var">to0base</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679036030"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679036030"><span class="hs-identifier hs-var">row</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679036029"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679036029"><span class="hs-identifier hs-var">col</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679036030"><span class="hs-identifier hs-var">row</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">1</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679036029"><span class="hs-identifier hs-var">col</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>  </span><span id="local-6989586621679036031"><span class="annot"><span class="annottext">getCursorPosition' :: IO (Maybe (Int, Int))
+</span><a href="#local-6989586621679036031"><span class="hs-identifier hs-var hs-var">getCursorPosition'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-113"></span><span>    </span><span id="local-6989586621679036028"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036028"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO BufferMode
+-&gt; (BufferMode -&gt; IO ()) -&gt; (BufferMode -&gt; IO String) -&gt; IO String
+forall a b c. IO a -&gt; (a -&gt; IO b) -&gt; (a -&gt; IO c) -&gt; IO c
+</span><span class="hs-identifier hs-var">bracket</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Handle -&gt; IO BufferMode
+</span><span class="hs-identifier hs-var">hGetBuffering</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Handle -&gt; BufferMode -&gt; IO ()
+</span><span class="hs-identifier hs-var">hSetBuffering</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((BufferMode -&gt; IO String) -&gt; IO String)
+-&gt; (BufferMode -&gt; IO String) -&gt; IO String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">BufferMode
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-114"></span><span>      </span><span class="hs-comment">-- set no buffering (if 'no buffering' is not already set, the contents of</span><span>
+</span><span id="line-115"></span><span>      </span><span class="hs-comment">-- the buffer will be discarded, so this needs to be done before the</span><span>
+</span><span id="line-116"></span><span>      </span><span class="hs-comment">-- cursor positon is emitted)</span><span>
+</span><span id="line-117"></span><span>      </span><span class="annot"><span class="annottext">Handle -&gt; BufferMode -&gt; IO ()
+</span><span class="hs-identifier hs-var">hSetBuffering</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span> </span><span class="annot"><span class="annottext">BufferMode
+</span><span class="hs-identifier hs-var">NoBuffering</span></span><span>
+</span><span id="line-118"></span><span>      </span><span class="hs-comment">-- ensure that echoing is off</span><span>
+</span><span id="line-119"></span><span>      </span><span class="annot"><span class="annottext">IO Bool -&gt; (Bool -&gt; IO ()) -&gt; (Bool -&gt; IO String) -&gt; IO String
+forall a b c. IO a -&gt; (a -&gt; IO b) -&gt; (a -&gt; IO c) -&gt; IO c
+</span><span class="hs-identifier hs-var">bracket</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Handle -&gt; IO Bool
+</span><span class="hs-identifier hs-var">hGetEcho</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Handle -&gt; Bool -&gt; IO ()
+</span><span class="hs-identifier hs-var">hSetEcho</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((Bool -&gt; IO String) -&gt; IO String)
+-&gt; (Bool -&gt; IO String) -&gt; IO String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-120"></span><span>        </span><span class="annot"><span class="annottext">Handle -&gt; Bool -&gt; IO ()
+</span><span class="hs-identifier hs-var">hSetEcho</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-121"></span><span>        </span><span class="annot"><span class="annottext">IO ()
+</span><a href="#local-6989586621679036026"><span class="hs-identifier hs-var">clearStdin</span></a></span><span>
+</span><span id="line-122"></span><span>        </span><span class="annot"><span class="annottext">Handle -&gt; IO ()
+</span><a href="System.Console.ANSI.Unix.html#hReportCursorPosition"><span class="hs-identifier hs-var">hReportCursorPosition</span></a></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036033"><span class="hs-identifier hs-var">h</span></a></span><span>
+</span><span id="line-123"></span><span>        </span><span class="annot"><span class="annottext">Handle -&gt; IO ()
+</span><span class="hs-identifier hs-var">hFlush</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><a href="#local-6989586621679036033"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="hs-comment">-- ensure the report cursor position code is sent to the</span><span>
+</span><span id="line-124"></span><span>                 </span><span class="hs-comment">-- operating system</span><span>
+</span><span id="line-125"></span><span>        </span><span class="annot"><span class="annottext">IO String
+</span><a href="System.Console.ANSI.Unix.html#getReportedCursorPosition"><span class="hs-identifier hs-var">getReportedCursorPosition</span></a></span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ReadP (Int, Int) -&gt; ReadS (Int, Int)
+forall a. ReadP a -&gt; ReadS a
+</span><span class="hs-identifier hs-var">readP_to_S</span></span><span> </span><span class="annot"><span class="annottext">ReadP (Int, Int)
+</span><a href="System.Console.ANSI.Unix.html#cursorPosition"><span class="hs-identifier hs-var">cursorPosition</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679036028"><span class="hs-identifier hs-var">input</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-127"></span><span>      </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int) -&gt; IO (Maybe (Int, Int))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-128"></span><span>      </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="hs-special">(</span><span id="local-6989586621679036023"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036023"><span class="hs-identifier hs-var">row</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679036022"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036022"><span class="hs-identifier hs-var">col</span></a></span></span><span class="hs-special">)</span><span class="hs-special">,</span><span class="annot"><span class="annottext">String
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int) -&gt; IO (Maybe (Int, Int))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Maybe (Int, Int) -&gt; IO (Maybe (Int, Int)))
+-&gt; Maybe (Int, Int) -&gt; IO (Maybe (Int, Int))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(Int, Int) -&gt; Maybe (Int, Int)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036023"><span class="hs-identifier hs-var">row</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679036022"><span class="hs-identifier hs-var">col</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-129"></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((Int, Int), String)
+</span><span class="hs-identifier">_</span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[((Int, Int), String)]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int) -&gt; IO (Maybe (Int, Int))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Maybe (Int, Int)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-130"></span><span>  </span><span id="local-6989586621679036026"><span class="annot"><span class="annottext">clearStdin :: IO ()
+</span><a href="#local-6989586621679036026"><span class="hs-identifier hs-var hs-var">clearStdin</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-131"></span><span>    </span><span id="local-6989586621679036021"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679036021"><span class="hs-identifier hs-var">isReady</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Handle -&gt; IO Bool
+</span><span class="hs-identifier hs-var">hReady</span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier hs-var">stdin</span></span><span>
+</span><span id="line-132"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679036021"><span class="hs-identifier hs-var">isReady</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-133"></span><span>      </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span class="annot"><span class="annottext">IO Char
+</span><span class="hs-identifier hs-var">getChar</span></span><span>
+</span><span id="line-134"></span><span>      </span><span class="annot"><span class="annottext">IO ()
+</span><a href="#local-6989586621679036026"><span class="hs-identifier hs-var">clearStdin</span></a></span><span>
+</span><span id="line-135"></span></pre></body></html>

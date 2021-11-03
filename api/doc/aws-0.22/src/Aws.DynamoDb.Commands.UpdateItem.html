@@ -1,0 +1,719 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_CEIOMnCYH0O0lH3Y517sF9"></span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts          #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NoMonomorphismRestriction #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings         #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards           #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies              #-}</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Module      :  Aws.DynamoDb.Commands.UpdateItem</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Copyright   :  Soostone Inc</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Maintainer  :  Ozgun Ataman &lt;ozgun.ataman@soostone.com&gt;</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.DynamoDb.Commands.UpdateItem</span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier">UpdateItem</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#updateItem"><span class="hs-identifier">updateItem</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier">AttributeUpdate</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#au"><span class="hs-identifier">au</span></a></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateAction"><span class="hs-identifier">UpdateAction</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier">UpdateItemResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Aeson</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Default</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.DynamoDb.Core.html"><span class="hs-identifier">Aws.DynamoDb.Core</span></a></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- | An @UpdateItem@ request.</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="UpdateItem"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-var">UpdateItem</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="UpdateItem"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-var">UpdateItem</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-45"></span><span>      </span><span id="uiTable"><span class="annot"><span class="annottext">UpdateItem -&gt; Text
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiTable"><span class="hs-identifier hs-var hs-var">uiTable</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiKey"><span class="annot"><span class="annottext">UpdateItem -&gt; PrimaryKey
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiKey"><span class="hs-identifier hs-var hs-var">uiKey</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiUpdates"><span class="annot"><span class="annottext">UpdateItem -&gt; [AttributeUpdate]
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiUpdates"><span class="hs-identifier hs-var hs-var">uiUpdates</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiExpect"><span class="annot"><span class="annottext">UpdateItem -&gt; Conditions
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiExpect"><span class="hs-identifier hs-var hs-var">uiExpect</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Conditions"><span class="hs-identifier hs-type">Conditions</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-comment">-- ^ Conditional update - see DynamoDb documentation</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiReturn"><span class="annot"><span class="annottext">UpdateItem -&gt; UpdateReturn
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiReturn"><span class="hs-identifier hs-var hs-var">uiReturn</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#UpdateReturn"><span class="hs-identifier hs-type">UpdateReturn</span></a></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiRetCons"><span class="annot"><span class="annottext">UpdateItem -&gt; ReturnConsumption
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiRetCons"><span class="hs-identifier hs-var hs-var">uiRetCons</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ReturnConsumption"><span class="hs-identifier hs-type">ReturnConsumption</span></a></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uiRetMet"><span class="annot"><span class="annottext">UpdateItem -&gt; ReturnItemCollectionMetrics
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uiRetMet"><span class="hs-identifier hs-var hs-var">uiRetMet</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ReturnItemCollectionMetrics"><span class="hs-identifier hs-type">ReturnItemCollectionMetrics</span></a></span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679225981"><span id="local-6989586621679225983"><span class="annot"><span class="annottext">UpdateItem -&gt; UpdateItem -&gt; Bool
+(UpdateItem -&gt; UpdateItem -&gt; Bool)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Bool) -&gt; Eq UpdateItem
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c/= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+== :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c== :: UpdateItem -&gt; UpdateItem -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225974"><span id="local-6989586621679225976"><span id="local-6989586621679225978"><span class="annot"><span class="annottext">Int -&gt; UpdateItem -&gt; ShowS
+[UpdateItem] -&gt; ShowS
+UpdateItem -&gt; String
+(Int -&gt; UpdateItem -&gt; ShowS)
+-&gt; (UpdateItem -&gt; String)
+-&gt; ([UpdateItem] -&gt; ShowS)
+-&gt; Show UpdateItem
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UpdateItem] -&gt; ShowS
+$cshowList :: [UpdateItem] -&gt; ShowS
+show :: UpdateItem -&gt; String
+$cshow :: UpdateItem -&gt; String
+showsPrec :: Int -&gt; UpdateItem -&gt; ShowS
+$cshowsPrec :: Int -&gt; UpdateItem -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225965"><span id="local-6989586621679225967"><span id="local-6989586621679225969"><span id="local-6989586621679225971"><span class="annot"><span class="annottext">ReadPrec [UpdateItem]
+ReadPrec UpdateItem
+Int -&gt; ReadS UpdateItem
+ReadS [UpdateItem]
+(Int -&gt; ReadS UpdateItem)
+-&gt; ReadS [UpdateItem]
+-&gt; ReadPrec UpdateItem
+-&gt; ReadPrec [UpdateItem]
+-&gt; Read UpdateItem
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [UpdateItem]
+$creadListPrec :: ReadPrec [UpdateItem]
+readPrec :: ReadPrec UpdateItem
+$creadPrec :: ReadPrec UpdateItem
+readList :: ReadS [UpdateItem]
+$creadList :: ReadS [UpdateItem]
+readsPrec :: Int -&gt; ReadS UpdateItem
+$creadsPrec :: Int -&gt; ReadS UpdateItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225949"><span id="local-6989586621679225951"><span id="local-6989586621679225953"><span id="local-6989586621679225955"><span id="local-6989586621679225957"><span id="local-6989586621679225959"><span id="local-6989586621679225961"><span class="annot"><span class="annottext">Eq UpdateItem
+Eq UpdateItem
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Ordering)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Bool)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Bool)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Bool)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; Bool)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; UpdateItem)
+-&gt; (UpdateItem -&gt; UpdateItem -&gt; UpdateItem)
+-&gt; Ord UpdateItem
+UpdateItem -&gt; UpdateItem -&gt; Bool
+UpdateItem -&gt; UpdateItem -&gt; Ordering
+UpdateItem -&gt; UpdateItem -&gt; UpdateItem
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: UpdateItem -&gt; UpdateItem -&gt; UpdateItem
+$cmin :: UpdateItem -&gt; UpdateItem -&gt; UpdateItem
+max :: UpdateItem -&gt; UpdateItem -&gt; UpdateItem
+$cmax :: UpdateItem -&gt; UpdateItem -&gt; UpdateItem
+&gt;= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c&gt;= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+&gt; :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c&gt; :: UpdateItem -&gt; UpdateItem -&gt; Bool
+&lt;= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c&lt;= :: UpdateItem -&gt; UpdateItem -&gt; Bool
+&lt; :: UpdateItem -&gt; UpdateItem -&gt; Bool
+$c&lt; :: UpdateItem -&gt; UpdateItem -&gt; Bool
+compare :: UpdateItem -&gt; UpdateItem -&gt; Ordering
+$ccompare :: UpdateItem -&gt; UpdateItem -&gt; Ordering
+$cp1Ord :: Eq UpdateItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- | Construct a minimal 'UpdateItem' request.</span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#updateItem"><span class="hs-identifier hs-type">updateItem</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>                   </span><span class="hs-comment">-- ^ Table name</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span>               </span><span class="hs-comment">-- ^ Primary key for item</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span class="hs-special">]</span><span>        </span><span class="hs-comment">-- ^ Updates for this item</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span><span>
+</span><span id="line-63"></span><span id="updateItem"><span class="annot"><span class="annottext">updateItem :: Text -&gt; PrimaryKey -&gt; [AttributeUpdate] -&gt; UpdateItem
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#updateItem"><span class="hs-identifier hs-var hs-var">updateItem</span></a></span></span><span> </span><span id="local-6989586621679225947"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679225947"><span class="hs-identifier hs-var">tn</span></a></span></span><span> </span><span id="local-6989586621679225946"><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679225946"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span id="local-6989586621679225945"><span class="annot"><span class="annottext">[AttributeUpdate]
+</span><a href="#local-6989586621679225945"><span class="hs-identifier hs-var">ups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text
+-&gt; PrimaryKey
+-&gt; [AttributeUpdate]
+-&gt; Conditions
+-&gt; UpdateReturn
+-&gt; ReturnConsumption
+-&gt; ReturnItemCollectionMetrics
+-&gt; UpdateItem
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-var">UpdateItem</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679225947"><span class="hs-identifier hs-var">tn</span></a></span><span> </span><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679225946"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">[AttributeUpdate]
+</span><a href="#local-6989586621679225945"><span class="hs-identifier hs-var">ups</span></a></span><span> </span><span class="annot"><span class="annottext">Conditions
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">UpdateReturn
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">ReturnItemCollectionMetrics
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- | A helper to avoid overlapping instances for 'ToJSON'.</span><span>
+</span><span id="line-67"></span><span class="hs-keyword">newtype</span><span> </span><span id="AttributeUpdates"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdates"><span class="hs-identifier hs-var">AttributeUpdates</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AttributeUpdates"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdates"><span class="hs-identifier hs-var">AttributeUpdates</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-68"></span><span>    </span><span id="getAttributeUpdates"><span class="annot"><span class="annottext">AttributeUpdates -&gt; [AttributeUpdate]
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#getAttributeUpdates"><span class="hs-identifier hs-var hs-var">getAttributeUpdates</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">data</span><span> </span><span id="AttributeUpdate"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-var">AttributeUpdate</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AttributeUpdate"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-var">AttributeUpdate</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-73"></span><span>      </span><span id="auAttr"><span class="annot"><span class="annottext">AttributeUpdate -&gt; Attribute
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#auAttr"><span class="hs-identifier hs-var hs-var">auAttr</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Attribute"><span class="hs-identifier hs-type">Attribute</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-comment">-- ^ Attribute key-value</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="auAction"><span class="annot"><span class="annottext">AttributeUpdate -&gt; UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#auAction"><span class="hs-identifier hs-var hs-var">auAction</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateAction"><span class="hs-identifier hs-type">UpdateAction</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">-- ^ Type of update operation.</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679225935"><span id="local-6989586621679225937"><span class="annot"><span class="annottext">AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+(AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; Eq AttributeUpdate
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c/= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+== :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c== :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225929"><span id="local-6989586621679225931"><span id="local-6989586621679225933"><span class="annot"><span class="annottext">Int -&gt; AttributeUpdate -&gt; ShowS
+[AttributeUpdate] -&gt; ShowS
+AttributeUpdate -&gt; String
+(Int -&gt; AttributeUpdate -&gt; ShowS)
+-&gt; (AttributeUpdate -&gt; String)
+-&gt; ([AttributeUpdate] -&gt; ShowS)
+-&gt; Show AttributeUpdate
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [AttributeUpdate] -&gt; ShowS
+$cshowList :: [AttributeUpdate] -&gt; ShowS
+show :: AttributeUpdate -&gt; String
+$cshow :: AttributeUpdate -&gt; String
+showsPrec :: Int -&gt; AttributeUpdate -&gt; ShowS
+$cshowsPrec :: Int -&gt; AttributeUpdate -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225921"><span id="local-6989586621679225923"><span id="local-6989586621679225925"><span id="local-6989586621679225927"><span class="annot"><span class="annottext">ReadPrec [AttributeUpdate]
+ReadPrec AttributeUpdate
+Int -&gt; ReadS AttributeUpdate
+ReadS [AttributeUpdate]
+(Int -&gt; ReadS AttributeUpdate)
+-&gt; ReadS [AttributeUpdate]
+-&gt; ReadPrec AttributeUpdate
+-&gt; ReadPrec [AttributeUpdate]
+-&gt; Read AttributeUpdate
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [AttributeUpdate]
+$creadListPrec :: ReadPrec [AttributeUpdate]
+readPrec :: ReadPrec AttributeUpdate
+$creadPrec :: ReadPrec AttributeUpdate
+readList :: ReadS [AttributeUpdate]
+$creadList :: ReadS [AttributeUpdate]
+readsPrec :: Int -&gt; ReadS AttributeUpdate
+$creadsPrec :: Int -&gt; ReadS AttributeUpdate
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225906"><span id="local-6989586621679225908"><span id="local-6989586621679225910"><span id="local-6989586621679225912"><span id="local-6989586621679225914"><span id="local-6989586621679225916"><span id="local-6989586621679225918"><span class="annot"><span class="annottext">Eq AttributeUpdate
+Eq AttributeUpdate
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Ordering)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; Bool)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate)
+-&gt; (AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate)
+-&gt; Ord AttributeUpdate
+AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+AttributeUpdate -&gt; AttributeUpdate -&gt; Ordering
+AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate
+$cmin :: AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate
+max :: AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate
+$cmax :: AttributeUpdate -&gt; AttributeUpdate -&gt; AttributeUpdate
+&gt;= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c&gt;= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+&gt; :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c&gt; :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+&lt;= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c&lt;= :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+&lt; :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+$c&lt; :: AttributeUpdate -&gt; AttributeUpdate -&gt; Bool
+compare :: AttributeUpdate -&gt; AttributeUpdate -&gt; Ordering
+$ccompare :: AttributeUpdate -&gt; AttributeUpdate -&gt; Ordering
+$cp1Ord :: Eq AttributeUpdate
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DynSize"><span class="hs-identifier hs-type">DynSize</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-81"></span><span>    </span><span id="local-6989586621679225903"><span class="annot"><span class="annottext">dynSize :: AttributeUpdate -&gt; Int
+</span><a href="Aws.DynamoDb.Core.html#dynSize"><span class="hs-identifier hs-var hs-var hs-var hs-var">dynSize</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span> </span><span id="local-6989586621679225901"><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225901"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Attribute -&gt; Int
+forall a. DynSize a =&gt; a -&gt; Int
+</span><a href="Aws.DynamoDb.Core.html#dynSize"><span class="hs-identifier hs-var">dynSize</span></a></span><span> </span><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225901"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- | Shorthand for the 'AttributeUpdate' constructor. Defaults to PUT</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- for the update action.</span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#au"><span class="hs-identifier hs-type">au</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Attribute"><span class="hs-identifier hs-type">Attribute</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span>
+</span><span id="line-87"></span><span id="au"><span class="annot"><span class="annottext">au :: Attribute -&gt; AttributeUpdate
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#au"><span class="hs-identifier hs-var hs-var">au</span></a></span></span><span> </span><span id="local-6989586621679225900"><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225900"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Attribute -&gt; UpdateAction -&gt; AttributeUpdate
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-var">AttributeUpdate</span></a></span><span> </span><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225900"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679225893"><span id="local-6989586621679225895"><span id="local-6989586621679225897"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdates"><span class="hs-identifier hs-type">AttributeUpdates</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621679225891"><span class="annot"><span class="annottext">toJSON :: AttributeUpdates -&gt; Value
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span> </span><span class="annot"><span class="annottext">([Pair] -&gt; Value)
+-&gt; (AttributeUpdates -&gt; [Pair]) -&gt; AttributeUpdates -&gt; Value
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(AttributeUpdate -&gt; Pair) -&gt; [AttributeUpdate] -&gt; [Pair]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">AttributeUpdate -&gt; Pair
+forall p. KeyValue p =&gt; AttributeUpdate -&gt; p
+</span><a href="#local-6989586621679225887"><span class="hs-identifier hs-var">mk</span></a></span><span> </span><span class="annot"><span class="annottext">([AttributeUpdate] -&gt; [Pair])
+-&gt; (AttributeUpdates -&gt; [AttributeUpdate])
+-&gt; AttributeUpdates
+-&gt; [Pair]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AttributeUpdates -&gt; [AttributeUpdate]
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#getAttributeUpdates"><span class="hs-identifier hs-var hs-var">getAttributeUpdates</span></a></span><span>
+</span><span id="line-92"></span><span>        </span><span class="hs-keyword">where</span><span>
+</span><span id="line-93"></span><span>          </span><span id="local-6989586621679225887"><span class="annot"><span class="annottext">mk :: AttributeUpdate -&gt; p
+</span><a href="#local-6989586621679225887"><span class="hs-identifier hs-var hs-var">mk</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">auAction :: AttributeUpdate -&gt; UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#auAction"><span class="hs-identifier hs-var">auAction</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UDelete"><span class="hs-identifier hs-var">UDelete</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">auAttr :: AttributeUpdate -&gt; Attribute
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#auAttr"><span class="hs-identifier hs-var">auAttr</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679225885"><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225885"><span class="hs-identifier hs-var">auAttr</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-94"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Attribute -&gt; Text
+</span><a href="Aws.DynamoDb.Core.html#attrName"><span class="hs-identifier hs-var hs-var">attrName</span></a></span><span> </span><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225885"><span class="hs-identifier hs-var">auAttr</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value -&gt; p
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span>
+</span><span id="line-95"></span><span>            </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Action&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; UpdateAction -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UDelete"><span class="hs-identifier hs-var">UDelete</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-96"></span><span>          </span><span class="annot"><a href="#local-6989586621679225887"><span class="hs-identifier hs-var">mk</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdate"><span class="hs-identifier hs-type">AttributeUpdate</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span id="local-6989586621679225881"><span id="local-6989586621679225882"><span class="annot"><span class="annottext">Attribute
+UpdateAction
+auAction :: UpdateAction
+auAttr :: Attribute
+auAction :: AttributeUpdate -&gt; UpdateAction
+auAttr :: AttributeUpdate -&gt; Attribute
+</span><a href="#local-6989586621679225881"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Attribute -&gt; Text
+</span><a href="Aws.DynamoDb.Core.html#attrName"><span class="hs-identifier hs-var hs-var">attrName</span></a></span><span> </span><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225882"><span class="hs-identifier hs-var">auAttr</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value -&gt; p
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span>
+</span><span id="line-97"></span><span>            </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Value&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; DValue -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Attribute -&gt; DValue
+</span><a href="Aws.DynamoDb.Core.html#attrVal"><span class="hs-identifier hs-var hs-var">attrVal</span></a></span><span> </span><span class="annot"><span class="annottext">Attribute
+</span><a href="#local-6989586621679225882"><span class="hs-identifier hs-var">auAttr</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Action&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; UpdateAction -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="#local-6989586621679225881"><span class="hs-identifier hs-var">auAction</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- | Type of attribute update to perform.</span><span>
+</span><span id="line-102"></span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- See AWS docs at:</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- @http:\/\/docs.aws.amazon.com\/amazondynamodb\/latest\/APIReference\/API_UpdateItem.html@</span><span>
+</span><span id="line-106"></span><span class="hs-keyword">data</span><span> </span><span id="UpdateAction"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateAction"><span class="hs-identifier hs-var">UpdateAction</span></a></span></span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="UPut"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UPut"><span class="hs-identifier hs-var">UPut</span></a></span></span><span>                      </span><span class="hs-comment">-- ^ Simpley write, overwriting any previous value</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UAdd"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UAdd"><span class="hs-identifier hs-var">UAdd</span></a></span></span><span>                      </span><span class="hs-comment">-- ^ Numerical add or add to set.</span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UDelete"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UDelete"><span class="hs-identifier hs-var">UDelete</span></a></span></span><span>                   </span><span class="hs-comment">-- ^ Empty value: remove; Set value: Subtract from set.</span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679225874"><span id="local-6989586621679225876"><span class="annot"><span class="annottext">UpdateAction -&gt; UpdateAction -&gt; Bool
+(UpdateAction -&gt; UpdateAction -&gt; Bool)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Bool) -&gt; Eq UpdateAction
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c/= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+== :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c== :: UpdateAction -&gt; UpdateAction -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225868"><span id="local-6989586621679225870"><span id="local-6989586621679225872"><span class="annot"><span class="annottext">Int -&gt; UpdateAction -&gt; ShowS
+[UpdateAction] -&gt; ShowS
+UpdateAction -&gt; String
+(Int -&gt; UpdateAction -&gt; ShowS)
+-&gt; (UpdateAction -&gt; String)
+-&gt; ([UpdateAction] -&gt; ShowS)
+-&gt; Show UpdateAction
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UpdateAction] -&gt; ShowS
+$cshowList :: [UpdateAction] -&gt; ShowS
+show :: UpdateAction -&gt; String
+$cshow :: UpdateAction -&gt; String
+showsPrec :: Int -&gt; UpdateAction -&gt; ShowS
+$cshowsPrec :: Int -&gt; UpdateAction -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225860"><span id="local-6989586621679225862"><span id="local-6989586621679225864"><span id="local-6989586621679225866"><span class="annot"><span class="annottext">ReadPrec [UpdateAction]
+ReadPrec UpdateAction
+Int -&gt; ReadS UpdateAction
+ReadS [UpdateAction]
+(Int -&gt; ReadS UpdateAction)
+-&gt; ReadS [UpdateAction]
+-&gt; ReadPrec UpdateAction
+-&gt; ReadPrec [UpdateAction]
+-&gt; Read UpdateAction
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [UpdateAction]
+$creadListPrec :: ReadPrec [UpdateAction]
+readPrec :: ReadPrec UpdateAction
+$creadPrec :: ReadPrec UpdateAction
+readList :: ReadS [UpdateAction]
+$creadList :: ReadS [UpdateAction]
+readsPrec :: Int -&gt; ReadS UpdateAction
+$creadsPrec :: Int -&gt; ReadS UpdateAction
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225845"><span id="local-6989586621679225847"><span id="local-6989586621679225849"><span id="local-6989586621679225851"><span id="local-6989586621679225853"><span id="local-6989586621679225855"><span id="local-6989586621679225857"><span class="annot"><span class="annottext">Eq UpdateAction
+Eq UpdateAction
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Ordering)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Bool)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Bool)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Bool)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; Bool)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; UpdateAction)
+-&gt; (UpdateAction -&gt; UpdateAction -&gt; UpdateAction)
+-&gt; Ord UpdateAction
+UpdateAction -&gt; UpdateAction -&gt; Bool
+UpdateAction -&gt; UpdateAction -&gt; Ordering
+UpdateAction -&gt; UpdateAction -&gt; UpdateAction
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: UpdateAction -&gt; UpdateAction -&gt; UpdateAction
+$cmin :: UpdateAction -&gt; UpdateAction -&gt; UpdateAction
+max :: UpdateAction -&gt; UpdateAction -&gt; UpdateAction
+$cmax :: UpdateAction -&gt; UpdateAction -&gt; UpdateAction
+&gt;= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c&gt;= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+&gt; :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c&gt; :: UpdateAction -&gt; UpdateAction -&gt; Bool
+&lt;= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c&lt;= :: UpdateAction -&gt; UpdateAction -&gt; Bool
+&lt; :: UpdateAction -&gt; UpdateAction -&gt; Bool
+$c&lt; :: UpdateAction -&gt; UpdateAction -&gt; Bool
+compare :: UpdateAction -&gt; UpdateAction -&gt; Ordering
+$ccompare :: UpdateAction -&gt; UpdateAction -&gt; Ordering
+$cp1Ord :: Eq UpdateAction
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679225838"><span id="local-6989586621679225840"><span id="local-6989586621679225842"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateAction"><span class="hs-identifier hs-type">UpdateAction</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-114"></span><span>    </span><span id="local-6989586621679225837"><span class="annot"><span class="annottext">toJSON :: UpdateAction -&gt; Value
+</span><a href="#local-6989586621679225837"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UPut"><span class="hs-identifier hs-var">UPut</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value
+</span><span class="hs-identifier hs-var">String</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;PUT&quot;</span></span><span>
+</span><span id="line-115"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">toJSON</span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UAdd"><span class="hs-identifier hs-var">UAdd</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value
+</span><span class="hs-identifier hs-var">String</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ADD&quot;</span></span><span>
+</span><span id="line-116"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">toJSON</span></span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UDelete"><span class="hs-identifier hs-var">UDelete</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value
+</span><span class="hs-identifier hs-var">String</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;DELETE&quot;</span></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Default</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateAction"><span class="hs-identifier hs-type">UpdateAction</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-120"></span><span>    </span><span id="local-6989586621679225833"><span class="annot"><span class="annottext">def :: UpdateAction
+</span><a href="#local-6989586621679225833"><span class="hs-identifier hs-var hs-var hs-var hs-var">def</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UpdateAction
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UPut"><span class="hs-identifier hs-var">UPut</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679225826"><span id="local-6989586621679225828"><span id="local-6989586621679225830"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>    </span><span id="local-6989586621679225825"><span class="annot"><span class="annottext">toJSON :: UpdateItem -&gt; Value
+</span><a href="#local-6989586621679225825"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span><span class="hs-special">{</span><span id="local-6989586621679225818"><span id="local-6989586621679225819"><span id="local-6989586621679225820"><span id="local-6989586621679225821"><span id="local-6989586621679225822"><span id="local-6989586621679225823"><span id="local-6989586621679225824"><span class="annot"><span class="annottext">[AttributeUpdate]
+Text
+UpdateReturn
+ReturnItemCollectionMetrics
+ReturnConsumption
+Conditions
+PrimaryKey
+uiRetMet :: ReturnItemCollectionMetrics
+uiRetCons :: ReturnConsumption
+uiReturn :: UpdateReturn
+uiExpect :: Conditions
+uiUpdates :: [AttributeUpdate]
+uiKey :: PrimaryKey
+uiTable :: Text
+uiRetMet :: UpdateItem -&gt; ReturnItemCollectionMetrics
+uiRetCons :: UpdateItem -&gt; ReturnConsumption
+uiReturn :: UpdateItem -&gt; UpdateReturn
+uiExpect :: UpdateItem -&gt; Conditions
+uiUpdates :: UpdateItem -&gt; [AttributeUpdate]
+uiKey :: UpdateItem -&gt; PrimaryKey
+uiTable :: UpdateItem -&gt; Text
+</span><a href="#local-6989586621679225818"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-125"></span><span>        </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span> </span><span class="annot"><span class="annottext">([Pair] -&gt; Value) -&gt; [Pair] -&gt; Value
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Conditions -&gt; [Pair]
+</span><a href="Aws.DynamoDb.Core.html#expectsJson"><span class="hs-identifier hs-var">expectsJson</span></a></span><span> </span><span class="annot"><span class="annottext">Conditions
+</span><a href="#local-6989586621679225821"><span class="hs-identifier hs-var">uiExpect</span></a></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; [Pair] -&gt; [Pair]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span>
+</span><span id="line-126"></span><span>          </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;TableName&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679225824"><span class="hs-identifier hs-var">uiTable</span></a></span><span>
+</span><span id="line-127"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Key&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; PrimaryKey -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679225823"><span class="hs-identifier hs-var">uiKey</span></a></span><span>
+</span><span id="line-128"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;AttributeUpdates&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; AttributeUpdates -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">[AttributeUpdate] -&gt; AttributeUpdates
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#AttributeUpdates"><span class="hs-identifier hs-var">AttributeUpdates</span></a></span><span> </span><span class="annot"><span class="annottext">[AttributeUpdate]
+</span><a href="#local-6989586621679225822"><span class="hs-identifier hs-var">uiUpdates</span></a></span><span>
+</span><span id="line-129"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnValues&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; UpdateReturn -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">UpdateReturn
+</span><a href="#local-6989586621679225820"><span class="hs-identifier hs-var">uiReturn</span></a></span><span>
+</span><span id="line-130"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnConsumedCapacity&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ReturnConsumption -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+</span><a href="#local-6989586621679225819"><span class="hs-identifier hs-var">uiRetCons</span></a></span><span>
+</span><span id="line-131"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnItemCollectionMetrics&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ReturnItemCollectionMetrics -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">ReturnItemCollectionMetrics
+</span><a href="#local-6989586621679225818"><span class="hs-identifier hs-var">uiRetMet</span></a></span><span>
+</span><span id="line-132"></span><span>          </span><span class="hs-special">]</span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-keyword">data</span><span> </span><span id="UpdateItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-var">UpdateItemResponse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="UpdateItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-var">UpdateItemResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-136"></span><span>      </span><span id="uirAttrs"><span class="annot"><span class="annottext">UpdateItemResponse -&gt; Maybe Item
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uirAttrs"><span class="hs-identifier hs-var hs-var">uirAttrs</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Item"><span class="hs-identifier hs-type">Item</span></a></span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-comment">-- ^ Old attributes, if requested</span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="uirConsumed"><span class="annot"><span class="annottext">UpdateItemResponse -&gt; Maybe ConsumedCapacity
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#uirConsumed"><span class="hs-identifier hs-var hs-var">uirConsumed</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ConsumedCapacity"><span class="hs-identifier hs-type">ConsumedCapacity</span></a></span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-comment">-- ^ Amount of capacity consumed</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679225810"><span id="local-6989586621679225812"><span class="annot"><span class="annottext">UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+(UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; Eq UpdateItemResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c/= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+== :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c== :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225804"><span id="local-6989586621679225806"><span id="local-6989586621679225808"><span class="annot"><span class="annottext">Int -&gt; UpdateItemResponse -&gt; ShowS
+[UpdateItemResponse] -&gt; ShowS
+UpdateItemResponse -&gt; String
+(Int -&gt; UpdateItemResponse -&gt; ShowS)
+-&gt; (UpdateItemResponse -&gt; String)
+-&gt; ([UpdateItemResponse] -&gt; ShowS)
+-&gt; Show UpdateItemResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UpdateItemResponse] -&gt; ShowS
+$cshowList :: [UpdateItemResponse] -&gt; ShowS
+show :: UpdateItemResponse -&gt; String
+$cshow :: UpdateItemResponse -&gt; String
+showsPrec :: Int -&gt; UpdateItemResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; UpdateItemResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225796"><span id="local-6989586621679225798"><span id="local-6989586621679225800"><span id="local-6989586621679225802"><span class="annot"><span class="annottext">ReadPrec [UpdateItemResponse]
+ReadPrec UpdateItemResponse
+Int -&gt; ReadS UpdateItemResponse
+ReadS [UpdateItemResponse]
+(Int -&gt; ReadS UpdateItemResponse)
+-&gt; ReadS [UpdateItemResponse]
+-&gt; ReadPrec UpdateItemResponse
+-&gt; ReadPrec [UpdateItemResponse]
+-&gt; Read UpdateItemResponse
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [UpdateItemResponse]
+$creadListPrec :: ReadPrec [UpdateItemResponse]
+readPrec :: ReadPrec UpdateItemResponse
+$creadPrec :: ReadPrec UpdateItemResponse
+readList :: ReadS [UpdateItemResponse]
+$creadList :: ReadS [UpdateItemResponse]
+readsPrec :: Int -&gt; ReadS UpdateItemResponse
+$creadsPrec :: Int -&gt; ReadS UpdateItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679225781"><span id="local-6989586621679225783"><span id="local-6989586621679225785"><span id="local-6989586621679225787"><span id="local-6989586621679225789"><span id="local-6989586621679225791"><span id="local-6989586621679225793"><span class="annot"><span class="annottext">Eq UpdateItemResponse
+Eq UpdateItemResponse
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Ordering)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse)
+-&gt; (UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse)
+-&gt; Ord UpdateItemResponse
+UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+UpdateItemResponse -&gt; UpdateItemResponse -&gt; Ordering
+UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse
+$cmin :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse
+max :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse
+$cmax :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; UpdateItemResponse
+&gt;= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c&gt;= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+&gt; :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c&gt; :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+&lt;= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c&lt;= :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+&lt; :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+$c&lt; :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Bool
+compare :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Ordering
+$ccompare :: UpdateItemResponse -&gt; UpdateItemResponse -&gt; Ordering
+$cp1Ord :: Eq UpdateItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span>
+</span><span id="line-145"></span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-148"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItem"><span class="hs-identifier hs-type">UpdateItem</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbConfiguration"><span class="hs-identifier hs-type">DdbConfiguration</span></a></span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621679225774"><span class="annot"><span class="annottext">signQuery :: UpdateItem
+-&gt; ServiceConfiguration UpdateItem queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span id="local-6989586621679225772"><span class="annot"><span class="annottext">UpdateItem
+</span><a href="#local-6989586621679225772"><span class="hs-identifier hs-var">gi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; UpdateItem
+-&gt; DdbConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall a qt.
+ToJSON a =&gt;
+ByteString
+-&gt; a -&gt; DdbConfiguration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.DynamoDb.Core.html#ddbSignQuery"><span class="hs-identifier hs-var">ddbSignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;UpdateItem&quot;</span></span><span> </span><span class="annot"><span class="annottext">UpdateItem
+</span><a href="#local-6989586621679225772"><span class="hs-identifier hs-var">gi</span></a></span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span>
+</span><span id="line-152"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679225768"><span class="annot"><span class="hs-identifier hs-type">FromJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-153"></span><span>    </span><span id="local-6989586621679225766"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser UpdateItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Object</span></span><span> </span><span id="local-6989586621679225763"><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679225763"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Item -&gt; Maybe ConsumedCapacity -&gt; UpdateItemResponse
+</span><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-var">UpdateItemResponse</span></a></span><span>
+</span><span id="line-154"></span><span>        </span><span class="annot"><span class="annottext">(Maybe Item -&gt; Maybe ConsumedCapacity -&gt; UpdateItemResponse)
+-&gt; Parser (Maybe Item)
+-&gt; Parser (Maybe ConsumedCapacity -&gt; UpdateItemResponse)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679225763"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe Item)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Attributes&quot;</span></span><span>
+</span><span id="line-155"></span><span>        </span><span class="annot"><span class="annottext">Parser (Maybe ConsumedCapacity -&gt; UpdateItemResponse)
+-&gt; Parser (Maybe ConsumedCapacity) -&gt; Parser UpdateItemResponse
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679225763"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe ConsumedCapacity)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ConsumedCapacity&quot;</span></span><span>
+</span><span id="line-156"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">parseJSON</span></span><span> </span><span class="annot"><span class="annottext">Value
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Parser UpdateItemResponse
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;UpdateItemResponse expected a JSON object&quot;</span></span><span>
+</span><span id="line-157"></span><span>
+</span><span id="line-158"></span><span>
+</span><span id="line-159"></span><span id="local-6989586621679225760"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679225760"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbResponse"><span class="hs-identifier hs-type">DdbResponse</span></a></span><span>
+</span><span id="line-161"></span><span>    </span><span id="local-6989586621679225756"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; r
+-&gt; IORef (ResponseMetadata UpdateItemResponse)
+-&gt; HTTPResponseConsumer UpdateItemResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679225754"><span class="annot"><span class="annottext">IORef (ResponseMetadata UpdateItemResponse)
+</span><a href="#local-6989586621679225754"><span class="hs-identifier hs-var">ref</span></a></span></span><span> </span><span id="local-6989586621679225753"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679225753"><span class="hs-identifier hs-var">resp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef DdbResponse -&gt; HTTPResponseConsumer UpdateItemResponse
+forall a. FromJSON a =&gt; IORef DdbResponse -&gt; HTTPResponseConsumer a
+</span><a href="Aws.DynamoDb.Core.html#ddbResponseConsumer"><span class="hs-identifier hs-var">ddbResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (ResponseMetadata UpdateItemResponse)
+IORef DdbResponse
+</span><a href="#local-6989586621679225754"><span class="hs-identifier hs-var">ref</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679225753"><span class="hs-identifier hs-var">resp</span></a></span></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-165"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.UpdateItem.html#UpdateItemResponse"><span class="hs-identifier hs-type">UpdateItemResponse</span></a></span><span>
+</span><span id="line-166"></span><span>    </span><span id="local-6989586621679225749"><span class="annot"><span class="annottext">loadToMemory :: UpdateItemResponse
+-&gt; ResourceT IO (MemoryResponse UpdateItemResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UpdateItemResponse
+-&gt; ResourceT IO (MemoryResponse UpdateItemResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span>
+</span><span id="line-175"></span></pre></body></html>

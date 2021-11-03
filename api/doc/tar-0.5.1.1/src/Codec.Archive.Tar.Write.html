@@ -1,0 +1,569 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module      :  Codec.Archive.Tar.Write</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright   :  (c) 2007 Bjorn Bringert,</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--                    2008 Andrea Vezzosi,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--                    2008-2009 Duncan Coutts</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Maintainer  :  duncan@community.haskell.org</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Codec.Archive.Tar.Write</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier">write</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html"><span class="hs-identifier">Codec.Archive.Tar.Types</span></a></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Char</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ord</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span>     </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">foldl'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span>   </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">mempty</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Numeric</span></span><span>       </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">showOct</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span>       </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS.Char8</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span>        </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy.Char8</span></span><span>  </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS.Char8</span></span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- | Create the external representation of a tar archive by serialising a list</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- of tar entries.</span><span>
+</span><span id="line-30"></span><span class="hs-comment">--</span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- * The conversion is done lazily.</span><span>
+</span><span id="line-32"></span><span class="hs-comment">--</span><span>
+</span><span id="line-33"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier hs-type">write</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span>
+</span><span id="line-34"></span><span id="write"><span class="annot"><span class="annottext">write :: [Entry] -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#write"><span class="hs-identifier hs-var hs-var">write</span></a></span></span><span> </span><span id="local-6989586621679059872"><span class="annot"><span class="annottext">[Entry]
+</span><a href="#local-6989586621679059872"><span class="hs-identifier hs-var">es</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.concat</span></span><span> </span><span class="annot"><span class="annottext">([ByteString] -&gt; ByteString) -&gt; [ByteString] -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(Entry -&gt; ByteString) -&gt; [Entry] -&gt; [ByteString]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">Entry -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#putEntry"><span class="hs-identifier hs-var">putEntry</span></a></span><span> </span><span class="annot"><span class="annottext">[Entry]
+</span><a href="#local-6989586621679059872"><span class="hs-identifier hs-var">es</span></a></span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; [ByteString] -&gt; [ByteString]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int64 -&gt; Word8 -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.replicate</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">512</span></span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putEntry"><span class="hs-identifier hs-type">putEntry</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span>
+</span><span id="line-37"></span><span id="putEntry"><span class="annot"><span class="annottext">putEntry :: Entry -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#putEntry"><span class="hs-identifier hs-var hs-var">putEntry</span></a></span></span><span> </span><span id="local-6989586621679059867"><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679059867"><span class="hs-identifier hs-var">entry</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Entry -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#entryContent"><span class="hs-identifier hs-var hs-var">entryContent</span></a></span><span> </span><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679059867"><span class="hs-identifier hs-var">entry</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-38"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#NormalFile"><span class="hs-identifier hs-type">NormalFile</span></a></span><span>       </span><span id="local-6989586621679059864"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059864"><span class="hs-identifier hs-var">content</span></a></span></span><span> </span><span id="local-6989586621679059863"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059863"><span class="hs-identifier hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.concat</span></span><span> </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059862"><span class="hs-identifier hs-var">header</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059864"><span class="hs-identifier hs-var">content</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString
+forall a. Integral a =&gt; a -&gt; ByteString
+</span><a href="#local-6989586621679059861"><span class="hs-identifier hs-var">padding</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059863"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-39"></span><span>  </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#OtherEntryType"><span class="hs-identifier hs-type">OtherEntryType</span></a></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679059859"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059859"><span class="hs-identifier hs-var">content</span></a></span></span><span> </span><span id="local-6989586621679059858"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059858"><span class="hs-identifier hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.concat</span></span><span> </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059862"><span class="hs-identifier hs-var">header</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059859"><span class="hs-identifier hs-var">content</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString
+forall a. Integral a =&gt; a -&gt; ByteString
+</span><a href="#local-6989586621679059861"><span class="hs-identifier hs-var">padding</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059858"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-40"></span><span>  </span><span class="annot"><span class="annottext">EntryContent
+</span><span class="hs-identifier">_</span></span><span>                             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059862"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-42"></span><span>    </span><span id="local-6989586621679059862"><span class="annot"><span class="annottext">header :: ByteString
+</span><a href="#local-6989586621679059862"><span class="hs-identifier hs-var hs-var">header</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Entry -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#putHeader"><span class="hs-identifier hs-var">putHeader</span></a></span><span> </span><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679059867"><span class="hs-identifier hs-var">entry</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621679059861"><span class="annot"><span class="annottext">padding :: a -&gt; ByteString
+</span><a href="#local-6989586621679059861"><span class="hs-identifier hs-var hs-var">padding</span></a></span></span><span> </span><span id="local-6989586621679059856"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059856"><span class="hs-identifier hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Word8 -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.replicate</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059855"><span class="hs-identifier hs-var">paddingSize</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-44"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679059855"><span class="annot"><span class="annottext">paddingSize :: Int64
+</span><a href="#local-6989586621679059855"><span class="hs-identifier hs-var hs-var">paddingSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">negate</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059856"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`mod`</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">512</span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putHeader"><span class="hs-identifier hs-type">putHeader</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">LBS.ByteString</span></span><span>
+</span><span id="line-47"></span><span id="putHeader"><span class="annot"><span class="annottext">putHeader :: Entry -&gt; ByteString
+</span><a href="Codec.Archive.Tar.Write.html#putHeader"><span class="hs-identifier hs-var hs-var">putHeader</span></a></span></span><span> </span><span id="local-6989586621679059853"><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679059853"><span class="hs-identifier hs-var">entry</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-48"></span><span>     </span><span class="annot"><span class="annottext">[TypeCode] -&gt; ByteString
+</span><span class="hs-identifier hs-var">LBS.Char8.pack</span></span><span>
+</span><span id="line-49"></span><span>   </span><span class="annot"><span class="annottext">([TypeCode] -&gt; ByteString) -&gt; [TypeCode] -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">148</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059850"><span class="hs-identifier hs-var">block</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059848"><span class="hs-identifier hs-var">checksum</span></a></span><span>
+</span><span id="line-51"></span><span>  </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">' '</span></span><span> </span><span class="annot"><span class="annottext">TypeCode -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">drop</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">156</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059850"><span class="hs-identifier hs-var">block</span></a></span><span>
+</span><span id="line-52"></span><span class="hs-comment">--  ++ putOct 8 checksum</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--  ++ drop 156 block</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>    </span><span id="local-6989586621679059850"><span class="annot"><span class="annottext">block :: [TypeCode]
+</span><a href="#local-6989586621679059850"><span class="hs-identifier hs-var hs-var">block</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Entry -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putHeaderNoChkSum"><span class="hs-identifier hs-var">putHeaderNoChkSum</span></a></span><span> </span><span class="annot"><span class="annottext">Entry
+</span><a href="#local-6989586621679059853"><span class="hs-identifier hs-var">entry</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span id="local-6989586621679059848"><span class="annot"><span class="annottext">checksum :: Int
+</span><a href="#local-6989586621679059848"><span class="hs-identifier hs-var hs-var">checksum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; TypeCode -&gt; Int) -&gt; Int -&gt; [TypeCode] -&gt; Int
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldl'</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679059845"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059845"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679059844"><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059844"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059845"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">TypeCode -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059844"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059850"><span class="hs-identifier hs-var">block</span></a></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putHeaderNoChkSum"><span class="hs-identifier hs-type">putHeaderNoChkSum</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-59"></span><span id="putHeaderNoChkSum"><span class="annot"><span class="annottext">putHeaderNoChkSum :: Entry -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putHeaderNoChkSum"><span class="hs-identifier hs-var hs-var">putHeaderNoChkSum</span></a></span></span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#Entry"><span class="hs-identifier hs-type">Entry</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-60"></span><span>    </span><span class="annot"><span class="annottext">entryTarPath :: Entry -&gt; TarPath
+</span><a href="Codec.Archive.Tar.Types.html#entryTarPath"><span class="hs-identifier hs-var">entryTarPath</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#TarPath"><span class="hs-identifier hs-type">TarPath</span></a></span><span> </span><span id="local-6989586621679059838"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059838"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621679059837"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059837"><span class="hs-identifier hs-var">prefix</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><span class="annottext">entryContent :: Entry -&gt; EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#entryContent"><span class="hs-identifier hs-var">entryContent</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679059836"><span class="annot"><span class="annottext">EntryContent
+</span><a href="#local-6989586621679059836"><span class="hs-identifier hs-var">content</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><span class="annottext">entryPermissions :: Entry -&gt; Permissions
+</span><a href="Codec.Archive.Tar.Types.html#entryPermissions"><span class="hs-identifier hs-var">entryPermissions</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679059834"><span class="annot"><span class="annottext">Permissions
+</span><a href="#local-6989586621679059834"><span class="hs-identifier hs-var">permissions</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-63"></span><span>    </span><span class="annot"><span class="annottext">entryOwnership :: Entry -&gt; Ownership
+</span><a href="Codec.Archive.Tar.Types.html#entryOwnership"><span class="hs-identifier hs-var">entryOwnership</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679059832"><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-64"></span><span>    </span><span class="annot"><span class="annottext">entryTime :: Entry -&gt; Int64
+</span><a href="Codec.Archive.Tar.Types.html#entryTime"><span class="hs-identifier hs-var">entryTime</span></a></span><span>        </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679059830"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059830"><span class="hs-identifier hs-var">modTime</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-65"></span><span>    </span><span class="annot"><span class="annottext">entryFormat :: Entry -&gt; Format
+</span><a href="Codec.Archive.Tar.Types.html#entryFormat"><span class="hs-identifier hs-var">entryFormat</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621679059828"><span class="annot"><span class="annottext">Format
+</span><a href="#local-6989586621679059828"><span class="hs-identifier hs-var">format</span></a></span></span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span>  </span><span class="annot"><span class="annottext">[[TypeCode]] -&gt; [TypeCode]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">100</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059838"><span class="hs-identifier hs-var">name</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Permissions -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Permissions -&gt; [TypeCode]) -&gt; Permissions -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Permissions
+</span><a href="#local-6989586621679059834"><span class="hs-identifier hs-var">permissions</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; Int
+</span><a href="Codec.Archive.Tar.Types.html#ownerId"><span class="hs-identifier hs-var hs-var">ownerId</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; Int
+</span><a href="Codec.Archive.Tar.Types.html#groupId"><span class="hs-identifier hs-var hs-var">groupId</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int64 -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>      </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; [TypeCode]) -&gt; Int64 -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059823"><span class="hs-identifier hs-var">contentSize</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int64 -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>      </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; [TypeCode]) -&gt; Int64 -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059830"><span class="hs-identifier hs-var">modTime</span></a></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span>         </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(TypeCode -&gt; [TypeCode]) -&gt; TypeCode -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">' '</span></span><span> </span><span class="hs-comment">-- dummy checksum</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putChar8"><span class="hs-identifier hs-var">putChar8</span></a></span><span>       </span><span class="annot"><span class="annottext">(TypeCode -&gt; [TypeCode]) -&gt; TypeCode -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059820"><span class="hs-identifier hs-var">typeCode</span></a></span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">100</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059819"><span class="hs-identifier hs-var">linkTarget</span></a></span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Format
+</span><a href="#local-6989586621679059828"><span class="hs-identifier hs-var">format</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#V7Format"><span class="hs-identifier hs-var">V7Format</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-81"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">255</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-82"></span><span>  </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#UstarFormat"><span class="hs-identifier hs-var">UstarFormat</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[[TypeCode]] -&gt; [TypeCode]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Codec.Archive.Tar.Write.html#ustarMagic"><span class="hs-identifier hs-var">ustarMagic</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-var">putString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">([TypeCode] -&gt; [TypeCode]) -&gt; [TypeCode] -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Types.html#ownerName"><span class="hs-identifier hs-var hs-var">ownerName</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-var">putString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">([TypeCode] -&gt; [TypeCode]) -&gt; [TypeCode] -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Types.html#groupName"><span class="hs-identifier hs-var hs-var">groupName</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059812"><span class="hs-identifier hs-var">deviceMajor</span></a></span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059811"><span class="hs-identifier hs-var">deviceMinor</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">155</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059837"><span class="hs-identifier hs-var">prefix</span></a></span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span>        </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">(TypeCode -&gt; [TypeCode]) -&gt; TypeCode -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-special">]</span><span>
+</span><span id="line-91"></span><span>  </span><span class="annot"><span class="annottext">Format
+</span><a href="Codec.Archive.Tar.Types.html#GnuFormat"><span class="hs-identifier hs-var">GnuFormat</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[[TypeCode]] -&gt; [TypeCode]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span>
+</span><span id="line-92"></span><span>    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Codec.Archive.Tar.Write.html#gnuMagic"><span class="hs-identifier hs-var">gnuMagic</span></a></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-var">putString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">([TypeCode] -&gt; [TypeCode]) -&gt; [TypeCode] -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Types.html#ownerName"><span class="hs-identifier hs-var hs-var">ownerName</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-var">putString</span></a></span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">([TypeCode] -&gt; [TypeCode]) -&gt; [TypeCode] -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Ownership -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Types.html#groupName"><span class="hs-identifier hs-var hs-var">groupName</span></a></span><span> </span><span class="annot"><span class="annottext">Ownership
+</span><a href="#local-6989586621679059832"><span class="hs-identifier hs-var">ownership</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="#local-6989586621679059808"><span class="hs-identifier hs-var">putGnuDev</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059812"><span class="hs-identifier hs-var">deviceMajor</span></a></span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="#local-6989586621679059808"><span class="hs-identifier hs-var">putGnuDev</span></a></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; [TypeCode]) -&gt; Int -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059811"><span class="hs-identifier hs-var">deviceMinor</span></a></span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var">putBString</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">155</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [TypeCode]) -&gt; ByteString -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059837"><span class="hs-identifier hs-var">prefix</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span>        </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span> </span><span class="annot"><span class="annottext">(TypeCode -&gt; [TypeCode]) -&gt; TypeCode -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-special">]</span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679059820"><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059820"><span class="hs-identifier hs-var">typeCode</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679059823"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059823"><span class="hs-identifier hs-var">contentSize</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679059819"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059819"><span class="hs-identifier hs-var">linkTarget</span></a></span></span><span class="hs-special">,</span><span>
+</span><span id="line-102"></span><span>     </span><span id="local-6989586621679059812"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059812"><span class="hs-identifier hs-var">deviceMajor</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679059811"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059811"><span class="hs-identifier hs-var">deviceMinor</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="#local-6989586621679059836"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-103"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#NormalFile"><span class="hs-identifier hs-type">NormalFile</span></a></span><span>      </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679059807"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059807"><span class="hs-identifier hs-var">size</span></a></span></span><span>            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'0'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059807"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>       </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#Directory"><span class="hs-identifier hs-var">Directory</span></a></span><span>                         </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'5'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#SymbolicLink"><span class="hs-identifier hs-type">SymbolicLink</span></a></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Types.html#LinkTarget"><span class="hs-identifier hs-type">LinkTarget</span></a></span><span> </span><span id="local-6989586621679059803"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059803"><span class="hs-identifier hs-var">link</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'2'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059803"><span class="hs-identifier hs-var">link</span></a></span><span class="hs-special">,</span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#HardLink"><span class="hs-identifier hs-type">HardLink</span></a></span><span>        </span><span class="hs-special">(</span><span class="annot"><a href="Codec.Archive.Tar.Types.html#LinkTarget"><span class="hs-identifier hs-type">LinkTarget</span></a></span><span> </span><span id="local-6989586621679059801"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059801"><span class="hs-identifier hs-var">link</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'1'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059801"><span class="hs-identifier hs-var">link</span></a></span><span class="hs-special">,</span><span>   </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#CharacterDevice"><span class="hs-identifier hs-type">CharacterDevice</span></a></span><span> </span><span id="local-6989586621679059799"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059799"><span class="hs-identifier hs-var">major</span></a></span></span><span> </span><span id="local-6989586621679059798"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059798"><span class="hs-identifier hs-var">minor</span></a></span></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'3'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059799"><span class="hs-identifier hs-var">major</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059798"><span class="hs-identifier hs-var">minor</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#BlockDevice"><span class="hs-identifier hs-type">BlockDevice</span></a></span><span>     </span><span id="local-6989586621679059796"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059796"><span class="hs-identifier hs-var">major</span></a></span></span><span> </span><span id="local-6989586621679059795"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059795"><span class="hs-identifier hs-var">minor</span></a></span></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'4'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059796"><span class="hs-identifier hs-var">major</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059795"><span class="hs-identifier hs-var">minor</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>       </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="Codec.Archive.Tar.Types.html#NamedPipe"><span class="hs-identifier hs-var">NamedPipe</span></a></span><span>                         </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'6'</span></span><span> </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>    </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-110"></span><span>       </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#OtherEntryType"><span class="hs-identifier hs-type">OtherEntryType</span></a></span><span>  </span><span id="local-6989586621679059793"><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059793"><span class="hs-identifier hs-var">code</span></a></span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679059792"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059792"><span class="hs-identifier hs-var">size</span></a></span></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059793"><span class="hs-identifier hs-var">code</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621679059792"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679059808"><span class="annot"><span class="annottext">putGnuDev :: Int -&gt; a -&gt; [TypeCode]
+</span><a href="#local-6989586621679059808"><span class="hs-identifier hs-var hs-var">putGnuDev</span></a></span></span><span> </span><span id="local-6989586621679059791"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059791"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span id="local-6989586621679059790"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059790"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">EntryContent
+</span><a href="#local-6989586621679059836"><span class="hs-identifier hs-var">content</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-113"></span><span>      </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#CharacterDevice"><span class="hs-identifier hs-type">CharacterDevice</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; a -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059791"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059790"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-114"></span><span>      </span><span class="annot"><a href="Codec.Archive.Tar.Types.html#BlockDevice"><span class="hs-identifier hs-type">BlockDevice</span></a></span><span>     </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; a -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var">putOct</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059791"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059790"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-115"></span><span>      </span><span class="annot"><span class="annottext">EntryContent
+</span><span class="hs-identifier">_</span></span><span>                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+forall a. Int -&gt; a -&gt; [a]
+</span><span class="hs-identifier hs-var">replicate</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059791"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#ustarMagic"><span class="hs-identifier hs-type">ustarMagic</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#gnuMagic"><span class="hs-identifier hs-type">gnuMagic</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span>
+</span><span id="line-118"></span><span id="ustarMagic"><span class="annot"><span class="annottext">ustarMagic :: ByteString
+</span><a href="Codec.Archive.Tar.Write.html#ustarMagic"><span class="hs-identifier hs-var hs-var">ustarMagic</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.pack</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><span class="hs-string">&quot;ustar\NUL00&quot;</span></span><span>
+</span><span id="line-119"></span><span id="gnuMagic"><span class="annot"><span class="annottext">gnuMagic :: ByteString
+</span><a href="Codec.Archive.Tar.Write.html#gnuMagic"><span class="hs-identifier hs-var hs-var">gnuMagic</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.Char8.pack</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><span class="hs-string">&quot;ustar  \NUL&quot;</span></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- * TAR format primitive output</span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-keyword">type</span><span> </span><span id="FieldWidth"><span class="annot"><a href="Codec.Archive.Tar.Write.html#FieldWidth"><span class="hs-identifier hs-var">FieldWidth</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-type">putBString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#FieldWidth"><span class="hs-identifier hs-type">FieldWidth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-126"></span><span id="putBString"><span class="annot"><span class="annottext">putBString :: Int -&gt; ByteString -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putBString"><span class="hs-identifier hs-var hs-var">putBString</span></a></span></span><span> </span><span id="local-6989586621679059786"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059786"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679059785"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059785"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; [TypeCode]
+</span><span class="hs-identifier hs-var">BS.Char8.unpack</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059786"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059785"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059786"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">BS.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679059785"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-type">putString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#FieldWidth"><span class="hs-identifier hs-type">FieldWidth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-129"></span><span id="putString"><span class="annot"><span class="annottext">putString :: Int -&gt; [TypeCode] -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putString"><span class="hs-identifier hs-var hs-var">putString</span></a></span></span><span> </span><span id="local-6989586621679059781"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059781"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679059780"><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059780"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059781"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059780"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059781"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><span class="hs-identifier hs-var">length</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059780"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-130"></span><span>
+</span><span id="line-131"></span><span class="hs-comment">--TODO: check integer widths, eg for large file sizes</span><span>
+</span><span id="line-132"></span><span id="local-6989586621679059895"><span class="annot"><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-type">putOct</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621679059895"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="#local-6989586621679059895"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#FieldWidth"><span class="hs-identifier hs-type">FieldWidth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679059895"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span></span><span>
+</span><span id="line-133"></span><span id="putOct"><span class="annot"><span class="annottext">putOct :: Int -&gt; a -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putOct"><span class="hs-identifier hs-var hs-var">putOct</span></a></span></span><span> </span><span id="local-6989586621679059778"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059778"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679059777"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059777"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-134"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679059776"><span class="annot"><span class="annottext">octStr :: [TypeCode]
+</span><a href="#local-6989586621679059776"><span class="hs-identifier hs-var hs-var">octStr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">take</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059778"><span class="hs-identifier hs-var">n</span></a></span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([TypeCode] -&gt; [TypeCode]) -&gt; [TypeCode] -&gt; [TypeCode]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. (Integral a, Show a) =&gt; a -&gt; [TypeCode] -&gt; [TypeCode]
+</span><span class="hs-identifier hs-var">showOct</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679059777"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><span class="hs-string">&quot;&quot;</span></span><span>
+</span><span id="line-135"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var">fill</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059778"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><span class="hs-identifier hs-var">length</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059776"><span class="hs-identifier hs-var">octStr</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'0'</span></span><span>
+</span><span id="line-136"></span><span>   </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">[TypeCode]
+</span><a href="#local-6989586621679059776"><span class="hs-identifier hs-var">octStr</span></a></span><span>
+</span><span id="line-137"></span><span>   </span><span class="annot"><span class="annottext">[TypeCode] -&gt; [TypeCode] -&gt; [TypeCode]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putChar8"><span class="hs-identifier hs-var">putChar8</span></a></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><span class="hs-char">'\NUL'</span></span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#putChar8"><span class="hs-identifier hs-type">putChar8</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-140"></span><span id="putChar8"><span class="annot"><span class="annottext">putChar8 :: TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#putChar8"><span class="hs-identifier hs-var hs-var">putChar8</span></a></span></span><span> </span><span id="local-6989586621679059775"><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059775"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059775"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span class="annot"><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-type">fill</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Codec.Archive.Tar.Write.html#FieldWidth"><span class="hs-identifier hs-type">FieldWidth</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-143"></span><span id="fill"><span class="annot"><span class="annottext">fill :: Int -&gt; TypeCode -&gt; [TypeCode]
+</span><a href="Codec.Archive.Tar.Write.html#fill"><span class="hs-identifier hs-var hs-var">fill</span></a></span></span><span> </span><span id="local-6989586621679059774"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059774"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679059773"><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059773"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; TypeCode -&gt; [TypeCode]
+forall a. Int -&gt; a -&gt; [a]
+</span><span class="hs-identifier hs-var">replicate</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679059774"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">TypeCode
+</span><a href="#local-6989586621679059773"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-144"></span></pre></body></html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- | This module provides for simple DOM traversal. It is inspired by XPath. There are two central concepts here:</span><span>
+</span><span id="line-2"></span><span class="hs-comment">--</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- * A 'Cursor' represents a node in the DOM. It also contains information on the node's /location/. While the 'Node' datatype will only know of its children, a @Cursor@ knows about its parent and siblings as well. (The underlying mechanism allowing this is called a zipper, see &lt;http://www.haskell.org/haskellwiki/Zipper&gt; and &lt;http://www.haskell.org/haskellwiki/Tying_the_Knot&gt;.)</span><span>
+</span><span id="line-4"></span><span class="hs-comment">--</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- * An 'Axis', in its simplest form, takes a @Cursor@ and returns a list of @Cursor@s. It is used for selections, such as finding children, ancestors, etc. Axes can be chained together to express complex rules, such as all children named /foo/.</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- The terminology used in this module is taken directly from the XPath</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- specification: &lt;http://www.w3.org/TR/xpath/&gt;. For those familiar with XPath,</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- the one major difference is that attributes are not considered nodes in this</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- module.</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Text.XML.Cursor</span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">(</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Data types</span></span><span>
+</span><span id="line-14"></span><span>      </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier">Cursor</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier">Axis</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Production</span></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#fromDocument"><span class="hs-identifier">fromDocument</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#fromNode"><span class="hs-identifier">fromNode</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#cut"><span class="hs-identifier">cut</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Axes</span></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#parent"><span class="hs-identifier">parent</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#precedingSibling"><span class="hs-identifier">CG.precedingSibling</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#followingSibling"><span class="hs-identifier">CG.followingSibling</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#child"><span class="hs-identifier">child</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier">node</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#preceding"><span class="hs-identifier">CG.preceding</span></a></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#following"><span class="hs-identifier">CG.following</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#ancestor"><span class="hs-identifier">CG.ancestor</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#descendant"><span class="hs-identifier">descendant</span></a></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#orSelf"><span class="hs-identifier">orSelf</span></a></span><span>
+</span><span id="line-31"></span><span>      </span><span class="annot"><span class="hs-comment">-- ** Filters</span></span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#check"><span class="hs-identifier">check</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#checkNode"><span class="hs-identifier">checkNode</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#checkElement"><span class="hs-identifier">checkElement</span></a></span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#checkName"><span class="hs-identifier">checkName</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#anyElement"><span class="hs-identifier">anyElement</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#element"><span class="hs-identifier">element</span></a></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#laxElement"><span class="hs-identifier">laxElement</span></a></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#content"><span class="hs-identifier">content</span></a></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#attribute"><span class="hs-identifier">attribute</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#laxAttribute"><span class="hs-identifier">laxAttribute</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#hasAttribute"><span class="hs-identifier">hasAttribute</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#attributeIs"><span class="hs-identifier">attributeIs</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Operators</span></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%26%7C"><span class="hs-operator">(CG.&amp;|)</span></a></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%26%2F"><span class="hs-operator">(CG.&amp;/)</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%26%2F%2F"><span class="hs-operator">(CG.&amp;//)</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%26.%2F%2F"><span class="hs-operator">(CG.&amp;.//)</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%24%7C"><span class="hs-operator">(CG.$|)</span></a></span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%24%2F"><span class="hs-operator">(CG.$/)</span></a></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%24%2F%2F"><span class="hs-operator">(CG.$//)</span></a></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#%24.%2F%2F"><span class="hs-operator">(CG.$.//)</span></a></span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(CG.&gt;=&gt;)</span></span><span>
+</span><span id="line-54"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Type classes</span></span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier">Boolean</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Error handling</span></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#force"><span class="hs-identifier">force</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#forceM"><span class="hs-identifier">forceM</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-63"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Resource</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadThrow</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">throwM</span></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Function</span></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">on</span></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Map</span></span><span>                     </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span>                   </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">maybeToList</span></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>                    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Text.XML.html"><span class="hs-identifier">Text.XML</span></a></span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Text.XML.Cursor.Generic.html"><span class="hs-identifier">Text.XML.Cursor.Generic</span></a></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Cursor.Generic.html#child"><span class="hs-identifier">child</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#descendant"><span class="hs-identifier">descendant</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier">node</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#orSelf"><span class="hs-identifier">orSelf</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>                                               </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#parent"><span class="hs-identifier">parent</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html"><span class="hs-identifier">Text.XML.Cursor.Generic</span></a></span><span>      </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CG</span></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- TODO: Consider [Cursor] -&gt; [Cursor]?</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- | The type of an Axis that returns a list of Cursors.</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- They are roughly modeled after &lt;http://www.w3.org/TR/xpath/#axes&gt;.</span><span>
+</span><span id="line-76"></span><span class="hs-comment">--</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- Axes can be composed with '&gt;=&gt;', where e.g. @f &gt;=&gt; g@ means that on all results of</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- the @f@ axis, the @g@ axis will be applied, and all results joined together.</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- Because Axis is just a type synonym for @Cursor -&gt; [Cursor]@, it is possible to use</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- other standard functions like '&gt;&gt;=' or 'concatMap' similarly.</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- The operators '&amp;|', '&amp;/', '&amp;//' and '&amp;.//' can be used to combine axes so that the second</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- axis works on the context nodes, children, descendants, respectively the context node as</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- well as its descendants of the results of the first axis.</span><span>
+</span><span id="line-85"></span><span class="hs-comment">--</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- The operators '$|', '$/', '$//' and '$.//' can be used to apply an axis (right-hand side)</span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- to a cursor so that it is applied on the cursor itself, its children, its descendants,</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- respectively itself and its descendants.</span><span>
+</span><span id="line-89"></span><span class="hs-comment">--</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- Note that many of these operators also work on /generalised Axes/ that can return</span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- lists of something other than Cursors, for example Content elements.</span><span>
+</span><span id="line-92"></span><span class="hs-keyword">type</span><span> </span><span id="Axis"><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-var">Axis</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- XPath axes as in http://www.w3.org/TR/xpath/#axes</span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- TODO: Decide whether to use an existing package for this</span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- | Something that can be used in a predicate check as a boolean.</span><span>
+</span><span id="line-98"></span><span class="hs-keyword">class</span><span> </span><span id="Boolean"><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-var">Boolean</span></a></span></span><span> </span><span id="local-6989586621679095148"><span class="annot"><a href="#local-6989586621679095148"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>    </span><span id="bool"><span class="annot"><a href="Text.XML.Cursor.html#bool"><span class="hs-identifier hs-type">bool</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679095148"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-102"></span><span>    </span><span id="local-6989586621679095045"><span class="annot"><span class="annottext">bool :: Bool -&gt; Bool
+</span><a href="#local-6989586621679095045"><span class="hs-identifier hs-var hs-var hs-var hs-var">bool</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+forall a. a -&gt; a
+</span><span class="hs-identifier hs-var">id</span></span><span>
+</span><span id="line-103"></span><span id="local-6989586621679095043"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679095043"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-104"></span><span>    </span><span id="local-6989586621679095041"><span class="annot"><span class="annottext">bool :: [a] -&gt; Bool
+</span><a href="#local-6989586621679095041"><span class="hs-identifier hs-var hs-var hs-var hs-var">bool</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool) -&gt; ([a] -&gt; Bool) -&gt; [a] -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[a] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span></span><span>
+</span><span id="line-105"></span><span id="local-6989586621679095037"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679095037"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621679095035"><span class="annot"><span class="annottext">bool :: Maybe a -&gt; Bool
+</span><a href="#local-6989586621679095035"><span class="hs-identifier hs-var hs-var hs-var hs-var">bool</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-107"></span><span>    </span><span class="annot"><a href="Text.XML.Cursor.html#bool"><span class="hs-identifier hs-var">bool</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><span class="hs-identifier">_</span></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span></span><span>
+</span><span id="line-108"></span><span id="local-6989586621679095033"><span id="local-6989586621679095034"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Either</span></span><span> </span><span class="annot"><a href="#local-6989586621679095034"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095033"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679095031"><span class="annot"><span class="annottext">bool :: Either a b -&gt; Bool
+</span><a href="#local-6989586621679095031"><span class="hs-identifier hs-var hs-var hs-var hs-var">bool</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span>
+</span><span id="line-110"></span><span>    </span><span class="annot"><a href="Text.XML.Cursor.html#bool"><span class="hs-identifier hs-var">bool</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span></span></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- | A cursor: contains an XML 'Node' and pointers to its children, ancestors and siblings.</span><span>
+</span><span id="line-113"></span><span class="hs-keyword">type</span><span> </span><span id="Cursor"><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-var">Cursor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Text.XML.Cursor.Generic.html#Cursor"><span class="hs-identifier hs-type">CG.Cursor</span></a></span><span> </span><span class="annot"><a href="Text.XML.html#Node"><span class="hs-identifier hs-type">Node</span></a></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- | Cut a cursor off from its parent. The idea is to allow restricting the scope of queries on it.</span><span>
+</span><span id="line-116"></span><span class="annot"><a href="Text.XML.Cursor.html#cut"><span class="hs-identifier hs-type">cut</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span>
+</span><span id="line-117"></span><span id="cut"><span class="annot"><span class="annottext">cut :: Cursor -&gt; Cursor
+</span><a href="Text.XML.Cursor.html#cut"><span class="hs-identifier hs-var hs-var">cut</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Node -&gt; Cursor
+</span><a href="Text.XML.Cursor.html#fromNode"><span class="hs-identifier hs-var">fromNode</span></a></span><span> </span><span class="annot"><span class="annottext">(Node -&gt; Cursor) -&gt; (Cursor -&gt; Node) -&gt; Cursor -&gt; Cursor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">CG.node</span></a></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-comment">-- | Convert a 'Document' to a 'Cursor'. It will point to the document root.</span><span>
+</span><span id="line-120"></span><span class="annot"><a href="Text.XML.Cursor.html#fromDocument"><span class="hs-identifier hs-type">fromDocument</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.html#Document"><span class="hs-identifier hs-type">Document</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span>
+</span><span id="line-121"></span><span id="fromDocument"><span class="annot"><span class="annottext">fromDocument :: Document -&gt; Cursor
+</span><a href="Text.XML.Cursor.html#fromDocument"><span class="hs-identifier hs-var hs-var">fromDocument</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Node -&gt; Cursor
+</span><a href="Text.XML.Cursor.html#fromNode"><span class="hs-identifier hs-var">fromNode</span></a></span><span> </span><span class="annot"><span class="annottext">(Node -&gt; Cursor) -&gt; (Document -&gt; Node) -&gt; Document -&gt; Cursor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Element -&gt; Node
+</span><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-var">NodeElement</span></a></span><span> </span><span class="annot"><span class="annottext">(Element -&gt; Node) -&gt; (Document -&gt; Element) -&gt; Document -&gt; Node
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Document -&gt; Element
+</span><a href="Text.XML.html#documentRoot"><span class="hs-identifier hs-var hs-var">documentRoot</span></a></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- | Convert a 'Node' to a 'Cursor' (without parents).</span><span>
+</span><span id="line-124"></span><span class="annot"><a href="Text.XML.Cursor.html#fromNode"><span class="hs-identifier hs-type">fromNode</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.html#Node"><span class="hs-identifier hs-type">Node</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span>
+</span><span id="line-125"></span><span id="fromNode"><span class="annot"><span class="annottext">fromNode :: Node -&gt; Cursor
+</span><a href="Text.XML.Cursor.html#fromNode"><span class="hs-identifier hs-var hs-var">fromNode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-126"></span><span>    </span><span class="annot"><span class="annottext">(Node -&gt; [Node]) -&gt; Node -&gt; Cursor
+forall node. (node -&gt; [node]) -&gt; node -&gt; Cursor node
+</span><a href="Text.XML.Cursor.Generic.html#toCursor"><span class="hs-identifier hs-var">CG.toCursor</span></a></span><span> </span><span class="annot"><span class="annottext">Node -&gt; [Node]
+</span><a href="#local-6989586621679095027"><span class="hs-identifier hs-var">cs</span></a></span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>    </span><span id="local-6989586621679095027"><span class="annot"><span class="annottext">cs :: Node -&gt; [Node]
+</span><a href="#local-6989586621679095027"><span class="hs-identifier hs-var hs-var">cs</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#Element"><span class="hs-identifier hs-type">Element</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Map Name Text
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679095025"><span class="annot"><span class="annottext">[Node]
+</span><a href="#local-6989586621679095025"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Node]
+</span><a href="#local-6989586621679095025"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-129"></span><span>    </span><span class="annot"><a href="#local-6989586621679095027"><span class="hs-identifier hs-var">cs</span></a></span><span> </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span>                             </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-130"></span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- | Filter cursors that don't pass a check.</span><span>
+</span><span id="line-132"></span><span id="local-6989586621679095120"><span class="annot"><a href="Text.XML.Cursor.html#check"><span class="hs-identifier hs-type">check</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095120"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679095120"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span></span><span>
+</span><span id="line-133"></span><span id="check"><span class="annot"><span class="annottext">check :: (Cursor -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#check"><span class="hs-identifier hs-var hs-var">check</span></a></span></span><span> </span><span id="local-6989586621679095024"><span class="annot"><span class="annottext">Cursor -&gt; b
+</span><a href="#local-6989586621679095024"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679095023"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095023"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095023"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">b -&gt; Bool
+forall a. Boolean a =&gt; a -&gt; Bool
+</span><a href="Text.XML.Cursor.html#bool"><span class="hs-identifier hs-var">bool</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Bool) -&gt; b -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; b
+</span><a href="#local-6989586621679095024"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095023"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- | Filter nodes that don't pass a check.</span><span>
+</span><span id="line-136"></span><span id="local-6989586621679095022"><span class="annot"><a href="Text.XML.Cursor.html#checkNode"><span class="hs-identifier hs-type">checkNode</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095022"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#Node"><span class="hs-identifier hs-type">Node</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679095022"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span></span><span>
+</span><span id="line-137"></span><span id="checkNode"><span class="annot"><span class="annottext">checkNode :: (Node -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkNode"><span class="hs-identifier hs-var hs-var">checkNode</span></a></span></span><span> </span><span id="local-6989586621679095021"><span class="annot"><span class="annottext">Node -&gt; b
+</span><a href="#local-6989586621679095021"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; b) -&gt; Axis
+forall b. Boolean b =&gt; (Cursor -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#check"><span class="hs-identifier hs-var">check</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Node -&gt; b
+</span><a href="#local-6989586621679095021"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Node -&gt; b) -&gt; (Cursor -&gt; Node) -&gt; Cursor -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | Filter elements that don't pass a check, and remove all non-elements.</span><span>
+</span><span id="line-140"></span><span id="local-6989586621679095117"><span class="annot"><a href="Text.XML.Cursor.html#checkElement"><span class="hs-identifier hs-type">checkElement</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095117"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#Element"><span class="hs-identifier hs-type">Element</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679095117"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span></span><span>
+</span><span id="line-141"></span><span id="checkElement"><span class="annot"><span class="annottext">checkElement :: (Element -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkElement"><span class="hs-identifier hs-var hs-var">checkElement</span></a></span></span><span> </span><span id="local-6989586621679095020"><span class="annot"><span class="annottext">Element -&gt; b
+</span><a href="#local-6989586621679095020"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679095019"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095019"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095019"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-142"></span><span>                     </span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span id="local-6989586621679095018"><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095018"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095019"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">b -&gt; Bool
+forall a. Boolean a =&gt; a -&gt; Bool
+</span><a href="Text.XML.Cursor.html#bool"><span class="hs-identifier hs-var">bool</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Bool) -&gt; b -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Element -&gt; b
+</span><a href="#local-6989586621679095020"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095018"><span class="hs-identifier hs-var">e</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-143"></span><span>                     </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- | Filter elements that don't pass a name check, and remove all non-elements.</span><span>
+</span><span id="line-146"></span><span id="local-6989586621679095114"><span class="annot"><a href="Text.XML.Cursor.html#checkName"><span class="hs-identifier hs-type">checkName</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Boolean"><span class="hs-identifier hs-type">Boolean</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095114"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679095114"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span></span><span>
+</span><span id="line-147"></span><span id="checkName"><span class="annot"><span class="annottext">checkName :: (Name -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkName"><span class="hs-identifier hs-var hs-var">checkName</span></a></span></span><span> </span><span id="local-6989586621679095017"><span class="annot"><span class="annottext">Name -&gt; b
+</span><a href="#local-6989586621679095017"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Element -&gt; b) -&gt; Axis
+forall b. Boolean b =&gt; (Element -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkElement"><span class="hs-identifier hs-var">checkElement</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; b
+</span><a href="#local-6989586621679095017"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Name -&gt; b) -&gt; (Element -&gt; Name) -&gt; Element -&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Element -&gt; Name
+</span><a href="Text.XML.html#elementName"><span class="hs-identifier hs-var hs-var">elementName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-148"></span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- | Remove all non-elements. Compare roughly to XPath:</span><span>
+</span><span id="line-150"></span><span class="hs-comment">-- /A node test * is true for any node of the principal node type. For example, child::* will select all element children of the context node [...]/.</span><span>
+</span><span id="line-151"></span><span class="annot"><a href="Text.XML.Cursor.html#anyElement"><span class="hs-identifier hs-type">anyElement</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span><span>
+</span><span id="line-152"></span><span id="anyElement"><span class="annot"><span class="annottext">anyElement :: Axis
+</span><a href="Text.XML.Cursor.html#anyElement"><span class="hs-identifier hs-var hs-var">anyElement</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Element -&gt; Bool) -&gt; Axis
+forall b. Boolean b =&gt; (Element -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkElement"><span class="hs-identifier hs-var">checkElement</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; Element -&gt; Bool
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">)</span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span class="hs-comment">-- | Select only those elements with a matching tag name. XPath:</span><span>
+</span><span id="line-155"></span><span class="hs-comment">-- /A node test that is a QName is true if and only if the type of the node (see [5 Data Model]) is the principal node type and has an expanded-name equal to the expanded-name specified by the QName./</span><span>
+</span><span id="line-156"></span><span class="annot"><a href="Text.XML.Cursor.html#element"><span class="hs-identifier hs-type">element</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span><span>
+</span><span id="line-157"></span><span id="element"><span class="annot"><span class="annottext">element :: Name -&gt; Axis
+</span><a href="Text.XML.Cursor.html#element"><span class="hs-identifier hs-var hs-var">element</span></a></span></span><span> </span><span id="local-6989586621679095014"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679095014"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name -&gt; Bool) -&gt; Axis
+forall b. Boolean b =&gt; (Name -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkName"><span class="hs-identifier hs-var">checkName</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Name -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679095014"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-158"></span><span>
+</span><span id="line-159"></span><span class="hs-comment">-- | Select only those elements with a loosely matching tag name. Namespace and case are ignored. XPath:</span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- /A node test that is a QName is true if and only if the type of the node (see [5 Data Model]) is the principal node type and has an expanded-name equal to the expanded-name specified by the QName./</span><span>
+</span><span id="line-161"></span><span class="annot"><a href="Text.XML.Cursor.html#laxElement"><span class="hs-identifier hs-type">laxElement</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span><span>
+</span><span id="line-162"></span><span id="laxElement"><span class="annot"><span class="annottext">laxElement :: Text -&gt; Axis
+</span><a href="Text.XML.Cursor.html#laxElement"><span class="hs-identifier hs-var hs-var">laxElement</span></a></span></span><span> </span><span id="local-6989586621679095013"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095013"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name -&gt; Bool) -&gt; Axis
+forall b. Boolean b =&gt; (Name -&gt; b) -&gt; Axis
+</span><a href="Text.XML.Cursor.html#checkName"><span class="hs-identifier hs-var">checkName</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Text -&gt; Text -&gt; Bool) -&gt; (Text -&gt; Text) -&gt; Text -&gt; Text -&gt; Bool
+forall b c a. (b -&gt; b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">on</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">(==)</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text
+</span><span class="hs-identifier hs-var">T.toCaseFold</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095013"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Bool) -&gt; (Name -&gt; Text) -&gt; Name -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; Text
+</span><span class="hs-identifier hs-var hs-var">nameLocalName</span></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- | Select only text nodes, and directly give the 'Content' values. XPath:</span><span>
+</span><span id="line-165"></span><span class="hs-comment">-- /The node test text() is true for any text node./</span><span>
+</span><span id="line-166"></span><span class="hs-comment">--</span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- Note that this is not strictly an 'Axis', but will work with most combinators.</span><span>
+</span><span id="line-168"></span><span class="annot"><a href="Text.XML.Cursor.html#content"><span class="hs-identifier hs-type">content</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">]</span><span>
+</span><span id="line-169"></span><span id="content"><span class="annot"><span class="annottext">content :: Cursor -&gt; [Text]
+</span><a href="Text.XML.Cursor.html#content"><span class="hs-identifier hs-var hs-var">content</span></a></span></span><span> </span><span id="local-6989586621679095010"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095010"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095010"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-170"></span><span>              </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#NodeContent"><span class="hs-identifier hs-type">NodeContent</span></a></span><span> </span><span id="local-6989586621679095008"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095008"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095008"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-171"></span><span>              </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- | Select attributes on the current element (or nothing if it is not an element). XPath:</span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- /the attribute axis contains the attributes of the context node; the axis will be empty unless the context node is an element/</span><span>
+</span><span id="line-175"></span><span class="hs-comment">--</span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- Note that this is not strictly an 'Axis', but will work with most combinators.</span><span>
+</span><span id="line-177"></span><span class="hs-comment">--</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- The return list of the generalised axis contains as elements lists of 'Content'</span><span>
+</span><span id="line-179"></span><span class="hs-comment">-- elements, each full list representing an attribute value.</span><span>
+</span><span id="line-180"></span><span class="annot"><a href="Text.XML.Cursor.html#attribute"><span class="hs-identifier hs-type">attribute</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">]</span><span>
+</span><span id="line-181"></span><span id="attribute"><span class="annot"><span class="annottext">attribute :: Name -&gt; Cursor -&gt; [Text]
+</span><a href="Text.XML.Cursor.html#attribute"><span class="hs-identifier hs-var hs-var">attribute</span></a></span></span><span> </span><span id="local-6989586621679095007"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679095007"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679095006"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095006"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-182"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095006"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-183"></span><span>        </span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span id="local-6989586621679095005"><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095005"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; [Text]
+forall a. Maybe a -&gt; [a]
+</span><span class="hs-identifier hs-var">maybeToList</span></span><span> </span><span class="annot"><span class="annottext">(Maybe Text -&gt; [Text]) -&gt; Maybe Text -&gt; [Text]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; Map Name Text -&gt; Maybe Text
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Map.lookup</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679095007"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Name Text -&gt; Maybe Text) -&gt; Map Name Text -&gt; Maybe Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Element -&gt; Map Name Text
+</span><a href="Text.XML.html#elementAttributes"><span class="hs-identifier hs-var hs-var">elementAttributes</span></a></span><span> </span><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095005"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-184"></span><span>        </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span>             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-185"></span><span>
+</span><span id="line-186"></span><span class="hs-comment">-- | Select attributes on the current element (or nothing if it is not an element).  Namespace and case are ignored. XPath:</span><span>
+</span><span id="line-187"></span><span class="hs-comment">-- /the attribute axis contains the attributes of the context node; the axis will be empty unless the context node is an element/</span><span>
+</span><span id="line-188"></span><span class="hs-comment">--</span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- Note that this is not strictly an 'Axis', but will work with most combinators.</span><span>
+</span><span id="line-190"></span><span class="hs-comment">--</span><span>
+</span><span id="line-191"></span><span class="hs-comment">-- The return list of the generalised axis contains as elements lists of 'Content'</span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- elements, each full list representing an attribute value.</span><span>
+</span><span id="line-193"></span><span class="annot"><a href="Text.XML.Cursor.html#laxAttribute"><span class="hs-identifier hs-type">laxAttribute</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Cursor"><span class="hs-identifier hs-type">Cursor</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">]</span><span>
+</span><span id="line-194"></span><span id="laxAttribute"><span class="annot"><span class="annottext">laxAttribute :: Text -&gt; Cursor -&gt; [Text]
+</span><a href="Text.XML.Cursor.html#laxAttribute"><span class="hs-identifier hs-var hs-var">laxAttribute</span></a></span></span><span> </span><span id="local-6989586621679095002"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095002"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679095001"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095001"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-195"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679095001"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-196"></span><span>        </span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span id="local-6989586621679095000"><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095000"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-197"></span><span>            </span><span class="hs-special">(</span><span id="local-6989586621679094999"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094999"><span class="hs-identifier hs-var">n'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679094998"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679094998"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Map Name Text -&gt; [(Name, Text)]
+forall k a. Map k a -&gt; [(k, a)]
+</span><span class="hs-identifier hs-var">Map.toList</span></span><span> </span><span class="annot"><span class="annottext">(Map Name Text -&gt; [(Name, Text)])
+-&gt; Map Name Text -&gt; [(Name, Text)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Element -&gt; Map Name Text
+</span><a href="Text.XML.html#elementAttributes"><span class="hs-identifier hs-var hs-var">elementAttributes</span></a></span><span> </span><span class="annot"><span class="annottext">Element
+</span><a href="#local-6989586621679095000"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-198"></span><span>            </span><span class="annot"><span class="annottext">Bool -&gt; [()]
+forall (f :: * -&gt; *). Alternative f =&gt; Bool -&gt; f ()
+</span><span class="hs-identifier hs-var">guard</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; [()]) -&gt; Bool -&gt; [()]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Text -&gt; Text -&gt; Bool) -&gt; (Text -&gt; Text) -&gt; Text -&gt; Text -&gt; Bool
+forall b c a. (b -&gt; b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">on</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">(==)</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text
+</span><span class="hs-identifier hs-var">T.toCaseFold</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679095002"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Text
+</span><span class="hs-identifier hs-var hs-var">nameLocalName</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094999"><span class="hs-identifier hs-var">n'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>            </span><span class="annot"><span class="annottext">Text -&gt; [Text]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679094998"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-200"></span><span>        </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span class="hs-comment">-- | Select only those element nodes with the given attribute.</span><span>
+</span><span id="line-203"></span><span class="annot"><a href="Text.XML.Cursor.html#hasAttribute"><span class="hs-identifier hs-type">hasAttribute</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span><span>
+</span><span id="line-204"></span><span id="hasAttribute"><span class="annot"><span class="annottext">hasAttribute :: Name -&gt; Axis
+</span><a href="Text.XML.Cursor.html#hasAttribute"><span class="hs-identifier hs-var hs-var">hasAttribute</span></a></span></span><span> </span><span id="local-6989586621679094996"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094996"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679094995"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094995"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-205"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094995"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-206"></span><span>        </span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#Element"><span class="hs-identifier hs-type">Element</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679094994"><span class="annot"><span class="annottext">Map Name Text
+</span><a href="#local-6989586621679094994"><span class="hs-keyword hs-var">as</span></a></span></span><span> </span><span class="annot"><span class="annottext">[Node]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Cursor] -&gt; (Text -&gt; [Cursor]) -&gt; Maybe Text -&gt; [Cursor]
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Cursor] -&gt; Text -&gt; [Cursor]
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094995"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe Text -&gt; [Cursor]) -&gt; Maybe Text -&gt; [Cursor]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; Map Name Text -&gt; Maybe Text
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Map.lookup</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094996"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Map Name Text
+</span><a href="#local-6989586621679094994"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-207"></span><span>        </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-208"></span><span>
+</span><span id="line-209"></span><span class="hs-comment">-- | Select only those element nodes containing the given attribute key/value pair.</span><span>
+</span><span id="line-210"></span><span class="annot"><a href="Text.XML.Cursor.html#attributeIs"><span class="hs-identifier hs-type">attributeIs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Text.XML.Cursor.html#Axis"><span class="hs-identifier hs-type">Axis</span></a></span><span>
+</span><span id="line-211"></span><span id="attributeIs"><span class="annot"><span class="annottext">attributeIs :: Name -&gt; Text -&gt; Axis
+</span><a href="Text.XML.Cursor.html#attributeIs"><span class="hs-identifier hs-var hs-var">attributeIs</span></a></span></span><span> </span><span id="local-6989586621679094992"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094992"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679094991"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679094991"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621679094990"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094990"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-212"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Node
+forall node. Cursor node -&gt; node
+</span><a href="Text.XML.Cursor.Generic.html#node"><span class="hs-identifier hs-var hs-var">node</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094990"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-213"></span><span>        </span><span class="annot"><a href="Text.XML.html#NodeElement"><span class="hs-identifier hs-type">NodeElement</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.XML.html#Element"><span class="hs-identifier hs-type">Element</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679094989"><span class="annot"><span class="annottext">Map Name Text
+</span><a href="#local-6989586621679094989"><span class="hs-keyword hs-var">as</span></a></span></span><span> </span><span class="annot"><span class="annottext">[Node]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679094990"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679094991"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Maybe Text -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; Map Name Text -&gt; Maybe Text
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Map.lookup</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679094992"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Map Name Text
+</span><a href="#local-6989586621679094989"><span class="hs-keyword hs-var">as</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-214"></span><span>        </span><span class="annot"><span class="annottext">Node
+</span><span class="hs-identifier">_</span></span><span>                            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-215"></span><span>
+</span><span id="line-216"></span><span id="local-6989586621679094986"><span id="local-6989586621679094987"><span id="local-6989586621679094988"><span class="annot"><a href="Text.XML.Cursor.html#force"><span class="hs-identifier hs-type">force</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621679094988"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadThrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679094987"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679094988"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679094986"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679094987"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679094986"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-217"></span><span id="force"><span class="annot"><span class="annottext">force :: e -&gt; [a] -&gt; f a
+</span><a href="Text.XML.Cursor.html#force"><span class="hs-identifier hs-var hs-var">force</span></a></span></span><span> </span><span id="local-6989586621679094985"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679094985"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">e -&gt; f a
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679094985"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-218"></span><span class="annot"><a href="Text.XML.Cursor.html#force"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679094984"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679094984"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[a]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; f a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679094984"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-219"></span><span>
+</span><span id="line-220"></span><span id="local-6989586621679094981"><span id="local-6989586621679094982"><span id="local-6989586621679094983"><span class="annot"><a href="Text.XML.Cursor.html#forceM"><span class="hs-identifier hs-type">forceM</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621679094983"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadThrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679094982"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679094983"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679094982"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679094981"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679094982"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679094981"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-221"></span><span id="forceM"><span class="annot"><span class="annottext">forceM :: e -&gt; [f a] -&gt; f a
+</span><a href="Text.XML.Cursor.html#forceM"><span class="hs-identifier hs-var hs-var">forceM</span></a></span></span><span> </span><span id="local-6989586621679094980"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679094980"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">e -&gt; f a
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679094980"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-222"></span><span class="annot"><a href="Text.XML.Cursor.html#forceM"><span class="hs-identifier hs-var">forceM</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679094979"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679094979"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[f a]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679094979"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-223"></span></pre></body></html>

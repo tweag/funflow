@@ -1,0 +1,428 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts          #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NoMonomorphismRestriction #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings         #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards           #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies              #-}</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Module      :  Aws.DynamoDb.Commands.DeleteItem</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Copyright   :  Soostone Inc</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Maintainer  :  Ozgun Ataman &lt;ozgun.ataman@soostone.com&gt;</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- @http:\/\/docs.aws.amazon.com\/amazondynamodb\/latest\/APIReference\/API_DeleteItem.html@</span><span>
+</span><span id="line-20"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.DynamoDb.Commands.DeleteItem</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Aeson</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Default</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-30"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.DynamoDb.Core.html"><span class="hs-identifier">Aws.DynamoDb.Core</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">data</span><span> </span><span id="DeleteItem"><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-var">DeleteItem</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="DeleteItem"><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-var">DeleteItem</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-37"></span><span>      </span><span id="diTable"><span class="annot"><span class="annottext">DeleteItem -&gt; Text
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diTable"><span class="hs-identifier hs-var hs-var">diTable</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-comment">-- ^ Target table</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="diKey"><span class="annot"><span class="annottext">DeleteItem -&gt; PrimaryKey
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diKey"><span class="hs-identifier hs-var hs-var">diKey</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-comment">-- ^ The item to delete.</span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="diExpect"><span class="annot"><span class="annottext">DeleteItem -&gt; Conditions
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diExpect"><span class="hs-identifier hs-var hs-var">diExpect</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Conditions"><span class="hs-identifier hs-type">Conditions</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-comment">-- ^ (Possible) set of expections for a conditional Put</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="diReturn"><span class="annot"><span class="annottext">DeleteItem -&gt; UpdateReturn
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diReturn"><span class="hs-identifier hs-var hs-var">diReturn</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#UpdateReturn"><span class="hs-identifier hs-type">UpdateReturn</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-comment">-- ^ What to return from this query.</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="diRetCons"><span class="annot"><span class="annottext">DeleteItem -&gt; ReturnConsumption
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diRetCons"><span class="hs-identifier hs-var hs-var">diRetCons</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ReturnConsumption"><span class="hs-identifier hs-type">ReturnConsumption</span></a></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="diRetMet"><span class="annot"><span class="annottext">DeleteItem -&gt; ReturnItemCollectionMetrics
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#diRetMet"><span class="hs-identifier hs-var hs-var">diRetMet</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ReturnItemCollectionMetrics"><span class="hs-identifier hs-type">ReturnItemCollectionMetrics</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228091"><span id="local-6989586621679228093"><span class="annot"><span class="annottext">DeleteItem -&gt; DeleteItem -&gt; Bool
+(DeleteItem -&gt; DeleteItem -&gt; Bool)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Bool) -&gt; Eq DeleteItem
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c/= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+== :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c== :: DeleteItem -&gt; DeleteItem -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228084"><span id="local-6989586621679228086"><span id="local-6989586621679228088"><span class="annot"><span class="annottext">Int -&gt; DeleteItem -&gt; ShowS
+[DeleteItem] -&gt; ShowS
+DeleteItem -&gt; String
+(Int -&gt; DeleteItem -&gt; ShowS)
+-&gt; (DeleteItem -&gt; String)
+-&gt; ([DeleteItem] -&gt; ShowS)
+-&gt; Show DeleteItem
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DeleteItem] -&gt; ShowS
+$cshowList :: [DeleteItem] -&gt; ShowS
+show :: DeleteItem -&gt; String
+$cshow :: DeleteItem -&gt; String
+showsPrec :: Int -&gt; DeleteItem -&gt; ShowS
+$cshowsPrec :: Int -&gt; DeleteItem -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228075"><span id="local-6989586621679228077"><span id="local-6989586621679228079"><span id="local-6989586621679228081"><span class="annot"><span class="annottext">ReadPrec [DeleteItem]
+ReadPrec DeleteItem
+Int -&gt; ReadS DeleteItem
+ReadS [DeleteItem]
+(Int -&gt; ReadS DeleteItem)
+-&gt; ReadS [DeleteItem]
+-&gt; ReadPrec DeleteItem
+-&gt; ReadPrec [DeleteItem]
+-&gt; Read DeleteItem
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [DeleteItem]
+$creadListPrec :: ReadPrec [DeleteItem]
+readPrec :: ReadPrec DeleteItem
+$creadPrec :: ReadPrec DeleteItem
+readList :: ReadS [DeleteItem]
+$creadList :: ReadS [DeleteItem]
+readsPrec :: Int -&gt; ReadS DeleteItem
+$creadsPrec :: Int -&gt; ReadS DeleteItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228059"><span id="local-6989586621679228061"><span id="local-6989586621679228063"><span id="local-6989586621679228065"><span id="local-6989586621679228067"><span id="local-6989586621679228069"><span id="local-6989586621679228071"><span class="annot"><span class="annottext">Eq DeleteItem
+Eq DeleteItem
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Ordering)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Bool)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Bool)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Bool)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; Bool)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; DeleteItem)
+-&gt; (DeleteItem -&gt; DeleteItem -&gt; DeleteItem)
+-&gt; Ord DeleteItem
+DeleteItem -&gt; DeleteItem -&gt; Bool
+DeleteItem -&gt; DeleteItem -&gt; Ordering
+DeleteItem -&gt; DeleteItem -&gt; DeleteItem
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: DeleteItem -&gt; DeleteItem -&gt; DeleteItem
+$cmin :: DeleteItem -&gt; DeleteItem -&gt; DeleteItem
+max :: DeleteItem -&gt; DeleteItem -&gt; DeleteItem
+$cmax :: DeleteItem -&gt; DeleteItem -&gt; DeleteItem
+&gt;= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c&gt;= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+&gt; :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c&gt; :: DeleteItem -&gt; DeleteItem -&gt; Bool
+&lt;= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c&lt;= :: DeleteItem -&gt; DeleteItem -&gt; Bool
+&lt; :: DeleteItem -&gt; DeleteItem -&gt; Bool
+$c&lt; :: DeleteItem -&gt; DeleteItem -&gt; Bool
+compare :: DeleteItem -&gt; DeleteItem -&gt; Ordering
+$ccompare :: DeleteItem -&gt; DeleteItem -&gt; Ordering
+$cp1Ord :: Eq DeleteItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | Construct a minimal 'DeleteItem' request.</span><span>
+</span><span id="line-52"></span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#deleteItem"><span class="hs-identifier hs-type">deleteItem</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-comment">-- ^ A Dynamo table name</span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-comment">-- ^ Item to be saved</span><span>
+</span><span id="line-56"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span><span>
+</span><span id="line-57"></span><span id="deleteItem"><span class="annot"><span class="annottext">deleteItem :: Text -&gt; PrimaryKey -&gt; DeleteItem
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#deleteItem"><span class="hs-identifier hs-var hs-var">deleteItem</span></a></span></span><span> </span><span id="local-6989586621679228056"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228056"><span class="hs-identifier hs-var">tn</span></a></span></span><span> </span><span id="local-6989586621679228055"><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679228055"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text
+-&gt; PrimaryKey
+-&gt; Conditions
+-&gt; UpdateReturn
+-&gt; ReturnConsumption
+-&gt; ReturnItemCollectionMetrics
+-&gt; DeleteItem
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-var">DeleteItem</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228056"><span class="hs-identifier hs-var">tn</span></a></span><span> </span><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679228055"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">Conditions
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">UpdateReturn
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span> </span><span class="annot"><span class="annottext">ReturnItemCollectionMetrics
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679228047"><span id="local-6989586621679228049"><span id="local-6989586621679228051"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span id="local-6989586621679228045"><span class="annot"><span class="annottext">toJSON :: DeleteItem -&gt; Value
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span><span class="hs-special">{</span><span id="local-6989586621679228038"><span id="local-6989586621679228039"><span id="local-6989586621679228040"><span id="local-6989586621679228041"><span id="local-6989586621679228042"><span id="local-6989586621679228043"><span class="annot"><span class="annottext">Text
+UpdateReturn
+ReturnItemCollectionMetrics
+ReturnConsumption
+Conditions
+PrimaryKey
+diRetMet :: ReturnItemCollectionMetrics
+diRetCons :: ReturnConsumption
+diReturn :: UpdateReturn
+diExpect :: Conditions
+diKey :: PrimaryKey
+diTable :: Text
+diRetMet :: DeleteItem -&gt; ReturnItemCollectionMetrics
+diRetCons :: DeleteItem -&gt; ReturnConsumption
+diReturn :: DeleteItem -&gt; UpdateReturn
+diExpect :: DeleteItem -&gt; Conditions
+diKey :: DeleteItem -&gt; PrimaryKey
+diTable :: DeleteItem -&gt; Text
+</span><a href="#local-6989586621679228038"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-62"></span><span>        </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span> </span><span class="annot"><span class="annottext">([Pair] -&gt; Value) -&gt; [Pair] -&gt; Value
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Conditions -&gt; [Pair]
+</span><a href="Aws.DynamoDb.Core.html#expectsJson"><span class="hs-identifier hs-var">expectsJson</span></a></span><span> </span><span class="annot"><span class="annottext">Conditions
+</span><a href="#local-6989586621679228041"><span class="hs-identifier hs-var">diExpect</span></a></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; [Pair] -&gt; [Pair]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span>
+</span><span id="line-63"></span><span>          </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;TableName&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228043"><span class="hs-identifier hs-var">diTable</span></a></span><span>
+</span><span id="line-64"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Key&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; PrimaryKey -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">PrimaryKey
+</span><a href="#local-6989586621679228042"><span class="hs-identifier hs-var">diKey</span></a></span><span>
+</span><span id="line-65"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnValues&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; UpdateReturn -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">UpdateReturn
+</span><a href="#local-6989586621679228040"><span class="hs-identifier hs-var">diReturn</span></a></span><span>
+</span><span id="line-66"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnConsumedCapacity&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ReturnConsumption -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+</span><a href="#local-6989586621679228039"><span class="hs-identifier hs-var">diRetCons</span></a></span><span>
+</span><span id="line-67"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnItemCollectionMetrics&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ReturnItemCollectionMetrics -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">ReturnItemCollectionMetrics
+</span><a href="#local-6989586621679228038"><span class="hs-identifier hs-var">diRetMet</span></a></span><span>
+</span><span id="line-68"></span><span>          </span><span class="hs-special">]</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">data</span><span> </span><span id="DeleteItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-var">DeleteItemResponse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="DeleteItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-var">DeleteItemResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-73"></span><span>      </span><span id="dirAttrs"><span class="annot"><span class="annottext">DeleteItemResponse -&gt; Maybe Item
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#dirAttrs"><span class="hs-identifier hs-var hs-var">dirAttrs</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#Item"><span class="hs-identifier hs-type">Item</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-comment">-- ^ Old attributes, if requested</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="dirConsumed"><span class="annot"><span class="annottext">DeleteItemResponse -&gt; Maybe ConsumedCapacity
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#dirConsumed"><span class="hs-identifier hs-var hs-var">dirConsumed</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ConsumedCapacity"><span class="hs-identifier hs-type">ConsumedCapacity</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">-- ^ Amount of capacity consumed</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="dirColMet"><span class="annot"><span class="annottext">DeleteItemResponse -&gt; Maybe ItemCollectionMetrics
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#dirColMet"><span class="hs-identifier hs-var hs-var">dirColMet</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ItemCollectionMetrics"><span class="hs-identifier hs-type">ItemCollectionMetrics</span></a></span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-comment">-- ^ Collection metrics if they have been requested.</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228027"><span id="local-6989586621679228029"><span class="annot"><span class="annottext">DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+(DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; Eq DeleteItemResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c/= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+== :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c== :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228021"><span id="local-6989586621679228023"><span id="local-6989586621679228025"><span class="annot"><span class="annottext">Int -&gt; DeleteItemResponse -&gt; ShowS
+[DeleteItemResponse] -&gt; ShowS
+DeleteItemResponse -&gt; String
+(Int -&gt; DeleteItemResponse -&gt; ShowS)
+-&gt; (DeleteItemResponse -&gt; String)
+-&gt; ([DeleteItemResponse] -&gt; ShowS)
+-&gt; Show DeleteItemResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DeleteItemResponse] -&gt; ShowS
+$cshowList :: [DeleteItemResponse] -&gt; ShowS
+show :: DeleteItemResponse -&gt; String
+$cshow :: DeleteItemResponse -&gt; String
+showsPrec :: Int -&gt; DeleteItemResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; DeleteItemResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228013"><span id="local-6989586621679228015"><span id="local-6989586621679228017"><span id="local-6989586621679228019"><span class="annot"><span class="annottext">ReadPrec [DeleteItemResponse]
+ReadPrec DeleteItemResponse
+Int -&gt; ReadS DeleteItemResponse
+ReadS [DeleteItemResponse]
+(Int -&gt; ReadS DeleteItemResponse)
+-&gt; ReadS [DeleteItemResponse]
+-&gt; ReadPrec DeleteItemResponse
+-&gt; ReadPrec [DeleteItemResponse]
+-&gt; Read DeleteItemResponse
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [DeleteItemResponse]
+$creadListPrec :: ReadPrec [DeleteItemResponse]
+readPrec :: ReadPrec DeleteItemResponse
+$creadPrec :: ReadPrec DeleteItemResponse
+readList :: ReadS [DeleteItemResponse]
+$creadList :: ReadS [DeleteItemResponse]
+readsPrec :: Int -&gt; ReadS DeleteItemResponse
+$creadsPrec :: Int -&gt; ReadS DeleteItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679227998"><span id="local-6989586621679228000"><span id="local-6989586621679228002"><span id="local-6989586621679228004"><span id="local-6989586621679228006"><span id="local-6989586621679228008"><span id="local-6989586621679228010"><span class="annot"><span class="annottext">Eq DeleteItemResponse
+Eq DeleteItemResponse
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Ordering)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse)
+-&gt; (DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse)
+-&gt; Ord DeleteItemResponse
+DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+DeleteItemResponse -&gt; DeleteItemResponse -&gt; Ordering
+DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse
+$cmin :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse
+max :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse
+$cmax :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; DeleteItemResponse
+&gt;= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c&gt;= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+&gt; :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c&gt; :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+&lt;= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c&lt;= :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+&lt; :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+$c&lt; :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Bool
+compare :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Ordering
+$ccompare :: DeleteItemResponse -&gt; DeleteItemResponse -&gt; Ordering
+$cp1Ord :: Eq DeleteItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItem"><span class="hs-identifier hs-type">DeleteItem</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbConfiguration"><span class="hs-identifier hs-type">DdbConfiguration</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679227991"><span class="annot"><span class="annottext">signQuery :: DeleteItem
+-&gt; ServiceConfiguration DeleteItem queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span id="local-6989586621679227989"><span class="annot"><span class="annottext">DeleteItem
+</span><a href="#local-6989586621679227989"><span class="hs-identifier hs-var">gi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; DeleteItem
+-&gt; DdbConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall a qt.
+ToJSON a =&gt;
+ByteString
+-&gt; a -&gt; DdbConfiguration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.DynamoDb.Core.html#ddbSignQuery"><span class="hs-identifier hs-var">ddbSignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;DeleteItem&quot;</span></span><span> </span><span class="annot"><span class="annottext">DeleteItem
+</span><a href="#local-6989586621679227989"><span class="hs-identifier hs-var">gi</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679227985"><span class="annot"><span class="hs-identifier hs-type">FromJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-92"></span><span>    </span><span id="local-6989586621679227983"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser DeleteItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Object</span></span><span> </span><span id="local-6989586621679227980"><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679227980"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Item
+-&gt; Maybe ConsumedCapacity
+-&gt; Maybe ItemCollectionMetrics
+-&gt; DeleteItemResponse
+</span><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-var">DeleteItemResponse</span></a></span><span>
+</span><span id="line-93"></span><span>        </span><span class="annot"><span class="annottext">(Maybe Item
+ -&gt; Maybe ConsumedCapacity
+ -&gt; Maybe ItemCollectionMetrics
+ -&gt; DeleteItemResponse)
+-&gt; Parser (Maybe Item)
+-&gt; Parser
+     (Maybe ConsumedCapacity
+      -&gt; Maybe ItemCollectionMetrics -&gt; DeleteItemResponse)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679227980"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe Item)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Attributes&quot;</span></span><span>
+</span><span id="line-94"></span><span>        </span><span class="annot"><span class="annottext">Parser
+  (Maybe ConsumedCapacity
+   -&gt; Maybe ItemCollectionMetrics -&gt; DeleteItemResponse)
+-&gt; Parser (Maybe ConsumedCapacity)
+-&gt; Parser (Maybe ItemCollectionMetrics -&gt; DeleteItemResponse)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679227980"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe ConsumedCapacity)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ConsumedCapacity&quot;</span></span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><span class="annottext">Parser (Maybe ItemCollectionMetrics -&gt; DeleteItemResponse)
+-&gt; Parser (Maybe ItemCollectionMetrics)
+-&gt; Parser DeleteItemResponse
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679227980"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe ItemCollectionMetrics)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ItemCollectionMetrics&quot;</span></span><span>
+</span><span id="line-96"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">parseJSON</span></span><span> </span><span class="annot"><span class="annottext">Value
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Parser DeleteItemResponse
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;DeleteItemResponse must be an object.&quot;</span></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span id="local-6989586621679227977"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679227977"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbResponse"><span class="hs-identifier hs-type">DdbResponse</span></a></span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679227973"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; r
+-&gt; IORef (ResponseMetadata DeleteItemResponse)
+-&gt; HTTPResponseConsumer DeleteItemResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679227971"><span class="annot"><span class="annottext">IORef (ResponseMetadata DeleteItemResponse)
+</span><a href="#local-6989586621679227971"><span class="hs-identifier hs-var">ref</span></a></span></span><span> </span><span id="local-6989586621679227970"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679227970"><span class="hs-identifier hs-var">resp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef DdbResponse -&gt; HTTPResponseConsumer DeleteItemResponse
+forall a. FromJSON a =&gt; IORef DdbResponse -&gt; HTTPResponseConsumer a
+</span><a href="Aws.DynamoDb.Core.html#ddbResponseConsumer"><span class="hs-identifier hs-var">ddbResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (ResponseMetadata DeleteItemResponse)
+IORef DdbResponse
+</span><a href="#local-6989586621679227971"><span class="hs-identifier hs-var">ref</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679227970"><span class="hs-identifier hs-var">resp</span></a></span></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.DeleteItem.html#DeleteItemResponse"><span class="hs-identifier hs-type">DeleteItemResponse</span></a></span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621679227966"><span class="annot"><span class="annottext">loadToMemory :: DeleteItemResponse
+-&gt; ResourceT IO (MemoryResponse DeleteItemResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DeleteItemResponse
+-&gt; ResourceT IO (MemoryResponse DeleteItemResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span></pre></body></html>

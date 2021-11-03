@@ -1,0 +1,394 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving, CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module      :  Data.Generics.Instances</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Copyright   :  (c) The University of Glasgow, CWI 2001--2004</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- License     :  BSD-style (see the LICENSE file)</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Maintainer  :  generics@haskell.org</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Portability :  non-portable (uses Data.Data)</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- \&quot;Scrap your boilerplate\&quot; --- Generic programming in Haskell</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- See &lt;http://www.cs.uu.nl/wiki/GenericProgramming/SYB&gt;. The present module</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- contains thirteen 'Data' instances which are considered dubious (either</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- because the types are abstract or just not meant to be traversed).</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Instances in this module might change or disappear in future releases</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- of this package.</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- (This module does not export anything. It really just defines instances.)</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-warn-orphans #-}</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Generics.Instances</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span class="hs-cpp">
+
+#ifdef __GLASGOW_HASKELL__
+</span><span class="hs-cpp">#if __GLASGOW_HASKELL__ &gt;= 611
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.IO.Handle</span></span><span>         </span><span class="hs-comment">-- So we can give Data instance for Handle</span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">GHC.IOBase</span><span>            </span><span class="hs-comment">-- So we can give Data instance for IO, Handle</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Stable</span></span><span>            </span><span class="hs-comment">-- So we can give Data instance for StablePtr</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.ST</span></span><span>                </span><span class="hs-comment">-- So we can give Data instance for ST</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Conc</span></span><span>              </span><span class="hs-comment">-- So we can give Data instance for TVar</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.IORef</span></span><span>            </span><span class="hs-comment">-- So we can give Data instance for IORef</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent</span></span><span>    </span><span class="hs-comment">-- So we can give Data instance for MVar</span><span class="hs-cpp">
+#else
+</span><span class="hs-cpp"># ifdef __HUGS__
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Hugs.Prelude</span><span class="hs-special">(</span><span> </span><span class="hs-identifier">Ratio</span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span class="hs-cpp">
+# endif
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">System.IO</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.Ptr</span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.ForeignPtr</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Foreign.StablePtr</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">Control.Monad.ST</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- Version compatibility issues caused by #2760</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-type">myMkNoRepType</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DataType</span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 611
+</span><span id="myMkNoRepType"><span class="annot"><span class="annottext">myMkNoRepType :: String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var hs-var">myMkNoRepType</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><span class="hs-identifier hs-var">mkNoRepType</span></span><span class="hs-cpp">
+#else
+</span><span class="hs-identifier">myMkNoRepType</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">mkNorepType</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-62"></span><span class="hs-comment">--</span><span>
+</span><span id="line-63"></span><span class="hs-comment">--      Instances of the Data class for Prelude-like types.</span><span>
+</span><span id="line-64"></span><span class="hs-comment">--      We define top-level definitions for representations.</span><span>
+</span><span id="line-65"></span><span class="hs-comment">--</span><span>
+</span><span id="line-66"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- Instances of abstract datatypes (6)</span><span>
+</span><span id="line-71"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &lt; 801
+</span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Data</span><span> </span><span class="hs-identifier">TypeRep</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-identifier">toConstr</span><span> </span><span class="hs-identifier">_</span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">error</span><span> </span><span class="hs-string">&quot;toConstr&quot;</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-identifier">gunfold</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-identifier">_</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">error</span><span> </span><span class="hs-string">&quot;gunfold&quot;</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-identifier">dataTypeOf</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">myMkNoRepType</span><span> </span><span class="hs-string">&quot;Data.Typeable.TypeRep&quot;</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679044027"><span id="local-6989586621679044029"><span id="local-6989586621679044031"><span id="local-6989586621679044033"><span id="local-6989586621679044035"><span id="local-6989586621679044037"><span id="local-6989586621679044039"><span id="local-6989586621679044041"><span id="local-6989586621679044043"><span id="local-6989586621679044045"><span id="local-6989586621679044050"><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">TyCon</span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-84"></span><span>  </span><span id="local-6989586621679044025"><span class="annot"><span class="annottext">toConstr :: TyCon -&gt; Constr
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></span></span><span> </span><span class="annot"><span class="annottext">TyCon
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-85"></span><span>  </span><span id="local-6989586621679044022"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c TyCon
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c TyCon
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-86"></span><span>  </span><span id="local-6989586621679044020"><span class="annot"><span class="annottext">dataTypeOf :: TyCon -&gt; DataType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></span></span><span> </span><span class="annot"><span class="annottext">TyCon
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Data.Typeable.TyCon&quot;</span></span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &lt; 709
+</span><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Typeable</span><span> </span><span class="hs-identifier">DataType</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-94"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043993"><span id="local-6989586621679043995"><span id="local-6989586621679043997"><span id="local-6989586621679043999"><span id="local-6989586621679044001"><span id="local-6989586621679044003"><span id="local-6989586621679044005"><span id="local-6989586621679044007"><span id="local-6989586621679044009"><span id="local-6989586621679044011"><span id="local-6989586621679044016"><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">DataType</span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-95"></span><span>  </span><span id="local-6989586621679043992"><span class="annot"><span class="annottext">toConstr :: DataType -&gt; Constr
+</span><a href="#local-6989586621679043992"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">DataType
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621679043991"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DataType
+</span><a href="#local-6989586621679043991"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c DataType
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-97"></span><span>  </span><span id="local-6989586621679043990"><span class="annot"><span class="annottext">dataTypeOf :: DataType -&gt; DataType
+</span><a href="#local-6989586621679043990"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">DataType
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Data.Generics.Basics.DataType&quot;</span></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043964"><span id="local-6989586621679043966"><span id="local-6989586621679043968"><span id="local-6989586621679043970"><span id="local-6989586621679043972"><span id="local-6989586621679043974"><span id="local-6989586621679043976"><span id="local-6989586621679043978"><span id="local-6989586621679043980"><span id="local-6989586621679043982"><span id="local-6989586621679043987"><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Handle</span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-103"></span><span>  </span><span id="local-6989586621679043963"><span class="annot"><span class="annottext">toConstr :: Handle -&gt; Constr
+</span><a href="#local-6989586621679043963"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-104"></span><span>  </span><span id="local-6989586621679043962"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Handle
+</span><a href="#local-6989586621679043962"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c Handle
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-105"></span><span>  </span><span id="local-6989586621679043961"><span class="annot"><span class="annottext">dataTypeOf :: Handle -&gt; DataType
+</span><a href="#local-6989586621679043961"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">Handle
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.IOBase.Handle&quot;</span></span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span id="local-6989586621679043960"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043934"><span id="local-6989586621679043936"><span id="local-6989586621679043938"><span id="local-6989586621679043940"><span id="local-6989586621679043942"><span id="local-6989586621679043944"><span id="local-6989586621679043946"><span id="local-6989586621679043948"><span id="local-6989586621679043950"><span id="local-6989586621679043952"><span id="local-6989586621679043957"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043960"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">StablePtr</span></span><span> </span><span class="annot"><a href="#local-6989586621679043960"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679043933"><span class="annot"><span class="annottext">toConstr :: StablePtr a -&gt; Constr
+</span><a href="#local-6989586621679043933"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">StablePtr a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-112"></span><span>  </span><span id="local-6989586621679043932"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (StablePtr a)
+</span><a href="#local-6989586621679043932"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (StablePtr a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-113"></span><span>  </span><span id="local-6989586621679043931"><span class="annot"><span class="annottext">dataTypeOf :: StablePtr a -&gt; DataType
+</span><a href="#local-6989586621679043931"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">StablePtr a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.Stable.StablePtr&quot;</span></span></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#ifdef __GLASGOW_HASKELL__
+</span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043905"><span id="local-6989586621679043907"><span id="local-6989586621679043909"><span id="local-6989586621679043911"><span id="local-6989586621679043913"><span id="local-6989586621679043915"><span id="local-6989586621679043917"><span id="local-6989586621679043919"><span id="local-6989586621679043921"><span id="local-6989586621679043923"><span id="local-6989586621679043928"><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ThreadId</span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-120"></span><span>  </span><span id="local-6989586621679043904"><span class="annot"><span class="annottext">toConstr :: ThreadId -&gt; Constr
+</span><a href="#local-6989586621679043904"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">ThreadId
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-121"></span><span>  </span><span id="local-6989586621679043903"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ThreadId
+</span><a href="#local-6989586621679043903"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c ThreadId
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-122"></span><span>  </span><span id="local-6989586621679043902"><span class="annot"><span class="annottext">dataTypeOf :: ThreadId -&gt; DataType
+</span><a href="#local-6989586621679043902"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">ThreadId
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.Conc.ThreadId&quot;</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- Dubious instances (7)</span><span>
+</span><span id="line-128"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#ifdef __GLASGOW_HASKELL__
+</span><span id="local-6989586621679043901"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043875"><span id="local-6989586621679043877"><span id="local-6989586621679043879"><span id="local-6989586621679043881"><span id="local-6989586621679043883"><span id="local-6989586621679043885"><span id="local-6989586621679043887"><span id="local-6989586621679043889"><span id="local-6989586621679043891"><span id="local-6989586621679043893"><span id="local-6989586621679043898"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043901"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="annot"><a href="#local-6989586621679043901"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-132"></span><span>  </span><span id="local-6989586621679043874"><span class="annot"><span class="annottext">toConstr :: TVar a -&gt; Constr
+</span><a href="#local-6989586621679043874"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">TVar a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-133"></span><span>  </span><span id="local-6989586621679043873"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (TVar a)
+</span><a href="#local-6989586621679043873"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (TVar a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-134"></span><span>  </span><span id="local-6989586621679043872"><span class="annot"><span class="annottext">dataTypeOf :: TVar a -&gt; DataType
+</span><a href="#local-6989586621679043872"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">TVar a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.Conc.TVar&quot;</span></span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-139"></span><span>
+</span><span id="line-140"></span><span id="local-6989586621679043871"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043845"><span id="local-6989586621679043847"><span id="local-6989586621679043849"><span id="local-6989586621679043851"><span id="local-6989586621679043853"><span id="local-6989586621679043855"><span id="local-6989586621679043857"><span id="local-6989586621679043859"><span id="local-6989586621679043861"><span id="local-6989586621679043863"><span id="local-6989586621679043868"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043871"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MVar</span></span><span> </span><span class="annot"><a href="#local-6989586621679043871"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-141"></span><span>  </span><span id="local-6989586621679043844"><span class="annot"><span class="annottext">toConstr :: MVar a -&gt; Constr
+</span><a href="#local-6989586621679043844"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">MVar a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-142"></span><span>  </span><span id="local-6989586621679043843"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (MVar a)
+</span><a href="#local-6989586621679043843"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (MVar a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-143"></span><span>  </span><span id="local-6989586621679043842"><span class="annot"><span class="annottext">dataTypeOf :: MVar a -&gt; DataType
+</span><a href="#local-6989586621679043842"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">MVar a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.Conc.MVar&quot;</span></span></span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span>
+</span><span id="line-146"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#ifdef __GLASGOW_HASKELL__
+</span><span id="local-6989586621679043841"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043815"><span id="local-6989586621679043817"><span id="local-6989586621679043819"><span id="local-6989586621679043821"><span id="local-6989586621679043823"><span id="local-6989586621679043825"><span id="local-6989586621679043827"><span id="local-6989586621679043829"><span id="local-6989586621679043831"><span id="local-6989586621679043833"><span id="local-6989586621679043838"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043841"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">STM</span></span><span> </span><span class="annot"><a href="#local-6989586621679043841"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-150"></span><span>  </span><span id="local-6989586621679043814"><span class="annot"><span class="annottext">toConstr :: STM a -&gt; Constr
+</span><a href="#local-6989586621679043814"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">STM a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-151"></span><span>  </span><span id="local-6989586621679043813"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (STM a)
+</span><a href="#local-6989586621679043813"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (STM a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-152"></span><span>  </span><span id="local-6989586621679043812"><span class="annot"><span class="annottext">dataTypeOf :: STM a -&gt; DataType
+</span><a href="#local-6989586621679043812"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">STM a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.Conc.STM&quot;</span></span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-157"></span><span>
+</span><span id="line-158"></span><span id="local-6989586621679043810"><span id="local-6989586621679043811"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043784"><span id="local-6989586621679043786"><span id="local-6989586621679043788"><span id="local-6989586621679043790"><span id="local-6989586621679043792"><span id="local-6989586621679043794"><span id="local-6989586621679043796"><span id="local-6989586621679043798"><span id="local-6989586621679043800"><span id="local-6989586621679043802"><span id="local-6989586621679043807"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043811"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043810"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ST</span></span><span> </span><span class="annot"><a href="#local-6989586621679043811"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679043810"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-159"></span><span>  </span><span id="local-6989586621679043783"><span class="annot"><span class="annottext">toConstr :: ST s a -&gt; Constr
+</span><a href="#local-6989586621679043783"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">ST s a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-160"></span><span>  </span><span id="local-6989586621679043782"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (ST s a)
+</span><a href="#local-6989586621679043782"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (ST s a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-161"></span><span>  </span><span id="local-6989586621679043781"><span class="annot"><span class="annottext">dataTypeOf :: ST s a -&gt; DataType
+</span><a href="#local-6989586621679043781"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">ST s a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.ST.ST&quot;</span></span></span></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-165"></span><span>
+</span><span id="line-166"></span><span id="local-6989586621679043780"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043754"><span id="local-6989586621679043756"><span id="local-6989586621679043758"><span id="local-6989586621679043760"><span id="local-6989586621679043762"><span id="local-6989586621679043764"><span id="local-6989586621679043766"><span id="local-6989586621679043768"><span id="local-6989586621679043770"><span id="local-6989586621679043772"><span id="local-6989586621679043777"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043780"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IORef</span></span><span> </span><span class="annot"><a href="#local-6989586621679043780"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-167"></span><span>  </span><span id="local-6989586621679043753"><span class="annot"><span class="annottext">toConstr :: IORef a -&gt; Constr
+</span><a href="#local-6989586621679043753"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">IORef a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-168"></span><span>  </span><span id="local-6989586621679043752"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (IORef a)
+</span><a href="#local-6989586621679043752"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (IORef a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-169"></span><span>  </span><span id="local-6989586621679043751"><span class="annot"><span class="annottext">dataTypeOf :: IORef a -&gt; DataType
+</span><a href="#local-6989586621679043751"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">IORef a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.IOBase.IORef&quot;</span></span></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span>
+</span><span id="line-172"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span id="local-6989586621679043750"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043724"><span id="local-6989586621679043726"><span id="local-6989586621679043728"><span id="local-6989586621679043730"><span id="local-6989586621679043732"><span id="local-6989586621679043734"><span id="local-6989586621679043736"><span id="local-6989586621679043738"><span id="local-6989586621679043740"><span id="local-6989586621679043742"><span id="local-6989586621679043747"><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621679043750"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621679043750"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-175"></span><span>  </span><span id="local-6989586621679043723"><span class="annot"><span class="annottext">toConstr :: IO a -&gt; Constr
+</span><a href="#local-6989586621679043723"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">IO a
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-176"></span><span>  </span><span id="local-6989586621679043722"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (IO a)
+</span><a href="#local-6989586621679043722"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (IO a)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-177"></span><span>  </span><span id="local-6989586621679043721"><span class="annot"><span class="annottext">dataTypeOf :: IO a -&gt; DataType
+</span><a href="#local-6989586621679043721"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">IO a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC.IOBase.IO&quot;</span></span></span><span>
+</span><span id="line-178"></span><span>
+</span><span id="line-179"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span class="hs-comment">--</span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- A last resort for functions</span><span>
+</span><span id="line-183"></span><span class="hs-comment">--</span><span>
+</span><span id="line-184"></span><span>
+</span><span id="line-185"></span><span id="local-6989586621679043719"><span id="local-6989586621679043720"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679043694"><span id="local-6989586621679043696"><span id="local-6989586621679043698"><span id="local-6989586621679043700"><span id="local-6989586621679043702"><span id="local-6989586621679043704"><span id="local-6989586621679043706"><span id="local-6989586621679043708"><span id="local-6989586621679043711"><span id="local-6989586621679043716"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679043720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679043719"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679043720"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679043719"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-186"></span><span>  </span><span id="local-6989586621679043693"><span class="annot"><span class="annottext">toConstr :: (a -&gt; b) -&gt; Constr
+</span><a href="#local-6989586621679043693"><span class="hs-identifier hs-var hs-var hs-var hs-var">toConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;toConstr&quot;</span></span><span>
+</span><span id="line-187"></span><span>  </span><span id="local-6989586621679043692"><span class="annot"><span class="annottext">gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (a -&gt; b)
+</span><a href="#local-6989586621679043692"><span class="hs-identifier hs-var hs-var hs-var hs-var">gunfold</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">forall r. r -&gt; c r
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Constr -&gt; c (a -&gt; b)
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;gunfold&quot;</span></span><span>
+</span><span id="line-188"></span><span>  </span><span id="local-6989586621679043691"><span class="annot"><span class="annottext">dataTypeOf :: (a -&gt; b) -&gt; DataType
+</span><a href="#local-6989586621679043691"><span class="hs-identifier hs-var hs-var hs-var hs-var">dataTypeOf</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; DataType
+</span><a href="Data.Generics.Instances.html#myMkNoRepType"><span class="hs-identifier hs-var">myMkNoRepType</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Prelude.(-&gt;)&quot;</span></span><span>
+</span><span id="line-189"></span><span>  </span><span id="local-6989586621679043690"><span class="annot"><span class="annottext">dataCast2 :: (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (a -&gt; b))
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">dataCast2</span></span></span><span> </span><span id="local-6989586621679043688"><span class="annot"><span class="annottext">forall d e. (Data d, Data e) =&gt; c (t d e)
+</span><a href="#local-6989586621679043688"><span class="hs-identifier hs-var">f</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">c (t a b) -&gt; Maybe (c (a -&gt; b))
+forall k1 k2 k3 (c :: k1 -&gt; *) (t :: k2 -&gt; k3 -&gt; k1)
+       (t' :: k2 -&gt; k3 -&gt; k1) (a :: k2) (b :: k3).
+(Typeable t, Typeable t') =&gt;
+c (t a b) -&gt; Maybe (c (t' a b))
+</span><span class="hs-identifier hs-var">gcast2</span></span><span> </span><span class="annot"><span class="annottext">c (t a b)
+forall d e. (Data d, Data e) =&gt; c (t d e)
+</span><a href="#local-6989586621679043688"><span class="hs-identifier hs-var">f</span></a></span></span></span><span>
+</span><span id="line-190"></span><span>
+</span><span id="line-191"></span></pre></body></html>

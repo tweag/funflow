@@ -1,0 +1,193 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Data.Vinyl.Tutorial.Overview</title><link href="linuwial.css" rel="stylesheet" type="text/css" title="Linuwial" /><link rel="stylesheet" type="text/css" href="quick-jump.css" /><link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=PT+Sans:400,400i,700" /><script src="haddock-bundle.min.js" async="async" type="text/javascript"></script><script type="text/x-mathjax-config">MathJax.Hub.Config({ tex2jax: { processClass: "mathjax", ignoreClass: ".*" } });</script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script></head><body><div id="package-header"><span class="caption">vinyl-0.13.3: Extensible Records</span><ul class="links" id="page-menu"><li><a href="src/Data.Vinyl.Tutorial.Overview.html">Source</a></li><li><a href="index.html">Contents</a></li><li><a href="doc-index.html">Index</a></li></ul></div><div id="content"><div id="module-header"><table class="info"><tr><th>Safe Haskell</th><td>None</td></tr><tr><th>Language</th><td>Haskell2010</td></tr></table><p class="caption">Data.Vinyl.Tutorial.Overview</p></div><div id="description"><p class="caption">Description</p><div class="doc"><p>Vinyl is a general solution to the records problem in Haskell using
+    type level strings and other modern GHC features, featuring static
+    structural typing (with a subtyping relation), and automatic
+    row-polymorphic lenses. All this is possible without Template Haskell.</p><p>Let's work through a quick example. We'll need to enable some language
+    extensions first:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XDataKinds
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XPolyKinds
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XTypeApplications
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XTypeOperators
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XTypeFamilies
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XFlexibleContexts
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XFlexibleInstances
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XNoMonomorphismRestriction
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XGADTs
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XTypeSynonymInstances
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XTemplateHaskell
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:set -XStandaloneDeriving
+</code></strong></pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Vinyl
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Vinyl.Functor
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Control.Applicative
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Control.Lens hiding (Identity)
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Control.Lens.TH
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Char
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Test.DocTest
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Singletons.TH (genSingletons)
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>import Data.Maybe
+</code></strong></pre><p>Let's define a universe of fields which we want to use.</p><p>First of all, we need a data type defining the field labels:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>data Fields = Name | Age | Sleeping | Master deriving Show
+</code></strong></pre><p>Any record can be now described by a type-level list of these labels.
+    The <code>DataKinds</code> extension must be enabled to automatically turn all the
+    constructors of the <code>Field</code> type into types.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>type LifeForm = [Name, Age, Sleeping]
+</code></strong></pre><p>Now, we need a way to map our labels to concrete types. We use a type
+    family for this purpose. Unfortunately, type families aren't first class in Haskell.  That's
+    why we also need a data type, with which we will parametrise <code><a href="Data-Vinyl-Core.html#t:Rec" title="Data.Vinyl.Core">Rec</a></code>.
+    We also generate the necessary singletons for each field label using
+    Template Haskell.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>type family ElF (f :: Fields) :: * where
+  ElF Name = String
+  ElF Age = Int
+  ElF Sleeping = Bool
+  ElF Master = Rec Attr LifeForm
+newtype Attr f = Attr { _unAttr :: ElF f }
+makeLenses ''Attr
+genSingletons [ ''Fields ]
+instance Show (Attr Name) where show (Attr x) = &quot;name: &quot; ++ show x
+instance Show (Attr Age) where show (Attr x) = &quot;age: &quot; ++ show x
+instance Show (Attr Sleeping) where show (Attr x) = &quot;sleeping: &quot; ++ show x
+instance Show (Attr Master) where show (Attr x) = &quot;master: &quot; ++ show x
+:}
+</pre><p>To make field construction easier, we define an operator.  The first
+    argument of this operator is a singleton - a constructor bringing the
+    data-kinded field label type into the data level.  It's needed because
+    there can be multiple labels with the same field type, so by just
+    supplying a value of type <code>ElF f</code> there would be no way to deduce the
+    correct &quot;f&quot;.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let (=::) :: sing f -&gt; ElF f -&gt; Attr f
+    _ =:: x = Attr x
+:}
+</pre><p>Now, let's try to make an entity that represents a human:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let jon = (SName =:: &quot;jon&quot;)
+       :&amp; (SAge =:: 23)
+       :&amp; (SSleeping =:: False)
+       :&amp; RNil
+:}
+</pre><p>Automatically, we can show the record:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>print jon
+</code></strong>{name: &quot;jon&quot;, age: 23, sleeping: False}
+</pre><p>And its types are all inferred with no problem. Now, make a dog! Dogs
+are life-forms, but unlike humans, they have masters. So, let&#8217;s build
+my dog:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let tucker = (SName =:: &quot;tucker&quot;)
+          :&amp; (SAge =:: 9)
+          :&amp; (SSleeping =:: True)
+          :&amp; (SMaster =:: jon)
+          :&amp; RNil
+:}
+</pre><p>Now, if we want to wake entities up, we don't want to have to write a
+separate wake-up function for both dogs and humans (even though they
+are of different type). Luckily, we can use the built-in lenses to
+focus on a particular field in the record for access and update,
+without losing additional information:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let wakeUp :: (Sleeping &#8712; fields) =&gt; Rec Attr fields -&gt; Rec Attr fields
+    wakeUp = rput $ SSleeping =:: False
+:}
+</pre><p>Now, the type annotation on <code>wakeUp</code> was not necessary; I just wanted
+to show how intuitive the type is. Basically, it takes as an input
+any record that has a <code><a href="../base-4.14.3.0/Data-Bool.html#t:Bool" title="Data.Bool">Bool</a></code> field labelled <code>sleeping</code>, and modifies
+that specific field in the record accordingly.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let tucker' = wakeUp tucker
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let jon' = wakeUp jon
+</code></strong></pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>tucker' ^. rlens @Sleeping
+</code></strong>sleeping: False
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>tucker ^. rlens @Sleeping
+</code></strong>sleeping: True
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>jon' ^. rlens @Sleeping
+</code></strong>sleeping: False
+</pre><p>We can also access the entire lens for a field using the rLens
+function; since lenses are composable, it&#8217;s super easy to do deep
+update on a record:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let masterSleeping = rlens @Master . unAttr . rlens @Sleeping
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let tucker'' = masterSleeping .~ (SSleeping =:: True) $ tucker'
+</code></strong></pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>tucker'' ^. masterSleeping
+</code></strong>sleeping: True
+</pre><p>A record <code>Rec f xs</code> is a subtype of a record <code>Rec f ys</code> if <code>ys &#8838; xs</code>;
+that is to say, if one record can do everything that another record
+can, the former is a subtype of the latter. As such, we should be able
+to provide an upcast operator which &quot;forgets&quot; whatever makes one
+record different from another (whether it be extra data, or different
+order).</p><p>Therefore, the following works:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let upcastedTucker :: Rec Attr LifeForm
+    upcastedTucker = rcast tucker
+:}
+</pre><p>The subtyping relationship between record types is expressed with the
+<code><a href="Data-Vinyl-Lens.html#t:-60-:" title="Data.Vinyl.Lens">&lt;:</a></code> constraint; so, <code><a href="Data-Vinyl-Lens.html#v:rcast" title="Data.Vinyl.Lens">rcast</a></code> is of the following type:</p><pre>rcast :: r1 &lt;: r2 =&gt; Rec f r2 -&gt; Rec f r1</pre><p>Also provided is a &quot;&#8773;&quot; constraint which indicates record congruence
+(that is, two record types differ only in the order of their fields).</p><p>In fact, <code><a href="Data-Vinyl-Lens.html#v:rcast" title="Data.Vinyl.Lens">rcast</a></code> is actually given as a special case of the lens <code><a href="Data-Vinyl-Lens.html#v:rsubset" title="Data.Vinyl.Lens">rsubset</a></code>,
+which lets you modify entire (possibly non-contiguous) slices of a record!</p><p>Consider the following declaration:</p><pre>data Rec :: (u -&gt; *) -&gt; [u] -&gt; * where
+  RNil :: Rec f '[]
+  (:&amp;) :: f r -&gt; Rec f rs -&gt; Rec f (r ': rs)</pre><p>Records are implicitly parameterized over a kind <code>u</code>, which stands for the
+&quot;universe&quot; or key space. Keys (inhabitants of <code>u</code>) are then interpreted into
+the types of their values by the first parameter to <code><a href="Data-Vinyl-Core.html#t:Rec" title="Data.Vinyl.Core">Rec</a></code>, <code>f</code>. An extremely
+powerful aspect of Vinyl records is that you can construct natural
+transformations between different interpretation functors <code>f,g</code>, or postcompose
+some other functor onto the stack. This can be used to immerse each field of a
+record in some particular effect modality, and then the library functions can
+be used to traverse and accumulate these effects.</p><p>Let's imagine that we want to do validation on a record that
+represents a name and an age:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>type Person = [Name, Age]
+</code></strong></pre><p>We've decided that names must be alphabetic, and ages must be positive. For
+validation, we'll use <code><a href="../base-4.14.3.0/Data-Maybe.html#t:Maybe" title="Data.Maybe">Maybe</a></code> for now, though you should use a
+left-accumulating <code>Validation</code> type (the module <code>Data.Either.Validation</code>
+from the <code>either</code> package provides such a type, though we do not
+cover it here).</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let goodPerson :: Rec Attr Person
+    goodPerson = (SName =:: &quot;Jon&quot;)
+              :&amp; (SAge =:: 20)
+              :&amp; RNil
+:}
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let badPerson = (SName =:: &quot;J#@#$on&quot;)
+             :&amp; (SAge =:: 20)
+             :&amp; RNil
+:}
+</pre><p>We'll give validation a (rather poor) shot.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let
+    validatePerson :: Rec Attr Person -&gt; Maybe (Rec Attr Person)
+    validatePerson p = (\n a -&gt; (SName =:: n) :&amp; (SAge =:: a) :&amp; RNil) &lt;$&gt; vName &lt;*&gt; vAge
+      where
+      vName = validateName $ p ^. rlens @Name . unAttr
+      vAge  = validateAge $ p ^. rlens @Age . unAttr
+      validateName str | all isAlpha str = Just str
+      validateName _ = Nothing
+      validateAge i | i &gt;= 0 = Just i
+      validateAge _ = Nothing
+:}
+</pre><p>Let's try it out:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust $ validatePerson goodPerson
+</code></strong>True
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust $ validatePerson badPerson
+</code></strong>False
+</pre><p>The results are as expected (<code>Just</code> for <code>goodPerson</code>, and a <code>Nothing</code> for
+<code>badPerson</code>); but this was not very fun to build.</p><p>Further, it would be nice to have some notion of a partial record;
+that is, if part of it can't be validated, it would still be nice to
+be able to access the rest. What if we could make a version of this
+record where the elements themselves were validation functions, and
+then that record could be applied to a plain one, to get a record of
+validated fields? That's what we&#8217;re going to do.</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>type Validator f = Lift (-&gt;) f (Maybe :. f)
+</code></strong></pre><p>Let's parameterize a record by it: when we do, then an element of type
+<code>a</code> should be a function <code>Identity a -&gt; Result e a</code>:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let lift f = Lift $ Compose . f
+    validateName (Attr str) | all isAlpha str = Just (Attr str)
+    validateName _ = Nothing
+    validateAge (Attr i) | i &gt;= 0 = Just (Attr i)
+    validateAge _ = Nothing
+    vperson :: Rec (Validator Attr) Person
+    vperson = lift validateName :&amp; lift validateAge :&amp; RNil
+:}
+</pre><p>And we can use the special application operator <code><a href="Data-Vinyl-Core.html#v:-60--60--42--62--62-" title="Data.Vinyl.Core">&lt;&lt;*&gt;&gt;</a></code> (which is
+analogous to <code><a href="../base-4.14.3.0/Control-Applicative.html#v:-60--42--62-" title="Control.Applicative">&lt;*&gt;</a></code>, but generalized a bit) to use this to validate a
+record:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let goodPersonResult = vperson &lt;&lt;*&gt;&gt; goodPerson
+</code></strong><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let badPersonResult  = vperson &lt;&lt;*&gt;&gt; badPerson
+</code></strong></pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust . getCompose $ goodPersonResult ^. rlens @Name
+</code></strong>True
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust . getCompose $ goodPersonResult ^. rlens @Age
+</code></strong>True
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust . getCompose $ badPersonResult ^. rlens @Name
+</code></strong>False
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust . getCompose $ badPersonResult ^. rlens @Age
+</code></strong>True
+</pre><p>So now we have a partial record, and we can still do stuff with its contents.
+Next, we can even recover the original behavior of the validator (that is, to
+give us a value of type <code>Maybe (Rec Attr Person)</code>) using <code><a href="Data-Vinyl-Core.html#v:rtraverse" title="Data.Vinyl.Core">rtraverse</a></code>:</p><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>:{
+</code></strong>let mgoodPerson :: Maybe (Rec Attr Person)
+    mgoodPerson = rtraverse getCompose goodPersonResult
+:}
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>let mbadPerson  = rtraverse getCompose badPersonResult
+</code></strong></pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust mgoodPerson
+</code></strong>True
+</pre><pre class="screen"><code class="prompt">&gt;&gt;&gt; </code><strong class="userinput"><code>isJust mbadPerson
+</code></strong>False
+</pre></div></div><div id="interface"></div></div><div id="footer"><p>Produced by <a href="http://www.haskell.org/haddock/">Haddock</a> version 2.24.2</p></div></body></html>

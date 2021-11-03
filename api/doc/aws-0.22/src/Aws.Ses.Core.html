@@ -1,0 +1,798 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Ses.Core</span><span>
+</span><span id="line-2"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesError"><span class="hs-identifier">SesError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-3"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier">SesMetadata</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier">SesConfiguration</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesEuWest1"><span class="hs-identifier">sesEuWest1</span></a></span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesUsEast"><span class="hs-identifier">sesUsEast</span></a></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier">sesUsEast1</span></a></span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesUsWest2"><span class="hs-identifier">sesUsWest2</span></a></span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesHttpsGet"><span class="hs-identifier">sesHttpsGet</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesHttpsPost"><span class="hs-identifier">sesHttpsPost</span></a></span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesSignQuery"><span class="hs-identifier">sesSignQuery</span></a></span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesResponseConsumer"><span class="hs-identifier">sesResponseConsumer</span></a></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#RawMessage"><span class="hs-identifier">RawMessage</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier">Destination</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier">EmailAddress</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Sender"><span class="hs-identifier">Sender</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#sesAsQuery"><span class="hs-identifier">sesAsQuery</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Blaze.ByteString.Builder</span></span><span>       </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Blaze</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Blaze.ByteString.Builder.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Blaze8</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>              </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>                  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">mplus</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Resource</span></span><span>   </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">throwM</span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>                </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Base64</span></span><span>         </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B64</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span>          </span><span class="hs-special">(</span><span class="hs-comment">{-IsString-}</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.IORef</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Semigroup</span></span><span>                 </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Sem</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>                      </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TE</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Conduit</span></span><span>           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Types</span></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">($/)</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">($//)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span>                </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Cu</span></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">data</span><span> </span><span id="SesError"><span class="annot"><a href="Aws.Ses.Core.html#SesError"><span class="hs-identifier hs-var">SesError</span></a></span></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="SesError"><span class="annot"><a href="Aws.Ses.Core.html#SesError"><span class="hs-identifier hs-var">SesError</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-48"></span><span>        </span><span id="sesStatusCode"><span class="annot"><span class="annottext">SesError -&gt; Status
+</span><a href="Aws.Ses.Core.html#sesStatusCode"><span class="hs-identifier hs-var hs-var">sesStatusCode</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Status</span></span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="sesErrorCode"><span class="annot"><span class="annottext">SesError -&gt; Text
+</span><a href="Aws.Ses.Core.html#sesErrorCode"><span class="hs-identifier hs-var hs-var">sesErrorCode</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-50"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="sesErrorMessage"><span class="annot"><span class="annottext">SesError -&gt; Text
+</span><a href="Aws.Ses.Core.html#sesErrorMessage"><span class="hs-identifier hs-var hs-var">sesErrorMessage</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-51"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233387"><span id="local-6989586621679233389"><span id="local-6989586621679233391"><span class="annot"><span class="annottext">Int -&gt; SesError -&gt; ShowS
+[SesError] -&gt; ShowS
+SesError -&gt; String
+(Int -&gt; SesError -&gt; ShowS)
+-&gt; (SesError -&gt; String) -&gt; ([SesError] -&gt; ShowS) -&gt; Show SesError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SesError] -&gt; ShowS
+$cshowList :: [SesError] -&gt; ShowS
+show :: SesError -&gt; String
+$cshow :: SesError -&gt; String
+showsPrec :: Int -&gt; SesError -&gt; ShowS
+$cshowsPrec :: Int -&gt; SesError -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233378"><span id="local-6989586621679233380"><span id="local-6989586621679233382"><span class="annot"><span class="hs-identifier hs-type">C.Exception</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesError"><span class="hs-identifier hs-type">SesError</span></a></span></span></span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">data</span><span> </span><span id="SesMetadata"><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-var">SesMetadata</span></a></span></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="SesMetadata"><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-var">SesMetadata</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-58"></span><span>        </span><span id="requestId"><span class="annot"><span class="annottext">SesMetadata -&gt; Maybe Text
+</span><a href="Aws.Ses.Core.html#requestId"><span class="hs-identifier hs-var hs-var">requestId</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-59"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233369"><span id="local-6989586621679233371"><span id="local-6989586621679233373"><span class="annot"><span class="annottext">Int -&gt; SesMetadata -&gt; ShowS
+[SesMetadata] -&gt; ShowS
+SesMetadata -&gt; String
+(Int -&gt; SesMetadata -&gt; ShowS)
+-&gt; (SesMetadata -&gt; String)
+-&gt; ([SesMetadata] -&gt; ShowS)
+-&gt; Show SesMetadata
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SesMetadata] -&gt; ShowS
+$cshowList :: [SesMetadata] -&gt; ShowS
+show :: SesMetadata -&gt; String
+$cshow :: SesMetadata -&gt; String
+showsPrec :: Int -&gt; SesMetadata -&gt; ShowS
+$cshowsPrec :: Int -&gt; SesMetadata -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Loggable"><span class="hs-identifier hs-type">Loggable</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621679233366"><span class="annot"><span class="annottext">toLogText :: SesMetadata -&gt; Text
+</span><a href="Aws.Core.html#toLogText"><span class="hs-identifier hs-var hs-var hs-var hs-var">toLogText</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span> </span><span id="local-6989586621679233364"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233364"><span class="hs-identifier hs-var">rid</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;SES: request ID=&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Text
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`mappend`</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe Text -&gt; Text
+forall a. a -&gt; Maybe a -&gt; a
+</span><span class="hs-identifier hs-var">fromMaybe</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;&lt;none&gt;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233364"><span class="hs-identifier hs-var">rid</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233358"><span id="local-6989586621679233360"><span class="annot"><span class="hs-identifier hs-type">Sem.Semigroup</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span> </span><span id="local-6989586621679233356"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233356"><span class="hs-identifier hs-var">r1</span></a></span></span><span> </span><span id="local-6989586621679233355"><span class="annot"><span class="annottext">&lt;&gt; :: SesMetadata -&gt; SesMetadata -&gt; SesMetadata
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span> </span><span id="local-6989586621679233354"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233354"><span class="hs-identifier hs-var">r2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; SesMetadata
+</span><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-var">SesMetadata</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233356"><span class="hs-identifier hs-var">r1</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Maybe Text -&gt; Maybe Text
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m a -&gt; m a
+</span><span class="hs-operator hs-var">`mplus`</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233354"><span class="hs-identifier hs-var">r2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233349"><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-69"></span><span>    </span><span id="local-6989586621679233347"><span class="annot"><span class="annottext">mempty :: SesMetadata
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; SesMetadata
+</span><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-var">SesMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621679233346"><span class="annot"><span class="annottext">mappend :: SesMetadata -&gt; SesMetadata -&gt; SesMetadata
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SesMetadata -&gt; SesMetadata -&gt; SesMetadata
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">(Sem.&lt;&gt;)</span></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">data</span><span> </span><span id="SesConfiguration"><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-var">SesConfiguration</span></a></span></span><span> </span><span id="local-6989586621679233478"><span class="annot"><a href="#local-6989586621679233478"><span class="hs-identifier hs-type">qt</span></a></span></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="SesConfiguration"><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-var">SesConfiguration</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-74"></span><span>        </span><span id="sesiHttpMethod"><span class="annot"><span class="annottext">SesConfiguration qt -&gt; Method
+</span><a href="Aws.Ses.Core.html#sesiHttpMethod"><span class="hs-identifier hs-var hs-var">sesiHttpMethod</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.Core.html#Method"><span class="hs-identifier hs-type">Method</span></a></span><span>
+</span><span id="line-75"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="sesiHost"><span class="annot"><span class="annottext">SesConfiguration qt -&gt; ByteString
+</span><a href="Aws.Ses.Core.html#sesiHost"><span class="hs-identifier hs-var hs-var">sesiHost</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span>
+</span><span id="line-76"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233337"><span id="local-6989586621679233339"><span id="local-6989586621679233341"><span class="annot"><span class="annottext">Int -&gt; SesConfiguration qt -&gt; ShowS
+[SesConfiguration qt] -&gt; ShowS
+SesConfiguration qt -&gt; String
+(Int -&gt; SesConfiguration qt -&gt; ShowS)
+-&gt; (SesConfiguration qt -&gt; String)
+-&gt; ([SesConfiguration qt] -&gt; ShowS)
+-&gt; Show (SesConfiguration qt)
+forall qt. Int -&gt; SesConfiguration qt -&gt; ShowS
+forall qt. [SesConfiguration qt] -&gt; ShowS
+forall qt. SesConfiguration qt -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SesConfiguration qt] -&gt; ShowS
+$cshowList :: forall qt. [SesConfiguration qt] -&gt; ShowS
+show :: SesConfiguration qt -&gt; String
+$cshow :: forall qt. SesConfiguration qt -&gt; String
+showsPrec :: Int -&gt; SesConfiguration qt -&gt; ShowS
+$cshowsPrec :: forall qt. Int -&gt; SesConfiguration qt -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- HTTP is not supported right now, always use HTTPS</span><span>
+</span><span id="line-80"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233334"><span class="annot"><a href="Aws.Core.html#DefaultServiceConfiguration"><span class="hs-identifier hs-type">DefaultServiceConfiguration</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span> </span><span class="annot"><a href="Aws.Core.html#NormalQuery"><span class="hs-identifier hs-type">NormalQuery</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-81"></span><span>    </span><span id="local-6989586621679233332"><span class="annot"><span class="annottext">defServiceConfig :: SesConfiguration NormalQuery
+</span><a href="Aws.Core.html#defServiceConfig"><span class="hs-identifier hs-var hs-var hs-var hs-var">defServiceConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; SesConfiguration NormalQuery
+</span><a href="Aws.Ses.Core.html#sesHttpsPost"><span class="hs-identifier hs-var">sesHttpsPost</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier hs-var">sesUsEast1</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233328"><span class="annot"><a href="Aws.Core.html#DefaultServiceConfiguration"><span class="hs-identifier hs-type">DefaultServiceConfiguration</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span> </span><span class="annot"><a href="Aws.Core.html#UriOnlyQuery"><span class="hs-identifier hs-type">UriOnlyQuery</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-84"></span><span>    </span><span id="local-6989586621679233327"><span class="annot"><span class="annottext">defServiceConfig :: SesConfiguration UriOnlyQuery
+</span><a href="#local-6989586621679233327"><span class="hs-identifier hs-var hs-var hs-var hs-var">defServiceConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; SesConfiguration UriOnlyQuery
+forall qt. ByteString -&gt; SesConfiguration qt
+</span><a href="Aws.Ses.Core.html#sesHttpsGet"><span class="hs-identifier hs-var">sesHttpsGet</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier hs-var">sesUsEast1</span></a></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Aws.Ses.Core.html#sesEuWest1"><span class="hs-identifier hs-type">sesEuWest1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span>
+</span><span id="line-87"></span><span id="sesEuWest1"><span class="annot"><span class="annottext">sesEuWest1 :: ByteString
+</span><a href="Aws.Ses.Core.html#sesEuWest1"><span class="hs-identifier hs-var hs-var">sesEuWest1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;email.eu-west-1.amazonaws.com&quot;</span></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="annot"><a href="Aws.Ses.Core.html#sesUsEast"><span class="hs-identifier hs-type">sesUsEast</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span>
+</span><span id="line-90"></span><span id="sesUsEast"><span class="annot"><span class="annottext">sesUsEast :: ByteString
+</span><a href="Aws.Ses.Core.html#sesUsEast"><span class="hs-identifier hs-var hs-var">sesUsEast</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier hs-var">sesUsEast1</span></a></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="annot"><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier hs-type">sesUsEast1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span>
+</span><span id="line-93"></span><span id="sesUsEast1"><span class="annot"><span class="annottext">sesUsEast1 :: ByteString
+</span><a href="Aws.Ses.Core.html#sesUsEast1"><span class="hs-identifier hs-var hs-var">sesUsEast1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;email.us-east-1.amazonaws.com&quot;</span></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Aws.Ses.Core.html#sesUsWest2"><span class="hs-identifier hs-type">sesUsWest2</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span>
+</span><span id="line-96"></span><span id="sesUsWest2"><span class="annot"><span class="annottext">sesUsWest2 :: ByteString
+</span><a href="Aws.Ses.Core.html#sesUsWest2"><span class="hs-identifier hs-var hs-var">sesUsWest2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;email.us-west-2.amazonaws.com&quot;</span></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span id="local-6989586621679233480"><span class="annot"><a href="Aws.Ses.Core.html#sesHttpsGet"><span class="hs-identifier hs-type">sesHttpsGet</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679233480"><span class="hs-identifier hs-type">qt</span></a></span></span><span>
+</span><span id="line-99"></span><span id="sesHttpsGet"><span class="annot"><span class="annottext">sesHttpsGet :: ByteString -&gt; SesConfiguration qt
+</span><a href="Aws.Ses.Core.html#sesHttpsGet"><span class="hs-identifier hs-var hs-var">sesHttpsGet</span></a></span></span><span> </span><span id="local-6989586621679233326"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233326"><span class="hs-identifier hs-var">endpoint</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Method -&gt; ByteString -&gt; SesConfiguration qt
+forall qt. Method -&gt; ByteString -&gt; SesConfiguration qt
+</span><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-var">SesConfiguration</span></a></span><span> </span><span class="annot"><span class="annottext">Method
+</span><a href="Aws.Core.html#Get"><span class="hs-identifier hs-var">Get</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233326"><span class="hs-identifier hs-var">endpoint</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="annot"><a href="Aws.Ses.Core.html#sesHttpsPost"><span class="hs-identifier hs-type">sesHttpsPost</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span> </span><span class="annot"><a href="Aws.Core.html#NormalQuery"><span class="hs-identifier hs-type">NormalQuery</span></a></span><span>
+</span><span id="line-102"></span><span id="sesHttpsPost"><span class="annot"><span class="annottext">sesHttpsPost :: ByteString -&gt; SesConfiguration NormalQuery
+</span><a href="Aws.Ses.Core.html#sesHttpsPost"><span class="hs-identifier hs-var hs-var">sesHttpsPost</span></a></span></span><span> </span><span id="local-6989586621679233324"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233324"><span class="hs-identifier hs-var">endpoint</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Method -&gt; ByteString -&gt; SesConfiguration NormalQuery
+forall qt. Method -&gt; ByteString -&gt; SesConfiguration qt
+</span><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-var">SesConfiguration</span></a></span><span> </span><span class="annot"><span class="annottext">Method
+</span><a href="Aws.Core.html#PostQuery"><span class="hs-identifier hs-var">PostQuery</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233324"><span class="hs-identifier hs-var">endpoint</span></a></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span id="local-6989586621679233322"><span class="annot"><a href="Aws.Ses.Core.html#sesSignQuery"><span class="hs-identifier hs-type">sesSignQuery</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesConfiguration"><span class="hs-identifier hs-type">SesConfiguration</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679233322"><span class="hs-identifier hs-type">qt</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Core.html#SignatureData"><span class="hs-identifier hs-type">SignatureData</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Core.html#SignedQuery"><span class="hs-identifier hs-type">SignedQuery</span></a></span></span><span>
+</span><span id="line-105"></span><span id="sesSignQuery"><span class="annot"><span class="annottext">sesSignQuery :: [(ByteString, ByteString)]
+-&gt; SesConfiguration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.Ses.Core.html#sesSignQuery"><span class="hs-identifier hs-var hs-var">sesSignQuery</span></a></span></span><span> </span><span id="local-6989586621679233321"><span class="annot"><span class="annottext">[(ByteString, ByteString)]
+</span><a href="#local-6989586621679233321"><span class="hs-identifier hs-var">query</span></a></span></span><span> </span><span id="local-6989586621679233320"><span class="annot"><span class="annottext">SesConfiguration qt
+</span><a href="#local-6989586621679233320"><span class="hs-identifier hs-var">si</span></a></span></span><span> </span><span id="local-6989586621679233319"><span class="annot"><span class="annottext">SignatureData
+</span><a href="#local-6989586621679233319"><span class="hs-identifier hs-var">sd</span></a></span></span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SignedQuery :: Method
+-&gt; Protocol
+-&gt; ByteString
+-&gt; Int
+-&gt; ByteString
+-&gt; Query
+-&gt; Maybe UTCTime
+-&gt; Maybe (IO ByteString)
+-&gt; Maybe ByteString
+-&gt; Maybe (Digest MD5)
+-&gt; RequestHeaders
+-&gt; RequestHeaders
+-&gt; Maybe RequestBody
+-&gt; ByteString
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#SignedQuery"><span class="hs-identifier hs-type">SignedQuery</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-107"></span><span>        </span><span class="annot"><span class="annottext">sqMethod :: Method
+</span><a href="Aws.Core.html#sqMethod"><span class="hs-identifier hs-var">sqMethod</span></a></span><span>        </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SesConfiguration qt -&gt; Method
+forall qt. SesConfiguration qt -&gt; Method
+</span><a href="Aws.Ses.Core.html#sesiHttpMethod"><span class="hs-identifier hs-var hs-var">sesiHttpMethod</span></a></span><span> </span><span class="annot"><span class="annottext">SesConfiguration qt
+</span><a href="#local-6989586621679233320"><span class="hs-identifier hs-var">si</span></a></span><span>
+</span><span id="line-108"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqProtocol :: Protocol
+</span><a href="Aws.Core.html#sqProtocol"><span class="hs-identifier hs-var">sqProtocol</span></a></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Protocol
+</span><a href="Aws.Core.html#HTTPS"><span class="hs-identifier hs-var">HTTPS</span></a></span><span>
+</span><span id="line-109"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqHost :: ByteString
+</span><a href="Aws.Core.html#sqHost"><span class="hs-identifier hs-var">sqHost</span></a></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SesConfiguration qt -&gt; ByteString
+forall qt. SesConfiguration qt -&gt; ByteString
+</span><a href="Aws.Ses.Core.html#sesiHost"><span class="hs-identifier hs-var hs-var">sesiHost</span></a></span><span> </span><span class="annot"><span class="annottext">SesConfiguration qt
+</span><a href="#local-6989586621679233320"><span class="hs-identifier hs-var">si</span></a></span><span>
+</span><span id="line-110"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqPort :: Int
+</span><a href="Aws.Core.html#sqPort"><span class="hs-identifier hs-var">sqPort</span></a></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Protocol -&gt; Int
+</span><a href="Aws.Core.html#defaultPort"><span class="hs-identifier hs-var">defaultPort</span></a></span><span> </span><span class="annot"><span class="annottext">Protocol
+</span><a href="Aws.Core.html#HTTPS"><span class="hs-identifier hs-var">HTTPS</span></a></span><span>
+</span><span id="line-111"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqPath :: ByteString
+</span><a href="Aws.Core.html#sqPath"><span class="hs-identifier hs-var">sqPath</span></a></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;/&quot;</span></span><span>
+</span><span id="line-112"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqQuery :: Query
+</span><a href="Aws.Core.html#sqQuery"><span class="hs-identifier hs-var">sqQuery</span></a></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(ByteString, ByteString)] -&gt; Query
+</span><span class="hs-identifier hs-var">HTTP.simpleQueryToQuery</span></span><span> </span><span class="annot"><span class="annottext">[(ByteString, ByteString)]
+</span><a href="#local-6989586621679233308"><span class="hs-identifier hs-var">query'</span></a></span><span>
+</span><span id="line-113"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqDate :: Maybe UTCTime
+</span><a href="Aws.Core.html#sqDate"><span class="hs-identifier hs-var">sqDate</span></a></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UTCTime -&gt; Maybe UTCTime
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(UTCTime -&gt; Maybe UTCTime) -&gt; UTCTime -&gt; Maybe UTCTime
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">SignatureData -&gt; UTCTime
+</span><a href="Aws.Core.html#signatureTime"><span class="hs-identifier hs-var hs-var">signatureTime</span></a></span><span> </span><span class="annot"><span class="annottext">SignatureData
+</span><a href="#local-6989586621679233319"><span class="hs-identifier hs-var">sd</span></a></span><span>
+</span><span id="line-114"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqAuthorization :: Maybe (IO ByteString)
+</span><a href="Aws.Core.html#sqAuthorization"><span class="hs-identifier hs-var">sqAuthorization</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (IO ByteString)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-115"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqContentType :: Maybe ByteString
+</span><a href="Aws.Core.html#sqContentType"><span class="hs-identifier hs-var">sqContentType</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-116"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqContentMd5 :: Maybe (Digest MD5)
+</span><a href="Aws.Core.html#sqContentMd5"><span class="hs-identifier hs-var">sqContentMd5</span></a></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (Digest MD5)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-117"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqAmzHeaders :: RequestHeaders
+</span><a href="Aws.Core.html#sqAmzHeaders"><span class="hs-identifier hs-var">sqAmzHeaders</span></a></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RequestHeaders
+</span><a href="#local-6989586621679233301"><span class="hs-identifier hs-var">amzHeaders</span></a></span><span>
+</span><span id="line-118"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqOtherHeaders :: RequestHeaders
+</span><a href="Aws.Core.html#sqOtherHeaders"><span class="hs-identifier hs-var">sqOtherHeaders</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-119"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqBody :: Maybe RequestBody
+</span><a href="Aws.Core.html#sqBody"><span class="hs-identifier hs-var">sqBody</span></a></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe RequestBody
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-120"></span><span>      </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">sqStringToSign :: ByteString
+</span><a href="Aws.Core.html#sqStringToSign"><span class="hs-identifier hs-var">sqStringToSign</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233297"><span class="hs-identifier hs-var">stringToSign</span></a></span><span>
+</span><span id="line-121"></span><span>      </span><span class="hs-special">}</span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-123"></span><span>      </span><span id="local-6989586621679233297"><span class="annot"><span class="annottext">stringToSign :: ByteString
+</span><a href="#local-6989586621679233297"><span class="hs-identifier hs-var hs-var">stringToSign</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UTCTime -&gt; ByteString
+</span><a href="Aws.Core.html#fmtRfc822Time"><span class="hs-identifier hs-var">fmtRfc822Time</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SignatureData -&gt; UTCTime
+</span><a href="Aws.Core.html#signatureTime"><span class="hs-identifier hs-var hs-var">signatureTime</span></a></span><span> </span><span class="annot"><span class="annottext">SignatureData
+</span><a href="#local-6989586621679233319"><span class="hs-identifier hs-var">sd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>      </span><span id="local-6989586621679233295"><span class="annot"><span class="annottext">credentials :: Credentials
+</span><a href="#local-6989586621679233295"><span class="hs-identifier hs-var hs-var">credentials</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SignatureData -&gt; Credentials
+</span><a href="Aws.Core.html#signatureCredentials"><span class="hs-identifier hs-var hs-var">signatureCredentials</span></a></span><span> </span><span class="annot"><span class="annottext">SignatureData
+</span><a href="#local-6989586621679233319"><span class="hs-identifier hs-var">sd</span></a></span><span>
+</span><span id="line-125"></span><span>      </span><span id="local-6989586621679233293"><span class="annot"><span class="annottext">accessKeyId :: ByteString
+</span><a href="#local-6989586621679233293"><span class="hs-identifier hs-var hs-var">accessKeyId</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Credentials -&gt; ByteString
+</span><a href="Aws.Core.html#accessKeyID"><span class="hs-identifier hs-var hs-var">accessKeyID</span></a></span><span> </span><span class="annot"><span class="annottext">Credentials
+</span><a href="#local-6989586621679233295"><span class="hs-identifier hs-var">credentials</span></a></span><span>
+</span><span id="line-126"></span><span>      </span><span id="local-6989586621679233301"><span class="annot"><span class="annottext">amzHeaders :: RequestHeaders
+</span><a href="#local-6989586621679233301"><span class="hs-identifier hs-var hs-var">amzHeaders</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe (HeaderName, ByteString)] -&gt; RequestHeaders
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span>
+</span><span id="line-127"></span><span>                    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">(HeaderName, ByteString) -&gt; Maybe (HeaderName, ByteString)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HeaderName
+</span><span class="hs-string">&quot;X-Amzn-Authorization&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233290"><span class="hs-identifier hs-var">authorization</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HeaderName
+</span><span class="hs-string">&quot;x-amz-security-token&quot;</span></span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (HeaderName, ByteString))
+-&gt; Maybe ByteString -&gt; Maybe (HeaderName, ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">`fmap`</span></span><span> </span><span class="annot"><span class="annottext">Credentials -&gt; Maybe ByteString
+</span><a href="Aws.Core.html#iamToken"><span class="hs-identifier hs-var hs-var">iamToken</span></a></span><span> </span><span class="annot"><span class="annottext">Credentials
+</span><a href="#local-6989586621679233295"><span class="hs-identifier hs-var">credentials</span></a></span><span>
+</span><span id="line-129"></span><span>                    </span><span class="hs-special">]</span><span>
+</span><span id="line-130"></span><span>      </span><span id="local-6989586621679233290"><span class="annot"><span class="annottext">authorization :: ByteString
+</span><a href="#local-6989586621679233290"><span class="hs-identifier hs-var hs-var">authorization</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.concat</span></span><span>
+</span><span id="line-131"></span><span>                    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;AWS3-HTTPS AWSAccessKeyId=&quot;</span></span><span>
+</span><span id="line-132"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233293"><span class="hs-identifier hs-var">accessKeyId</span></a></span><span>
+</span><span id="line-133"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;, Algorithm=HmacSHA256, Signature=&quot;</span></span><span>
+</span><span id="line-134"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Credentials -&gt; AuthorizationHash -&gt; ByteString -&gt; ByteString
+</span><a href="Aws.Core.html#signature"><span class="hs-keyword hs-var">signature</span></a></span><span> </span><span class="annot"><span class="annottext">Credentials
+</span><a href="#local-6989586621679233295"><span class="hs-identifier hs-var">credentials</span></a></span><span> </span><span class="annot"><span class="annottext">AuthorizationHash
+</span><a href="Aws.Core.html#HmacSHA256"><span class="hs-identifier hs-var">HmacSHA256</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233297"><span class="hs-identifier hs-var">stringToSign</span></a></span><span>
+</span><span id="line-135"></span><span>                    </span><span class="hs-special">]</span><span>
+</span><span id="line-136"></span><span>      </span><span id="local-6989586621679233308"><span class="annot"><span class="annottext">query' :: [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233308"><span class="hs-identifier hs-var hs-var">query'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;AWSAccessKeyId&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679233293"><span class="hs-identifier hs-var">accessKeyId</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ByteString, ByteString)
+-&gt; [(ByteString, ByteString)] -&gt; [(ByteString, ByteString)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[(ByteString, ByteString)]
+</span><a href="#local-6989586621679233321"><span class="hs-identifier hs-var">query</span></a></span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span id="local-6989586621679233285"><span class="annot"><a href="Aws.Ses.Core.html#sesResponseConsumer"><span class="hs-identifier hs-type">sesResponseConsumer</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Cu.Cursor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Core.html#Response"><span class="hs-identifier hs-type">Response</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679233285"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>                    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IORef</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-type">SesMetadata</span></a></span><span>
+</span><span id="line-140"></span><span>                    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.Core.html#HTTPResponseConsumer"><span class="hs-identifier hs-type">HTTPResponseConsumer</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679233285"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-141"></span><span id="sesResponseConsumer"><span class="annot"><span class="annottext">sesResponseConsumer :: (Cursor -&gt; Response SesMetadata a)
+-&gt; IORef SesMetadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Ses.Core.html#sesResponseConsumer"><span class="hs-identifier hs-var hs-var">sesResponseConsumer</span></a></span></span><span> </span><span id="local-6989586621679233284"><span class="annot"><span class="annottext">Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233284"><span class="hs-identifier hs-var">inner</span></a></span></span><span> </span><span id="local-6989586621679233283"><span class="annot"><span class="annottext">IORef SesMetadata
+</span><a href="#local-6989586621679233283"><span class="hs-identifier hs-var">metadataRef</span></a></span></span><span> </span><span id="local-6989586621679233282"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679233282"><span class="hs-identifier hs-var">resp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; Response SesMetadata a)
+-&gt; IORef SesMetadata -&gt; HTTPResponseConsumer a
+forall m a.
+Monoid m =&gt;
+(Cursor -&gt; Response m a) -&gt; IORef m -&gt; HTTPResponseConsumer a
+</span><a href="Aws.Core.html#xmlCursorConsumer"><span class="hs-identifier hs-var">xmlCursorConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233280"><span class="hs-identifier hs-var">parse</span></a></span><span> </span><span class="annot"><span class="annottext">IORef SesMetadata
+</span><a href="#local-6989586621679233283"><span class="hs-identifier hs-var">metadataRef</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679233282"><span class="hs-identifier hs-var">resp</span></a></span><span>
+</span><span id="line-142"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-143"></span><span>      </span><span id="local-6989586621679233280"><span class="annot"><span class="annottext">parse :: Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233280"><span class="hs-identifier hs-var hs-var">parse</span></a></span></span><span> </span><span id="local-6989586621679233279"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233279"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-144"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679233278"><span class="annot"><span class="annottext">requestId' :: Maybe Text
+</span><a href="#local-6989586621679233278"><span class="hs-identifier hs-var hs-var">requestId'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Maybe Text
+forall a. [a] -&gt; Maybe a
+</span><span class="hs-identifier hs-var">listToMaybe</span></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Maybe Text) -&gt; [Text] -&gt; Maybe Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233279"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Text]) -&gt; [Text]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Text]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;RequestID&quot;</span></span><span>
+</span><span id="line-145"></span><span>        </span><span class="annot"><span class="annottext">SesMetadata -&gt; Response SesMetadata ()
+forall m. m -&gt; Response m ()
+</span><a href="Aws.Core.html#tellMetadata"><span class="hs-identifier hs-var">tellMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">(SesMetadata -&gt; Response SesMetadata ())
+-&gt; SesMetadata -&gt; Response SesMetadata ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; SesMetadata
+</span><a href="Aws.Ses.Core.html#SesMetadata"><span class="hs-identifier hs-var">SesMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679233278"><span class="hs-identifier hs-var">requestId'</span></a></span><span>
+</span><span id="line-146"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233279"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Cursor]) -&gt; [Cursor]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$/</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Cursor]
+</span><span class="hs-identifier hs-var">Cu.laxElement</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Error&quot;</span></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-147"></span><span>          </span><span class="hs-special">[</span><span class="hs-special">]</span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233284"><span class="hs-identifier hs-var">inner</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233279"><span class="hs-identifier hs-var">cursor</span></a></span><span>
+</span><span id="line-148"></span><span>          </span><span class="hs-special">(</span><span id="local-6989586621679233273"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233273"><span class="hs-identifier hs-var">err</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[Cursor]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233272"><span class="hs-identifier hs-var">fromError</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233273"><span class="hs-identifier hs-var">err</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span>      </span><span id="local-6989586621679233272"><span class="annot"><span class="annottext">fromError :: Cursor -&gt; Response SesMetadata a
+</span><a href="#local-6989586621679233272"><span class="hs-identifier hs-var hs-var">fromError</span></a></span></span><span> </span><span id="local-6989586621679233271"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233271"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-151"></span><span>        </span><span id="local-6989586621679233270"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233270"><span class="hs-identifier hs-var">errCode</span></a></span></span><span>    </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Text] -&gt; Response SesMetadata Text
+forall (m :: * -&gt; *) a. MonadThrow m =&gt; String -&gt; [a] -&gt; m a
+</span><a href="Aws.Core.html#force"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Missing Error Code&quot;</span></span><span>    </span><span class="annot"><span class="annottext">([Text] -&gt; Response SesMetadata Text)
+-&gt; [Text] -&gt; Response SesMetadata Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233271"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Text]) -&gt; [Text]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Text]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Code&quot;</span></span><span>
+</span><span id="line-152"></span><span>        </span><span id="local-6989586621679233268"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233268"><span class="hs-identifier hs-var">errMessage</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Text] -&gt; Response SesMetadata Text
+forall (m :: * -&gt; *) a. MonadThrow m =&gt; String -&gt; [a] -&gt; m a
+</span><a href="Aws.Core.html#force"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Missing Error Message&quot;</span></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Response SesMetadata Text)
+-&gt; [Text] -&gt; Response SesMetadata Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679233271"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Text]) -&gt; [Text]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$//</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Cursor -&gt; [Text]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Message&quot;</span></span><span>
+</span><span id="line-153"></span><span>        </span><span class="annot"><span class="annottext">SesError -&gt; Response SesMetadata a
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="annot"><span class="annottext">(SesError -&gt; Response SesMetadata a)
+-&gt; SesError -&gt; Response SesMetadata a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Status -&gt; Text -&gt; Text -&gt; SesError
+</span><a href="Aws.Ses.Core.html#SesError"><span class="hs-identifier hs-var">SesError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ()) -&gt; Status
+forall body. Response body -&gt; Status
+</span><span class="hs-identifier hs-var hs-var">HTTP.responseStatus</span></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679233282"><span class="hs-identifier hs-var">resp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233270"><span class="hs-identifier hs-var">errCode</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233268"><span class="hs-identifier hs-var">errMessage</span></a></span><span>
+</span><span id="line-154"></span><span>
+</span><span id="line-155"></span><span class="hs-keyword">class</span><span> </span><span id="SesAsQuery"><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-var">SesAsQuery</span></a></span></span><span> </span><span id="local-6989586621679233433"><span class="annot"><a href="#local-6989586621679233433"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-comment">-- | Write a data type as a list of query parameters.</span><span>
+</span><span id="line-157"></span><span>    </span><span id="sesAsQuery"><span class="annot"><a href="Aws.Ses.Core.html#sesAsQuery"><span class="hs-identifier hs-type">sesAsQuery</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679233433"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-158"></span><span>
+</span><span id="line-159"></span><span id="local-6989586621679233266"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-type">SesAsQuery</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679233266"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-type">SesAsQuery</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679233266"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-160"></span><span>    </span><span id="local-6989586621679233263"><span class="annot"><span class="annottext">sesAsQuery :: Maybe a -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233263"><span class="hs-identifier hs-var hs-var hs-var hs-var">sesAsQuery</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(ByteString, ByteString)]
+-&gt; (a -&gt; [(ByteString, ByteString)])
+-&gt; Maybe a
+-&gt; [(ByteString, ByteString)]
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">a -&gt; [(ByteString, ByteString)]
+forall a. SesAsQuery a =&gt; a -&gt; [(ByteString, ByteString)]
+</span><a href="Aws.Ses.Core.html#sesAsQuery"><span class="hs-identifier hs-var">sesAsQuery</span></a></span></span><span>
+</span><span id="line-161"></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- | A raw e-mail.</span><span>
+</span><span id="line-164"></span><span class="hs-keyword">data</span><span> </span><span id="RawMessage"><span class="annot"><a href="Aws.Ses.Core.html#RawMessage"><span class="hs-identifier hs-var">RawMessage</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="RawMessage"><span class="annot"><a href="Aws.Ses.Core.html#RawMessage"><span class="hs-identifier hs-var">RawMessage</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="rawMessageData"><span class="annot"><span class="annottext">RawMessage -&gt; ByteString
+</span><a href="Aws.Ses.Core.html#rawMessageData"><span class="hs-identifier hs-var hs-var">rawMessageData</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B.ByteString</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-165"></span><span>                </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233256"><span id="local-6989586621679233258"><span class="annot"><span class="annottext">RawMessage -&gt; RawMessage -&gt; Bool
+(RawMessage -&gt; RawMessage -&gt; Bool)
+-&gt; (RawMessage -&gt; RawMessage -&gt; Bool) -&gt; Eq RawMessage
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: RawMessage -&gt; RawMessage -&gt; Bool
+$c/= :: RawMessage -&gt; RawMessage -&gt; Bool
+== :: RawMessage -&gt; RawMessage -&gt; Bool
+$c== :: RawMessage -&gt; RawMessage -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233240"><span id="local-6989586621679233242"><span id="local-6989586621679233244"><span id="local-6989586621679233246"><span id="local-6989586621679233248"><span id="local-6989586621679233250"><span id="local-6989586621679233252"><span class="annot"><span class="annottext">Eq RawMessage
+Eq RawMessage
+-&gt; (RawMessage -&gt; RawMessage -&gt; Ordering)
+-&gt; (RawMessage -&gt; RawMessage -&gt; Bool)
+-&gt; (RawMessage -&gt; RawMessage -&gt; Bool)
+-&gt; (RawMessage -&gt; RawMessage -&gt; Bool)
+-&gt; (RawMessage -&gt; RawMessage -&gt; Bool)
+-&gt; (RawMessage -&gt; RawMessage -&gt; RawMessage)
+-&gt; (RawMessage -&gt; RawMessage -&gt; RawMessage)
+-&gt; Ord RawMessage
+RawMessage -&gt; RawMessage -&gt; Bool
+RawMessage -&gt; RawMessage -&gt; Ordering
+RawMessage -&gt; RawMessage -&gt; RawMessage
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: RawMessage -&gt; RawMessage -&gt; RawMessage
+$cmin :: RawMessage -&gt; RawMessage -&gt; RawMessage
+max :: RawMessage -&gt; RawMessage -&gt; RawMessage
+$cmax :: RawMessage -&gt; RawMessage -&gt; RawMessage
+&gt;= :: RawMessage -&gt; RawMessage -&gt; Bool
+$c&gt;= :: RawMessage -&gt; RawMessage -&gt; Bool
+&gt; :: RawMessage -&gt; RawMessage -&gt; Bool
+$c&gt; :: RawMessage -&gt; RawMessage -&gt; Bool
+&lt;= :: RawMessage -&gt; RawMessage -&gt; Bool
+$c&lt;= :: RawMessage -&gt; RawMessage -&gt; Bool
+&lt; :: RawMessage -&gt; RawMessage -&gt; Bool
+$c&lt; :: RawMessage -&gt; RawMessage -&gt; Bool
+compare :: RawMessage -&gt; RawMessage -&gt; Ordering
+$ccompare :: RawMessage -&gt; RawMessage -&gt; Ordering
+$cp1Ord :: Eq RawMessage
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233233"><span id="local-6989586621679233235"><span id="local-6989586621679233237"><span class="annot"><span class="annottext">Int -&gt; RawMessage -&gt; ShowS
+[RawMessage] -&gt; ShowS
+RawMessage -&gt; String
+(Int -&gt; RawMessage -&gt; ShowS)
+-&gt; (RawMessage -&gt; String)
+-&gt; ([RawMessage] -&gt; ShowS)
+-&gt; Show RawMessage
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [RawMessage] -&gt; ShowS
+$cshowList :: [RawMessage] -&gt; ShowS
+show :: RawMessage -&gt; String
+$cshow :: RawMessage -&gt; String
+showsPrec :: Int -&gt; RawMessage -&gt; ShowS
+$cshowsPrec :: Int -&gt; RawMessage -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-type">SesAsQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#RawMessage"><span class="hs-identifier hs-type">RawMessage</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-168"></span><span>    </span><span id="local-6989586621679233231"><span class="annot"><span class="annottext">sesAsQuery :: RawMessage -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233231"><span class="hs-identifier hs-var hs-var hs-var hs-var">sesAsQuery</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString, ByteString)
+-&gt; [(ByteString, ByteString)] -&gt; [(ByteString, ByteString)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((ByteString, ByteString) -&gt; [(ByteString, ByteString)])
+-&gt; (RawMessage -&gt; (ByteString, ByteString))
+-&gt; RawMessage
+-&gt; [(ByteString, ByteString)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;RawMessage.Data&quot;</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; (RawMessage -&gt; ByteString)
+-&gt; RawMessage
+-&gt; (ByteString, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B64.encode</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; (RawMessage -&gt; ByteString) -&gt; RawMessage -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">RawMessage -&gt; ByteString
+</span><a href="Aws.Ses.Core.html#rawMessageData"><span class="hs-identifier hs-var hs-var">rawMessageData</span></a></span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- | The destinations of an e-mail.</span><span>
+</span><span id="line-172"></span><span class="hs-keyword">data</span><span> </span><span id="Destination"><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-var">Destination</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-173"></span><span>    </span><span id="Destination"><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-var">Destination</span></a></span></span><span>
+</span><span id="line-174"></span><span>      </span><span class="hs-special">{</span><span> </span><span id="destinationBccAddresses"><span class="annot"><span class="annottext">Destination -&gt; [Text]
+</span><a href="Aws.Ses.Core.html#destinationBccAddresses"><span class="hs-identifier hs-var hs-var">destinationBccAddresses</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier hs-type">EmailAddress</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-175"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="destinationCcAddresses"><span class="annot"><span class="annottext">Destination -&gt; [Text]
+</span><a href="Aws.Ses.Core.html#destinationCcAddresses"><span class="hs-identifier hs-var hs-var">destinationCcAddresses</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier hs-type">EmailAddress</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-176"></span><span>      </span><span class="hs-special">,</span><span> </span><span id="destinationToAddresses"><span class="annot"><span class="annottext">Destination -&gt; [Text]
+</span><a href="Aws.Ses.Core.html#destinationToAddresses"><span class="hs-identifier hs-var hs-var">destinationToAddresses</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier hs-type">EmailAddress</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-177"></span><span>      </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233221"><span id="local-6989586621679233223"><span class="annot"><span class="annottext">Destination -&gt; Destination -&gt; Bool
+(Destination -&gt; Destination -&gt; Bool)
+-&gt; (Destination -&gt; Destination -&gt; Bool) -&gt; Eq Destination
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Destination -&gt; Destination -&gt; Bool
+$c/= :: Destination -&gt; Destination -&gt; Bool
+== :: Destination -&gt; Destination -&gt; Bool
+$c== :: Destination -&gt; Destination -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233206"><span id="local-6989586621679233208"><span id="local-6989586621679233210"><span id="local-6989586621679233212"><span id="local-6989586621679233214"><span id="local-6989586621679233216"><span id="local-6989586621679233218"><span class="annot"><span class="annottext">Eq Destination
+Eq Destination
+-&gt; (Destination -&gt; Destination -&gt; Ordering)
+-&gt; (Destination -&gt; Destination -&gt; Bool)
+-&gt; (Destination -&gt; Destination -&gt; Bool)
+-&gt; (Destination -&gt; Destination -&gt; Bool)
+-&gt; (Destination -&gt; Destination -&gt; Bool)
+-&gt; (Destination -&gt; Destination -&gt; Destination)
+-&gt; (Destination -&gt; Destination -&gt; Destination)
+-&gt; Ord Destination
+Destination -&gt; Destination -&gt; Bool
+Destination -&gt; Destination -&gt; Ordering
+Destination -&gt; Destination -&gt; Destination
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: Destination -&gt; Destination -&gt; Destination
+$cmin :: Destination -&gt; Destination -&gt; Destination
+max :: Destination -&gt; Destination -&gt; Destination
+$cmax :: Destination -&gt; Destination -&gt; Destination
+&gt;= :: Destination -&gt; Destination -&gt; Bool
+$c&gt;= :: Destination -&gt; Destination -&gt; Bool
+&gt; :: Destination -&gt; Destination -&gt; Bool
+$c&gt; :: Destination -&gt; Destination -&gt; Bool
+&lt;= :: Destination -&gt; Destination -&gt; Bool
+$c&lt;= :: Destination -&gt; Destination -&gt; Bool
+&lt; :: Destination -&gt; Destination -&gt; Bool
+$c&lt; :: Destination -&gt; Destination -&gt; Bool
+compare :: Destination -&gt; Destination -&gt; Ordering
+$ccompare :: Destination -&gt; Destination -&gt; Ordering
+$cp1Ord :: Eq Destination
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233200"><span id="local-6989586621679233202"><span id="local-6989586621679233204"><span class="annot"><span class="annottext">Int -&gt; Destination -&gt; ShowS
+[Destination] -&gt; ShowS
+Destination -&gt; String
+(Int -&gt; Destination -&gt; ShowS)
+-&gt; (Destination -&gt; String)
+-&gt; ([Destination] -&gt; ShowS)
+-&gt; Show Destination
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Destination] -&gt; ShowS
+$cshowList :: [Destination] -&gt; ShowS
+show :: Destination -&gt; String
+$cshow :: Destination -&gt; String
+showsPrec :: Int -&gt; Destination -&gt; ShowS
+$cshowsPrec :: Int -&gt; Destination -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-178"></span><span>
+</span><span id="line-179"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-type">SesAsQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-180"></span><span>    </span><span id="local-6989586621679233198"><span class="annot"><span class="annottext">sesAsQuery :: Destination -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233198"><span class="hs-identifier hs-var hs-var hs-var hs-var">sesAsQuery</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span><span> </span><span id="local-6989586621679233197"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233197"><span class="hs-identifier hs-var">bcc</span></a></span></span><span> </span><span id="local-6989586621679233196"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233196"><span class="hs-identifier hs-var">cc</span></a></span></span><span> </span><span id="local-6989586621679233195"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233195"><span class="hs-identifier hs-var">to</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[[(ByteString, ByteString)]] -&gt; [(ByteString, ByteString)]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span> </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; [Text] -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233193"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><a href="#local-6989586621679233192"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Bcc&quot;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233197"><span class="hs-identifier hs-var">bcc</span></a></span><span>
+</span><span id="line-181"></span><span>                                                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; [Text] -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233193"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><a href="#local-6989586621679233192"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Cc&quot;</span></span><span class="hs-special">)</span><span>  </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233196"><span class="hs-identifier hs-var">cc</span></a></span><span>
+</span><span id="line-182"></span><span>                                                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; [Text] -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233193"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><a href="#local-6989586621679233192"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;To&quot;</span></span><span class="hs-special">)</span><span>  </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233195"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-183"></span><span>        </span><span class="hs-keyword">where</span><span>
+</span><span id="line-184"></span><span>          </span><span id="local-6989586621679233193"><span class="annot"><span class="annottext">go :: Builder -&gt; [Text] -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233193"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679233191"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679233191"><span class="hs-identifier hs-var">kind</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Builder -&gt; Text -&gt; (ByteString, ByteString))
+-&gt; [Builder] -&gt; [Text] -&gt; [(ByteString, ByteString)]
+forall a b c. (a -&gt; b -&gt; c) -&gt; [a] -&gt; [b] -&gt; [c]
+</span><span class="hs-identifier hs-var">zipWith</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Text -&gt; (ByteString, ByteString)
+</span><a href="#local-6989586621679233189"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Int -&gt; Builder) -&gt; [Int] -&gt; [Builder]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder
+forall a. Show a =&gt; a -&gt; Builder
+</span><span class="hs-identifier hs-var">Blaze8.fromShow</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679233187"><span class="hs-identifier hs-var">one</span></a></span><span class="hs-glyph">..</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span>              </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679233186"><span class="annot"><span class="annottext">txt :: Builder
+</span><a href="#local-6989586621679233186"><span class="hs-identifier hs-var hs-var">txt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679233191"><span class="hs-identifier hs-var">kind</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`mappend`</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><a href="#local-6989586621679233192"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Addresses.member.&quot;</span></span><span>
+</span><span id="line-186"></span><span>                    </span><span id="local-6989586621679233189"><span class="annot"><span class="annottext">f :: Builder -&gt; Text -&gt; (ByteString, ByteString)
+</span><a href="#local-6989586621679233189"><span class="hs-identifier hs-var hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679233185"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679233185"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621679233184"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233184"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; ByteString
+</span><span class="hs-identifier hs-var">Blaze.toByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679233186"><span class="hs-identifier hs-var">txt</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`mappend`</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621679233185"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span>                            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><span class="hs-identifier hs-var">TE.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679233184"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-188"></span><span>          </span><span id="local-6989586621679233192"><span class="annot"><span class="annottext">s :: ByteString -&gt; Builder
+</span><a href="#local-6989586621679233192"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">Blaze.fromByteString</span></span><span>
+</span><span id="line-189"></span><span>          </span><span id="local-6989586621679233187"><span class="annot"><span class="annottext">one :: Int
+</span><a href="#local-6989586621679233187"><span class="hs-identifier hs-var hs-var">one</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-190"></span><span>
+</span><span id="line-191"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233176"><span id="local-6989586621679233178"><span class="annot"><span class="hs-identifier hs-type">Sem.Semigroup</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-192"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span><span> </span><span id="local-6989586621679233175"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233175"><span class="hs-identifier hs-var">a1</span></a></span></span><span> </span><span id="local-6989586621679233174"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233174"><span class="hs-identifier hs-var">a2</span></a></span></span><span> </span><span id="local-6989586621679233173"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233173"><span class="hs-identifier hs-var">a3</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679233172"><span class="annot"><span class="annottext">&lt;&gt; :: Destination -&gt; Destination -&gt; Destination
+</span><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span><span> </span><span id="local-6989586621679233171"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233171"><span class="hs-identifier hs-var">b1</span></a></span></span><span> </span><span id="local-6989586621679233170"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233170"><span class="hs-identifier hs-var">b2</span></a></span></span><span> </span><span id="local-6989586621679233169"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233169"><span class="hs-identifier hs-var">b3</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-193"></span><span>        </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text] -&gt; Destination
+</span><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-var">Destination</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233175"><span class="hs-identifier hs-var">a1</span></a></span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233171"><span class="hs-identifier hs-var">b1</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233174"><span class="hs-identifier hs-var">a2</span></a></span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233170"><span class="hs-identifier hs-var">b2</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233173"><span class="hs-identifier hs-var">a3</span></a></span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679233169"><span class="hs-identifier hs-var">b3</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-194"></span><span>
+</span><span id="line-195"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679233164"><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-type">Destination</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-196"></span><span>    </span><span id="local-6989586621679233163"><span class="annot"><span class="annottext">mempty :: Destination
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; [Text] -&gt; [Text] -&gt; Destination
+</span><a href="Aws.Ses.Core.html#Destination"><span class="hs-identifier hs-var">Destination</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-197"></span><span>    </span><span id="local-6989586621679233162"><span class="annot"><span class="annottext">mappend :: Destination -&gt; Destination -&gt; Destination
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Destination -&gt; Destination -&gt; Destination
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">(Sem.&lt;&gt;)</span></span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span class="hs-comment">-- | An e-mail address.</span><span>
+</span><span id="line-200"></span><span class="hs-keyword">type</span><span> </span><span id="EmailAddress"><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier hs-var">EmailAddress</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span>
+</span><span id="line-203"></span><span class="hs-comment">-- | The sender's e-mail address.</span><span>
+</span><span id="line-204"></span><span class="hs-keyword">data</span><span> </span><span id="Sender"><span class="annot"><a href="Aws.Ses.Core.html#Sender"><span class="hs-identifier hs-var">Sender</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Sender"><span class="annot"><a href="Aws.Ses.Core.html#Sender"><span class="hs-identifier hs-var">Sender</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="senderAddress"><span class="annot"><span class="annottext">Sender -&gt; Text
+</span><a href="Aws.Ses.Core.html#senderAddress"><span class="hs-identifier hs-var hs-var">senderAddress</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#EmailAddress"><span class="hs-identifier hs-type">EmailAddress</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-205"></span><span>              </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679233156"><span id="local-6989586621679233158"><span class="annot"><span class="annottext">Sender -&gt; Sender -&gt; Bool
+(Sender -&gt; Sender -&gt; Bool)
+-&gt; (Sender -&gt; Sender -&gt; Bool) -&gt; Eq Sender
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Sender -&gt; Sender -&gt; Bool
+$c/= :: Sender -&gt; Sender -&gt; Bool
+== :: Sender -&gt; Sender -&gt; Bool
+$c== :: Sender -&gt; Sender -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233141"><span id="local-6989586621679233143"><span id="local-6989586621679233145"><span id="local-6989586621679233147"><span id="local-6989586621679233149"><span id="local-6989586621679233151"><span id="local-6989586621679233153"><span class="annot"><span class="annottext">Eq Sender
+Eq Sender
+-&gt; (Sender -&gt; Sender -&gt; Ordering)
+-&gt; (Sender -&gt; Sender -&gt; Bool)
+-&gt; (Sender -&gt; Sender -&gt; Bool)
+-&gt; (Sender -&gt; Sender -&gt; Bool)
+-&gt; (Sender -&gt; Sender -&gt; Bool)
+-&gt; (Sender -&gt; Sender -&gt; Sender)
+-&gt; (Sender -&gt; Sender -&gt; Sender)
+-&gt; Ord Sender
+Sender -&gt; Sender -&gt; Bool
+Sender -&gt; Sender -&gt; Ordering
+Sender -&gt; Sender -&gt; Sender
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: Sender -&gt; Sender -&gt; Sender
+$cmin :: Sender -&gt; Sender -&gt; Sender
+max :: Sender -&gt; Sender -&gt; Sender
+$cmax :: Sender -&gt; Sender -&gt; Sender
+&gt;= :: Sender -&gt; Sender -&gt; Bool
+$c&gt;= :: Sender -&gt; Sender -&gt; Bool
+&gt; :: Sender -&gt; Sender -&gt; Bool
+$c&gt; :: Sender -&gt; Sender -&gt; Bool
+&lt;= :: Sender -&gt; Sender -&gt; Bool
+$c&lt;= :: Sender -&gt; Sender -&gt; Bool
+&lt; :: Sender -&gt; Sender -&gt; Bool
+$c&lt; :: Sender -&gt; Sender -&gt; Bool
+compare :: Sender -&gt; Sender -&gt; Ordering
+$ccompare :: Sender -&gt; Sender -&gt; Ordering
+$cp1Ord :: Eq Sender
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679233135"><span id="local-6989586621679233137"><span id="local-6989586621679233139"><span class="annot"><span class="annottext">Int -&gt; Sender -&gt; ShowS
+[Sender] -&gt; ShowS
+Sender -&gt; String
+(Int -&gt; Sender -&gt; ShowS)
+-&gt; (Sender -&gt; String) -&gt; ([Sender] -&gt; ShowS) -&gt; Show Sender
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Sender] -&gt; ShowS
+$cshowList :: [Sender] -&gt; ShowS
+show :: Sender -&gt; String
+$cshow :: Sender -&gt; String
+showsPrec :: Int -&gt; Sender -&gt; ShowS
+$cshowsPrec :: Int -&gt; Sender -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-206"></span><span>
+</span><span id="line-207"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#SesAsQuery"><span class="hs-identifier hs-type">SesAsQuery</span></a></span><span> </span><span class="annot"><a href="Aws.Ses.Core.html#Sender"><span class="hs-identifier hs-type">Sender</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-208"></span><span>    </span><span id="local-6989586621679233133"><span class="annot"><span class="annottext">sesAsQuery :: Sender -&gt; [(ByteString, ByteString)]
+</span><a href="#local-6989586621679233133"><span class="hs-identifier hs-var hs-var hs-var hs-var">sesAsQuery</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString, ByteString)
+-&gt; [(ByteString, ByteString)] -&gt; [(ByteString, ByteString)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((ByteString, ByteString) -&gt; [(ByteString, ByteString)])
+-&gt; (Sender -&gt; (ByteString, ByteString))
+-&gt; Sender
+-&gt; [(ByteString, ByteString)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;Source&quot;</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; (ByteString, ByteString))
+-&gt; (Sender -&gt; ByteString) -&gt; Sender -&gt; (ByteString, ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><span class="hs-identifier hs-var">TE.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; ByteString) -&gt; (Sender -&gt; Text) -&gt; Sender -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Sender -&gt; Text
+</span><a href="Aws.Ses.Core.html#senderAddress"><span class="hs-identifier hs-var hs-var">senderAddress</span></a></span><span>
+</span><span id="line-209"></span></pre></body></html>

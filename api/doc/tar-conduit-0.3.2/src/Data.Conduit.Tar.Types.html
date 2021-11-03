@@ -1,0 +1,301 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+#if WINDOWS
+</span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-comment">-- | Module contains all the types necessary for tarball processing.</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Conduit.Tar.Types</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#Header"><span class="hs-identifier">Header</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarChunk"><span class="hs-identifier">TarChunk</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarException"><span class="hs-identifier">TarException</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarCreateException"><span class="hs-identifier">TarCreateException</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileType"><span class="hs-identifier">FileType</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier">FileInfo</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">FileOffset</span></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ByteCount</span></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">UserID</span></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">GroupID</span></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">DeviceID</span></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">EpochTime</span></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">CUid</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">CGid</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#encodeFilePath"><span class="hs-identifier">encodeFilePath</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier">decodeFilePath</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#getFileInfoPath"><span class="hs-identifier">getFileInfoPath</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Exception</span></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>          </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString.Short</span></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ShortByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">System.Posix.Types</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span>         </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S8</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>                     </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span>            </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding.Error</span></span><span>      </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span class="hs-cpp">
+#if WINDOWS
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Data.Bits</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Foreign.Storable</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">newtype</span><span> </span><span class="hs-identifier">CUid</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-identifier">CUid</span><span> </span><span class="hs-identifier">Word32</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span class="hs-identifier">Bounded</span><span>
+</span><span id="line-41"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Enum</span><span>
+</span><span id="line-42"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Eq</span><span>
+</span><span id="line-43"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Integral</span><span>
+</span><span id="line-44"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Num</span><span>
+</span><span id="line-45"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Ord</span><span>
+</span><span id="line-46"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Read</span><span>
+</span><span id="line-47"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Real</span><span>
+</span><span id="line-48"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Show</span><span>
+</span><span id="line-49"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Bits</span><span>
+</span><span id="line-50"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Storable</span><span>
+</span><span id="line-51"></span><span>           </span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">newtype</span><span> </span><span class="hs-identifier">CGid</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-identifier">CGid</span><span> </span><span class="hs-identifier">Word32</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span class="hs-identifier">Bounded</span><span>
+</span><span id="line-55"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Enum</span><span>
+</span><span id="line-56"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Eq</span><span>
+</span><span id="line-57"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Integral</span><span>
+</span><span id="line-58"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Num</span><span>
+</span><span id="line-59"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Ord</span><span>
+</span><span id="line-60"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Read</span><span>
+</span><span id="line-61"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Real</span><span>
+</span><span id="line-62"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Show</span><span>
+</span><span id="line-63"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Bits</span><span>
+</span><span id="line-64"></span><span>           </span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Storable</span><span>
+</span><span id="line-65"></span><span>           </span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">type</span><span> </span><span class="hs-identifier">UserID</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">CUid</span><span>
+</span><span id="line-67"></span><span class="hs-keyword">type</span><span> </span><span class="hs-identifier">GroupID</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">CGid</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-70"></span><span class="hs-keyword">data</span><span> </span><span id="FileType"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileType"><span class="hs-identifier hs-var">FileType</span></a></span></span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="FTNormal"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTNormal"><span class="hs-identifier hs-var">FTNormal</span></a></span></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTHardLink"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTHardLink"><span class="hs-identifier hs-var">FTHardLink</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTSymbolicLink"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTSymbolicLink"><span class="hs-identifier hs-var">FTSymbolicLink</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTCharacterSpecial"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTCharacterSpecial"><span class="hs-identifier hs-var">FTCharacterSpecial</span></a></span></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTBlockSpecial"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTBlockSpecial"><span class="hs-identifier hs-var">FTBlockSpecial</span></a></span></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTDirectory"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTDirectory"><span class="hs-identifier hs-var">FTDirectory</span></a></span></span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTFifo"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTFifo"><span class="hs-identifier hs-var">FTFifo</span></a></span></span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FTOther"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FTOther"><span class="hs-identifier hs-var">FTOther</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071537"><span id="local-6989586621679071539"><span id="local-6989586621679071541"><span class="annot"><span class="annottext">Int -&gt; FileType -&gt; ShowS
+[FileType] -&gt; ShowS
+FileType -&gt; String
+(Int -&gt; FileType -&gt; ShowS)
+-&gt; (FileType -&gt; String) -&gt; ([FileType] -&gt; ShowS) -&gt; Show FileType
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FileType] -&gt; ShowS
+$cshowList :: [FileType] -&gt; ShowS
+show :: FileType -&gt; String
+$cshow :: FileType -&gt; String
+showsPrec :: Int -&gt; FileType -&gt; ShowS
+$cshowsPrec :: Int -&gt; FileType -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679071532"><span id="local-6989586621679071534"><span class="annot"><span class="annottext">FileType -&gt; FileType -&gt; Bool
+(FileType -&gt; FileType -&gt; Bool)
+-&gt; (FileType -&gt; FileType -&gt; Bool) -&gt; Eq FileType
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: FileType -&gt; FileType -&gt; Bool
+$c/= :: FileType -&gt; FileType -&gt; Bool
+== :: FileType -&gt; FileType -&gt; Bool
+$c== :: FileType -&gt; FileType -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span class="hs-keyword">data</span><span> </span><span id="FileInfo"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-var">FileInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FileInfo"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-var">FileInfo</span></a></span></span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="filePath"><span class="annot"><span class="annottext">FileInfo -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#filePath"><span class="hs-identifier hs-var hs-var">filePath</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-comment">-- ^ File path.</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileUserId"><span class="annot"><span class="annottext">FileInfo -&gt; UserID
+</span><a href="Data.Conduit.Tar.Types.html#fileUserId"><span class="hs-identifier hs-var hs-var">fileUserId</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">UserID</span></span><span>  </span><span class="hs-comment">-- ^ Unix user id.</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileUserName"><span class="annot"><span class="annottext">FileInfo -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#fileUserName"><span class="hs-identifier hs-var hs-var">fileUserName</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>  </span><span class="hs-comment">-- ^ Unix user name.</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileGroupId"><span class="annot"><span class="annottext">FileInfo -&gt; GroupID
+</span><a href="Data.Conduit.Tar.Types.html#fileGroupId"><span class="hs-identifier hs-var hs-var">fileGroupId</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">GroupID</span></span><span> </span><span class="hs-comment">-- ^ Unix group id.</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileGroupName"><span class="annot"><span class="annottext">FileInfo -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#fileGroupName"><span class="hs-identifier hs-var hs-var">fileGroupName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>  </span><span class="hs-comment">-- ^ Unix group name.</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileMode"><span class="annot"><span class="annottext">FileInfo -&gt; FileMode
+</span><a href="Data.Conduit.Tar.Types.html#fileMode"><span class="hs-identifier hs-var hs-var">fileMode</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileMode</span></span><span> </span><span class="hs-comment">-- ^ Unix file permissions</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileSize"><span class="annot"><span class="annottext">FileInfo -&gt; FileOffset
+</span><a href="Data.Conduit.Tar.Types.html#fileSize"><span class="hs-identifier hs-var hs-var">fileSize</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span> </span><span class="hs-comment">-- ^ File size</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileType"><span class="annot"><span class="annottext">FileInfo -&gt; FileType
+</span><a href="Data.Conduit.Tar.Types.html#fileType"><span class="hs-identifier hs-var hs-var">fileType</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileType"><span class="hs-identifier hs-type">FileType</span></a></span><span>  </span><span class="hs-comment">-- ^ File type. `FTNormal`, `FTHardLink` (@since 0.3.0),</span><span>
+</span><span id="line-91"></span><span>                                  </span><span class="hs-comment">-- `FTSymbolicLink` and `FTDirectory` are the only ones supported</span><span>
+</span><span id="line-92"></span><span>                                  </span><span class="hs-comment">-- for now</span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="fileModTime"><span class="annot"><span class="annottext">FileInfo -&gt; EpochTime
+</span><a href="Data.Conduit.Tar.Types.html#fileModTime"><span class="hs-identifier hs-var hs-var">fileModTime</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">EpochTime</span></span><span> </span><span class="hs-comment">-- ^ File modification timestamp</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071515"><span id="local-6989586621679071517"><span id="local-6989586621679071519"><span class="annot"><span class="annottext">Int -&gt; FileInfo -&gt; ShowS
+[FileInfo] -&gt; ShowS
+FileInfo -&gt; String
+(Int -&gt; FileInfo -&gt; ShowS)
+-&gt; (FileInfo -&gt; String) -&gt; ([FileInfo] -&gt; ShowS) -&gt; Show FileInfo
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FileInfo] -&gt; ShowS
+$cshowList :: [FileInfo] -&gt; ShowS
+show :: FileInfo -&gt; String
+$cshow :: FileInfo -&gt; String
+showsPrec :: Int -&gt; FileInfo -&gt; ShowS
+$cshowsPrec :: Int -&gt; FileInfo -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679071511"><span id="local-6989586621679071513"><span class="annot"><span class="annottext">FileInfo -&gt; FileInfo -&gt; Bool
+(FileInfo -&gt; FileInfo -&gt; Bool)
+-&gt; (FileInfo -&gt; FileInfo -&gt; Bool) -&gt; Eq FileInfo
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: FileInfo -&gt; FileInfo -&gt; Bool
+$c/= :: FileInfo -&gt; FileInfo -&gt; Bool
+== :: FileInfo -&gt; FileInfo -&gt; Bool
+$c== :: FileInfo -&gt; FileInfo -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-keyword">data</span><span> </span><span id="Header"><span class="annot"><a href="Data.Conduit.Tar.Types.html#Header"><span class="hs-identifier hs-var">Header</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Header"><span class="annot"><a href="Data.Conduit.Tar.Types.html#Header"><span class="hs-identifier hs-var">Header</span></a></span></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="headerOffset"><span class="annot"><span class="annottext">Header -&gt; FileOffset
+</span><a href="Data.Conduit.Tar.Types.html#headerOffset"><span class="hs-identifier hs-var hs-var">headerOffset</span></a></span></span><span>         </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerPayloadOffset"><span class="annot"><span class="annottext">Header -&gt; FileOffset
+</span><a href="Data.Conduit.Tar.Types.html#headerPayloadOffset"><span class="hs-identifier hs-var hs-var">headerPayloadOffset</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerFileNameSuffix"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerFileNameSuffix"><span class="hs-identifier hs-var hs-var">headerFileNameSuffix</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerFileMode"><span class="annot"><span class="annottext">Header -&gt; FileMode
+</span><a href="Data.Conduit.Tar.Types.html#headerFileMode"><span class="hs-identifier hs-var hs-var">headerFileMode</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">CMode</span></span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerOwnerId"><span class="annot"><span class="annottext">Header -&gt; UserID
+</span><a href="Data.Conduit.Tar.Types.html#headerOwnerId"><span class="hs-identifier hs-var hs-var">headerOwnerId</span></a></span></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">UserID</span></span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerGroupId"><span class="annot"><span class="annottext">Header -&gt; GroupID
+</span><a href="Data.Conduit.Tar.Types.html#headerGroupId"><span class="hs-identifier hs-var hs-var">headerGroupId</span></a></span></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">GroupID</span></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerPayloadSize"><span class="annot"><span class="annottext">Header -&gt; FileOffset
+</span><a href="Data.Conduit.Tar.Types.html#headerPayloadSize"><span class="hs-identifier hs-var hs-var">headerPayloadSize</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerTime"><span class="annot"><span class="annottext">Header -&gt; EpochTime
+</span><a href="Data.Conduit.Tar.Types.html#headerTime"><span class="hs-identifier hs-var hs-var">headerTime</span></a></span></span><span>           </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">EpochTime</span></span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerLinkIndicator"><span class="annot"><span class="annottext">Header -&gt; Word8
+</span><a href="Data.Conduit.Tar.Types.html#headerLinkIndicator"><span class="hs-identifier hs-var hs-var">headerLinkIndicator</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerLinkName"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerLinkName"><span class="hs-identifier hs-var hs-var">headerLinkName</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerMagicVersion"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerMagicVersion"><span class="hs-identifier hs-var hs-var">headerMagicVersion</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerOwnerName"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerOwnerName"><span class="hs-identifier hs-var hs-var">headerOwnerName</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerGroupName"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerGroupName"><span class="hs-identifier hs-var hs-var">headerGroupName</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerDeviceMajor"><span class="annot"><span class="annottext">Header -&gt; DeviceID
+</span><a href="Data.Conduit.Tar.Types.html#headerDeviceMajor"><span class="hs-identifier hs-var hs-var">headerDeviceMajor</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">DeviceID</span></span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerDeviceMinor"><span class="annot"><span class="annottext">Header -&gt; DeviceID
+</span><a href="Data.Conduit.Tar.Types.html#headerDeviceMinor"><span class="hs-identifier hs-var hs-var">headerDeviceMinor</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">DeviceID</span></span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="headerFileNamePrefix"><span class="annot"><span class="annottext">Header -&gt; ShortByteString
+</span><a href="Data.Conduit.Tar.Types.html#headerFileNamePrefix"><span class="hs-identifier hs-var hs-var">headerFileNamePrefix</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ShortByteString</span></span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679071487"><span id="local-6989586621679071489"><span id="local-6989586621679071491"><span class="annot"><span class="annottext">Int -&gt; Header -&gt; ShowS
+[Header] -&gt; ShowS
+Header -&gt; String
+(Int -&gt; Header -&gt; ShowS)
+-&gt; (Header -&gt; String) -&gt; ([Header] -&gt; ShowS) -&gt; Show Header
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Header] -&gt; ShowS
+$cshowList :: [Header] -&gt; ShowS
+show :: Header -&gt; String
+$cshow :: Header -&gt; String
+showsPrec :: Int -&gt; Header -&gt; ShowS
+$cshowsPrec :: Int -&gt; Header -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-keyword">data</span><span> </span><span id="TarChunk"><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarChunk"><span class="hs-identifier hs-var">TarChunk</span></a></span></span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="ChunkHeader"><span class="annot"><a href="Data.Conduit.Tar.Types.html#ChunkHeader"><span class="hs-identifier hs-var">ChunkHeader</span></a></span></span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#Header"><span class="hs-identifier hs-type">Header</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="ChunkPayload"><span class="annot"><a href="Data.Conduit.Tar.Types.html#ChunkPayload"><span class="hs-identifier hs-var">ChunkPayload</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="ChunkException"><span class="annot"><a href="Data.Conduit.Tar.Types.html#ChunkException"><span class="hs-identifier hs-var">ChunkException</span></a></span></span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarException"><span class="hs-identifier hs-type">TarException</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679071478"><span id="local-6989586621679071480"><span id="local-6989586621679071482"><span class="annot"><span class="annottext">Int -&gt; TarChunk -&gt; ShowS
+[TarChunk] -&gt; ShowS
+TarChunk -&gt; String
+(Int -&gt; TarChunk -&gt; ShowS)
+-&gt; (TarChunk -&gt; String) -&gt; ([TarChunk] -&gt; ShowS) -&gt; Show TarChunk
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TarChunk] -&gt; ShowS
+$cshowList :: [TarChunk] -&gt; ShowS
+show :: TarChunk -&gt; String
+$cshow :: TarChunk -&gt; String
+showsPrec :: Int -&gt; TarChunk -&gt; ShowS
+$cshowsPrec :: Int -&gt; TarChunk -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | This the the exception type that is used in this module.</span><span>
+</span><span id="line-126"></span><span class="hs-comment">--</span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- More constructors are susceptible to be added without bumping the major</span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- version of this module.</span><span>
+</span><span id="line-129"></span><span class="hs-keyword">data</span><span> </span><span id="TarException"><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarException"><span class="hs-identifier hs-var">TarException</span></a></span></span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="NoMoreHeaders"><span class="annot"><a href="Data.Conduit.Tar.Types.html#NoMoreHeaders"><span class="hs-identifier hs-var">NoMoreHeaders</span></a></span></span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnexpectedPayload"><span class="annot"><a href="Data.Conduit.Tar.Types.html#UnexpectedPayload"><span class="hs-identifier hs-var">UnexpectedPayload</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="IncompleteHeader"><span class="annot"><a href="Data.Conduit.Tar.Types.html#IncompleteHeader"><span class="hs-identifier hs-var">IncompleteHeader</span></a></span></span><span>  </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-133"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="IncompletePayload"><span class="annot"><a href="Data.Conduit.Tar.Types.html#IncompletePayload"><span class="hs-identifier hs-var">IncompletePayload</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteCount</span></span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="ShortTrailer"><span class="annot"><a href="Data.Conduit.Tar.Types.html#ShortTrailer"><span class="hs-identifier hs-var">ShortTrailer</span></a></span></span><span>      </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="BadTrailer"><span class="annot"><a href="Data.Conduit.Tar.Types.html#BadTrailer"><span class="hs-identifier hs-var">BadTrailer</span></a></span></span><span>        </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-136"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="InvalidHeader"><span class="annot"><a href="Data.Conduit.Tar.Types.html#InvalidHeader"><span class="hs-identifier hs-var">InvalidHeader</span></a></span></span><span>     </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="BadChecksum"><span class="annot"><a href="Data.Conduit.Tar.Types.html#BadChecksum"><span class="hs-identifier hs-var">BadChecksum</span></a></span></span><span>       </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="FileTypeError"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileTypeError"><span class="hs-identifier hs-var">FileTypeError</span></a></span></span><span>     </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">FileOffset</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Char</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnsupportedType"><span class="annot"><a href="Data.Conduit.Tar.Types.html#UnsupportedType"><span class="hs-identifier hs-var">UnsupportedType</span></a></span></span><span>   </span><span class="hs-glyph">!</span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileType"><span class="hs-identifier hs-type">FileType</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679071462"><span id="local-6989586621679071464"><span id="local-6989586621679071466"><span class="annot"><span class="annottext">Int -&gt; TarException -&gt; ShowS
+[TarException] -&gt; ShowS
+TarException -&gt; String
+(Int -&gt; TarException -&gt; ShowS)
+-&gt; (TarException -&gt; String)
+-&gt; ([TarException] -&gt; ShowS)
+-&gt; Show TarException
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TarException] -&gt; ShowS
+$cshowList :: [TarException] -&gt; ShowS
+show :: TarException -&gt; String
+$cshow :: TarException -&gt; String
+showsPrec :: Int -&gt; TarException -&gt; ShowS
+$cshowsPrec :: Int -&gt; TarException -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-141"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679071454"><span id="local-6989586621679071456"><span id="local-6989586621679071458"><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarException"><span class="hs-identifier hs-type">TarException</span></a></span></span></span></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span class="hs-keyword">data</span><span> </span><span id="TarCreateException"><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarCreateException"><span class="hs-identifier hs-var">TarCreateException</span></a></span></span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="FileNameTooLong"><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileNameTooLong"><span class="hs-identifier hs-var">FileNameTooLong</span></a></span></span><span>   </span><span class="hs-glyph">!</span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span>
+</span><span id="line-146"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="TarCreationError"><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarCreationError"><span class="hs-identifier hs-var">TarCreationError</span></a></span></span><span>  </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-147"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679071445"><span id="local-6989586621679071447"><span id="local-6989586621679071449"><span class="annot"><span class="annottext">Int -&gt; TarCreateException -&gt; ShowS
+[TarCreateException] -&gt; ShowS
+TarCreateException -&gt; String
+(Int -&gt; TarCreateException -&gt; ShowS)
+-&gt; (TarCreateException -&gt; String)
+-&gt; ([TarCreateException] -&gt; ShowS)
+-&gt; Show TarCreateException
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TarCreateException] -&gt; ShowS
+$cshowList :: [TarCreateException] -&gt; ShowS
+show :: TarCreateException -&gt; String
+$cshow :: TarCreateException -&gt; String
+showsPrec :: Int -&gt; TarCreateException -&gt; ShowS
+$cshowsPrec :: Int -&gt; TarCreateException -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-148"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679071437"><span id="local-6989586621679071439"><span id="local-6989586621679071441"><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#TarCreateException"><span class="hs-identifier hs-type">TarCreateException</span></a></span></span></span></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span class="hs-comment">-- | Convert `FilePath` into a UTF-8 encoded `ByteString`</span><span>
+</span><span id="line-151"></span><span class="annot"><a href="Data.Conduit.Tar.Types.html#encodeFilePath"><span class="hs-identifier hs-type">encodeFilePath</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">S8.ByteString</span></span><span>
+</span><span id="line-152"></span><span id="encodeFilePath"><span class="annot"><span class="annottext">encodeFilePath :: String -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#encodeFilePath"><span class="hs-identifier hs-var hs-var">encodeFilePath</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; ByteString) -&gt; (String -&gt; Text) -&gt; String -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span class="hs-comment">-- | Convert UTF-8 encoded `ByteString` back into the `FilePath`.</span><span>
+</span><span id="line-155"></span><span class="annot"><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-type">decodeFilePath</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">S8.ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>
+</span><span id="line-156"></span><span id="decodeFilePath"><span class="annot"><span class="annottext">decodeFilePath :: ByteString -&gt; String
+</span><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-var hs-var">decodeFilePath</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; String
+</span><span class="hs-identifier hs-var">T.unpack</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; String) -&gt; (ByteString -&gt; Text) -&gt; ByteString -&gt; String
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">OnDecodeError -&gt; ByteString -&gt; Text
+</span><span class="hs-identifier hs-var">T.decodeUtf8With</span></span><span> </span><span class="annot"><span class="annottext">OnDecodeError
+</span><span class="hs-identifier hs-var">T.lenientDecode</span></span><span>
+</span><span id="line-157"></span><span>
+</span><span id="line-158"></span><span class="hs-comment">-- | Get the `FilePath`.</span><span>
+</span><span id="line-159"></span><span class="annot"><a href="Data.Conduit.Tar.Types.html#getFileInfoPath"><span class="hs-identifier hs-type">getFileInfoPath</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Conduit.Tar.Types.html#FileInfo"><span class="hs-identifier hs-type">FileInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span>
+</span><span id="line-160"></span><span id="getFileInfoPath"><span class="annot"><span class="annottext">getFileInfoPath :: FileInfo -&gt; String
+</span><a href="Data.Conduit.Tar.Types.html#getFileInfoPath"><span class="hs-identifier hs-var hs-var">getFileInfoPath</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; String
+</span><a href="Data.Conduit.Tar.Types.html#decodeFilePath"><span class="hs-identifier hs-var">decodeFilePath</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; String)
+-&gt; (FileInfo -&gt; ByteString) -&gt; FileInfo -&gt; String
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">FileInfo -&gt; ByteString
+</span><a href="Data.Conduit.Tar.Types.html#filePath"><span class="hs-identifier hs-var hs-var">filePath</span></a></span><span>
+</span><span id="line-161"></span></pre></body></html>

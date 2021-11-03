@@ -1,0 +1,643 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts          #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NoMonomorphismRestriction #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings         #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards           #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies              #-}</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Module      :  Aws.DynamoDb.Commands.BatchGetItem</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Copyright   :  Soostone Inc</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- License     :  BSD3</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Maintainer  :  Justin Dawson &lt;jtdawso@gmail.com&gt;</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- @http:\/\/docs.aws.amazon.com\/amazondynamodb\/latest\/APIReference\/API_BatchGetItem.html@</span><span>
+</span><span id="line-20"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.DynamoDb.Commands.BatchGetItem</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Aeson</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Default</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Strict</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HM</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span>           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.DynamoDb.Core.html"><span class="hs-identifier">Aws.DynamoDb.Core</span></a></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html"><span class="hs-identifier">Aws.DynamoDb.Commands.GetItem</span></a></span><span>
+</span><span id="line-35"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">data</span><span> </span><span id="GetRequestItem"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-var">GetRequestItem</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="GetRequestItem"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-var">GetRequestItem</span></a></span></span><span class="hs-special">{</span><span>
+</span><span id="line-39"></span><span>         </span><span id="griProjExpr"><span class="annot"><span class="annottext">GetRequestItem -&gt; Maybe Text
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#griProjExpr"><span class="hs-identifier hs-var hs-var">griProjExpr</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-40"></span><span>       </span><span class="hs-special">,</span><span> </span><span id="griConsistent"><span class="annot"><span class="annottext">GetRequestItem -&gt; Bool
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#griConsistent"><span class="hs-identifier hs-var hs-var">griConsistent</span></a></span></span><span> </span><span class="hs-glyph">::</span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-41"></span><span>       </span><span class="hs-special">,</span><span> </span><span id="griKeys"><span class="annot"><span class="annottext">GetRequestItem -&gt; [PrimaryKey]
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#griKeys"><span class="hs-identifier hs-var hs-var">griKeys</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span class="hs-special">]</span><span>  </span><span>
+</span><span id="line-42"></span><span>     </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228696"><span id="local-6989586621679228698"><span class="annot"><span class="annottext">GetRequestItem -&gt; GetRequestItem -&gt; Bool
+(GetRequestItem -&gt; GetRequestItem -&gt; Bool)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Bool) -&gt; Eq GetRequestItem
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c/= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+== :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c== :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228689"><span id="local-6989586621679228691"><span id="local-6989586621679228693"><span class="annot"><span class="annottext">Int -&gt; GetRequestItem -&gt; ShowS
+[GetRequestItem] -&gt; ShowS
+GetRequestItem -&gt; String
+(Int -&gt; GetRequestItem -&gt; ShowS)
+-&gt; (GetRequestItem -&gt; String)
+-&gt; ([GetRequestItem] -&gt; ShowS)
+-&gt; Show GetRequestItem
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GetRequestItem] -&gt; ShowS
+$cshowList :: [GetRequestItem] -&gt; ShowS
+show :: GetRequestItem -&gt; String
+$cshow :: GetRequestItem -&gt; String
+showsPrec :: Int -&gt; GetRequestItem -&gt; ShowS
+$cshowsPrec :: Int -&gt; GetRequestItem -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228680"><span id="local-6989586621679228682"><span id="local-6989586621679228684"><span id="local-6989586621679228686"><span class="annot"><span class="annottext">ReadPrec [GetRequestItem]
+ReadPrec GetRequestItem
+Int -&gt; ReadS GetRequestItem
+ReadS [GetRequestItem]
+(Int -&gt; ReadS GetRequestItem)
+-&gt; ReadS [GetRequestItem]
+-&gt; ReadPrec GetRequestItem
+-&gt; ReadPrec [GetRequestItem]
+-&gt; Read GetRequestItem
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [GetRequestItem]
+$creadListPrec :: ReadPrec [GetRequestItem]
+readPrec :: ReadPrec GetRequestItem
+$creadPrec :: ReadPrec GetRequestItem
+readList :: ReadS [GetRequestItem]
+$creadList :: ReadS [GetRequestItem]
+readsPrec :: Int -&gt; ReadS GetRequestItem
+$creadsPrec :: Int -&gt; ReadS GetRequestItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228664"><span id="local-6989586621679228666"><span id="local-6989586621679228668"><span id="local-6989586621679228670"><span id="local-6989586621679228672"><span id="local-6989586621679228674"><span id="local-6989586621679228676"><span class="annot"><span class="annottext">Eq GetRequestItem
+Eq GetRequestItem
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Ordering)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Bool)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Bool)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Bool)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; Bool)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem)
+-&gt; (GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem)
+-&gt; Ord GetRequestItem
+GetRequestItem -&gt; GetRequestItem -&gt; Bool
+GetRequestItem -&gt; GetRequestItem -&gt; Ordering
+GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem
+$cmin :: GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem
+max :: GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem
+$cmax :: GetRequestItem -&gt; GetRequestItem -&gt; GetRequestItem
+&gt;= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c&gt;= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+&gt; :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c&gt; :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+&lt;= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c&lt;= :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+&lt; :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+$c&lt; :: GetRequestItem -&gt; GetRequestItem -&gt; Bool
+compare :: GetRequestItem -&gt; GetRequestItem -&gt; Ordering
+$ccompare :: GetRequestItem -&gt; GetRequestItem -&gt; Ordering
+$cp1Ord :: Eq GetRequestItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="BatchGetItem"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-var">BatchGetItem</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="BatchGetItem"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-var">BatchGetItem</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-45"></span><span>      </span><span id="bgRequests"><span class="annot"><span class="annottext">BatchGetItem -&gt; [(Text, GetRequestItem)]
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#bgRequests"><span class="hs-identifier hs-var hs-var">bgRequests</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">,</span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-comment">-- ^ Get Requests for a specified table</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="bgRetCons"><span class="annot"><span class="annottext">BatchGetItem -&gt; ReturnConsumption
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#bgRetCons"><span class="hs-identifier hs-var hs-var">bgRetCons</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ReturnConsumption"><span class="hs-identifier hs-type">ReturnConsumption</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228656"><span id="local-6989586621679228658"><span class="annot"><span class="annottext">BatchGetItem -&gt; BatchGetItem -&gt; Bool
+(BatchGetItem -&gt; BatchGetItem -&gt; Bool)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Bool) -&gt; Eq BatchGetItem
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c/= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+== :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c== :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228650"><span id="local-6989586621679228652"><span id="local-6989586621679228654"><span class="annot"><span class="annottext">Int -&gt; BatchGetItem -&gt; ShowS
+[BatchGetItem] -&gt; ShowS
+BatchGetItem -&gt; String
+(Int -&gt; BatchGetItem -&gt; ShowS)
+-&gt; (BatchGetItem -&gt; String)
+-&gt; ([BatchGetItem] -&gt; ShowS)
+-&gt; Show BatchGetItem
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [BatchGetItem] -&gt; ShowS
+$cshowList :: [BatchGetItem] -&gt; ShowS
+show :: BatchGetItem -&gt; String
+$cshow :: BatchGetItem -&gt; String
+showsPrec :: Int -&gt; BatchGetItem -&gt; ShowS
+$cshowsPrec :: Int -&gt; BatchGetItem -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228642"><span id="local-6989586621679228644"><span id="local-6989586621679228646"><span id="local-6989586621679228648"><span class="annot"><span class="annottext">ReadPrec [BatchGetItem]
+ReadPrec BatchGetItem
+Int -&gt; ReadS BatchGetItem
+ReadS [BatchGetItem]
+(Int -&gt; ReadS BatchGetItem)
+-&gt; ReadS [BatchGetItem]
+-&gt; ReadPrec BatchGetItem
+-&gt; ReadPrec [BatchGetItem]
+-&gt; Read BatchGetItem
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [BatchGetItem]
+$creadListPrec :: ReadPrec [BatchGetItem]
+readPrec :: ReadPrec BatchGetItem
+$creadPrec :: ReadPrec BatchGetItem
+readList :: ReadS [BatchGetItem]
+$creadList :: ReadS [BatchGetItem]
+readsPrec :: Int -&gt; ReadS BatchGetItem
+$creadsPrec :: Int -&gt; ReadS BatchGetItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228627"><span id="local-6989586621679228629"><span id="local-6989586621679228631"><span id="local-6989586621679228633"><span id="local-6989586621679228635"><span id="local-6989586621679228637"><span id="local-6989586621679228639"><span class="annot"><span class="annottext">Eq BatchGetItem
+Eq BatchGetItem
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Ordering)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Bool)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Bool)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Bool)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; Bool)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem)
+-&gt; (BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem)
+-&gt; Ord BatchGetItem
+BatchGetItem -&gt; BatchGetItem -&gt; Bool
+BatchGetItem -&gt; BatchGetItem -&gt; Ordering
+BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem
+$cmin :: BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem
+max :: BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem
+$cmax :: BatchGetItem -&gt; BatchGetItem -&gt; BatchGetItem
+&gt;= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c&gt;= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+&gt; :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c&gt; :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+&lt;= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c&lt;= :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+&lt; :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+$c&lt; :: BatchGetItem -&gt; BatchGetItem -&gt; Bool
+compare :: BatchGetItem -&gt; BatchGetItem -&gt; Ordering
+$ccompare :: BatchGetItem -&gt; BatchGetItem -&gt; Ordering
+$cp1Ord :: Eq BatchGetItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- | Construct a RequestItem .</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#batchGetRequestItem"><span class="hs-identifier hs-type">batchGetRequestItem</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span>
+</span><span id="line-54"></span><span>               </span><span class="hs-comment">-- ^ Projection Expression</span><span>
+</span><span id="line-55"></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-56"></span><span>               </span><span class="hs-comment">-- ^ Consistent Read</span><span>
+</span><span id="line-57"></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Core.html#PrimaryKey"><span class="hs-identifier hs-type">PrimaryKey</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-58"></span><span>               </span><span class="hs-comment">-- ^ Items to be deleted</span><span>
+</span><span id="line-59"></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span>
+</span><span id="line-60"></span><span id="batchGetRequestItem"><span class="annot"><span class="annottext">batchGetRequestItem :: Maybe Text -&gt; Bool -&gt; [PrimaryKey] -&gt; GetRequestItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#batchGetRequestItem"><span class="hs-identifier hs-var hs-var">batchGetRequestItem</span></a></span></span><span> </span><span id="local-6989586621679228625"><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679228625"><span class="hs-identifier hs-var">expr</span></a></span></span><span> </span><span id="local-6989586621679228624"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679228624"><span class="hs-identifier hs-var">consistent</span></a></span></span><span> </span><span id="local-6989586621679228623"><span class="annot"><span class="annottext">[PrimaryKey]
+</span><a href="#local-6989586621679228623"><span class="hs-identifier hs-var">keys</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe Text -&gt; Bool -&gt; [PrimaryKey] -&gt; GetRequestItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-var">GetRequestItem</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679228625"><span class="hs-identifier hs-var">expr</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679228624"><span class="hs-identifier hs-var">consistent</span></a></span><span> </span><span class="annot"><span class="annottext">[PrimaryKey]
+</span><a href="#local-6989586621679228623"><span class="hs-identifier hs-var">keys</span></a></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#toBatchGet"><span class="hs-identifier hs-type">toBatchGet</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html#GetItem"><span class="hs-identifier hs-type">GetItem</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span>
+</span><span id="line-63"></span><span id="toBatchGet"><span class="annot"><span class="annottext">toBatchGet :: [GetItem] -&gt; BatchGetItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#toBatchGet"><span class="hs-identifier hs-var hs-var">toBatchGet</span></a></span></span><span> </span><span id="local-6989586621679228621"><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228621"><span class="hs-identifier hs-var">gs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Text, GetRequestItem)] -&gt; ReturnConsumption -&gt; BatchGetItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-var">BatchGetItem</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[GetItem] -&gt; [(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228620"><span class="hs-identifier hs-var">convert</span></a></span><span> </span><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228621"><span class="hs-identifier hs-var">gs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span class="annot"><a href="#local-6989586621679228618"><span class="hs-identifier hs-type">groupItems</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html#GetItem"><span class="hs-identifier hs-type">GetItem</span></a></span><span class="hs-special">]</span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HM.HashMap</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html#GetItem"><span class="hs-identifier hs-type">GetItem</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HM.HashMap</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html#GetItem"><span class="hs-identifier hs-type">GetItem</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679228618"><span class="annot"><span class="annottext">groupItems :: [GetItem] -&gt; HashMap Text [GetItem] -&gt; HashMap Text [GetItem]
+</span><a href="#local-6989586621679228618"><span class="hs-identifier hs-var hs-var">groupItems</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span id="local-6989586621679228617"><span class="annot"><span class="annottext">HashMap Text [GetItem]
+</span><a href="#local-6989586621679228617"><span class="hs-identifier hs-var">hm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">HashMap Text [GetItem]
+</span><a href="#local-6989586621679228617"><span class="hs-identifier hs-var">hm</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="annot"><a href="#local-6989586621679228618"><span class="hs-identifier hs-var">groupItems</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228616"><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228616"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span id="local-6989586621679228615"><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228615"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679228614"><span class="annot"><span class="annottext">HashMap Text [GetItem]
+</span><a href="#local-6989586621679228614"><span class="hs-identifier hs-var">hm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679228613"><span class="annot"><span class="annottext">key :: Text
+</span><a href="#local-6989586621679228613"><span class="hs-identifier hs-var hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GetItem -&gt; Text
+</span><a href="Aws.DynamoDb.Commands.GetItem.html#giTableName"><span class="hs-identifier hs-var hs-var">giTableName</span></a></span><span> </span><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228616"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-69"></span><span>                             </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">[GetItem] -&gt; HashMap Text [GetItem] -&gt; HashMap Text [GetItem]
+</span><a href="#local-6989586621679228618"><span class="hs-identifier hs-var">groupItems</span></a></span><span> </span><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228615"><span class="hs-identifier hs-var">xs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text
+-&gt; [GetItem] -&gt; HashMap Text [GetItem] -&gt; HashMap Text [GetItem]
+forall k v.
+(Eq k, Hashable k) =&gt;
+k -&gt; v -&gt; HashMap k v -&gt; HashMap k v
+</span><span class="hs-identifier hs-var">HM.insert</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228613"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228616"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">GetItem -&gt; [GetItem] -&gt; [GetItem]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[GetItem] -&gt; Text -&gt; HashMap Text [GetItem] -&gt; [GetItem]
+forall k v. (Eq k, Hashable k) =&gt; v -&gt; k -&gt; HashMap k v -&gt; v
+</span><span class="hs-identifier hs-var">HM.lookupDefault</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228613"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">HashMap Text [GetItem]
+</span><a href="#local-6989586621679228614"><span class="hs-identifier hs-var">hm</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">HashMap Text [GetItem]
+</span><a href="#local-6989586621679228614"><span class="hs-identifier hs-var">hm</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>    </span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><a href="#local-6989586621679228620"><span class="hs-identifier hs-type">convert</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Commands.GetItem.html#GetItem"><span class="hs-identifier hs-type">GetItem</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">,</span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621679228620"><span class="annot"><span class="annottext">convert :: [GetItem] -&gt; [(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228620"><span class="hs-identifier hs-var hs-var">convert</span></a></span></span><span> </span><span id="local-6989586621679228609"><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228609"><span class="hs-identifier hs-var">gs'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679228608"><span class="annot"><span class="annottext">l :: [(Text, [GetItem])]
+</span><a href="#local-6989586621679228608"><span class="hs-identifier hs-var hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">HashMap Text [GetItem] -&gt; [(Text, [GetItem])]
+forall k v. HashMap k v -&gt; [(k, v)]
+</span><span class="hs-identifier hs-var">HM.toList</span></span><span> </span><span class="annot"><span class="annottext">(HashMap Text [GetItem] -&gt; [(Text, [GetItem])])
+-&gt; HashMap Text [GetItem] -&gt; [(Text, [GetItem])]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[GetItem] -&gt; HashMap Text [GetItem] -&gt; HashMap Text [GetItem]
+</span><a href="#local-6989586621679228618"><span class="hs-identifier hs-var">groupItems</span></a></span><span> </span><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228609"><span class="hs-identifier hs-var">gs'</span></a></span><span> </span><span class="annot"><span class="annottext">HashMap Text [GetItem]
+forall k v. HashMap k v
+</span><span class="hs-identifier hs-var">HM.empty</span></span><span>
+</span><span id="line-73"></span><span>                    </span><span class="hs-comment">-- Uses one GetItem to specify ProjectionExpression</span><span>
+</span><span id="line-74"></span><span>                    </span><span class="hs-comment">-- and ConsistentRead for the entire batch</span><span>
+</span><span id="line-75"></span><span>                    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">((Text, [GetItem]) -&gt; (Text, GetRequestItem))
+-&gt; [(Text, [GetItem])] -&gt; [(Text, GetRequestItem)]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679228605"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228605"><span class="hs-identifier hs-var">table</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679228604"><span class="annot"><span class="annottext">items :: [GetItem]
+</span><a href="#local-6989586621679228604"><span class="hs-identifier hs-var">items</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span id="local-6989586621679228603"><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228603"><span class="hs-identifier hs-var">i</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[GetItem]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679228605"><span class="hs-identifier hs-var">table</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Maybe Text -&gt; Bool -&gt; [PrimaryKey] -&gt; GetRequestItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-var">GetRequestItem</span></a></span><span> </span><span>
+</span><span id="line-76"></span><span>                                                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; [Text] -&gt; Text
+</span><span class="hs-identifier hs-var">T.intercalate</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;,&quot;</span></span><span> </span><span class="annot"><span class="annottext">([Text] -&gt; Text) -&gt; Maybe [Text] -&gt; Maybe Text
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">GetItem -&gt; Maybe [Text]
+</span><a href="Aws.DynamoDb.Commands.GetItem.html#giAttrs"><span class="hs-identifier hs-var hs-var">giAttrs</span></a></span><span> </span><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228603"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>                                                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GetItem -&gt; Bool
+</span><a href="Aws.DynamoDb.Commands.GetItem.html#giConsistent"><span class="hs-identifier hs-var hs-var">giConsistent</span></a></span><span> </span><span class="annot"><span class="annottext">GetItem
+</span><a href="#local-6989586621679228603"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>                                                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(GetItem -&gt; PrimaryKey) -&gt; [GetItem] -&gt; [PrimaryKey]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">GetItem -&gt; PrimaryKey
+</span><a href="Aws.DynamoDb.Commands.GetItem.html#giKey"><span class="hs-identifier hs-var hs-var">giKey</span></a></span><span> </span><span class="annot"><span class="annottext">[GetItem]
+</span><a href="#local-6989586621679228604"><span class="hs-identifier hs-var">items</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[(Text, [GetItem])]
+</span><a href="#local-6989586621679228608"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- | Construct a BatchGetItem</span><span>
+</span><span id="line-81"></span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#batchGetItem"><span class="hs-identifier hs-type">batchGetItem</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-82"></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span>
+</span><span id="line-83"></span><span id="batchGetItem"><span class="annot"><span class="annottext">batchGetItem :: [(Text, GetRequestItem)] -&gt; BatchGetItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#batchGetItem"><span class="hs-identifier hs-var hs-var">batchGetItem</span></a></span></span><span> </span><span id="local-6989586621679228596"><span class="annot"><span class="annottext">[(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228596"><span class="hs-identifier hs-var">reqs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Text, GetRequestItem)] -&gt; ReturnConsumption -&gt; BatchGetItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-var">BatchGetItem</span></a></span><span> </span><span class="annot"><span class="annottext">[(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228596"><span class="hs-identifier hs-var">reqs</span></a></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+forall a. Default a =&gt; a
+</span><span class="hs-identifier hs-var">def</span></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679228589"><span id="local-6989586621679228591"><span id="local-6989586621679228593"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-87"></span><span>   </span><span id="local-6989586621679228587"><span class="annot"><span class="annottext">toJSON :: GetRequestItem -&gt; Value
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span class="hs-special">{</span><span id="local-6989586621679228583"><span id="local-6989586621679228584"><span id="local-6989586621679228585"><span class="annot"><span class="annottext">Bool
+[PrimaryKey]
+Maybe Text
+griKeys :: [PrimaryKey]
+griConsistent :: Bool
+griProjExpr :: Maybe Text
+griKeys :: GetRequestItem -&gt; [PrimaryKey]
+griConsistent :: GetRequestItem -&gt; Bool
+griProjExpr :: GetRequestItem -&gt; Maybe Text
+</span><a href="#local-6989586621679228583"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-88"></span><span>       </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span> </span><span class="annot"><span class="annottext">([Pair] -&gt; Value) -&gt; [Pair] -&gt; Value
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; (Text -&gt; [Pair]) -&gt; Maybe Text -&gt; [Pair]
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pair -&gt; [Pair]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Pair -&gt; [Pair]) -&gt; (Text -&gt; Pair) -&gt; Text -&gt; [Pair]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ProjectionExpression&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe Text
+</span><a href="#local-6989586621679228585"><span class="hs-identifier hs-var">griProjExpr</span></a></span><span> </span><span class="annot"><span class="annottext">[Pair] -&gt; [Pair] -&gt; [Pair]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span>
+</span><span id="line-89"></span><span>                 </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ConsistentRead&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Bool -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679228584"><span class="hs-identifier hs-var">griConsistent</span></a></span><span>
+</span><span id="line-90"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Keys&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [PrimaryKey] -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">[PrimaryKey]
+</span><a href="#local-6989586621679228583"><span class="hs-identifier hs-var">griKeys</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>         </span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679228572"><span id="local-6989586621679228574"><span id="local-6989586621679228576"><span class="annot"><span class="hs-identifier hs-type">ToJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621679228571"><span class="annot"><span class="annottext">toJSON :: BatchGetItem -&gt; Value
+</span><a href="#local-6989586621679228571"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span class="hs-special">{</span><span id="local-6989586621679228569"><span id="local-6989586621679228570"><span class="annot"><span class="annottext">[(Text, GetRequestItem)]
+ReturnConsumption
+bgRetCons :: ReturnConsumption
+bgRequests :: [(Text, GetRequestItem)]
+bgRetCons :: BatchGetItem -&gt; ReturnConsumption
+bgRequests :: BatchGetItem -&gt; [(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228569"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><span class="annottext">[Pair] -&gt; Value
+</span><span class="hs-identifier hs-var">object</span></span><span> </span><span class="annot"><span class="annottext">([Pair] -&gt; Value) -&gt; [Pair] -&gt; Value
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-96"></span><span>          </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;RequestItems&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; HashMap Text GetRequestItem -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">[(Text, GetRequestItem)] -&gt; HashMap Text GetRequestItem
+forall k v. (Eq k, Hashable k) =&gt; [(k, v)] -&gt; HashMap k v
+</span><span class="hs-identifier hs-var">HM.fromList</span></span><span> </span><span class="annot"><span class="annottext">[(Text, GetRequestItem)]
+</span><a href="#local-6989586621679228570"><span class="hs-identifier hs-var">bgRequests</span></a></span><span>
+</span><span id="line-97"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ReturnConsumedCapacity&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ReturnConsumption -&gt; Pair
+forall kv v. (KeyValue kv, ToJSON v) =&gt; Text -&gt; v -&gt; kv
+</span><span class="hs-operator hs-var">.=</span></span><span> </span><span class="annot"><span class="annottext">ReturnConsumption
+</span><a href="#local-6989586621679228569"><span class="hs-identifier hs-var">bgRetCons</span></a></span><span>
+</span><span id="line-98"></span><span>          </span><span class="hs-special">]</span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679228565"><span class="annot"><span class="hs-identifier hs-type">FromJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679228563"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser GetRequestItem
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Object</span></span><span> </span><span id="local-6989586621679228560"><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228560"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-102"></span><span>                 </span><span class="annot"><span class="annottext">Maybe Text -&gt; Bool -&gt; [PrimaryKey] -&gt; GetRequestItem
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-var">GetRequestItem</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe Text -&gt; Bool -&gt; [PrimaryKey] -&gt; GetRequestItem)
+-&gt; Parser (Maybe Text)
+-&gt; Parser (Bool -&gt; [PrimaryKey] -&gt; GetRequestItem)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228560"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe Text)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ProjectionExpression&quot;</span></span><span>
+</span><span id="line-103"></span><span>                                </span><span class="annot"><span class="annottext">Parser (Bool -&gt; [PrimaryKey] -&gt; GetRequestItem)
+-&gt; Parser Bool -&gt; Parser ([PrimaryKey] -&gt; GetRequestItem)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228560"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser Bool
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser a
+</span><span class="hs-operator hs-var">.:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ConsistentRead&quot;</span></span><span>
+</span><span id="line-104"></span><span>                                </span><span class="annot"><span class="annottext">Parser ([PrimaryKey] -&gt; GetRequestItem)
+-&gt; Parser [PrimaryKey] -&gt; Parser GetRequestItem
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228560"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser [PrimaryKey]
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser a
+</span><span class="hs-operator hs-var">.:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Keys&quot;</span></span><span>
+</span><span id="line-105"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">parseJSON</span></span><span> </span><span class="annot"><span class="annottext">Value
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Parser GetRequestItem
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;unable to parse GetRequestItem&quot;</span></span><span>
+</span><span id="line-106"></span><span>    </span><span>
+</span><span id="line-107"></span><span>         </span><span>
+</span><span id="line-108"></span><span class="hs-keyword">data</span><span> </span><span id="BatchGetItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-var">BatchGetItemResponse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="BatchGetItemResponse"><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-var">BatchGetItemResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-109"></span><span>      </span><span id="bgResponses"><span class="annot"><span class="annottext">BatchGetItemResponse -&gt; [(Text, [Item])]
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#bgResponses"><span class="hs-identifier hs-var hs-var">bgResponses</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Aws.DynamoDb.Core.html#Item"><span class="hs-identifier hs-type">Item</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="bgUnprocessed"><span class="annot"><span class="annottext">BatchGetItemResponse -&gt; Maybe [(Text, GetRequestItem)]
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#bgUnprocessed"><span class="hs-identifier hs-var hs-var">bgUnprocessed</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">,</span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#GetRequestItem"><span class="hs-identifier hs-type">GetRequestItem</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-comment">-- ^ Unprocessed Requests on failure</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="bgConsumed"><span class="annot"><span class="annottext">BatchGetItemResponse -&gt; Maybe ConsumedCapacity
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#bgConsumed"><span class="hs-identifier hs-var hs-var">bgConsumed</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#ConsumedCapacity"><span class="hs-identifier hs-type">ConsumedCapacity</span></a></span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-comment">-- ^ Amount of capacity consumed</span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679228550"><span id="local-6989586621679228552"><span class="annot"><span class="annottext">BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+(BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; Eq BatchGetItemResponse
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c/= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+== :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c== :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228544"><span id="local-6989586621679228546"><span id="local-6989586621679228548"><span class="annot"><span class="annottext">Int -&gt; BatchGetItemResponse -&gt; ShowS
+[BatchGetItemResponse] -&gt; ShowS
+BatchGetItemResponse -&gt; String
+(Int -&gt; BatchGetItemResponse -&gt; ShowS)
+-&gt; (BatchGetItemResponse -&gt; String)
+-&gt; ([BatchGetItemResponse] -&gt; ShowS)
+-&gt; Show BatchGetItemResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [BatchGetItemResponse] -&gt; ShowS
+$cshowList :: [BatchGetItemResponse] -&gt; ShowS
+show :: BatchGetItemResponse -&gt; String
+$cshow :: BatchGetItemResponse -&gt; String
+showsPrec :: Int -&gt; BatchGetItemResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; BatchGetItemResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228536"><span id="local-6989586621679228538"><span id="local-6989586621679228540"><span id="local-6989586621679228542"><span class="annot"><span class="annottext">ReadPrec [BatchGetItemResponse]
+ReadPrec BatchGetItemResponse
+Int -&gt; ReadS BatchGetItemResponse
+ReadS [BatchGetItemResponse]
+(Int -&gt; ReadS BatchGetItemResponse)
+-&gt; ReadS [BatchGetItemResponse]
+-&gt; ReadPrec BatchGetItemResponse
+-&gt; ReadPrec [BatchGetItemResponse]
+-&gt; Read BatchGetItemResponse
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+readListPrec :: ReadPrec [BatchGetItemResponse]
+$creadListPrec :: ReadPrec [BatchGetItemResponse]
+readPrec :: ReadPrec BatchGetItemResponse
+$creadPrec :: ReadPrec BatchGetItemResponse
+readList :: ReadS [BatchGetItemResponse]
+$creadList :: ReadS [BatchGetItemResponse]
+readsPrec :: Int -&gt; ReadS BatchGetItemResponse
+$creadsPrec :: Int -&gt; ReadS BatchGetItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679228521"><span id="local-6989586621679228523"><span id="local-6989586621679228525"><span id="local-6989586621679228527"><span id="local-6989586621679228529"><span id="local-6989586621679228531"><span id="local-6989586621679228533"><span class="annot"><span class="annottext">Eq BatchGetItemResponse
+Eq BatchGetItemResponse
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Ordering)
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; (BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool)
+-&gt; (BatchGetItemResponse
+    -&gt; BatchGetItemResponse -&gt; BatchGetItemResponse)
+-&gt; (BatchGetItemResponse
+    -&gt; BatchGetItemResponse -&gt; BatchGetItemResponse)
+-&gt; Ord BatchGetItemResponse
+BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Ordering
+BatchGetItemResponse
+-&gt; BatchGetItemResponse -&gt; BatchGetItemResponse
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: BatchGetItemResponse
+-&gt; BatchGetItemResponse -&gt; BatchGetItemResponse
+$cmin :: BatchGetItemResponse
+-&gt; BatchGetItemResponse -&gt; BatchGetItemResponse
+max :: BatchGetItemResponse
+-&gt; BatchGetItemResponse -&gt; BatchGetItemResponse
+$cmax :: BatchGetItemResponse
+-&gt; BatchGetItemResponse -&gt; BatchGetItemResponse
+&gt;= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c&gt;= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+&gt; :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c&gt; :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+&lt;= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c&lt;= :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+&lt; :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+$c&lt; :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Bool
+compare :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Ordering
+$ccompare :: BatchGetItemResponse -&gt; BatchGetItemResponse -&gt; Ordering
+$cp1Ord :: Eq BatchGetItemResponse
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItem"><span class="hs-identifier hs-type">BatchGetItem</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbConfiguration"><span class="hs-identifier hs-type">DdbConfiguration</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span id="local-6989586621679228514"><span class="annot"><span class="annottext">signQuery :: BatchGetItem
+-&gt; ServiceConfiguration BatchGetItem queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span id="local-6989586621679228512"><span class="annot"><span class="annottext">BatchGetItem
+</span><a href="#local-6989586621679228512"><span class="hs-identifier hs-var">gi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+-&gt; BatchGetItem
+-&gt; DdbConfiguration queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+forall a qt.
+ToJSON a =&gt;
+ByteString
+-&gt; a -&gt; DdbConfiguration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.DynamoDb.Core.html#ddbSignQuery"><span class="hs-identifier hs-var">ddbSignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;BatchGetItem&quot;</span></span><span> </span><span class="annot"><span class="annottext">BatchGetItem
+</span><a href="#local-6989586621679228512"><span class="hs-identifier hs-var">gi</span></a></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679228508"><span class="annot"><span class="hs-identifier hs-type">FromJSON</span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-127"></span><span>    </span><span id="local-6989586621679228507"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser BatchGetItemResponse
+</span><a href="#local-6989586621679228507"><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Object</span></span><span> </span><span id="local-6989586621679228506"><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228506"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Text, [Item])]
+-&gt; Maybe [(Text, GetRequestItem)]
+-&gt; Maybe ConsumedCapacity
+-&gt; BatchGetItemResponse
+</span><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-var">BatchGetItemResponse</span></a></span><span>
+</span><span id="line-128"></span><span>        </span><span class="annot"><span class="annottext">([(Text, [Item])]
+ -&gt; Maybe [(Text, GetRequestItem)]
+ -&gt; Maybe ConsumedCapacity
+ -&gt; BatchGetItemResponse)
+-&gt; Parser [(Text, [Item])]
+-&gt; Parser
+     (Maybe [(Text, GetRequestItem)]
+      -&gt; Maybe ConsumedCapacity -&gt; BatchGetItemResponse)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HashMap Text [Item] -&gt; [(Text, [Item])]
+forall k v. HashMap k v -&gt; [(k, v)]
+</span><span class="hs-identifier hs-var">HM.toList</span></span><span> </span><span class="annot"><span class="annottext">(HashMap Text [Item] -&gt; [(Text, [Item])])
+-&gt; Parser (HashMap Text [Item]) -&gt; Parser [(Text, [Item])]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228506"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (HashMap Text [Item])
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser a
+</span><span class="hs-operator hs-var">.:</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Responses&quot;</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-129"></span><span>        </span><span class="annot"><span class="annottext">Parser
+  (Maybe [(Text, GetRequestItem)]
+   -&gt; Maybe ConsumedCapacity -&gt; BatchGetItemResponse)
+-&gt; Parser (Maybe [(Text, GetRequestItem)])
+-&gt; Parser (Maybe ConsumedCapacity -&gt; BatchGetItemResponse)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228506"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe [(Text, GetRequestItem)])
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;UnprocessedItems&quot;</span></span><span>
+</span><span id="line-130"></span><span>        </span><span class="annot"><span class="annottext">Parser (Maybe ConsumedCapacity -&gt; BatchGetItemResponse)
+-&gt; Parser (Maybe ConsumedCapacity) -&gt; Parser BatchGetItemResponse
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><a href="#local-6989586621679228506"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Object -&gt; Text -&gt; Parser (Maybe ConsumedCapacity)
+forall a. FromJSON a =&gt; Object -&gt; Text -&gt; Parser (Maybe a)
+</span><span class="hs-operator hs-var">.:?</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;ConsumedCapacity&quot;</span></span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span>    </span><span class="annot"><span class="hs-identifier hs-var">parseJSON</span></span><span> </span><span class="annot"><span class="annottext">Value
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Parser BatchGetItemResponse
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;BatchGetItemResponse must be an object.&quot;</span></span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span id="local-6989586621679228505"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679228505"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Core.html#DdbResponse"><span class="hs-identifier hs-type">DdbResponse</span></a></span><span>
+</span><span id="line-136"></span><span>    </span><span id="local-6989586621679228501"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; r
+-&gt; IORef (ResponseMetadata BatchGetItemResponse)
+-&gt; HTTPResponseConsumer BatchGetItemResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679228499"><span class="annot"><span class="annottext">IORef (ResponseMetadata BatchGetItemResponse)
+</span><a href="#local-6989586621679228499"><span class="hs-identifier hs-var">ref</span></a></span></span><span> </span><span id="local-6989586621679228498"><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679228498"><span class="hs-identifier hs-var">resp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef DdbResponse -&gt; HTTPResponseConsumer BatchGetItemResponse
+forall a. FromJSON a =&gt; IORef DdbResponse -&gt; HTTPResponseConsumer a
+</span><a href="Aws.DynamoDb.Core.html#ddbResponseConsumer"><span class="hs-identifier hs-var">ddbResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (ResponseMetadata BatchGetItemResponse)
+IORef DdbResponse
+</span><a href="#local-6989586621679228499"><span class="hs-identifier hs-var">ref</span></a></span><span> </span><span class="annot"><span class="annottext">Response (ConduitM () ByteString (ResourceT IO) ())
+</span><a href="#local-6989586621679228498"><span class="hs-identifier hs-var">resp</span></a></span></span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.DynamoDb.Commands.BatchGetItem.html#BatchGetItemResponse"><span class="hs-identifier hs-type">BatchGetItemResponse</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621679228494"><span class="annot"><span class="annottext">loadToMemory :: BatchGetItemResponse
+-&gt; ResourceT IO (MemoryResponse BatchGetItemResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BatchGetItemResponse
+-&gt; ResourceT IO (MemoryResponse BatchGetItemResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span></pre></body></html>

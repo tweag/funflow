@@ -1,0 +1,892 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards #-}</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Module      :  Text.URI.Parser.Text</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Copyright   :  &#169; 2017&#8211;present Mark Karpov</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- License     :  BSD 3 clause</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Maintainer  :  Mark Karpov &lt;markkarpov92@gmail.com&gt;</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- URI parser for strict 'Text', an internal module.</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Text.URI.Parser.Text</span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#mkURI"><span class="hs-identifier">mkURI</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>    </span><span class="annot"><a href="Text.URI.Parser.Text.html#parser"><span class="hs-identifier">parser</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Catch</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">MonadThrow</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.State.Strict</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B8</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.List.NonEmpty</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">NonEmpty</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.List.NonEmpty</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NE</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">catMaybes</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">isJust</span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Set</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TE</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Void</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.Megaparsec</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.Megaparsec.Char</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Text.Megaparsec.Char.Lexer</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.Utils.html"><span class="hs-identifier">Text.URI.Parser.Text.Utils</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Text.URI.Types.html"><span class="hs-identifier">Text.URI.Types</span></a></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | Construct a 'URI' from 'Text'. The input you pass to 'mkURI' must be a</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- valid URI as per RFC 3986, that is, its components should be</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- percent-encoded where necessary. In case of parse failure</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- 'ParseException' is thrown.</span><span>
+</span><span id="line-45"></span><span class="hs-comment">--</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- This function uses the 'parser' parser under the hood, which you can also</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- use directly in a Megaparsec parser.</span><span>
+</span><span id="line-48"></span><span id="local-6989586621679153972"><span class="annot"><a href="Text.URI.Parser.Text.html#mkURI"><span class="hs-identifier hs-type">mkURI</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadThrow</span></span><span> </span><span class="annot"><a href="#local-6989586621679153972"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679153972"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span></span><span>
+</span><span id="line-49"></span><span id="mkURI"><span class="annot"><span class="annottext">mkURI :: Text -&gt; m URI
+</span><a href="Text.URI.Parser.Text.html#mkURI"><span class="hs-identifier hs-var hs-var">mkURI</span></a></span></span><span> </span><span id="local-6989586621679153971"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153971"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Parsec Void Text URI
+-&gt; String -&gt; Text -&gt; Either (ParseErrorBundle Text Void) URI
+forall e s a.
+Parsec e s a -&gt; String -&gt; s -&gt; Either (ParseErrorBundle s e) a
+</span><span class="hs-identifier hs-var">runParser</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Parsec Void Text URI
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m URI
+</span><a href="Text.URI.Parser.Text.html#parser"><span class="hs-identifier hs-var">parser</span></a></span><span> </span><span class="annot"><span class="annottext">Parsec Void Text URI
+-&gt; ParsecT Void Text Identity () -&gt; Parsec Void Text URI
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;*</span></span><span> </span><span class="annot"><span class="annottext">ParsecT Void Text Identity ()
+forall e s (m :: * -&gt; *). MonadParsec e s m =&gt; m ()
+</span><span class="hs-identifier hs-var">eof</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Parsec</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153971"><span class="hs-identifier hs-var">input</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span id="local-6989586621679153967"><span class="annot"><span class="annottext">ParseErrorBundle Text Void
+</span><a href="#local-6989586621679153967"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ParseException -&gt; m URI
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ParseErrorBundle Text Void -&gt; ParseException
+</span><a href="Text.URI.Types.html#ParseException"><span class="hs-identifier hs-var">ParseException</span></a></span><span> </span><span class="annot"><span class="annottext">ParseErrorBundle Text Void
+</span><a href="#local-6989586621679153967"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679153964"><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679153964"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">URI -&gt; m URI
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">URI
+</span><a href="#local-6989586621679153964"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- | This parser can be used to parse 'URI' from strict 'Text'. Remember to</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- use a concrete non-polymorphic parser type for efficiency.</span><span>
+</span><span id="line-56"></span><span id="local-6989586621679154136"><span id="local-6989586621679154137"><span class="annot"><a href="Text.URI.Parser.Text.html#parser"><span class="hs-identifier hs-type">parser</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154137"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154136"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154136"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span></span></span><span>
+</span><span id="line-57"></span><span id="parser"><span class="annot"><span class="annottext">parser :: m URI
+</span><a href="Text.URI.Parser.Text.html#parser"><span class="hs-identifier hs-var hs-var">parser</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-58"></span><span>  </span><span id="local-6989586621679153963"><span class="annot"><span class="annottext">Maybe (RText 'Scheme)
+</span><a href="#local-6989586621679153963"><span class="hs-identifier hs-var">uriScheme</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (RText 'Scheme) -&gt; m (Maybe (RText 'Scheme))
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m (RText 'Scheme) -&gt; m (RText 'Scheme)
+forall e s (m :: * -&gt; *) a. MonadParsec e s m =&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">try</span></span><span> </span><span class="annot"><span class="annottext">m (RText 'Scheme)
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m (RText 'Scheme)
+</span><a href="Text.URI.Parser.Text.html#pScheme"><span class="hs-identifier hs-var">pScheme</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>  </span><span id="local-6989586621679153959"><span class="annot"><span class="annottext">Maybe Authority
+</span><a href="#local-6989586621679153959"><span class="hs-identifier hs-var">mauth</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Authority -&gt; m (Maybe Authority)
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="annot"><span class="annottext">m Authority
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Authority
+</span><a href="Text.URI.Parser.Text.html#pAuthority"><span class="hs-identifier hs-var">pAuthority</span></a></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679153957"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153957"><span class="hs-identifier hs-var">absPath</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679153956"><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+</span><a href="#local-6989586621679153956"><span class="hs-identifier hs-var">uriPath</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; m (Bool, Maybe (Bool, NonEmpty (RText 'PathPiece)))
+forall e (m :: * -&gt; *).
+MonadParsec e Text m =&gt;
+Bool -&gt; m (Bool, Maybe (Bool, NonEmpty (RText 'PathPiece)))
+</span><a href="Text.URI.Parser.Text.html#pPath"><span class="hs-identifier hs-var">pPath</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe Authority -&gt; Bool
+forall a. Maybe a -&gt; Bool
+</span><span class="hs-identifier hs-var">isJust</span></span><span> </span><span class="annot"><span class="annottext">Maybe Authority
+</span><a href="#local-6989586621679153959"><span class="hs-identifier hs-var">mauth</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>  </span><span id="local-6989586621679153954"><span class="annot"><span class="annottext">[QueryParam]
+</span><a href="#local-6989586621679153954"><span class="hs-identifier hs-var">uriQuery</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[QueryParam] -&gt; m [QueryParam] -&gt; m [QueryParam]
+forall (m :: * -&gt; *) a. Alternative m =&gt; a -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">option</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">m [QueryParam]
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m [QueryParam]
+</span><a href="Text.URI.Parser.Text.html#pQuery"><span class="hs-identifier hs-var">pQuery</span></a></span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621679153951"><span class="annot"><span class="annottext">Maybe (RText 'Fragment)
+</span><a href="#local-6989586621679153951"><span class="hs-identifier hs-var">uriFragment</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (RText 'Fragment) -&gt; m (Maybe (RText 'Fragment))
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="annot"><span class="annottext">m (RText 'Fragment)
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m (RText 'Fragment)
+</span><a href="Text.URI.Parser.Text.html#pFragment"><span class="hs-identifier hs-var">pFragment</span></a></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679153949"><span class="annot"><span class="annottext">uriAuthority :: Either Bool Authority
+</span><a href="#local-6989586621679153949"><span class="hs-identifier hs-var hs-var">uriAuthority</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Either Bool Authority
+-&gt; (Authority -&gt; Either Bool Authority)
+-&gt; Maybe Authority
+-&gt; Either Bool Authority
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; Either Bool Authority
+forall a b. a -&gt; Either a b
+</span><span class="hs-identifier hs-var">Left</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153957"><span class="hs-identifier hs-var">absPath</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Authority -&gt; Either Bool Authority
+forall a b. b -&gt; Either a b
+</span><span class="hs-identifier hs-var">Right</span></span><span> </span><span class="annot"><span class="annottext">Maybe Authority
+</span><a href="#local-6989586621679153959"><span class="hs-identifier hs-var">mauth</span></a></span><span>
+</span><span id="line-64"></span><span>  </span><span class="annot"><span class="annottext">URI -&gt; m URI
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">URI :: Maybe (RText 'Scheme)
+-&gt; Either Bool Authority
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+-&gt; [QueryParam]
+-&gt; Maybe (RText 'Fragment)
+-&gt; URI
+</span><a href="Text.URI.Types.html#URI"><span class="hs-identifier hs-type">URI</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">[QueryParam]
+Maybe (Bool, NonEmpty (RText 'PathPiece))
+Maybe (RText 'Scheme)
+Maybe (RText 'Fragment)
+Either Bool Authority
+uriFragment :: Maybe (RText 'Fragment)
+uriQuery :: [QueryParam]
+uriPath :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+uriAuthority :: Either Bool Authority
+uriScheme :: Maybe (RText 'Scheme)
+uriAuthority :: Either Bool Authority
+uriFragment :: Maybe (RText 'Fragment)
+uriQuery :: [QueryParam]
+uriPath :: Maybe (Bool, NonEmpty (RText 'PathPiece))
+uriScheme :: Maybe (RText 'Scheme)
+</span><a href="Text.URI.Types.html#uriFragment"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-65"></span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#parser"><span class="hs-pragma hs-type">parser</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-66"></span><span class="hs-pragma">{-# SPECIALIZE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#parser"><span class="hs-pragma hs-type">parser</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Parsec</span></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Void</span></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Text</span></span><span> </span><span class="annot"><a href="Text.URI.Types.html#URI"><span class="hs-pragma hs-type">URI</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span id="local-6989586621679154110"><span id="local-6989586621679154111"><span class="annot"><a href="Text.URI.Parser.Text.html#pScheme"><span class="hs-identifier hs-type">pScheme</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154111"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154110"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154110"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Scheme"><span class="hs-identifier hs-type">Scheme</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-69"></span><span id="pScheme"><span class="annot"><span class="annottext">pScheme :: m (RText 'Scheme)
+</span><a href="Text.URI.Parser.Text.html#pScheme"><span class="hs-identifier hs-var hs-var">pScheme</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-70"></span><span>  </span><span id="local-6989586621679153941"><span class="annot"><span class="annottext">RText 'Scheme
+</span><a href="#local-6989586621679153941"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'Scheme)) -&gt; m String -&gt; m (RText 'Scheme)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;scheme&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'Scheme)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Scheme)
+</span><a href="Text.URI.Types.html#mkScheme"><span class="hs-identifier hs-var">mkScheme</span></a></span><span> </span><span class="annot"><span class="annottext">(m String -&gt; m (RText 'Scheme)) -&gt; m String -&gt; m (RText 'Scheme)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621679153938"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679153938"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#asciiAlphaChar"><span class="hs-identifier hs-var">asciiAlphaChar</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621679153936"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153936"><span class="hs-identifier hs-var">xs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#asciiAlphaNumChar"><span class="hs-identifier hs-var">asciiAlphaNumChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'+'</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'-'</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'.'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>    </span><span class="annot"><span class="annottext">String -&gt; m String
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621679153938"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; String -&gt; String
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153936"><span class="hs-identifier hs-var">xs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span>  </span><span class="annot"><span class="annottext">m Char -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">':'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>  </span><span class="annot"><span class="annottext">RText 'Scheme -&gt; m (RText 'Scheme)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">RText 'Scheme
+</span><a href="#local-6989586621679153941"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-76"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pScheme"><span class="hs-pragma hs-type">pScheme</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span id="local-6989586621679154107"><span id="local-6989586621679154108"><span class="annot"><a href="Text.URI.Parser.Text.html#pAuthority"><span class="hs-identifier hs-type">pAuthority</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154108"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154107"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154107"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">Authority</span></a></span></span></span><span>
+</span><span id="line-79"></span><span id="pAuthority"><span class="annot"><span class="annottext">pAuthority :: m Authority
+</span><a href="Text.URI.Parser.Text.html#pAuthority"><span class="hs-identifier hs-var hs-var">pAuthority</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><span class="annottext">m Text -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tokens Text -&gt; m (Tokens Text)
+forall e s (m :: * -&gt; *).
+MonadParsec e s m =&gt;
+Tokens s -&gt; m (Tokens s)
+</span><span class="hs-identifier hs-var">string</span></span><span> </span><span class="annot"><span class="annottext">Tokens Text
+</span><span class="hs-string">&quot;//&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>  </span><span id="local-6989586621679153929"><span class="annot"><span class="annottext">Maybe UserInfo
+</span><a href="#local-6989586621679153929"><span class="hs-identifier hs-var">authUserInfo</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m UserInfo -&gt; m (Maybe UserInfo)
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="annot"><span class="annottext">m UserInfo
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m UserInfo
+</span><a href="Text.URI.Parser.Text.html#pUserInfo"><span class="hs-identifier hs-var">pUserInfo</span></a></span><span>
+</span><span id="line-82"></span><span>  </span><span id="local-6989586621679153927"><span class="annot"><span class="annottext">RText 'Host
+</span><a href="#local-6989586621679153927"><span class="hs-identifier hs-var">authHost</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'Host)) -&gt; m String -&gt; m (RText 'Host)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;host&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'Host)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Host)
+</span><a href="Text.URI.Types.html#mkHost"><span class="hs-identifier hs-var">mkHost</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; m String
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; Bool -&gt; m String
+</span><a href="Text.URI.Parser.Text.Utils.html#pHost"><span class="hs-identifier hs-var">pHost</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>  </span><span id="local-6989586621679153924"><span class="annot"><span class="annottext">Maybe Word
+</span><a href="#local-6989586621679153924"><span class="hs-identifier hs-var">authPort</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Word -&gt; m (Maybe Word)
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">':'</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Word -&gt; m Word
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">m Word
+forall e s (m :: * -&gt; *) a.
+(MonadParsec e s m, Token s ~ Char, Num a) =&gt;
+m a
+</span><span class="hs-identifier hs-var">L.decimal</span></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><span class="annottext">Authority -&gt; m Authority
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">Authority :: Maybe UserInfo -&gt; RText 'Host -&gt; Maybe Word -&gt; Authority
+</span><a href="Text.URI.Types.html#Authority"><span class="hs-identifier hs-type">Authority</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">Maybe Word
+Maybe UserInfo
+RText 'Host
+authPort :: Maybe Word
+authHost :: RText 'Host
+authUserInfo :: Maybe UserInfo
+authPort :: Maybe Word
+authHost :: RText 'Host
+authUserInfo :: Maybe UserInfo
+</span><a href="Text.URI.Types.html#authPort"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-85"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pAuthority"><span class="hs-pragma hs-type">pAuthority</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span id="local-6989586621679154060"><span id="local-6989586621679154061"><span class="annot"><a href="Text.URI.Parser.Text.html#pUserInfo"><span class="hs-identifier hs-type">pUserInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154061"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154060"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154060"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier hs-type">UserInfo</span></a></span></span></span><span>
+</span><span id="line-88"></span><span id="pUserInfo"><span class="annot"><span class="annottext">pUserInfo :: m UserInfo
+</span><a href="Text.URI.Parser.Text.html#pUserInfo"><span class="hs-identifier hs-var hs-var">pUserInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m UserInfo -&gt; m UserInfo
+forall e s (m :: * -&gt; *) a. MonadParsec e s m =&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">try</span></span><span> </span><span class="annot"><span class="annottext">(m UserInfo -&gt; m UserInfo) -&gt; m UserInfo -&gt; m UserInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-89"></span><span>  </span><span id="local-6989586621679153918"><span class="annot"><span class="annottext">RText 'Username
+</span><a href="#local-6989586621679153918"><span class="hs-identifier hs-var">uiUsername</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-90"></span><span>    </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'Username))
+-&gt; m String
+-&gt; m (RText 'Username)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span>
+</span><span id="line-91"></span><span>      </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;username&quot;</span></span><span>
+</span><span id="line-92"></span><span>      </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'Username)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Username)
+</span><a href="Text.URI.Types.html#mkUsername"><span class="hs-identifier hs-var">mkUsername</span></a></span><span>
+</span><span id="line-93"></span><span>      </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">String -&gt; m String -&gt; m String
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+String -&gt; m a -&gt; m a
+</span><span class="hs-keyword hs-var">label</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;username&quot;</span></span><span> </span><span class="annot"><span class="annottext">(m String -&gt; m String) -&gt; m String -&gt; m String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-94"></span><span>          </span><span class="annot"><span class="annottext">m Char -&gt; m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#unreservedChar"><span class="hs-identifier hs-var">unreservedChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#percentEncChar"><span class="hs-identifier hs-var">percentEncChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#subDelimChar"><span class="hs-identifier hs-var">subDelimChar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-95"></span><span>      </span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621679153912"><span class="annot"><span class="annottext">Maybe (RText 'Password)
+</span><a href="#local-6989586621679153912"><span class="hs-identifier hs-var">uiPassword</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (RText 'Password) -&gt; m (Maybe (RText 'Password))
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="annot"><span class="annottext">(m (RText 'Password) -&gt; m (Maybe (RText 'Password)))
+-&gt; m (RText 'Password) -&gt; m (Maybe (RText 'Password))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-97"></span><span>    </span><span class="annot"><span class="annottext">m Char -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">':'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'Password))
+-&gt; m String
+-&gt; m (RText 'Password)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span>
+</span><span id="line-99"></span><span>      </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;password&quot;</span></span><span>
+</span><span id="line-100"></span><span>      </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'Password)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Password)
+</span><a href="Text.URI.Types.html#mkPassword"><span class="hs-identifier hs-var">mkPassword</span></a></span><span>
+</span><span id="line-101"></span><span>      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char -&gt; m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#unreservedChar"><span class="hs-identifier hs-var">unreservedChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#percentEncChar"><span class="hs-identifier hs-var">percentEncChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#subDelimChar"><span class="hs-identifier hs-var">subDelimChar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">':'</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>  </span><span class="annot"><span class="annottext">m Char -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'@'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>  </span><span class="annot"><span class="annottext">UserInfo -&gt; m UserInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">UserInfo :: RText 'Username -&gt; Maybe (RText 'Password) -&gt; UserInfo
+</span><a href="Text.URI.Types.html#UserInfo"><span class="hs-identifier hs-type">UserInfo</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">Maybe (RText 'Password)
+RText 'Username
+uiPassword :: Maybe (RText 'Password)
+uiUsername :: RText 'Username
+uiPassword :: Maybe (RText 'Password)
+uiUsername :: RText 'Username
+</span><a href="Text.URI.Types.html#uiPassword"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-104"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pUserInfo"><span class="hs-pragma hs-type">pUserInfo</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span id="local-6989586621679154103"><span id="local-6989586621679154104"><span class="annot"><a href="Text.URI.Parser.Text.html#pPath"><span class="hs-identifier hs-type">pPath</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-107"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154104"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154103"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-108"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><a href="#local-6989586621679154103"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NonEmpty</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#PathPiece"><span class="hs-identifier hs-type">PathPiece</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-110"></span><span id="pPath"><span class="annot"><span class="annottext">pPath :: Bool -&gt; m (Bool, Maybe (Bool, NonEmpty (RText 'PathPiece)))
+</span><a href="Text.URI.Parser.Text.html#pPath"><span class="hs-identifier hs-var hs-var">pPath</span></a></span></span><span> </span><span id="local-6989586621679153907"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153907"><span class="hs-identifier hs-var">hasAuth</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679153906"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153906"><span class="hs-identifier hs-var">doubleSlash</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Bool -&gt; m Bool
+forall e s (m :: * -&gt; *) a. MonadParsec e s m =&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">lookAhead</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; m Bool -&gt; m Bool
+forall (m :: * -&gt; *) a. Alternative m =&gt; a -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">option</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; m Text -&gt; m Bool
+forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;$</span></span><span> </span><span class="annot"><span class="annottext">Tokens Text -&gt; m (Tokens Text)
+forall e s (m :: * -&gt; *).
+MonadParsec e s m =&gt;
+Tokens s -&gt; m (Tokens s)
+</span><span class="hs-identifier hs-var">string</span></span><span> </span><span class="annot"><span class="annottext">Tokens Text
+</span><span class="hs-string">&quot;//&quot;</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>  </span><span class="annot"><span class="annottext">Bool -&gt; m () -&gt; m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153906"><span class="hs-identifier hs-var">doubleSlash</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153907"><span class="hs-identifier hs-var">hasAuth</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(m () -&gt; m ()) -&gt; m () -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ErrorItem Char -&gt; m ()
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+ErrorItem (Token s) -&gt; m a
+</span><span class="hs-identifier hs-var">unexpected</span></span><span> </span><span class="annot"><span class="annottext">(ErrorItem Char -&gt; m ())
+-&gt; (String -&gt; ErrorItem Char) -&gt; String -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">NonEmpty Char -&gt; ErrorItem Char
+forall t. NonEmpty t -&gt; ErrorItem t
+</span><span class="hs-identifier hs-var">Tokens</span></span><span> </span><span class="annot"><span class="annottext">(NonEmpty Char -&gt; ErrorItem Char)
+-&gt; (String -&gt; NonEmpty Char) -&gt; String -&gt; ErrorItem Char
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; NonEmpty Char
+forall a. [a] -&gt; NonEmpty a
+</span><span class="hs-identifier hs-var">NE.fromList</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;//&quot;</span></span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679153896"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153896"><span class="hs-identifier hs-var">absPath</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; m Bool -&gt; m Bool
+forall (m :: * -&gt; *) a. Alternative m =&gt; a -&gt; m a -&gt; m a
+</span><span class="hs-identifier hs-var">option</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; m Char -&gt; m Bool
+forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;$</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'/'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679153895"><span class="annot"><span class="annottext">mkPathPiece' :: Text -&gt; Maybe (Maybe (RText 'PathPiece))
+</span><a href="#local-6989586621679153895"><span class="hs-identifier hs-var hs-var">mkPathPiece'</span></a></span></span><span> </span><span id="local-6989586621679153894"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153894"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-116"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Bool
+</span><span class="hs-identifier hs-var">T.null</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153894"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-117"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'PathPiece) -&gt; Maybe (Maybe (RText 'PathPiece))
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'PathPiece)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-118"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">RText 'PathPiece -&gt; Maybe (RText 'PathPiece)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(RText 'PathPiece -&gt; Maybe (RText 'PathPiece))
+-&gt; Maybe (RText 'PathPiece) -&gt; Maybe (Maybe (RText 'PathPiece))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'PathPiece)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'PathPiece)
+</span><a href="Text.URI.Types.html#mkPathPiece"><span class="hs-identifier hs-var">mkPathPiece</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153894"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-119"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679153890"><span class="annot"><span class="annottext">[Maybe (RText 'PathPiece)]
+</span><a href="#local-6989586621679153890"><span class="hs-identifier hs-var">maybePieces</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679153889"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153889"><span class="hs-identifier hs-var">trailingSlash</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(StateT Bool m [Maybe (RText 'PathPiece)]
+ -&gt; Bool -&gt; m ([Maybe (RText 'PathPiece)], Bool))
+-&gt; Bool
+-&gt; StateT Bool m [Maybe (RText 'PathPiece)]
+-&gt; m ([Maybe (RText 'PathPiece)], Bool)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">StateT Bool m [Maybe (RText 'PathPiece)]
+-&gt; Bool -&gt; m ([Maybe (RText 'PathPiece)], Bool)
+forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><span class="hs-identifier hs-var hs-var">runStateT</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">(StateT Bool m [Maybe (RText 'PathPiece)]
+ -&gt; m ([Maybe (RText 'PathPiece)], Bool))
+-&gt; StateT Bool m [Maybe (RText 'PathPiece)]
+-&gt; m ([Maybe (RText 'PathPiece)], Bool)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-120"></span><span>    </span><span class="annot"><span class="annottext">(StateT Bool m (Maybe (RText 'PathPiece))
+ -&gt; StateT Bool m Char -&gt; StateT Bool m [Maybe (RText 'PathPiece)])
+-&gt; StateT Bool m Char
+-&gt; StateT Bool m (Maybe (RText 'PathPiece))
+-&gt; StateT Bool m [Maybe (RText 'PathPiece)]
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">StateT Bool m (Maybe (RText 'PathPiece))
+-&gt; StateT Bool m Char -&gt; StateT Bool m [Maybe (RText 'PathPiece)]
+forall (m :: * -&gt; *) a sep. MonadPlus m =&gt; m a -&gt; m sep -&gt; m [a]
+</span><span class="hs-identifier hs-var">sepBy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; StateT Bool m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'/'</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(StateT Bool m (Maybe (RText 'PathPiece))
+ -&gt; StateT Bool m [Maybe (RText 'PathPiece)])
+-&gt; StateT Bool m (Maybe (RText 'PathPiece))
+-&gt; StateT Bool m [Maybe (RText 'PathPiece)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-121"></span><span>      </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (Maybe (RText 'PathPiece)))
+-&gt; StateT Bool m String
+-&gt; StateT Bool m (Maybe (RText 'PathPiece))
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;path piece&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (Maybe (RText 'PathPiece))
+</span><a href="#local-6989586621679153895"><span class="hs-identifier hs-var">mkPathPiece'</span></a></span><span> </span><span class="annot"><span class="annottext">(StateT Bool m String -&gt; StateT Bool m (Maybe (RText 'PathPiece)))
+-&gt; StateT Bool m String -&gt; StateT Bool m (Maybe (RText 'PathPiece))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-122"></span><span>        </span><span class="annot"><span class="annottext">String -&gt; StateT Bool m String -&gt; StateT Bool m String
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+String -&gt; m a -&gt; m a
+</span><span class="hs-keyword hs-var">label</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;path piece&quot;</span></span><span> </span><span class="annot"><span class="annottext">(StateT Bool m String -&gt; StateT Bool m String)
+-&gt; StateT Bool m String -&gt; StateT Bool m String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-123"></span><span>          </span><span id="local-6989586621679153885"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153885"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">StateT Bool m Char -&gt; StateT Bool m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="annot"><span class="annottext">StateT Bool m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#pchar"><span class="hs-identifier hs-var">pchar</span></a></span><span>
+</span><span id="line-124"></span><span>          </span><span class="annot"><span class="annottext">Bool -&gt; StateT Bool m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><span class="hs-identifier hs-var">put</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153885"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>          </span><span class="annot"><span class="annottext">String -&gt; StateT Bool m String
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153885"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-126"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679153881"><span class="annot"><span class="annottext">pieces :: [RText 'PathPiece]
+</span><a href="#local-6989586621679153881"><span class="hs-identifier hs-var hs-var">pieces</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe (RText 'PathPiece)] -&gt; [RText 'PathPiece]
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span> </span><span class="annot"><span class="annottext">[Maybe (RText 'PathPiece)]
+</span><a href="#local-6989586621679153890"><span class="hs-identifier hs-var">maybePieces</span></a></span><span>
+</span><span id="line-127"></span><span>  </span><span class="annot"><span class="annottext">(Bool, Maybe (Bool, NonEmpty (RText 'PathPiece)))
+-&gt; m (Bool, Maybe (Bool, NonEmpty (RText 'PathPiece)))
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-128"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153896"><span class="hs-identifier hs-var">absPath</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-129"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece] -&gt; Maybe (NonEmpty (RText 'PathPiece))
+forall a. [a] -&gt; Maybe (NonEmpty a)
+</span><span class="hs-identifier hs-var">NE.nonEmpty</span></span><span> </span><span class="annot"><span class="annottext">[RText 'PathPiece]
+</span><a href="#local-6989586621679153881"><span class="hs-identifier hs-var">pieces</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-130"></span><span>        </span><span class="annot"><span class="annottext">Maybe (NonEmpty (RText 'PathPiece))
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (Bool, NonEmpty (RText 'PathPiece))
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-131"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679153879"><span class="annot"><span class="annottext">NonEmpty (RText 'PathPiece)
+</span><a href="#local-6989586621679153879"><span class="hs-identifier hs-var">ps</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Bool, NonEmpty (RText 'PathPiece))
+-&gt; Maybe (Bool, NonEmpty (RText 'PathPiece))
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679153889"><span class="hs-identifier hs-var">trailingSlash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">NonEmpty (RText 'PathPiece)
+</span><a href="#local-6989586621679153879"><span class="hs-identifier hs-var">ps</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-133"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pPath"><span class="hs-pragma hs-type">pPath</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span id="local-6989586621679154096"><span id="local-6989586621679154097"><span class="annot"><a href="Text.URI.Parser.Text.html#pQuery"><span class="hs-identifier hs-type">pQuery</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154097"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154096"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154096"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-type">QueryParam</span></a></span><span class="hs-special">]</span></span></span><span>
+</span><span id="line-136"></span><span id="pQuery"><span class="annot"><span class="annottext">pQuery :: m [QueryParam]
+</span><a href="Text.URI.Parser.Text.html#pQuery"><span class="hs-identifier hs-var hs-var">pQuery</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-137"></span><span>  </span><span class="annot"><span class="annottext">m Char -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'?'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>  </span><span class="annot"><span class="annottext">m (Maybe Char) -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char -&gt; m (Maybe Char)
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'&amp;'</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>  </span><span class="annot"><span class="annottext">([Maybe QueryParam] -&gt; [QueryParam])
+-&gt; m [Maybe QueryParam] -&gt; m [QueryParam]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="annot"><span class="annottext">[Maybe QueryParam] -&gt; [QueryParam]
+forall a. [Maybe a] -&gt; [a]
+</span><span class="hs-identifier hs-var">catMaybes</span></span><span> </span><span class="annot"><span class="annottext">(m [Maybe QueryParam] -&gt; m [QueryParam])
+-&gt; (m (Maybe QueryParam) -&gt; m [Maybe QueryParam])
+-&gt; m (Maybe QueryParam)
+-&gt; m [QueryParam]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(m (Maybe QueryParam) -&gt; m Char -&gt; m [Maybe QueryParam])
+-&gt; m Char -&gt; m (Maybe QueryParam) -&gt; m [Maybe QueryParam]
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">m (Maybe QueryParam) -&gt; m Char -&gt; m [Maybe QueryParam]
+forall (m :: * -&gt; *) a sep. MonadPlus m =&gt; m a -&gt; m sep -&gt; m [a]
+</span><span class="hs-identifier hs-var">sepBy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'&amp;'</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(m (Maybe QueryParam) -&gt; m [Maybe QueryParam])
+-&gt; (m (Maybe QueryParam) -&gt; m (Maybe QueryParam))
+-&gt; m (Maybe QueryParam)
+-&gt; m [Maybe QueryParam]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; m (Maybe QueryParam) -&gt; m (Maybe QueryParam)
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+String -&gt; m a -&gt; m a
+</span><span class="hs-keyword hs-var">label</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;query parameter&quot;</span></span><span> </span><span class="annot"><span class="annottext">(m (Maybe QueryParam) -&gt; m [QueryParam])
+-&gt; m (Maybe QueryParam) -&gt; m [QueryParam]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679153878"><span class="annot"><span class="annottext">p :: m String
+</span><a href="#local-6989586621679153878"><span class="hs-identifier hs-var hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#pchar%27"><span class="hs-identifier hs-var">pchar'</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'/'</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'?'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>    </span><span id="local-6989586621679153876"><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679153876"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'QueryKey))
+-&gt; m String
+-&gt; m (RText 'QueryKey)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;query key&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'QueryKey)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'QueryKey)
+</span><a href="Text.URI.Types.html#mkQueryKey"><span class="hs-identifier hs-var">mkQueryKey</span></a></span><span> </span><span class="annot"><span class="annottext">m String
+</span><a href="#local-6989586621679153878"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-142"></span><span>    </span><span id="local-6989586621679153874"><span class="annot"><span class="annottext">Maybe (RText 'QueryValue)
+</span><a href="#local-6989586621679153874"><span class="hs-identifier hs-var">mv</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (RText 'QueryValue) -&gt; m (Maybe (RText 'QueryValue))
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f (Maybe a)
+</span><span class="hs-identifier hs-var">optional</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'='</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m (RText 'QueryValue) -&gt; m (RText 'QueryValue)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'QueryValue))
+-&gt; m String
+-&gt; m (RText 'QueryValue)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;query value&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'QueryValue)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'QueryValue)
+</span><a href="Text.URI.Types.html#mkQueryValue"><span class="hs-identifier hs-var">mkQueryValue</span></a></span><span> </span><span class="annot"><span class="annottext">m String
+</span><a href="#local-6989586621679153878"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-143"></span><span>    </span><span class="annot"><span class="annottext">Maybe QueryParam -&gt; m (Maybe QueryParam)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">(Maybe QueryParam -&gt; m (Maybe QueryParam))
+-&gt; Maybe QueryParam -&gt; m (Maybe QueryParam)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-144"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Bool
+</span><span class="hs-identifier hs-var">T.null</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; Text
+forall (l :: RTextLabel). RText l -&gt; Text
+</span><a href="Text.URI.Types.html#unRText"><span class="hs-identifier hs-var">unRText</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679153876"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Maybe QueryParam
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-146"></span><span>        </span><span class="hs-keyword">else</span><span>
+</span><span id="line-147"></span><span>          </span><span class="annot"><span class="annottext">QueryParam -&gt; Maybe QueryParam
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span>
+</span><span id="line-148"></span><span>            </span><span class="hs-special">(</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe (RText 'QueryValue)
+</span><a href="#local-6989586621679153874"><span class="hs-identifier hs-var">mv</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-149"></span><span>                </span><span class="annot"><span class="annottext">Maybe (RText 'QueryValue)
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; QueryParam
+</span><a href="Text.URI.Types.html#QueryFlag"><span class="hs-identifier hs-var">QueryFlag</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679153876"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-150"></span><span>                </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679153870"><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679153870"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey -&gt; RText 'QueryValue -&gt; QueryParam
+</span><a href="Text.URI.Types.html#QueryParam"><span class="hs-identifier hs-var">QueryParam</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryKey
+</span><a href="#local-6989586621679153876"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">RText 'QueryValue
+</span><a href="#local-6989586621679153870"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-151"></span><span>            </span><span class="hs-special">)</span><span>
+</span><span id="line-152"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pQuery"><span class="hs-pragma hs-type">pQuery</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span id="local-6989586621679154093"><span id="local-6989586621679154094"><span class="annot"><a href="Text.URI.Parser.Text.html#pFragment"><span class="hs-identifier hs-type">pFragment</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154094"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154093"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679154093"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Text.URI.Types.html#RText"><span class="hs-identifier hs-type">RText</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="Text.URI.Types.html#Fragment"><span class="hs-identifier hs-type">Fragment</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-155"></span><span id="pFragment"><span class="annot"><span class="annottext">pFragment :: m (RText 'Fragment)
+</span><a href="Text.URI.Parser.Text.html#pFragment"><span class="hs-identifier hs-var hs-var">pFragment</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-156"></span><span>  </span><span class="annot"><span class="annottext">m Char -&gt; m ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><span class="hs-identifier hs-var">void</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'#'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span>  </span><span class="annot"><span class="annottext">String
+-&gt; (Text -&gt; Maybe (RText 'Fragment))
+-&gt; m String
+-&gt; m (RText 'Fragment)
+forall e (m :: * -&gt; *) r.
+MonadParsec e Text m =&gt;
+String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var">liftR</span></a></span><span>
+</span><span id="line-158"></span><span>    </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;fragment&quot;</span></span><span>
+</span><span id="line-159"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; Maybe (RText 'Fragment)
+forall (m :: * -&gt; *). MonadThrow m =&gt; Text -&gt; m (RText 'Fragment)
+</span><a href="Text.URI.Types.html#mkFragment"><span class="hs-identifier hs-var">mkFragment</span></a></span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m String
+forall (m :: * -&gt; *) a. MonadPlus m =&gt; m a -&gt; m [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="annot"><span class="annottext">(m Char -&gt; m String) -&gt; (m Char -&gt; m Char) -&gt; m Char -&gt; m String
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; m Char -&gt; m Char
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+String -&gt; m a -&gt; m a
+</span><span class="hs-keyword hs-var">label</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;fragment character&quot;</span></span><span> </span><span class="annot"><span class="annottext">(m Char -&gt; m String) -&gt; m Char -&gt; m String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-161"></span><span>        </span><span class="annot"><span class="annottext">m Char
+forall e (m :: * -&gt; *). MonadParsec e Text m =&gt; m Char
+</span><a href="Text.URI.Parser.Text.Utils.html#pchar"><span class="hs-identifier hs-var">pchar</span></a></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'/'</span></span><span> </span><span class="annot"><span class="annottext">m Char -&gt; m Char -&gt; m Char
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">Token Text -&gt; m (Token Text)
+forall e s (m :: * -&gt; *).
+(MonadParsec e s m, Token s ~ Char) =&gt;
+Token s -&gt; m (Token s)
+</span><span class="hs-identifier hs-var">char</span></span><span> </span><span class="annot"><span class="annottext">Char
+Token Text
+</span><span class="hs-char">'?'</span></span><span>
+</span><span id="line-162"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#pFragment"><span class="hs-pragma hs-type">pFragment</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-164"></span><span>
+</span><span id="line-165"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-166"></span><span class="hs-comment">-- Helpers</span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- | Lift a smart constructor that consumes 'Text' into a parser.</span><span>
+</span><span id="line-169"></span><span id="local-6989586621679154085"><span id="local-6989586621679154086"><span id="local-6989586621679154087"><span class="annot"><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-type">liftR</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-170"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">MonadParsec</span></span><span> </span><span class="annot"><a href="#local-6989586621679154087"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="annot"><a href="#local-6989586621679154086"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-171"></span><span>  </span><span class="hs-comment">-- | What is being parsed</span><span>
+</span><span id="line-172"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-173"></span><span>  </span><span class="hs-comment">-- | The smart constructor that produces the result</span><span>
+</span><span id="line-174"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621679154085"><span class="hs-identifier hs-type">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-175"></span><span>  </span><span class="hs-comment">-- | How to parse 'String' that will be converted to 'Text' and fed to</span><span>
+</span><span id="line-176"></span><span>  </span><span class="hs-comment">-- the smart constructor</span><span>
+</span><span id="line-177"></span><span>  </span><span class="annot"><a href="#local-6989586621679154086"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-178"></span><span>  </span><span class="annot"><a href="#local-6989586621679154086"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679154085"><span class="hs-identifier hs-type">r</span></a></span></span></span></span><span>
+</span><span id="line-179"></span><span id="liftR"><span class="annot"><span class="annottext">liftR :: String -&gt; (Text -&gt; Maybe r) -&gt; m String -&gt; m r
+</span><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-identifier hs-var hs-var">liftR</span></a></span></span><span> </span><span id="local-6989586621679153867"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153867"><span class="hs-identifier hs-var">lbl</span></a></span></span><span> </span><span id="local-6989586621679153866"><span class="annot"><span class="annottext">Text -&gt; Maybe r
+</span><a href="#local-6989586621679153866"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679153865"><span class="annot"><span class="annottext">m String
+</span><a href="#local-6989586621679153865"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-180"></span><span>  </span><span id="local-6989586621679153864"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679153864"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Int
+forall e s (m :: * -&gt; *). MonadParsec e s m =&gt; m Int
+</span><span class="hs-identifier hs-var">getOffset</span></span><span>
+</span><span id="line-181"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679153862"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153862"><span class="hs-identifier hs-var">toks</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679153861"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153861"><span class="hs-identifier hs-var">s</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m String -&gt; m (Tokens Text, String)
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+m a -&gt; m (Tokens s, a)
+</span><span class="hs-identifier hs-var">match</span></span><span> </span><span class="annot"><span class="annottext">m String
+</span><a href="#local-6989586621679153865"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-182"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Either UnicodeException Text
+</span><span class="hs-identifier hs-var">TE.decodeUtf8'</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><span class="hs-identifier hs-var">B8.pack</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153861"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-183"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Left</span></span><span> </span><span class="annot"><span class="annottext">UnicodeException
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-184"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679153857"><span class="annot"><span class="annottext">unexp :: NonEmpty Char
+</span><a href="#local-6989586621679153857"><span class="hs-identifier hs-var hs-var">unexp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; NonEmpty Char
+forall a. [a] -&gt; NonEmpty a
+</span><span class="hs-identifier hs-var">NE.fromList</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; String
+</span><span class="hs-identifier hs-var">T.unpack</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153862"><span class="hs-identifier hs-var">toks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span>          </span><span id="local-6989586621679153855"><span class="annot"><span class="annottext">expecting :: NonEmpty Char
+</span><a href="#local-6989586621679153855"><span class="hs-identifier hs-var hs-var">expecting</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; NonEmpty Char
+forall a. [a] -&gt; NonEmpty a
+</span><span class="hs-identifier hs-var">NE.fromList</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679153867"><span class="hs-identifier hs-var">lbl</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot; that can be decoded as UTF-8&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-186"></span><span>      </span><span class="annot"><span class="annottext">ParseError Text e -&gt; m r
+forall e s (m :: * -&gt; *) a.
+MonadParsec e s m =&gt;
+ParseError s e -&gt; m a
+</span><span class="hs-identifier hs-var">parseError</span></span><span>
+</span><span id="line-187"></span><span>        </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Int
+-&gt; Maybe (ErrorItem (Token Text))
+-&gt; Set (ErrorItem (Token Text))
+-&gt; ParseError Text e
+forall s e.
+Int
+-&gt; Maybe (ErrorItem (Token s))
+-&gt; Set (ErrorItem (Token s))
+-&gt; ParseError s e
+</span><span class="hs-identifier hs-var">TrivialError</span></span><span>
+</span><span id="line-188"></span><span>            </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679153864"><span class="hs-identifier hs-var">o</span></a></span><span>
+</span><span id="line-189"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ErrorItem Char -&gt; Maybe (ErrorItem Char)
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NonEmpty Char -&gt; ErrorItem Char
+forall t. NonEmpty t -&gt; ErrorItem t
+</span><span class="hs-identifier hs-var">Tokens</span></span><span> </span><span class="annot"><span class="annottext">NonEmpty Char
+</span><a href="#local-6989586621679153857"><span class="hs-identifier hs-var">unexp</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-190"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ErrorItem Char -&gt; Set (ErrorItem Char)
+forall a. a -&gt; Set a
+</span><span class="hs-identifier hs-var">S.singleton</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NonEmpty Char -&gt; ErrorItem Char
+forall t. NonEmpty Char -&gt; ErrorItem t
+</span><span class="hs-identifier hs-var">Label</span></span><span> </span><span class="annot"><span class="annottext">NonEmpty Char
+</span><a href="#local-6989586621679153855"><span class="hs-identifier hs-var">expecting</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-191"></span><span>        </span><span class="hs-special">)</span><span>
+</span><span id="line-192"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Right</span></span><span> </span><span id="local-6989586621679153850"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153850"><span class="hs-identifier hs-var">text</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">m r -&gt; (r -&gt; m r) -&gt; Maybe r -&gt; m r
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="annot"><span class="annottext">m r
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; m r
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; Maybe r
+</span><a href="#local-6989586621679153866"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679153850"><span class="hs-identifier hs-var">text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-193"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Text.URI.Parser.Text.html#liftR"><span class="hs-pragma hs-type">liftR</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-194"></span></pre></body></html>

@@ -1,0 +1,1725 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE KindSignatures #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE PolyKinds #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE ConstraintKinds #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Kernmantle.Rope.Internal</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Category</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Arrow</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Reader</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">rmap</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bifunctor</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Biapplicative</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bifunctor.Tannen</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.Identity</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor.Cayley</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.EffFunctor.html"><span class="hs-identifier">Data.Profunctor.EffFunctor</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor.Monad</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Profunctor.Traversing</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Profunctor.Trans.html"><span class="hs-identifier">Data.Profunctor.Trans</span></a></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vinyl</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&lt;+&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vinyl.TypeLevel</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.TypeLits</span></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(.)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Kernmantle.Arrow.html"><span class="hs-identifier">Control.Kernmantle.Arrow</span></a></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Kernmantle.Error.html"><span class="hs-identifier">Control.Kernmantle.Error</span></a></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- | The kind for all binary effects. First param is usually an input</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- (contravariant) of the effect and second one an output (covariant).</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">type</span><span> </span><span id="BinEff"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#BinEff"><span class="hs-identifier hs-var">BinEff</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | The kind for unary effects</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">type</span><span> </span><span id="UnaryEff"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#UnaryEff"><span class="hs-identifier hs-var">UnaryEff</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- | The kind for a named binary effect. Must remain a tuple because that's what</span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- vinyl expects.</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">type</span><span> </span><span id="Strand"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Strand"><span class="hs-identifier hs-var">Strand</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Symbol</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#BinEff"><span class="hs-identifier hs-type">BinEff</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">family</span><span> </span><span id="StrandName"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandName"><span class="hs-identifier hs-var">StrandName</span></a></span></span><span> </span><span id="local-6989586621679081062"><span class="annot"><a href="#local-6989586621679081062"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-49"></span><span>  </span><span id="StrandName"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandName"><span class="hs-identifier hs-var">StrandName</span></a></span></span><span> </span><span class="hs-special">'</span><span class="hs-special">(</span><span id="local-6989586621679081061"><span class="annot"><a href="#local-6989586621679081061"><span class="hs-identifier hs-type hs-type">name</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081060"><span class="annot"><a href="#local-6989586621679081060"><span class="hs-identifier hs-type hs-type">eff</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="#local-6989586621679081061"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">family</span><span> </span><span id="StrandEff"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandEff"><span class="hs-identifier hs-var">StrandEff</span></a></span></span><span> </span><span id="local-6989586621679081059"><span class="annot"><a href="#local-6989586621679081059"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>  </span><span id="StrandEff"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandEff"><span class="hs-identifier hs-var">StrandEff</span></a></span></span><span> </span><span class="hs-special">'</span><span class="hs-special">(</span><span id="local-6989586621679081058"><span class="annot"><a href="#local-6989586621679081058"><span class="hs-identifier hs-type hs-type">name</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081057"><span class="annot"><a href="#local-6989586621679081057"><span class="hs-identifier hs-type hs-type">eff</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="#local-6989586621679081057"><span class="hs-identifier hs-type">eff</span></a></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- | The kind for records that will contain 'Weaver's. First type param will</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- most often be @Weaver someCore@</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">type</span><span> </span><span id="RopeRec"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRec"><span class="hs-identifier hs-var">RopeRec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Strand"><span class="hs-identifier hs-type">Strand</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Strand"><span class="hs-identifier hs-type">Strand</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-operator">*</span></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- | Runs one @strand@ (* -&gt; * -&gt; * effect) in a @interp@ effect. Is</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- parameterized over a Strand (and not just a BinEffect) even if it ignores its</span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- name internally because that's what is expect by the 'RopeRec'</span><span>
+</span><span id="line-61"></span><span class="hs-keyword">newtype</span><span> </span><span id="Weaver"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-var">Weaver</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081633"><span class="annot"><a href="#local-6989586621679081633"><span class="hs-identifier hs-type">interp</span></a></span></span><span class="hs-glyph">::</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#BinEff"><span class="hs-identifier hs-type">BinEff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081634"><span class="annot"><a href="#local-6989586621679081634"><span class="hs-identifier hs-type">strand</span></a></span></span><span class="hs-glyph">::</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Strand"><span class="hs-identifier hs-type">Strand</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Weaver"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-var">Weaver</span></a></span></span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="weaveStrand"><span class="annot"><span class="annottext">Weaver interp strand
+-&gt; forall a b. StrandEff strand a b -&gt; interp a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#weaveStrand"><span class="hs-identifier hs-var hs-var">weaveStrand</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandEff"><span class="hs-identifier hs-type">StrandEff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081634"><span class="hs-identifier hs-type">strand</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621679081633"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span id="local-6989586621679081136"><span id="local-6989586621679081137"><span id="local-6989586621679081138"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#mapWeaverInterp"><span class="hs-identifier hs-type">mapWeaverInterp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081138"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621679081137"><span class="hs-identifier hs-type">interp'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081138"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081136"><span class="hs-identifier hs-type">strand</span></a></span><span>
+</span><span id="line-66"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081137"><span class="hs-identifier hs-type">interp'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081136"><span class="hs-identifier hs-type">strand</span></a></span></span></span></span><span>
+</span><span id="line-67"></span><span id="mapWeaverInterp"><span class="annot"><span class="annottext">mapWeaverInterp :: (interp :-&gt; interp')
+-&gt; Weaver interp strand -&gt; Weaver interp' strand
+</span><a href="Control.Kernmantle.Rope.Internal.html#mapWeaverInterp"><span class="hs-identifier hs-var hs-var">mapWeaverInterp</span></a></span></span><span> </span><span id="local-6989586621679081053"><span class="annot"><span class="annottext">interp :-&gt; interp'
+</span><a href="#local-6989586621679081053"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span id="local-6989586621679081052"><span class="annot"><span class="annottext">StrandEff strand :-&gt; interp
+</span><a href="#local-6989586621679081052"><span class="hs-identifier hs-var">w</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(StrandEff strand :-&gt; interp') -&gt; Weaver interp' strand
+forall (interp :: BinEff) (strand :: Strand).
+(StrandEff strand :-&gt; interp) -&gt; Weaver interp strand
+</span><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-var">Weaver</span></a></span><span> </span><span class="annot"><span class="annottext">((StrandEff strand :-&gt; interp') -&gt; Weaver interp' strand)
+-&gt; (StrandEff strand :-&gt; interp') -&gt; Weaver interp' strand
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">interp a b -&gt; interp' a b
+interp :-&gt; interp'
+</span><a href="#local-6989586621679081053"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(interp a b -&gt; interp' a b)
+-&gt; (StrandEff strand a b -&gt; interp a b)
+-&gt; StrandEff strand a b
+-&gt; interp' a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">StrandEff strand a b -&gt; interp a b
+StrandEff strand :-&gt; interp
+</span><a href="#local-6989586621679081052"><span class="hs-identifier hs-var">w</span></a></span><span>
+</span><span id="line-68"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#mapWeaverInterp"><span class="hs-pragma hs-type">mapWeaverInterp</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- | The internal implementation of a Rope, where @interp@ and @core@ can be two</span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- different types (this facilitates implementation of some functions).</span><span>
+</span><span id="line-72"></span><span class="hs-comment">--</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- @record@ holds the functions to interpret the @strands@ in an @interp@</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- effect. And then all these interpreted effects will run in a @core@ effect.</span><span>
+</span><span id="line-75"></span><span class="hs-keyword">newtype</span><span> </span><span id="RopeRunner"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081150"><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span></span><span class="hs-glyph">::</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRec"><span class="hs-identifier hs-type">RopeRec</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081148"><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span></span><span class="hs-glyph">::</span><span class="hs-special">[</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Strand"><span class="hs-identifier hs-type">Strand</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081149"><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span></span><span class="hs-glyph">::</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#BinEff"><span class="hs-identifier hs-type">BinEff</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679081147"><span class="annot"><a href="#local-6989586621679081147"><span class="hs-identifier hs-type">core</span></a></span></span><span class="hs-glyph">::</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#BinEff"><span class="hs-identifier hs-type">BinEff</span></a></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679081146"><span class="annot"><a href="#local-6989586621679081146"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679081145"><span class="annot"><a href="#local-6989586621679081145"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-76"></span><span>  </span><span id="RopeRunner"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679081147"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081146"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081145"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>  </span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679081046"><span id="local-6989586621679081048"><span class="annot"><span class="annottext">RopeRunner record mantle interp core a a
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+(forall a. RopeRunner record mantle interp core a a)
+-&gt; (forall b c a.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core a c)
+-&gt; Category (RopeRunner record mantle interp core)
+forall a. RopeRunner record mantle interp core a a
+forall b c a.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall k (cat :: k -&gt; k -&gt; *).
+(forall (a :: k). cat a a)
+-&gt; (forall (b :: k) (c :: k) (a :: k).
+    cat b c -&gt; cat a b -&gt; cat a c)
+-&gt; Category cat
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a.
+Category core =&gt;
+RopeRunner record mantle interp core a a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Category core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+. :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+$c. :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Category core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+id :: RopeRunner record mantle interp core a a
+$cid :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a.
+Category core =&gt;
+RopeRunner record mantle interp core a a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Category</span></span></span></span><span>
+</span><span id="line-79"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081034"><span id="local-6989586621679081036"><span id="local-6989586621679081038"><span id="local-6989586621679081040"><span id="local-6989586621679081042"><span class="annot"><span class="annottext">Category (RopeRunner record mantle interp core)
+Category (RopeRunner record mantle interp core)
+-&gt; (forall b c.
+    (b -&gt; c) -&gt; RopeRunner record mantle interp core b c)
+-&gt; (forall b c d.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core (b, d) (c, d))
+-&gt; (forall b c d.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core (d, b) (d, c))
+-&gt; (forall b c b' c'.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core b' c'
+    -&gt; RopeRunner record mantle interp core (b, b') (c, c'))
+-&gt; (forall b c c'.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core b c'
+    -&gt; RopeRunner record mantle interp core b (c, c'))
+-&gt; Arrow (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (b, d) (c, d)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (d, b) (d, c)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (b, b') (c, c')
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c'
+-&gt; RopeRunner record mantle interp core b (c, c')
+(b -&gt; c) -&gt; RopeRunner record mantle interp core b c
+forall b c. (b -&gt; c) -&gt; RopeRunner record mantle interp core b c
+forall b c d.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (b, d) (c, d)
+forall b c d.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (d, b) (d, c)
+forall b c c'.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c'
+-&gt; RopeRunner record mantle interp core b (c, c')
+forall b c b' c'.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (b, b') (c, c')
+forall (a :: BinEff).
+Category a
+-&gt; (forall b c. (b -&gt; c) -&gt; a b c)
+-&gt; (forall b c d. a b c -&gt; a (b, d) (c, d))
+-&gt; (forall b c d. a b c -&gt; a (d, b) (d, c))
+-&gt; (forall b c b' c'. a b c -&gt; a b' c' -&gt; a (b, b') (c, c'))
+-&gt; (forall b c c'. a b c -&gt; a b c' -&gt; a b (c, c'))
+-&gt; Arrow a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Arrow core =&gt;
+Category (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+Arrow core =&gt;
+(b -&gt; c) -&gt; RopeRunner record mantle interp core b c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (b, d) (c, d)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (d, b) (d, c)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c c'.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c'
+-&gt; RopeRunner record mantle interp core b (c, c')
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c b' c'.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (b, b') (c, c')
+&amp;&amp;&amp; :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c'
+-&gt; RopeRunner record mantle interp core b (c, c')
+$c&amp;&amp;&amp; :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c c'.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c'
+-&gt; RopeRunner record mantle interp core b (c, c')
+*** :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (b, b') (c, c')
+$c*** :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c b' c'.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (b, b') (c, c')
+second :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (d, b) (d, c)
+$csecond :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (d, b) (d, c)
+first :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (b, d) (c, d)
+$cfirst :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+Arrow core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (b, d) (c, d)
+arr :: (b -&gt; c) -&gt; RopeRunner record mantle interp core b c
+$carr :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+Arrow core =&gt;
+(b -&gt; c) -&gt; RopeRunner record mantle interp core b c
+$cp1Arrow :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Arrow core =&gt;
+Category (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Arrow</span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081024"><span id="local-6989586621679081026"><span id="local-6989586621679081028"><span id="local-6989586621679081030"><span class="annot"><span class="annottext">Arrow (RopeRunner record mantle interp core)
+Arrow (RopeRunner record mantle interp core)
+-&gt; (forall b c d.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core (Either b d) (Either c d))
+-&gt; (forall b c d.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core (Either d b) (Either d c))
+-&gt; (forall b c b' c'.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core b' c'
+    -&gt; RopeRunner
+         record mantle interp core (Either b b') (Either c c'))
+-&gt; (forall b d c.
+    RopeRunner record mantle interp core b d
+    -&gt; RopeRunner record mantle interp core c d
+    -&gt; RopeRunner record mantle interp core (Either b c) d)
+-&gt; ArrowChoice (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either b d) (Either c d)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either d b) (Either d c)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (Either b b') (Either c c')
+RopeRunner record mantle interp core b d
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core (Either b c) d
+forall b c d.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either b d) (Either c d)
+forall b c d.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either d b) (Either d c)
+forall b d c.
+RopeRunner record mantle interp core b d
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core (Either b c) d
+forall b c b' c'.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (Either b b') (Either c c')
+forall (a :: BinEff).
+Arrow a
+-&gt; (forall b c d. a b c -&gt; a (Either b d) (Either c d))
+-&gt; (forall b c d. a b c -&gt; a (Either d b) (Either d c))
+-&gt; (forall b c b' c'.
+    a b c -&gt; a b' c' -&gt; a (Either b b') (Either c c'))
+-&gt; (forall b d c. a b d -&gt; a c d -&gt; a (Either b c) d)
+-&gt; ArrowChoice a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowChoice core =&gt;
+Arrow (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either b d) (Either c d)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either d b) (Either d c)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b d c.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b d
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core (Either b c) d
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c b' c'.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (Either b b') (Either c c')
+||| :: RopeRunner record mantle interp core b d
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core (Either b c) d
+$c||| :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b d c.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b d
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core (Either b c) d
++++ :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (Either b b') (Either c c')
+$c+++ :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c b' c'.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b' c'
+-&gt; RopeRunner record mantle interp core (Either b b') (Either c c')
+right :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either d b) (Either d c)
+$cright :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either d b) (Either d c)
+left :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either b d) (Either c d)
+$cleft :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c d.
+ArrowChoice core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core (Either b d) (Either c d)
+$cp1ArrowChoice :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowChoice core =&gt;
+Arrow (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ArrowChoice</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081020"><span class="annot"><span class="annottext">Arrow (RopeRunner record mantle interp core)
+Arrow (RopeRunner record mantle interp core)
+-&gt; (forall b d c.
+    RopeRunner record mantle interp core (b, d) (c, d)
+    -&gt; RopeRunner record mantle interp core b c)
+-&gt; ArrowLoop (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core (b, d) (c, d)
+-&gt; RopeRunner record mantle interp core b c
+forall b d c.
+RopeRunner record mantle interp core (b, d) (c, d)
+-&gt; RopeRunner record mantle interp core b c
+forall (a :: BinEff).
+Arrow a -&gt; (forall b d c. a (b, d) (c, d) -&gt; a b c) -&gt; ArrowLoop a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowLoop core =&gt;
+Arrow (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b d c.
+ArrowLoop core =&gt;
+RopeRunner record mantle interp core (b, d) (c, d)
+-&gt; RopeRunner record mantle interp core b c
+loop :: RopeRunner record mantle interp core (b, d) (c, d)
+-&gt; RopeRunner record mantle interp core b c
+$cloop :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b d c.
+ArrowLoop core =&gt;
+RopeRunner record mantle interp core (b, d) (c, d)
+-&gt; RopeRunner record mantle interp core b c
+$cp1ArrowLoop :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowLoop core =&gt;
+Arrow (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ArrowLoop</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081016"><span class="annot"><span class="annottext">Arrow (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core b c
+Arrow (RopeRunner record mantle interp core)
+-&gt; (forall b c. RopeRunner record mantle interp core b c)
+-&gt; ArrowZero (RopeRunner record mantle interp core)
+forall b c. RopeRunner record mantle interp core b c
+forall (a :: BinEff). Arrow a -&gt; (forall b c. a b c) -&gt; ArrowZero a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowZero core =&gt;
+Arrow (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+ArrowZero core =&gt;
+RopeRunner record mantle interp core b c
+zeroArrow :: RopeRunner record mantle interp core b c
+$czeroArrow :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+ArrowZero core =&gt;
+RopeRunner record mantle interp core b c
+$cp1ArrowZero :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowZero core =&gt;
+Arrow (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ArrowZero</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081012"><span class="annot"><span class="annottext">ArrowZero (RopeRunner record mantle interp core)
+ArrowZero (RopeRunner record mantle interp core)
+-&gt; (forall b c.
+    RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core b c)
+-&gt; ArrowPlus (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+forall b c.
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+forall (a :: BinEff).
+ArrowZero a -&gt; (forall b c. a b c -&gt; a b c -&gt; a b c) -&gt; ArrowPlus a
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowPlus core =&gt;
+ArrowZero (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+ArrowPlus core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+&lt;+&gt; :: RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+$c&lt;+&gt; :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c.
+ArrowPlus core =&gt;
+RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core b c
+$cp1ArrowPlus :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+ArrowPlus core =&gt;
+ArrowZero (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ArrowPlus</span></span></span><span>
+</span><span id="line-80"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679081001"><span id="local-6989586621679081003"><span id="local-6989586621679081005"><span id="local-6989586621679081007"><span id="local-6989586621679081009"><span class="annot"><span class="annottext">q b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+RopeRunner record mantle interp core b c
+-&gt; q a b -&gt; RopeRunner record mantle interp core a c
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a d
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a c
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+(forall a b c d.
+ (a -&gt; b)
+ -&gt; (c -&gt; d)
+ -&gt; RopeRunner record mantle interp core b c
+ -&gt; RopeRunner record mantle interp core a d)
+-&gt; (forall a b c.
+    (a -&gt; b)
+    -&gt; RopeRunner record mantle interp core b c
+    -&gt; RopeRunner record mantle interp core a c)
+-&gt; (forall b c a.
+    (b -&gt; c)
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core a c)
+-&gt; (forall a b c (q :: BinEff).
+    Coercible c b =&gt;
+    q b c
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core a c)
+-&gt; (forall a b c (q :: BinEff).
+    Coercible b a =&gt;
+    RopeRunner record mantle interp core b c
+    -&gt; q a b -&gt; RopeRunner record mantle interp core a c)
+-&gt; Profunctor (RopeRunner record mantle interp core)
+forall a b c.
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a c
+forall b c a.
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall a b c d.
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a d
+forall a b c (q :: BinEff).
+Coercible b a =&gt;
+RopeRunner record mantle interp core b c
+-&gt; q a b -&gt; RopeRunner record mantle interp core a c
+forall a b c (q :: BinEff).
+Coercible c b =&gt;
+q b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall (p :: BinEff).
+(forall a b c d. (a -&gt; b) -&gt; (c -&gt; d) -&gt; p b c -&gt; p a d)
+-&gt; (forall a b c. (a -&gt; b) -&gt; p b c -&gt; p a c)
+-&gt; (forall b c a. (b -&gt; c) -&gt; p a b -&gt; p a c)
+-&gt; (forall a b c (q :: BinEff).
+    Coercible c b =&gt;
+    q b c -&gt; p a b -&gt; p a c)
+-&gt; (forall a b c (q :: BinEff).
+    Coercible b a =&gt;
+    p b c -&gt; q a b -&gt; p a c)
+-&gt; Profunctor p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Profunctor core =&gt;
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Profunctor core =&gt;
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Profunctor core =&gt;
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a d
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c (q :: BinEff).
+(Profunctor core, Coercible b a) =&gt;
+RopeRunner record mantle interp core b c
+-&gt; q a b -&gt; RopeRunner record mantle interp core a c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c (q :: BinEff).
+(Profunctor core, Coercible c b) =&gt;
+q b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+.# :: RopeRunner record mantle interp core b c
+-&gt; q a b -&gt; RopeRunner record mantle interp core a c
+$c.# :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c (q :: BinEff).
+(Profunctor core, Coercible b a) =&gt;
+RopeRunner record mantle interp core b c
+-&gt; q a b -&gt; RopeRunner record mantle interp core a c
+#. :: q b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+$c#. :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c (q :: BinEff).
+(Profunctor core, Coercible c b) =&gt;
+q b c
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+rmap :: (b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+$crmap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Profunctor core =&gt;
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+lmap :: (a -&gt; b)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a c
+$clmap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Profunctor core =&gt;
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a c
+dimap :: (a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a d
+$cdimap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Profunctor core =&gt;
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core b c
+-&gt; RopeRunner record mantle interp core a d
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Profunctor</span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080995"><span id="local-6989586621679080997"><span class="annot"><span class="annottext">Profunctor (RopeRunner record mantle interp core)
+Profunctor (RopeRunner record mantle interp core)
+-&gt; (forall a b c.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (a, c) (b, c))
+-&gt; (forall a b c.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (c, a) (c, b))
+-&gt; Strong (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (a, c) (b, c)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (c, a) (c, b)
+forall a b c.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (a, c) (b, c)
+forall a b c.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (c, a) (c, b)
+forall (p :: BinEff).
+Profunctor p
+-&gt; (forall a b c. p a b -&gt; p (a, c) (b, c))
+-&gt; (forall a b c. p a b -&gt; p (c, a) (c, b))
+-&gt; Strong p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Strong core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Strong core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (a, c) (b, c)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Strong core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (c, a) (c, b)
+second' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (c, a) (c, b)
+$csecond' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Strong core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (c, a) (c, b)
+first' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (a, c) (b, c)
+$cfirst' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Strong core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (a, c) (b, c)
+$cp1Strong :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Strong core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Strong</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080989"><span id="local-6989586621679080991"><span class="annot"><span class="annottext">Profunctor (RopeRunner record mantle interp core)
+Profunctor (RopeRunner record mantle interp core)
+-&gt; (forall a b c.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (Either a c) (Either b c))
+-&gt; (forall a b c.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (Either c a) (Either c b))
+-&gt; Choice (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either a c) (Either b c)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either c a) (Either c b)
+forall a b c.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either a c) (Either b c)
+forall a b c.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either c a) (Either c b)
+forall (p :: BinEff).
+Profunctor p
+-&gt; (forall a b c. p a b -&gt; p (Either a c) (Either b c))
+-&gt; (forall a b c. p a b -&gt; p (Either c a) (Either c b))
+-&gt; Choice p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Choice core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Choice core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either a c) (Either b c)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Choice core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either c a) (Either c b)
+right' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either c a) (Either c b)
+$cright' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Choice core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either c a) (Either c b)
+left' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either a c) (Either b c)
+$cleft' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Choice core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (Either a c) (Either b c)
+$cp1Choice :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Choice core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Choice</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080985"><span class="annot"><span class="annottext">Profunctor (RopeRunner record mantle interp core)
+Profunctor (RopeRunner record mantle interp core)
+-&gt; (forall a b x.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b))
+-&gt; Closed (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b)
+forall a b x.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b)
+forall (p :: BinEff).
+Profunctor p
+-&gt; (forall a b x. p a b -&gt; p (x -&gt; a) (x -&gt; b)) -&gt; Closed p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Closed core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b x.
+Closed core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b)
+closed :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b)
+$cclosed :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b x.
+Closed core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (x -&gt; a) (x -&gt; b)
+$cp1Closed :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Closed core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">Closed</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080979"><span id="local-6989586621679080981"><span class="annot"><span class="annottext">Profunctor (RopeRunner record mantle interp core)
+Profunctor (RopeRunner record mantle interp core)
+-&gt; (forall a d b.
+    RopeRunner record mantle interp core (a, d) (b, d)
+    -&gt; RopeRunner record mantle interp core a b)
+-&gt; (forall d a b.
+    RopeRunner record mantle interp core (d, a) (d, b)
+    -&gt; RopeRunner record mantle interp core a b)
+-&gt; Costrong (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core (a, d) (b, d)
+-&gt; RopeRunner record mantle interp core a b
+RopeRunner record mantle interp core (d, a) (d, b)
+-&gt; RopeRunner record mantle interp core a b
+forall d a b.
+RopeRunner record mantle interp core (d, a) (d, b)
+-&gt; RopeRunner record mantle interp core a b
+forall a d b.
+RopeRunner record mantle interp core (a, d) (b, d)
+-&gt; RopeRunner record mantle interp core a b
+forall (p :: BinEff).
+Profunctor p
+-&gt; (forall a d b. p (a, d) (b, d) -&gt; p a b)
+-&gt; (forall d a b. p (d, a) (d, b) -&gt; p a b)
+-&gt; Costrong p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Costrong core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) d a b.
+Costrong core =&gt;
+RopeRunner record mantle interp core (d, a) (d, b)
+-&gt; RopeRunner record mantle interp core a b
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a d b.
+Costrong core =&gt;
+RopeRunner record mantle interp core (a, d) (b, d)
+-&gt; RopeRunner record mantle interp core a b
+unsecond :: RopeRunner record mantle interp core (d, a) (d, b)
+-&gt; RopeRunner record mantle interp core a b
+$cunsecond :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) d a b.
+Costrong core =&gt;
+RopeRunner record mantle interp core (d, a) (d, b)
+-&gt; RopeRunner record mantle interp core a b
+unfirst :: RopeRunner record mantle interp core (a, d) (b, d)
+-&gt; RopeRunner record mantle interp core a b
+$cunfirst :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a d b.
+Costrong core =&gt;
+RopeRunner record mantle interp core (a, d) (b, d)
+-&gt; RopeRunner record mantle interp core a b
+$cp1Costrong :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Costrong core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Costrong</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080973"><span id="local-6989586621679080975"><span class="annot"><span class="annottext">Profunctor (RopeRunner record mantle interp core)
+Profunctor (RopeRunner record mantle interp core)
+-&gt; (forall a d b.
+    RopeRunner record mantle interp core (Either a d) (Either b d)
+    -&gt; RopeRunner record mantle interp core a b)
+-&gt; (forall d a b.
+    RopeRunner record mantle interp core (Either d a) (Either d b)
+    -&gt; RopeRunner record mantle interp core a b)
+-&gt; Cochoice (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core (Either a d) (Either b d)
+-&gt; RopeRunner record mantle interp core a b
+RopeRunner record mantle interp core (Either d a) (Either d b)
+-&gt; RopeRunner record mantle interp core a b
+forall d a b.
+RopeRunner record mantle interp core (Either d a) (Either d b)
+-&gt; RopeRunner record mantle interp core a b
+forall a d b.
+RopeRunner record mantle interp core (Either a d) (Either b d)
+-&gt; RopeRunner record mantle interp core a b
+forall (p :: BinEff).
+Profunctor p
+-&gt; (forall a d b. p (Either a d) (Either b d) -&gt; p a b)
+-&gt; (forall d a b. p (Either d a) (Either d b) -&gt; p a b)
+-&gt; Cochoice p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Cochoice core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) d a b.
+Cochoice core =&gt;
+RopeRunner record mantle interp core (Either d a) (Either d b)
+-&gt; RopeRunner record mantle interp core a b
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a d b.
+Cochoice core =&gt;
+RopeRunner record mantle interp core (Either a d) (Either b d)
+-&gt; RopeRunner record mantle interp core a b
+unright :: RopeRunner record mantle interp core (Either d a) (Either d b)
+-&gt; RopeRunner record mantle interp core a b
+$cunright :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) d a b.
+Cochoice core =&gt;
+RopeRunner record mantle interp core (Either d a) (Either d b)
+-&gt; RopeRunner record mantle interp core a b
+unleft :: RopeRunner record mantle interp core (Either a d) (Either b d)
+-&gt; RopeRunner record mantle interp core a b
+$cunleft :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a d b.
+Cochoice core =&gt;
+RopeRunner record mantle interp core (Either a d) (Either b d)
+-&gt; RopeRunner record mantle interp core a b
+$cp1Cochoice :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Cochoice core =&gt;
+Profunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Cochoice</span></span></span></span><span>
+</span><span id="line-81"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080966"><span id="local-6989586621679080968"><span class="annot"><span class="annottext">Traversing (RopeRunner record mantle interp core)
+Closed (RopeRunner record mantle interp core)
+Traversing (RopeRunner record mantle interp core)
+-&gt; Closed (RopeRunner record mantle interp core)
+-&gt; (forall (f :: * -&gt; *) a b.
+    Functor f =&gt;
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (f a) (f b))
+-&gt; (forall a b s t.
+    ((a -&gt; b) -&gt; s -&gt; t)
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core s t)
+-&gt; Mapping (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+((a -&gt; b) -&gt; s -&gt; t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall a b s t.
+((a -&gt; b) -&gt; s -&gt; t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall (f :: * -&gt; *) a b.
+Functor f =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+forall (p :: BinEff).
+Traversing p
+-&gt; Closed p
+-&gt; (forall (f :: * -&gt; *) a b. Functor f =&gt; p a b -&gt; p (f a) (f b))
+-&gt; (forall a b s t. ((a -&gt; b) -&gt; s -&gt; t) -&gt; p a b -&gt; p s t)
+-&gt; Mapping p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Mapping core =&gt;
+Traversing (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Mapping core =&gt;
+Closed (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b s t.
+Mapping core =&gt;
+((a -&gt; b) -&gt; s -&gt; t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) (f :: * -&gt; *) a b.
+(Mapping core, Functor f) =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+roam :: ((a -&gt; b) -&gt; s -&gt; t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+$croam :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b s t.
+Mapping core =&gt;
+((a -&gt; b) -&gt; s -&gt; t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+map' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+$cmap' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) (f :: * -&gt; *) a b.
+(Mapping core, Functor f) =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+$cp2Mapping :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Mapping core =&gt;
+Closed (RopeRunner record mantle interp core)
+$cp1Mapping :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Mapping core =&gt;
+Traversing (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Mapping</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080959"><span id="local-6989586621679080961"><span class="annot"><span class="annottext">Choice (RopeRunner record mantle interp core)
+Strong (RopeRunner record mantle interp core)
+Choice (RopeRunner record mantle interp core)
+-&gt; Strong (RopeRunner record mantle interp core)
+-&gt; (forall (f :: * -&gt; *) a b.
+    Traversable f =&gt;
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core (f a) (f b))
+-&gt; (forall a b s t.
+    (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core s t)
+-&gt; Traversing (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall a b s t.
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall (f :: * -&gt; *) a b.
+Traversable f =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+forall (p :: BinEff).
+Choice p
+-&gt; Strong p
+-&gt; (forall (f :: * -&gt; *) a b.
+    Traversable f =&gt;
+    p a b -&gt; p (f a) (f b))
+-&gt; (forall a b s t.
+    (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+    -&gt; p a b -&gt; p s t)
+-&gt; Traversing p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Traversing core =&gt;
+Choice (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Traversing core =&gt;
+Strong (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b s t.
+Traversing core =&gt;
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) (f :: * -&gt; *) a b.
+(Traversing core, Traversable f) =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+wander :: (forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+$cwander :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b s t.
+Traversing core =&gt;
+(forall (f :: * -&gt; *). Applicative f =&gt; (a -&gt; f b) -&gt; s -&gt; f t)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core s t
+traverse' :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+$ctraverse' :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) (f :: * -&gt; *) a b.
+(Traversing core, Traversable f) =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core (f a) (f b)
+$cp2Traversing :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Traversing core =&gt;
+Strong (RopeRunner record mantle interp core)
+$cp1Traversing :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Traversing core =&gt;
+Choice (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversing</span></span></span></span><span>
+</span><span id="line-82"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080956"><span class="annot"><a href="Control.Kernmantle.Error.html#ThrowEffect"><span class="hs-identifier hs-type">ThrowEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080954"><span class="hs-identifier hs-type">ex</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080952"><span class="annot"><a href="Control.Kernmantle.Error.html#TryEffect"><span class="hs-identifier hs-type">TryEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080950"><span class="hs-identifier hs-type">ex</span></a></span></span><span>
+</span><span id="line-83"></span><span>           </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080946"><span id="local-6989586621679080948"><span class="annot"><a href="Data.Profunctor.Trans.html#SieveTrans"><span class="hs-identifier hs-type">SieveTrans</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080944"><span class="hs-identifier hs-type">f</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080942"><span class="annot"><a href="Control.Kernmantle.Arrow.html#HasAutoIdent"><span class="hs-identifier hs-type">HasAutoIdent</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080940"><span class="hs-identifier hs-type">eff</span></a></span></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>    </span><span id="local-6989586621679080940"><span id="local-6989586621679080944"><span id="local-6989586621679080950"><span id="local-6989586621679080954"><span class="hs-keyword">via</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Cayley</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081147"><span class="hs-identifier hs-type">core</span></a></span></span></span></span></span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679080937"><span class="annot"><span class="annottext">(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+(forall (p :: BinEff) (q :: BinEff).
+ Profunctor p =&gt;
+ (p :-&gt; q)
+ -&gt; RopeRunner record mantle interp p
+    :-&gt; RopeRunner record mantle interp q)
+-&gt; ProfunctorFunctor (RopeRunner record mantle interp)
+forall k k1 (t :: BinEff -&gt; k -&gt; k1 -&gt; *).
+(forall (p :: BinEff) (q :: BinEff).
+ Profunctor p =&gt;
+ (p :-&gt; q) -&gt; t p :-&gt; t q)
+-&gt; ProfunctorFunctor t
+forall (p :: BinEff) (q :: BinEff).
+Profunctor p =&gt;
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff) (q :: BinEff).
+Profunctor p =&gt;
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+promap :: (p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+$cpromap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff) (q :: BinEff).
+Profunctor p =&gt;
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ProfunctorFunctor</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080931"><span id="local-6989586621679080933"><span class="annot"><span class="annottext">ProfunctorFunctor (RopeRunner record mantle interp)
+ProfunctorFunctor (RopeRunner record mantle interp)
+-&gt; (forall (p :: BinEff).
+    Profunctor p =&gt;
+    p :-&gt; RopeRunner record mantle interp p)
+-&gt; (forall (p :: BinEff).
+    Profunctor p =&gt;
+    RopeRunner record mantle interp (RopeRunner record mantle interp p)
+    :-&gt; RopeRunner record mantle interp p)
+-&gt; ProfunctorMonad (RopeRunner record mantle interp)
+p :-&gt; RopeRunner record mantle interp p
+RopeRunner record mantle interp (RopeRunner record mantle interp p)
+:-&gt; RopeRunner record mantle interp p
+forall (p :: BinEff).
+Profunctor p =&gt;
+p :-&gt; RopeRunner record mantle interp p
+forall (p :: BinEff).
+Profunctor p =&gt;
+RopeRunner record mantle interp (RopeRunner record mantle interp p)
+:-&gt; RopeRunner record mantle interp p
+forall (t :: BinEff -&gt; BinEff).
+ProfunctorFunctor t
+-&gt; (forall (p :: BinEff). Profunctor p =&gt; p :-&gt; t p)
+-&gt; (forall (p :: BinEff). Profunctor p =&gt; t (t p) :-&gt; t p)
+-&gt; ProfunctorMonad t
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand]).
+ProfunctorFunctor (RopeRunner record mantle interp)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff).
+Profunctor p =&gt;
+p :-&gt; RopeRunner record mantle interp p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff).
+Profunctor p =&gt;
+RopeRunner record mantle interp (RopeRunner record mantle interp p)
+:-&gt; RopeRunner record mantle interp p
+projoin :: RopeRunner record mantle interp (RopeRunner record mantle interp p)
+:-&gt; RopeRunner record mantle interp p
+$cprojoin :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff).
+Profunctor p =&gt;
+RopeRunner record mantle interp (RopeRunner record mantle interp p)
+:-&gt; RopeRunner record mantle interp p
+proreturn :: p :-&gt; RopeRunner record mantle interp p
+$cproreturn :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff).
+Profunctor p =&gt;
+p :-&gt; RopeRunner record mantle interp p
+$cp1ProfunctorMonad :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand]).
+ProfunctorFunctor (RopeRunner record mantle interp)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ProfunctorMonad</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-keyword">via</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Cayley</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679080924"><span id="local-6989586621679080926"><span id="local-6989586621679080928"><span class="annot"><span class="annottext">(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b c
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+(forall a b c d.
+ (a -&gt; b)
+ -&gt; (c -&gt; d)
+ -&gt; RopeRunner record mantle interp core a c
+ -&gt; RopeRunner record mantle interp core b d)
+-&gt; (forall a b c.
+    (a -&gt; b)
+    -&gt; RopeRunner record mantle interp core a c
+    -&gt; RopeRunner record mantle interp core b c)
+-&gt; (forall b c a.
+    (b -&gt; c)
+    -&gt; RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core a c)
+-&gt; Bifunctor (RopeRunner record mantle interp core)
+forall a b c.
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b c
+forall b c a.
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall a b c d.
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+forall (p :: BinEff).
+(forall a b c d. (a -&gt; b) -&gt; (c -&gt; d) -&gt; p a c -&gt; p b d)
+-&gt; (forall a b c. (a -&gt; b) -&gt; p a c -&gt; p b c)
+-&gt; (forall b c a. (b -&gt; c) -&gt; p a b -&gt; p a c)
+-&gt; Bifunctor p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Bifunctor core =&gt;
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Bifunctor core =&gt;
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Bifunctor core =&gt;
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+second :: (b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+$csecond :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) b c a.
+Bifunctor core =&gt;
+(b -&gt; c)
+-&gt; RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core a c
+first :: (a -&gt; b)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b c
+$cfirst :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c.
+Bifunctor core =&gt;
+(a -&gt; b)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b c
+bimap :: (a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+$cbimap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Bifunctor core =&gt;
+(a -&gt; b)
+-&gt; (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Bifunctor</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080912"><span id="local-6989586621679080914"><span id="local-6989586621679080916"><span id="local-6989586621679080918"><span id="local-6989586621679080920"><span class="annot"><span class="annottext">Bifunctor (RopeRunner record mantle interp core)
+a -&gt; b -&gt; RopeRunner record mantle interp core a b
+Bifunctor (RopeRunner record mantle interp core)
+-&gt; (forall a b. a -&gt; b -&gt; RopeRunner record mantle interp core a b)
+-&gt; (forall a b c d.
+    RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+    -&gt; RopeRunner record mantle interp core a c
+    -&gt; RopeRunner record mantle interp core b d)
+-&gt; (forall a b c d e f.
+    (a -&gt; b -&gt; c)
+    -&gt; (d -&gt; e -&gt; f)
+    -&gt; RopeRunner record mantle interp core a d
+    -&gt; RopeRunner record mantle interp core b e
+    -&gt; RopeRunner record mantle interp core c f)
+-&gt; (forall a b c d.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core c d
+    -&gt; RopeRunner record mantle interp core c d)
+-&gt; (forall a b c d.
+    RopeRunner record mantle interp core a b
+    -&gt; RopeRunner record mantle interp core c d
+    -&gt; RopeRunner record mantle interp core a b)
+-&gt; Biapplicative (RopeRunner record mantle interp core)
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core c d
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core a b
+RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+(a -&gt; b -&gt; c)
+-&gt; (d -&gt; e -&gt; f)
+-&gt; RopeRunner record mantle interp core a d
+-&gt; RopeRunner record mantle interp core b e
+-&gt; RopeRunner record mantle interp core c f
+forall a b. a -&gt; b -&gt; RopeRunner record mantle interp core a b
+forall a b c d.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core a b
+forall a b c d.
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core c d
+forall a b c d.
+RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+forall a b c d e f.
+(a -&gt; b -&gt; c)
+-&gt; (d -&gt; e -&gt; f)
+-&gt; RopeRunner record mantle interp core a d
+-&gt; RopeRunner record mantle interp core b e
+-&gt; RopeRunner record mantle interp core c f
+forall (p :: BinEff).
+Bifunctor p
+-&gt; (forall a b. a -&gt; b -&gt; p a b)
+-&gt; (forall a b c d. p (a -&gt; b) (c -&gt; d) -&gt; p a c -&gt; p b d)
+-&gt; (forall a b c d e f.
+    (a -&gt; b -&gt; c) -&gt; (d -&gt; e -&gt; f) -&gt; p a d -&gt; p b e -&gt; p c f)
+-&gt; (forall a b c d. p a b -&gt; p c d -&gt; p c d)
+-&gt; (forall a b c d. p a b -&gt; p c d -&gt; p a b)
+-&gt; Biapplicative p
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Biapplicative core =&gt;
+Bifunctor (RopeRunner record mantle interp core)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b.
+Biapplicative core =&gt;
+a -&gt; b -&gt; RopeRunner record mantle interp core a b
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core a b
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core c d
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d e f.
+Biapplicative core =&gt;
+(a -&gt; b -&gt; c)
+-&gt; (d -&gt; e -&gt; f)
+-&gt; RopeRunner record mantle interp core a d
+-&gt; RopeRunner record mantle interp core b e
+-&gt; RopeRunner record mantle interp core c f
+&lt;&lt;* :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core a b
+$c&lt;&lt;* :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core a b
+*&gt;&gt; :: RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core c d
+$c*&gt;&gt; :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core a b
+-&gt; RopeRunner record mantle interp core c d
+-&gt; RopeRunner record mantle interp core c d
+biliftA2 :: (a -&gt; b -&gt; c)
+-&gt; (d -&gt; e -&gt; f)
+-&gt; RopeRunner record mantle interp core a d
+-&gt; RopeRunner record mantle interp core b e
+-&gt; RopeRunner record mantle interp core c f
+$cbiliftA2 :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d e f.
+Biapplicative core =&gt;
+(a -&gt; b -&gt; c)
+-&gt; (d -&gt; e -&gt; f)
+-&gt; RopeRunner record mantle interp core a d
+-&gt; RopeRunner record mantle interp core b e
+-&gt; RopeRunner record mantle interp core c f
+&lt;&lt;*&gt;&gt; :: RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+$c&lt;&lt;*&gt;&gt; :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b c d.
+Biapplicative core =&gt;
+RopeRunner record mantle interp core (a -&gt; b) (c -&gt; d)
+-&gt; RopeRunner record mantle interp core a c
+-&gt; RopeRunner record mantle interp core b d
+bipure :: a -&gt; b -&gt; RopeRunner record mantle interp core a b
+$cbipure :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff) a b.
+Biapplicative core =&gt;
+a -&gt; b -&gt; RopeRunner record mantle interp core a b
+$cp1Biapplicative :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (core :: BinEff).
+Biapplicative core =&gt;
+Bifunctor (RopeRunner record mantle interp core)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Biapplicative</span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-keyword">via</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Tannen</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081147"><span class="hs-identifier hs-type">core</span></a></span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679080908"><span class="annot"><span class="annottext">(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+(forall (p :: BinEff) (q :: BinEff).
+ (p :-&gt; q)
+ -&gt; RopeRunner record mantle interp p
+    :-&gt; RopeRunner record mantle interp q)
+-&gt; BifunctorFunctor (RopeRunner record mantle interp)
+forall k k1 k2 k3 (t :: (k -&gt; k1 -&gt; *) -&gt; k2 -&gt; k3 -&gt; *).
+(forall (p :: k -&gt; k1 -&gt; *) (q :: k -&gt; k1 -&gt; *).
+ (p :-&gt; q) -&gt; t p :-&gt; t q)
+-&gt; BifunctorFunctor t
+forall (p :: BinEff) (q :: BinEff).
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff) (q :: BinEff).
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+bifmap :: (p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+$cbifmap :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (p :: BinEff) (q :: BinEff).
+(p :-&gt; q)
+-&gt; RopeRunner record mantle interp p
+   :-&gt; RopeRunner record mantle interp q
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">EffFunctor</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679080904"><span class="annot"><span class="annottext">EffFunctor (RopeRunner record mantle interp)
+eff a b -&gt; RopeRunner record mantle interp eff a b
+EffFunctor (RopeRunner record mantle interp)
+-&gt; (forall (eff :: BinEff).
+    eff :-&gt; RopeRunner record mantle interp eff)
+-&gt; EffPointedFunctor (RopeRunner record mantle interp)
+forall (eff :: BinEff). eff :-&gt; RopeRunner record mantle interp eff
+forall (f :: BinEff -&gt; BinEff).
+EffFunctor f
+-&gt; (forall (eff :: BinEff). eff :-&gt; f eff) -&gt; EffPointedFunctor f
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand]).
+EffFunctor (RopeRunner record mantle interp)
+forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (eff :: BinEff).
+eff :-&gt; RopeRunner record mantle interp eff
+effpure :: eff a b -&gt; RopeRunner record mantle interp eff a b
+$ceffpure :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand])
+       (eff :: BinEff).
+eff :-&gt; RopeRunner record mantle interp eff
+$cp1EffPointedFunctor :: forall (record :: RopeRec) (interp :: BinEff) (mantle :: [Strand]).
+EffFunctor (RopeRunner record mantle interp)
+</span><a href="Data.Profunctor.EffFunctor.html#C%3AEffPointedFunctor"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">EffPointedFunctor</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>    </span><span class="hs-keyword">via</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Tannen</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">-&gt;</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081150"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081149"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081148"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621679080902"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679080898"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">RMap</span></span><span> </span><span class="annot"><a href="#local-6989586621679080902"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Profunctor.EffFunctor.html#EffProfunctor"><span class="hs-identifier hs-type">EffProfunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679080902"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>  </span><span id="local-6989586621679080896"><span class="annot"><span class="annottext">effdimap :: (a' :-&gt; a)
+-&gt; (b :-&gt; b') -&gt; RopeRunner Rec m a b :-&gt; RopeRunner Rec m a' b'
+</span><a href="Data.Profunctor.EffFunctor.html#effdimap"><span class="hs-identifier hs-var hs-var hs-var hs-var">effdimap</span></a></span></span><span> </span><span id="local-6989586621679080894"><span class="annot"><span class="annottext">a' :-&gt; a
+</span><a href="#local-6989586621679080894"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679080893"><span class="annot"><span class="annottext">b :-&gt; b'
+</span><a href="#local-6989586621679080893"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span id="local-6989586621679080892"><span class="annot"><span class="annottext">Rec (Weaver a) m -&gt; b a b
+</span><a href="#local-6989586621679080892"><span class="hs-identifier hs-var">run</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver a') m -&gt; b' a b) -&gt; RopeRunner Rec m a' b' a b
+forall (record :: RopeRec) (mantle :: [Strand]) (interp :: BinEff)
+       (core :: BinEff) a b.
+(record (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner record mantle interp core a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">((Rec (Weaver a') m -&gt; b' a b) -&gt; RopeRunner Rec m a' b' a b)
+-&gt; (Rec (Weaver a') m -&gt; b' a b) -&gt; RopeRunner Rec m a' b' a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>
+</span><span id="line-95"></span><span>    </span><span class="annot"><span class="annottext">b a b -&gt; b' a b
+b :-&gt; b'
+</span><a href="#local-6989586621679080893"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">(b a b -&gt; b' a b)
+-&gt; (Rec (Weaver a') m -&gt; b a b) -&gt; Rec (Weaver a') m -&gt; b' a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver a) m -&gt; b a b
+</span><a href="#local-6989586621679080892"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver a) m -&gt; b a b)
+-&gt; (Rec (Weaver a') m -&gt; Rec (Weaver a) m)
+-&gt; Rec (Weaver a') m
+-&gt; b a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(forall (x :: Strand). Weaver a' x -&gt; Weaver a x)
+-&gt; Rec (Weaver a') m -&gt; Rec (Weaver a) m
+forall u (rs :: [u]) (f :: u -&gt; *) (g :: u -&gt; *).
+RMap rs =&gt;
+(forall (x :: u). f x -&gt; g x) -&gt; Rec f rs -&gt; Rec g rs
+</span><span class="hs-identifier hs-var">rmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a' :-&gt; a) -&gt; Weaver a' x -&gt; Weaver a x
+forall (interp :: BinEff) (interp' :: BinEff) (strand :: Strand).
+(interp :-&gt; interp')
+-&gt; Weaver interp strand -&gt; Weaver interp' strand
+</span><a href="Control.Kernmantle.Rope.Internal.html#mapWeaverInterp"><span class="hs-identifier hs-var">mapWeaverInterp</span></a></span><span> </span><span class="annot"><span class="annottext">a' :-&gt; a
+</span><a href="#local-6989586621679080894"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Profunctor.EffFunctor.html#effdimap"><span class="hs-pragma hs-type">effdimap</span></a></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- | Splits a 'RopeRunner' in two parts, so we can select several strands to act on</span><span>
+</span><span id="line-99"></span><span id="local-6989586621679081068"><span id="local-6989586621679081069"><span id="local-6989586621679081070"><span id="local-6989586621679081071"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#splitRopeRunner"><span class="hs-identifier hs-type">splitRopeRunner</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081071"><span class="hs-identifier hs-type">mantle1</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">++</span></span><span> </span><span class="annot"><a href="#local-6989586621679081070"><span class="hs-identifier hs-type">mantle2</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081069"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081068"><span class="hs-identifier hs-type">core</span></a></span><span>
+</span><span id="line-100"></span><span>               </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679081071"><span class="hs-identifier hs-type">mantle1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081069"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679081070"><span class="hs-identifier hs-type">mantle2</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081069"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081068"><span class="hs-identifier hs-type">core</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-101"></span><span id="splitRopeRunner"><span class="annot"><span class="annottext">splitRopeRunner :: RopeRunner Rec (mantle1 ++ mantle2) interp core a b
+-&gt; RopeRunner
+     Rec mantle1 interp (RopeRunner Rec mantle2 interp core) a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#splitRopeRunner"><span class="hs-identifier hs-var hs-var">splitRopeRunner</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span id="local-6989586621679080889"><span class="annot"><span class="annottext">Rec (Weaver interp) (mantle1 ++ mantle2) -&gt; core a b
+</span><a href="#local-6989586621679080889"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver interp) mantle1
+ -&gt; RopeRunner Rec mantle2 interp core a b)
+-&gt; RopeRunner
+     Rec mantle1 interp (RopeRunner Rec mantle2 interp core) a b
+forall (record :: RopeRec) (mantle :: [Strand]) (interp :: BinEff)
+       (core :: BinEff) a b.
+(record (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner record mantle interp core a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">((Rec (Weaver interp) mantle1
+  -&gt; RopeRunner Rec mantle2 interp core a b)
+ -&gt; RopeRunner
+      Rec mantle1 interp (RopeRunner Rec mantle2 interp core) a b)
+-&gt; (Rec (Weaver interp) mantle1
+    -&gt; RopeRunner Rec mantle2 interp core a b)
+-&gt; RopeRunner
+     Rec mantle1 interp (RopeRunner Rec mantle2 interp core) a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679080888"><span class="annot"><span class="annottext">Rec (Weaver interp) mantle1
+</span><a href="#local-6989586621679080888"><span class="hs-identifier hs-var">r1</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver interp) mantle2 -&gt; core a b)
+-&gt; RopeRunner Rec mantle2 interp core a b
+forall (record :: RopeRec) (mantle :: [Strand]) (interp :: BinEff)
+       (core :: BinEff) a b.
+(record (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner record mantle interp core a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">((Rec (Weaver interp) mantle2 -&gt; core a b)
+ -&gt; RopeRunner Rec mantle2 interp core a b)
+-&gt; (Rec (Weaver interp) mantle2 -&gt; core a b)
+-&gt; RopeRunner Rec mantle2 interp core a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679080887"><span class="annot"><span class="annottext">Rec (Weaver interp) mantle2
+</span><a href="#local-6989586621679080887"><span class="hs-identifier hs-var">r2</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-102"></span><span>  </span><span class="annot"><span class="annottext">Rec (Weaver interp) (mantle1 ++ mantle2) -&gt; core a b
+</span><a href="#local-6989586621679080889"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver interp) (mantle1 ++ mantle2) -&gt; core a b)
+-&gt; Rec (Weaver interp) (mantle1 ++ mantle2) -&gt; core a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) mantle1
+</span><a href="#local-6989586621679080888"><span class="hs-identifier hs-var">r1</span></a></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) mantle1
+-&gt; Rec (Weaver interp) mantle2
+-&gt; Rec (Weaver interp) (mantle1 ++ mantle2)
+forall k (f :: k -&gt; *) (as :: [k]) (bs :: [k]).
+Rec f as -&gt; Rec f bs -&gt; Rec f (as ++ bs)
+</span><span class="hs-operator hs-var">`rappend`</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) mantle2
+</span><a href="#local-6989586621679080887"><span class="hs-identifier hs-var">r2</span></a></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- | Indicates that @strands@ can be reordered and considered a subset of</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- @strands'@</span><span>
+</span><span id="line-106"></span><span class="hs-keyword">type</span><span> </span><span id="RetwinableAs"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RetwinableAs"><span class="hs-identifier hs-var">RetwinableAs</span></a></span></span><span> </span><span id="local-6989586621679080884"><span class="annot"><a href="#local-6989586621679080884"><span class="hs-identifier hs-type">record</span></a></span></span><span> </span><span id="local-6989586621679080883"><span class="annot"><a href="#local-6989586621679080883"><span class="hs-identifier hs-type">strands</span></a></span></span><span> </span><span id="local-6989586621679080882"><span class="annot"><a href="#local-6989586621679080882"><span class="hs-identifier hs-type">core</span></a></span></span><span> </span><span id="local-6989586621679080881"><span class="annot"><a href="#local-6989586621679080881"><span class="hs-identifier hs-type">strands'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">RecSubset</span></span><span> </span><span class="annot"><a href="#local-6989586621679080884"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080883"><span class="hs-identifier hs-type">strands</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080881"><span class="hs-identifier hs-type">strands'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">RImage</span></span><span> </span><span class="annot"><a href="#local-6989586621679080883"><span class="hs-identifier hs-type">strands</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080881"><span class="hs-identifier hs-type">strands'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">RecSubsetFCtx</span></span><span> </span><span class="annot"><a href="#local-6989586621679080884"><span class="hs-identifier hs-type">record</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080882"><span class="hs-identifier hs-type">core</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span id="local-6989586621679080874"><span id="local-6989586621679080875"><span id="local-6989586621679080876"><span id="local-6989586621679080877"><span id="local-6989586621679080878"><span id="local-6989586621679080879"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#joinRopeRunner"><span class="hs-identifier hs-type">joinRopeRunner</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RetwinableAs"><span class="hs-identifier hs-type">RetwinableAs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080879"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080878"><span class="hs-identifier hs-type">mantle1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080877"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080876"><span class="hs-identifier hs-type">mantle</span></a></span><span>
+</span><span id="line-111"></span><span>                  </span><span class="hs-special">,</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RetwinableAs"><span class="hs-identifier hs-type">RetwinableAs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080879"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080875"><span class="hs-identifier hs-type">mantle2</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080877"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080876"><span class="hs-identifier hs-type">mantle</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>               </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080879"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080878"><span class="hs-identifier hs-type">mantle1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080877"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080879"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080875"><span class="hs-identifier hs-type">mantle2</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080877"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080874"><span class="hs-identifier hs-type">core</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>              </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080879"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080876"><span class="hs-identifier hs-type">mantle</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080877"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080874"><span class="hs-identifier hs-type">core</span></a></span></span></span></span></span></span></span><span>
+</span><span id="line-114"></span><span id="joinRopeRunner"><span class="annot"><span class="annottext">joinRopeRunner :: RopeRunner r mantle1 interp (RopeRunner r mantle2 interp core)
+:-&gt; RopeRunner r mantle interp core
+</span><a href="Control.Kernmantle.Rope.Internal.html#joinRopeRunner"><span class="hs-identifier hs-var hs-var">joinRopeRunner</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span id="local-6989586621679080872"><span class="annot"><span class="annottext">r (Weaver interp) mantle1 -&gt; RopeRunner r mantle2 interp core a b
+</span><a href="#local-6989586621679080872"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(r (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner r mantle interp core a b
+forall (record :: RopeRec) (mantle :: [Strand]) (interp :: BinEff)
+       (core :: BinEff) a b.
+(record (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner record mantle interp core a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">((r (Weaver interp) mantle -&gt; core a b)
+ -&gt; RopeRunner r mantle interp core a b)
+-&gt; (r (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner r mantle interp core a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679080871"><span class="annot"><span class="annottext">r (Weaver interp) mantle
+</span><a href="#local-6989586621679080871"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">r (Weaver interp) mantle1 -&gt; RopeRunner r mantle2 interp core a b
+</span><a href="#local-6989586621679080872"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">r (Weaver interp) mantle -&gt; r (Weaver interp) mantle1
+forall k1 k2 (rs :: [k1]) (ss :: [k1]) (f :: k2 -&gt; *)
+       (record :: (k2 -&gt; *) -&gt; [k1] -&gt; *) (is :: [Nat]).
+(RecSubset record rs ss is, RecSubsetFCtx record f) =&gt;
+record f ss -&gt; record f rs
+</span><span class="hs-identifier hs-var">rcast</span></span><span> </span><span class="annot"><span class="annottext">r (Weaver interp) mantle
+</span><a href="#local-6989586621679080871"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-115"></span><span>  </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span id="local-6989586621679080869"><span class="annot"><span class="annottext">r (Weaver interp) mantle2 -&gt; core a b
+</span><a href="#local-6989586621679080869"><span class="hs-identifier hs-var">f'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">r (Weaver interp) mantle2 -&gt; core a b
+</span><a href="#local-6989586621679080869"><span class="hs-identifier hs-var">f'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">r (Weaver interp) mantle -&gt; r (Weaver interp) mantle2
+forall k1 k2 (rs :: [k1]) (ss :: [k1]) (f :: k2 -&gt; *)
+       (record :: (k2 -&gt; *) -&gt; [k1] -&gt; *) (is :: [Nat]).
+(RecSubset record rs ss is, RecSubsetFCtx record f) =&gt;
+record f ss -&gt; record f rs
+</span><span class="hs-identifier hs-var">rcast</span></span><span> </span><span class="annot"><span class="annottext">r (Weaver interp) mantle
+</span><a href="#local-6989586621679080871"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- | Wrap each strand effect inside a type constructor</span><span>
+</span><span id="line-118"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">family</span><span> </span><span id="MapStrandEffs"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-var">MapStrandEffs</span></a></span></span><span> </span><span id="local-6989586621679080868"><span class="annot"><a href="#local-6989586621679080868"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679080867"><span class="annot"><a href="#local-6989586621679080867"><span class="hs-identifier hs-type">mantle</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-119"></span><span>  </span><span id="MapStrandEffs"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-var">MapStrandEffs</span></a></span></span><span> </span><span id="local-6989586621679080866"><span class="annot"><a href="#local-6989586621679080866"><span class="hs-identifier hs-type hs-type">f</span></a></span></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-120"></span><span>  </span><span id="MapStrandEffs"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-var">MapStrandEffs</span></a></span></span><span> </span><span id="local-6989586621679080865"><span class="annot"><a href="#local-6989586621679080865"><span class="hs-identifier hs-type hs-type">f</span></a></span></span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679080864"><span class="annot"><a href="#local-6989586621679080864"><span class="hs-identifier hs-type hs-type">s</span></a></span></span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span id="local-6989586621679080863"><span class="annot"><a href="#local-6989586621679080863"><span class="hs-identifier hs-type hs-type">strands</span></a></span></span><span> </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">'</span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandName"><span class="hs-identifier hs-type">StrandName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080864"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679080865"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#StrandEff"><span class="hs-identifier hs-type">StrandEff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080864"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-type">MapStrandEffs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080865"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080863"><span class="hs-identifier hs-type">strands</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span id="local-6989586621679081088"><span id="local-6989586621679081089"><span id="local-6989586621679081090"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#effmapRopeRec"><span class="hs-identifier hs-type">effmapRopeRec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.EffFunctor.html#EffFunctor"><span class="hs-identifier hs-type">EffFunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081090"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span>              </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081089"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081088"><span class="hs-identifier hs-type">strands</span></a></span><span>
+</span><span id="line-124"></span><span>              </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081090"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081089"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-type">MapStrandEffs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081090"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081088"><span class="hs-identifier hs-type">strands</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-125"></span><span id="effmapRopeRec"><span class="annot"><span class="annottext">effmapRopeRec :: Rec (Weaver interp) strands
+-&gt; Rec (Weaver (f interp)) (MapStrandEffs f strands)
+</span><a href="Control.Kernmantle.Rope.Internal.html#effmapRopeRec"><span class="hs-identifier hs-var hs-var">effmapRopeRec</span></a></span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) strands
+</span><span class="hs-identifier hs-var">RNil</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Rec (Weaver (f interp)) (MapStrandEffs f strands)
+forall u (a :: u -&gt; *). Rec a '[]
+</span><span class="hs-identifier hs-var">RNil</span></span><span>
+</span><span id="line-126"></span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#effmapRopeRec"><span class="hs-identifier hs-var">effmapRopeRec</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-type">Weaver</span></a></span><span> </span><span id="local-6989586621679080860"><span class="annot"><span class="annottext">StrandEff r :-&gt; interp
+</span><a href="#local-6989586621679080860"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&amp;</span></span><span> </span><span id="local-6989586621679080858"><span class="annot"><span class="annottext">Rec (Weaver interp) rs
+</span><a href="#local-6989586621679080858"><span class="hs-identifier hs-var">rest</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(StrandEff '(StrandName r, f (StrandEff r)) :-&gt; f interp)
+-&gt; Weaver (f interp) '(StrandName r, f (StrandEff r))
+forall (interp :: BinEff) (strand :: Strand).
+(StrandEff strand :-&gt; interp) -&gt; Weaver interp strand
+</span><a href="Control.Kernmantle.Rope.Internal.html#Weaver"><span class="hs-identifier hs-var">Weaver</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(StrandEff r :-&gt; interp) -&gt; f (StrandEff r) :-&gt; f interp
+forall (f :: BinEff -&gt; BinEff) (eff :: BinEff) (eff' :: BinEff).
+EffFunctor f =&gt;
+(eff :-&gt; eff') -&gt; f eff :-&gt; f eff'
+</span><a href="Data.Profunctor.EffFunctor.html#effrmap"><span class="hs-identifier hs-var">effrmap</span></a></span><span> </span><span class="annot"><span class="annottext">StrandEff r :-&gt; interp
+</span><a href="#local-6989586621679080860"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Weaver (f interp) '(StrandName r, f (StrandEff r))
+-&gt; Rec (Weaver (f interp)) (MapStrandEffs f rs)
+-&gt; Rec
+     (Weaver (f interp))
+     ('(StrandName r, f (StrandEff r)) : MapStrandEffs f rs)
+forall u (a :: u -&gt; *) (r :: u) (rs :: [u]).
+a r -&gt; Rec a rs -&gt; Rec a (r : rs)
+</span><span class="hs-operator hs-var">:&amp;</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) rs
+-&gt; Rec (Weaver (f interp)) (MapStrandEffs f rs)
+forall (f :: BinEff -&gt; BinEff) (interp :: BinEff)
+       (strands :: [Strand]).
+EffFunctor f =&gt;
+Rec (Weaver interp) strands
+-&gt; Rec (Weaver (f interp)) (MapStrandEffs f strands)
+</span><a href="Control.Kernmantle.Rope.Internal.html#effmapRopeRec"><span class="hs-identifier hs-var">effmapRopeRec</span></a></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver interp) rs
+</span><a href="#local-6989586621679080858"><span class="hs-identifier hs-var">rest</span></a></span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- | When all the strands of a 'Rope' are built by the same 'EffFunctor', we can</span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- run them. See 'splitRope' to isolate some strands in a 'Rope'</span><span>
+</span><span id="line-130"></span><span id="local-6989586621679081072"><span id="local-6989586621679081073"><span id="local-6989586621679081074"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#unwrapRopeRunner"><span class="hs-identifier hs-type">unwrapRopeRunner</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.EffFunctor.html#EffFunctor"><span class="hs-identifier hs-type">EffFunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081074"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>                 </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-type">MapStrandEffs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081074"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081073"><span class="hs-identifier hs-type">strands</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679081074"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081072"><span class="hs-identifier hs-type">core</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679081072"><span class="hs-identifier hs-type">core</span></a></span><span>
+</span><span id="line-132"></span><span>                </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679081073"><span class="hs-identifier hs-type">strands</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081072"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679081072"><span class="hs-identifier hs-type">core</span></a></span></span></span></span><span>
+</span><span id="line-133"></span><span id="unwrapRopeRunner"><span class="annot"><span class="annottext">unwrapRopeRunner :: RopeRunner Rec (MapStrandEffs f strands) (f core) core
+:-&gt; RopeRunner Rec strands core core
+</span><a href="Control.Kernmantle.Rope.Internal.html#unwrapRopeRunner"><span class="hs-identifier hs-var hs-var">unwrapRopeRunner</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span id="local-6989586621679080855"><span class="annot"><span class="annottext">Rec (Weaver (f core)) (MapStrandEffs f strands) -&gt; core a b
+</span><a href="#local-6989586621679080855"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver core) strands -&gt; core a b)
+-&gt; RopeRunner Rec strands core core a b
+forall (record :: RopeRec) (mantle :: [Strand]) (interp :: BinEff)
+       (core :: BinEff) a b.
+(record (Weaver interp) mantle -&gt; core a b)
+-&gt; RopeRunner record mantle interp core a b
+</span><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-var">RopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">((Rec (Weaver core) strands -&gt; core a b)
+ -&gt; RopeRunner Rec strands core core a b)
+-&gt; (Rec (Weaver core) strands -&gt; core a b)
+-&gt; RopeRunner Rec strands core core a b
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver (f core)) (MapStrandEffs f strands) -&gt; core a b
+</span><a href="#local-6989586621679080855"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Rec (Weaver (f core)) (MapStrandEffs f strands) -&gt; core a b)
+-&gt; (Rec (Weaver core) strands
+    -&gt; Rec (Weaver (f core)) (MapStrandEffs f strands))
+-&gt; Rec (Weaver core) strands
+-&gt; core a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Rec (Weaver core) strands
+-&gt; Rec (Weaver (f core)) (MapStrandEffs f strands)
+forall (f :: BinEff -&gt; BinEff) (interp :: BinEff)
+       (strands :: [Strand]).
+EffFunctor f =&gt;
+Rec (Weaver interp) strands
+-&gt; Rec (Weaver (f interp)) (MapStrandEffs f strands)
+</span><a href="Control.Kernmantle.Rope.Internal.html#effmapRopeRec"><span class="hs-identifier hs-var">effmapRopeRec</span></a></span><span>
+</span><span id="line-134"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#unwrapRopeRunner"><span class="hs-pragma hs-type">unwrapRopeRunner</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span id="local-6989586621679080849"><span id="local-6989586621679080850"><span id="local-6989586621679080851"><span id="local-6989586621679080852"><span id="local-6989586621679080853"><span id="local-6989586621679080854"><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#unwrapSomeStrands"><span class="hs-identifier hs-type">unwrapSomeStrands</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Profunctor.EffFunctor.html#EffFunctor"><span class="hs-identifier hs-type">EffFunctor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080854"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">RMap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-type">MapStrandEffs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080854"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080853"><span class="hs-identifier hs-type">mantle1</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>                  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679080854"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080852"><span class="hs-identifier hs-type">core'</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621679080851"><span class="hs-identifier hs-type">interp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>                     </span><span class="hs-comment">-- ^ How to run the extracted EffFunctor layer</span><span>
+</span><span id="line-139"></span><span>                  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679080850"><span class="hs-identifier hs-type">mantle2</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080851"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080849"><span class="hs-identifier hs-type">core</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621679080852"><span class="hs-identifier hs-type">core'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-140"></span><span>                     </span><span class="hs-comment">-- ^ What to do with the remaining strands (those not</span><span>
+</span><span id="line-141"></span><span>                     </span><span class="hs-comment">-- wrapped)</span><span>
+</span><span id="line-142"></span><span>                  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#MapStrandEffs"><span class="hs-identifier hs-type">MapStrandEffs</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080854"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080853"><span class="hs-identifier hs-type">mantle1</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">++</span></span><span> </span><span class="annot"><a href="#local-6989586621679080850"><span class="hs-identifier hs-type">mantle2</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679080851"><span class="hs-identifier hs-type">interp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679080849"><span class="hs-identifier hs-type">core</span></a></span><span>
+</span><span id="line-143"></span><span>                 </span><span class="annot"><span class="hs-operator hs-type">:-&gt;</span></span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#RopeRunner"><span class="hs-identifier hs-type">RopeRunner</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Rec</span></span><span> </span><span class="annot"><a href="#local-6989586621679080853"><span class="hs-identifier hs-type">mantle1</span></a></span><span>                              </span><span class="annot"><a href="#local-6989586621679080852"><span class="hs-identifier hs-type">core'</span></a></span><span>  </span><span class="annot"><a href="#local-6989586621679080852"><span class="hs-identifier hs-type">core'</span></a></span><span>
+</span><span id="line-144"></span><span>                     </span><span class="hs-comment">-- ^ The resulting 'RopeRunner', where </span></span></span></span></span></span></span><span>
+</span><span id="line-145"></span><span id="unwrapSomeStrands"><span class="annot"><span class="annottext">unwrapSomeStrands :: (f core' :-&gt; interp)
+-&gt; (RopeRunner Rec mantle2 interp core :-&gt; core')
+-&gt; RopeRunner Rec (MapStrandEffs f mantle1 ++ mantle2) interp core
+   :-&gt; RopeRunner Rec mantle1 core' core'
+</span><a href="Control.Kernmantle.Rope.Internal.html#unwrapSomeStrands"><span class="hs-identifier hs-var hs-var">unwrapSomeStrands</span></a></span></span><span> </span><span id="local-6989586621679080847"><span class="annot"><span class="annottext">f core' :-&gt; interp
+</span><a href="#local-6989586621679080847"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679080846"><span class="annot"><span class="annottext">RopeRunner Rec mantle2 interp core :-&gt; core'
+</span><a href="#local-6989586621679080846"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RopeRunner Rec (MapStrandEffs f mantle1) (f core') core' a b
+-&gt; RopeRunner Rec mantle1 core' core' a b
+forall (f :: BinEff -&gt; BinEff) (strands :: [Strand])
+       (core :: BinEff).
+EffFunctor f =&gt;
+RopeRunner Rec (MapStrandEffs f strands) (f core) core
+:-&gt; RopeRunner Rec strands core core
+</span><a href="Control.Kernmantle.Rope.Internal.html#unwrapRopeRunner"><span class="hs-identifier hs-var">unwrapRopeRunner</span></a></span><span> </span><span class="annot"><span class="annottext">(RopeRunner Rec (MapStrandEffs f mantle1) (f core') core' a b
+ -&gt; RopeRunner Rec mantle1 core' core' a b)
+-&gt; (RopeRunner
+      Rec (MapStrandEffs f mantle1 ++ mantle2) interp core a b
+    -&gt; RopeRunner Rec (MapStrandEffs f mantle1) (f core') core' a b)
+-&gt; RopeRunner
+     Rec (MapStrandEffs f mantle1 ++ mantle2) interp core a b
+-&gt; RopeRunner Rec mantle1 core' core' a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(f core' :-&gt; interp)
+-&gt; (RopeRunner Rec mantle2 interp core :-&gt; core')
+-&gt; RopeRunner
+     Rec
+     (MapStrandEffs f mantle1)
+     interp
+     (RopeRunner Rec mantle2 interp core)
+   :-&gt; RopeRunner Rec (MapStrandEffs f mantle1) (f core') core'
+forall (p :: BinEff -&gt; BinEff -&gt; BinEff) (a' :: BinEff)
+       (a :: BinEff) (b :: BinEff) (b' :: BinEff).
+EffProfunctor p =&gt;
+(a' :-&gt; a) -&gt; (b :-&gt; b') -&gt; p a b :-&gt; p a' b'
+</span><a href="Data.Profunctor.EffFunctor.html#effdimap"><span class="hs-identifier hs-var">effdimap</span></a></span><span> </span><span class="annot"><span class="annottext">f core' :-&gt; interp
+</span><a href="#local-6989586621679080847"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">RopeRunner Rec mantle2 interp core :-&gt; core'
+</span><a href="#local-6989586621679080846"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">(RopeRunner
+   Rec
+   (MapStrandEffs f mantle1)
+   interp
+   (RopeRunner Rec mantle2 interp core)
+   a
+   b
+ -&gt; RopeRunner Rec (MapStrandEffs f mantle1) (f core') core' a b)
+-&gt; (RopeRunner
+      Rec (MapStrandEffs f mantle1 ++ mantle2) interp core a b
+    -&gt; RopeRunner
+         Rec
+         (MapStrandEffs f mantle1)
+         interp
+         (RopeRunner Rec mantle2 interp core)
+         a
+         b)
+-&gt; RopeRunner
+     Rec (MapStrandEffs f mantle1 ++ mantle2) interp core a b
+-&gt; RopeRunner Rec (MapStrandEffs f mantle1) (f core') core' a b
+forall k (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">RopeRunner Rec (MapStrandEffs f mantle1 ++ mantle2) interp core a b
+-&gt; RopeRunner
+     Rec
+     (MapStrandEffs f mantle1)
+     interp
+     (RopeRunner Rec mantle2 interp core)
+     a
+     b
+forall (mantle1 :: [Strand]) (mantle2 :: [Strand])
+       (interp :: BinEff) (core :: BinEff).
+RopeRunner Rec (mantle1 ++ mantle2) interp core
+:-&gt; RopeRunner
+      Rec mantle1 interp (RopeRunner Rec mantle2 interp core)
+</span><a href="Control.Kernmantle.Rope.Internal.html#splitRopeRunner"><span class="hs-identifier hs-var">splitRopeRunner</span></a></span><span>
+</span><span id="line-146"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Kernmantle.Rope.Internal.html#unwrapSomeStrands"><span class="hs-pragma hs-type">unwrapSomeStrands</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span></pre></body></html>
