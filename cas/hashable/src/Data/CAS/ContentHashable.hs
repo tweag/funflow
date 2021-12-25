@@ -456,12 +456,12 @@ instance ContentHashable m c => GContentHashable m (K1 i c) where
   gContentHashUpdate ctx x = contentHashUpdate ctx (unK1 x)
 
 instance (Constructor c, GContentHashable m f) => GContentHashable m (C1 c f) where
-  gContentHashUpdate ctx0 x = gContentHashUpdate nameCtx (unM1 x)
+  gContentHashUpdate ctx0 x = nameCtx `seq` gContentHashUpdate nameCtx (unM1 x)
     where
       nameCtx = hashUpdate ctx0 $ C8.pack (conName x)
 
 instance (Datatype d, GContentHashable m f) => GContentHashable m (D1 d f) where
-  gContentHashUpdate ctx0 x = gContentHashUpdate packageCtx (unM1 x)
+  gContentHashUpdate ctx0 x = packageCtx `seq` gContentHashUpdate packageCtx (unM1 x)
     where
       datatypeCtx = hashUpdate ctx0 $ C8.pack (datatypeName x)
       moduleCtx = hashUpdate datatypeCtx $ C8.pack (datatypeName x)
@@ -471,7 +471,7 @@ instance GContentHashable m f => GContentHashable m (S1 s f) where
   gContentHashUpdate ctx x = gContentHashUpdate ctx (unM1 x)
 
 instance (GContentHashable m a, GContentHashable m b) => GContentHashable m (a :*: b) where
-  gContentHashUpdate ctx (x :*: y) = gContentHashUpdate ctx x >>= flip gContentHashUpdate y
+  gContentHashUpdate ctx (x :*: y) = gContentHashUpdate ctx x >>= \ctx' -> ctx' `seq` gContentHashUpdate ctx' y
 
 instance (GContentHashable m a, GContentHashable m b) => GContentHashable m (a :+: b) where
   gContentHashUpdate ctx (L1 x) = gContentHashUpdate ctx x
