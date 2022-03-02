@@ -20,9 +20,7 @@ mkdir -p "$out"/api
 stack haddock
 cp -r "$(stack path --local-doc-root)" "$out"/api/
 chmod -R +rwx "$out"/api/
-# Add extra symlink for header "Contents" links
-mkdir -p "$out"/api/share/doc/
-ln -s "$out"/api/index.html "$out"/api/share/doc/doc-index.html
+mv "${out}"/api/doc/* "${out}"/api
 
 # Make tutorials
 mkdir -p /tmp/funflow/store
