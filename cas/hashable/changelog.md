@@ -1,0 +1,1 @@
+- Fix space leak when hashing structure where instances were derived using `Generic`. Now hashing happen in constant space. @guibou.
