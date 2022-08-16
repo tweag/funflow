@@ -59,6 +59,8 @@ import Crypto.Hash
   )
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
+import qualified Data.Aeson.KeyMap as Aeson
+import qualified Data.Aeson.Key as Aeson
 import Data.Bits (shiftL)
 import Data.ByteArray
   ( Bytes,
@@ -442,6 +444,12 @@ instance ContentHashable m a => ContentHashable m (Maybe a)
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (Either a b)
 
 instance Monad m => ContentHashable m Aeson.Value
+
+instance Monad m => ContentHashable m (Aeson.KeyMap Aeson.Value) where
+  contentHashUpdate ctx m = contentHashUpdate ctx (Aeson.toList m)
+
+instance Monad m => ContentHashable m Aeson.Key where
+  contentHashUpdate ctx k = contentHashUpdate ctx (Aeson.toText k)
 
 class Monad m => GContentHashable m f where
   gContentHashUpdate :: Context SHA256 -> f a -> m (Context SHA256)
