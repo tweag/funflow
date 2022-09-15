@@ -301,7 +301,7 @@ tests =
       testCase "list store contents" $
         withEmptyStore $ \store -> do
           [a, b, c, d] <- mapM contentHash ["a", "b", "c", "d" :: String]
-          void $ mapM (ContentStore.markPending store) [a, b, c, d]
+          mapM_ (ContentStore.markPending store) [a, b, c, d]
           mapM_ (ContentStore.markComplete store) [a, b]
 
           (pendings, completes, items) <- ContentStore.listAll store

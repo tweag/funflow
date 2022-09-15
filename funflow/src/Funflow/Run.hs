@@ -40,7 +40,6 @@ import Data.CAS.ContentHashable (DirectoryContent (DirectoryContent))
 import qualified Data.CAS.ContentStore as CS
 import qualified Data.CAS.RemoteCache as RC
 import Data.Either (isLeft, lefts, partitionEithers)
-import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet as HashSet
 import qualified Data.Map.Lazy as Map
 import Data.Maybe (mapMaybe)
@@ -91,9 +90,9 @@ import System.PosixCompat.User (getEffectiveGroupID, getEffectiveUserID)
 
 -- | Flow execution configuration
 data RunFlowConfig = RunFlowConfig
-  { storePath :: Path Abs Dir,
+  { storePath :: !(Path Abs Dir),
     -- Optional config file for configuring task arguments
-    configFile :: Maybe (Path Abs File)
+    configFile :: !(Maybe (Path Abs File))
   }
 
 -- | Run a flow, parsing any required `Configurable` values from their respective sources.
@@ -142,7 +141,7 @@ runFlowWithConfig config flow input =
 
           -- Run IO Actions to read config file, env vars, etc:
           fileConfig <- case configFile of
-            Nothing -> return HashMap.empty
+            Nothing -> pure mempty
             Just path -> readYamlFileConfig $ toFilePath path
           envConfig <- readEnvs $ HashSet.toList $ envConfigKeys dockerConfigs
           -- TODO: Support for configurations via a CLI.

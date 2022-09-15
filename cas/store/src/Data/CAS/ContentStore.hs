@@ -261,7 +261,7 @@ instance Exception StoreError where
         ++ ". No automatic migration is available, \
            \please use a fresh store location."
     MalformedMetadataEntry hash key ->
-      "The metadtaa entry for hash '"
+      "The metadata entry for hash '"
         ++ C8.unpack (encodeHash hash)
         ++ "' under key '"
         ++ show key
@@ -283,7 +283,7 @@ data ContentStore = ContentStore
   }
 
 -- | A completed item in the 'ContentStore'.
-data Item = Item {itemHash :: ContentHash}
+newtype Item = Item {itemHash :: ContentHash}
   deriving (Eq, Ord, Show, Generic)
 
 instance Monad m => ContentHashable m Item where
