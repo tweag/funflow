@@ -174,7 +174,7 @@ import qualified Database.SQLite.Simple.FromField as SQL
 import qualified Database.SQLite.Simple.ToField as SQL
 import GHC.Generics (Generic)
 import Path
-import Path.IO
+import Path.IO hiding (removePathForcibly)
 import System.Directory (removePathForcibly)
 import System.FilePath (dropTrailingPathSeparator)
 import System.IO
