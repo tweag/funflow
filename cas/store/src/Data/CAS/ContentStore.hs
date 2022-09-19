@@ -283,7 +283,7 @@ data ContentStore = ContentStore
   }
 
 -- | A completed item in the 'ContentStore'.
-newtype Item = Item {itemHash :: ContentHash}
+data Item = Item {itemHash :: !ContentHash}
   deriving (Eq, Ord, Show, Generic)
 
 instance Monad m => ContentHashable m Item where
