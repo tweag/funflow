@@ -272,18 +272,18 @@ data ContentStore = ContentStore
   { -- | Root directory of the content store.
     -- The process must be able to create this directory if missing,
     -- change permissions, and create files and directories within.
-    storeRoot :: Path Abs Dir,
+    storeRoot :: !(Path Abs Dir),
     -- | Write lock on store metadata to ensure multi thread and process safety.
     -- The lock is taken when item state is changed or queried.
-    storeLock :: Lock,
+    storeLock :: !Lock,
     -- | Used to watch for updates on store items.
-    storeNotifier :: Notifier,
+    storeNotifier :: !Notifier,
     -- | Connection to the metadata SQLite database.
-    storeDb :: SQL.Connection
+    storeDb :: !SQL.Connection
   }
 
 -- | A completed item in the 'ContentStore'.
-data Item = Item {itemHash :: !ContentHash}
+newtype Item = Item {itemHash :: ContentHash}
   deriving (Eq, Ord, Show, Generic)
 
 instance Monad m => ContentHashable m Item where
