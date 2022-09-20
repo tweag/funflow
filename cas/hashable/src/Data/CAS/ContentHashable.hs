@@ -10,6 +10,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 -- | 'ContentHashable' provides a hashing function suitable for use in the
 --   Funflow content store.
@@ -251,11 +253,9 @@ contentHashUpdate_byteArray# ba (I# off) (I# len) ctx = hashUpdate ctx $
 
 -- | Update hash context based on the contents of a strict 'Data.Text.Text'.
 contentHashUpdate_text :: Context SHA256 -> T.Text -> Context SHA256
-contentHashUpdate_text ctx (T.Text (TA.ByteArray arr) off_ len_) =
+contentHashUpdate_text ctx (T.Text (TA.ByteArray arr) off len) =
   contentHashUpdate_byteArray# arr off len ctx
-  where
-    off = off_ `shiftL` 0 -- convert from 'Word16' to 'Word8'
-    len = len_ `shiftL` 0 -- convert from 'Word16' to 'Word8'
+
 
 instance Monad m => ContentHashable m Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
