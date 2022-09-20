@@ -341,6 +341,16 @@ tests =
 
           ContentStore.assignAlias store aliasA itemA
           ContentStore.assignAlias store aliasB itemB
+
+          do 
+            lr <- ContentStore.listAliases store
+            length lr @?= 2
+            ((\(a,b,c) -> a) <$> lr) @?= [aliasA, aliasB]
+            ((\(_,b,_) -> b) <$> lr) @?= [itemA, itemB]
+            hashA <- contentHash aliasA
+            hashB <- contentHash aliasB
+            ((\(_,_,c) -> c) <$> lr) @?= [hashA, hashB]
+
           do
             r <- ContentStore.lookupAlias store aliasA
             r @?= Just itemA
