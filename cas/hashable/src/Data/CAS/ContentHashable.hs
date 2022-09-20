@@ -254,8 +254,8 @@ contentHashUpdate_text :: Context SHA256 -> T.Text -> Context SHA256
 contentHashUpdate_text ctx (T.Text (TA.ByteArray arr) off_ len_) =
   contentHashUpdate_byteArray# arr off len ctx
   where
-    off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
-    len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
+    off = off_ `shiftL` 0 -- convert from 'Word16' to 'Word8'
+    len = len_ `shiftL` 0 -- convert from 'Word16' to 'Word8'
 
 instance Monad m => ContentHashable m Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
