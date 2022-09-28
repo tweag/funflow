@@ -14,13 +14,13 @@ let
   # As those are not "nixified", use `callCabal2nix` to convert them
   haskellPackages = pkgs.haskell.packages."${compiler}".override {
           overrides = hself: hsuper: rec {
-            text = pkgs.haskell.lib.dontCheck hsuper.text_2_0_1;
-            hashable = pkgs.haskell.lib.dontCheck hsuper.hashable_1_4_1_0;
+            text = hsuper.text_2_0_1;
+            hashable = hsuper.hashable_1_4_1_0;
             conduit-extra = pkgs.haskell.lib.dontCheck hsuper.conduit-extra;
-            parsec = pkgs.haskell.lib.dontCheck hsuper.parsec_3_1_15_1;
-            lens = pkgs.haskell.lib.dontCheck hsuper.lens_5_2;
-            aeson = pkgs.haskell.lib.dontCheck hsuper.aeson_2_1_0_0;
-            lens-aeson = pkgs.haskell.lib.dontCheck hsuper.lens-aeson_1_2_2;
+            parsec = hsuper.parsec_3_1_15_1;
+            lens = hsuper.lens_5_2;
+            aeson = hsuper.aeson_2_1_0_0;
+            lens-aeson = hsuper.lens-aeson_1_2_2;
             store = pkgs.haskell.lib.dontCheck (hself.callCabal2nix "store" "${sources.store}" { });
             store-core = pkgs.haskell.lib.dontCheck (hself.callCabal2nix "store-core" "${sources.store}/store-core" { });
             funflow = pkgs.haskell.lib.dontCheck (hself.callCabal2nix "funflow" ../funflow { });
