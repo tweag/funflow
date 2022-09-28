@@ -63,7 +63,6 @@ import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
 import qualified Data.Aeson.KeyMap as Aeson
 import qualified Data.Aeson.Key as Aeson
-import Data.Bits (shiftL)
 import Data.ByteArray
   ( Bytes,
     MemView (MemView),
