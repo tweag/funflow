@@ -719,7 +719,7 @@ removeAlias store alias =
 listAliases :: MonadIO m => ContentStore -> m [(Alias, Item, ContentHash)]
 listAliases store =
   liftIO . withStoreLock store $
-    fmap (map (\(a,b,c) -> (a, Item b, c))) $
+    map (\(a,b,c) -> (a, Item b, c)) <$>
       SQL.query_
         (storeDb store)
         "SELECT name, dest, hash FROM aliases"

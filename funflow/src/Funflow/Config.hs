@@ -33,8 +33,8 @@ type ConfigMap = Object
 type EnvConfigMap = Ae.KeyMap String
 
 data ExternalConfig = ExternalConfig
-  { fileConfig :: !ConfigMap,
-    envConfig :: !EnvConfigMap
+  { fileConfig :: ConfigMap,
+    envConfig :: EnvConfigMap
     -- Dorran: Disabling this for now until we implement CLI support
     -- cliConfig :: ConfigMap
   }
