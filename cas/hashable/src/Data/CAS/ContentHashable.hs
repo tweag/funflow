@@ -10,6 +10,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 
 -- | 'ContentHashable' provides a hashing function suitable for use in the
 --   Funflow content store.
@@ -59,7 +61,8 @@ import Crypto.Hash
   )
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Types as Aeson
-import Data.Bits (shiftL)
+import qualified Data.Aeson.KeyMap as Aeson
+import qualified Data.Aeson.Key as Aeson
 import Data.ByteArray
   ( Bytes,
     MemView (MemView),
@@ -249,11 +252,9 @@ contentHashUpdate_byteArray# ba (I# off) (I# len) ctx = hashUpdate ctx $
 
 -- | Update hash context based on the contents of a strict 'Data.Text.Text'.
 contentHashUpdate_text :: Context SHA256 -> T.Text -> Context SHA256
-contentHashUpdate_text ctx (T.Text arr off_ len_) =
-  contentHashUpdate_byteArray# (TA.aBA arr) off len ctx
-  where
-    off = off_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
-    len = len_ `shiftL` 1 -- convert from 'Word16' to 'Word8'
+contentHashUpdate_text ctx (T.Text (TA.ByteArray arr) off len) =
+  contentHashUpdate_byteArray# arr off len ctx
+
 
 instance Monad m => ContentHashable m Fingerprint where
   contentHashUpdate ctx (Fingerprint a b) = flip contentHashUpdate_storable a >=> flip contentHashUpdate_storable b $ ctx
@@ -442,6 +443,12 @@ instance ContentHashable m a => ContentHashable m (Maybe a)
 instance (ContentHashable m a, ContentHashable m b) => ContentHashable m (Either a b)
 
 instance Monad m => ContentHashable m Aeson.Value
+
+instance Monad m => ContentHashable m (Aeson.KeyMap Aeson.Value) where
+  contentHashUpdate ctx m = contentHashUpdate ctx (Aeson.toList m)
+
+instance Monad m => ContentHashable m Aeson.Key where
+  contentHashUpdate ctx k = contentHashUpdate ctx (Aeson.toText k)
 
 class Monad m => GContentHashable m f where
   gContentHashUpdate :: Context SHA256 -> f a -> m (Context SHA256)

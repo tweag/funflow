@@ -7,12 +7,13 @@ module Funflow.Config where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString.UTF8 as BSU
-import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as HashSet
 import Data.Text (Text, unpack)
 import Data.Yaml (FromJSON, Object, ParseException, decodeEither', decodeFileThrow, encode, prettyPrintParseException)
 import System.Environment (lookupEnv)
+import qualified Data.Aeson.KeyMap as Ae
+import qualified Data.Aeson.Key as Ae
 
 -- Re-using Data.Yaml types here since we are parsing config from
 -- text anyways.
@@ -26,9 +27,10 @@ type ConfigKey = Text
 -- initially being read in order to identify which config keys are defined in
 -- the file and therefore is of type Object.
 
+-- this has changed to be a KeyMap Value in the latest version of yaml
 type ConfigMap = Object
 
-type EnvConfigMap = HashMap.HashMap Text String
+type EnvConfigMap = Ae.KeyMap String
 
 data ExternalConfig = ExternalConfig
   { fileConfig :: ConfigMap,
@@ -64,14 +66,14 @@ render configVal extConfig = case configVal of
   Literal _ -> Right configVal
   where
     valueFromStrings :: FromJSON a => Text -> EnvConfigMap -> Either String a
-    valueFromStrings k env = case HashMap.lookup k env of
+    valueFromStrings k env = case Ae.lookup (Ae.fromText k) env of
       Nothing -> Left $ "Failed to find key '" ++ unpack k ++ "' in provided config."
       Just v -> case (decodeEither' $ BSU.fromString v) :: Either ParseException a of
         Left parseException -> Left $ prettyPrintParseException parseException
         Right parseResult -> Right parseResult
 
     valueFromObject :: FromJSON a => Text -> Object -> Either String a
-    valueFromObject k obj = case HashMap.lookup k obj of
+    valueFromObject k obj = case Ae.lookup (Ae.fromText k) obj of
       Nothing -> Left $ "Failed to find key '" ++ unpack k ++ "' in provided config."
       Just v -> case (decodeEither' $ encode v) :: Either ParseException a of
         Left parseException -> Left $ prettyPrintParseException parseException
@@ -96,8 +98,8 @@ getConfigKey conf = case conf of
 
 -- | Stores ConfigKey values by their declared sources.
 data ConfigKeysBySource = ConfigKeysBySource
-  { fileConfigKeys :: HashSet Text,
-    envConfigKeys :: HashSet Text
+  { fileConfigKeys :: !(HashSet Text),
+    envConfigKeys :: !(HashSet Text)
     -- cliConfigKeys :: HashSet Text
   }
   deriving (Show)
@@ -142,31 +144,31 @@ configKeyBySource conf = case conf of
   --       envConfigKeys = HashSet.empty,
   --       cliConfigKeys = HashSet.fromList [k]
   --     }
-  _ -> mempty
+  Literal _ -> mempty
 
 -- | Get a list of any ConfigKeys which don't exist in their corresponding
 -- field in the providedExternalConfig
 missing :: ExternalConfig -> ConfigKeysBySource -> [ConfigKey]
 missing conf ids =
-  let missingFileConfs = filter (not . (flip HashMap.member $ fileConfig conf)) $ HashSet.toList $ fileConfigKeys ids
-      missingEnvConfs = filter (not . (flip HashMap.member $ envConfig conf)) $ HashSet.toList $ envConfigKeys ids
+  let missingFileConfs = filter (not . flip Ae.member (fileConfig conf)) $ Ae.fromText <$> HashSet.toList (fileConfigKeys ids)
+      missingEnvConfs = filter (not . flip Ae.member (envConfig conf)) $ Ae.fromText <$> HashSet.toList (envConfigKeys ids)
    in -- missingCLIConfs = filter (not . (flip HashMap.member $ cliConfig conf)) $ HashSet.toList $ cliConfigKeys ids
-      missingFileConfs ++ missingEnvConfs -- ++ missingCLIConfs
+      Ae.toText <$> missingFileConfs <> missingEnvConfs -- ++ missingCLIConfs
 
 ---------------------------------------------------------------------
 -- IO actions which return configs
 ---------------------------------------------------------------------
 
 -- | Construct an HashMap containing specified environment variable values.
-readEnv :: MonadIO m => ConfigKey -> m (HashMap.HashMap Text String)
+readEnv :: MonadIO m => ConfigKey -> m (Ae.KeyMap String)
 readEnv key = do
   val <- liftIO $ lookupEnv $ unpack key
   case val of
-    Nothing -> return HashMap.empty
-    Just v -> return $ HashMap.fromList [(key, v)]
+    Nothing -> pure mempty
+    Just v -> pure $ Ae.singleton (Ae.fromText key) v
 
 -- | Convenience function for calling readEnv on a list of ConfigKeys
-readEnvs :: MonadIO m => [ConfigKey] -> m (HashMap.HashMap Text String)
+readEnvs :: MonadIO m => [ConfigKey] -> m (Ae.KeyMap String)
 readEnvs keys = do
   envVars <- mapM readEnv keys
   return $ mconcat envVars

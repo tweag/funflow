@@ -301,7 +301,7 @@ tests =
       testCase "list store contents" $
         withEmptyStore $ \store -> do
           [a, b, c, d] <- mapM contentHash ["a", "b", "c", "d" :: String]
-          void $ mapM (ContentStore.markPending store) [a, b, c, d]
+          mapM_ (ContentStore.markPending store) [a, b, c, d]
           mapM_ (ContentStore.markComplete store) [a, b]
 
           (pendings, completes, items) <- ContentStore.listAll store
@@ -341,6 +341,16 @@ tests =
 
           ContentStore.assignAlias store aliasA itemA
           ContentStore.assignAlias store aliasB itemB
+
+          do 
+            lr <- ContentStore.listAliases store
+            length lr @?= 2
+            ((\(a,b,c) -> a) <$> lr) @?= [aliasA, aliasB]
+            ((\(_,b,_) -> b) <$> lr) @?= [itemA, itemB]
+            hashA <- contentHash aliasA
+            hashB <- contentHash aliasB
+            ((\(_,_,c) -> c) <$> lr) @?= [hashA, hashB]
+
           do
             r <- ContentStore.lookupAlias store aliasA
             r @?= Just itemA

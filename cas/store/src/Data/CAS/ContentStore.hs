@@ -174,7 +174,7 @@ import qualified Database.SQLite.Simple.FromField as SQL
 import qualified Database.SQLite.Simple.ToField as SQL
 import GHC.Generics (Generic)
 import Path
-import Path.IO
+import Path.IO hiding (removePathForcibly)
 import System.Directory (removePathForcibly)
 import System.FilePath (dropTrailingPathSeparator)
 import System.IO
@@ -261,7 +261,7 @@ instance Exception StoreError where
         ++ ". No automatic migration is available, \
            \please use a fresh store location."
     MalformedMetadataEntry hash key ->
-      "The metadtaa entry for hash '"
+      "The metadata entry for hash '"
         ++ C8.unpack (encodeHash hash)
         ++ "' under key '"
         ++ show key
@@ -272,18 +272,18 @@ data ContentStore = ContentStore
   { -- | Root directory of the content store.
     -- The process must be able to create this directory if missing,
     -- change permissions, and create files and directories within.
-    storeRoot :: Path Abs Dir,
+    storeRoot :: !(Path Abs Dir),
     -- | Write lock on store metadata to ensure multi thread and process safety.
     -- The lock is taken when item state is changed or queried.
-    storeLock :: Lock,
+    storeLock :: !Lock,
     -- | Used to watch for updates on store items.
-    storeNotifier :: Notifier,
+    storeNotifier :: !Notifier,
     -- | Connection to the metadata SQLite database.
-    storeDb :: SQL.Connection
+    storeDb :: !SQL.Connection
   }
 
 -- | A completed item in the 'ContentStore'.
-data Item = Item {itemHash :: ContentHash}
+newtype Item = Item {itemHash :: ContentHash}
   deriving (Eq, Ord, Show, Generic)
 
 instance Monad m => ContentHashable m Item where
@@ -716,13 +716,13 @@ removeAlias store alias =
         [":hash" SQL.:= hash]
 
 -- | List all aliases and the respective items.
-listAliases :: MonadIO m => ContentStore -> m [(Alias, Item)]
+listAliases :: MonadIO m => ContentStore -> m [(Alias, Item, ContentHash)]
 listAliases store =
   liftIO . withStoreLock store $
-    fmap (map (second Item)) $
+    map (\(a,b,c) -> (a, Item b, c)) <$>
       SQL.query_
         (storeDb store)
-        "SELECT name, dest FROM aliases"
+        "SELECT name, dest, hash FROM aliases"
 
 -- | Get all hashes that resulted in the given item.
 getBackReferences :: MonadIO m => ContentStore -> Item -> m [ContentHash]
