@@ -11,7 +11,7 @@
 module Funflow.Config
 type ConfigKey = Text
 type ConfigMap = Object
-type EnvConfigMap = HashMap Text String
+type EnvConfigMap = KeyMap String
 data ExternalConfig
 ExternalConfig :: ConfigMap -> EnvConfigMap -> ExternalConfig
 [fileConfig] :: ExternalConfig -> ConfigMap
@@ -42,9 +42,9 @@ getConfigKey :: Configurable a -> Maybe ConfigKey
 
 -- | Stores ConfigKey values by their declared sources.
 data ConfigKeysBySource
-ConfigKeysBySource :: HashSet Text -> HashSet Text -> ConfigKeysBySource
-[fileConfigKeys] :: ConfigKeysBySource -> HashSet Text
-[envConfigKeys] :: ConfigKeysBySource -> HashSet Text
+ConfigKeysBySource :: !HashSet Text -> !HashSet Text -> ConfigKeysBySource
+[fileConfigKeys] :: ConfigKeysBySource -> !HashSet Text
+[envConfigKeys] :: ConfigKeysBySource -> !HashSet Text
 
 -- | Get the key of a <a>Configurable</a> as a <a>ConfigKeysBySource</a>.
 configKeyBySource :: Configurable a -> ConfigKeysBySource
@@ -54,10 +54,10 @@ configKeyBySource :: Configurable a -> ConfigKeysBySource
 missing :: ExternalConfig -> ConfigKeysBySource -> [ConfigKey]
 
 -- | Construct an HashMap containing specified environment variable values.
-readEnv :: MonadIO m => ConfigKey -> m (HashMap Text String)
+readEnv :: MonadIO m => ConfigKey -> m (KeyMap String)
 
 -- | Convenience function for calling readEnv on a list of ConfigKeys
-readEnvs :: MonadIO m => [ConfigKey] -> m (HashMap Text String)
+readEnvs :: MonadIO m => [ConfigKey] -> m (KeyMap String)
 
 -- | Construct a HashMap containing the content of a yaml file. Is just an
 --   Alias for <a>decodeFileThrow</a>.
@@ -242,9 +242,9 @@ runFlowWithConfig :: RunFlowConfig -> LooseRopeWith RequiredStrands (RequiredCor
 
 -- | Flow execution configuration
 data RunFlowConfig
-RunFlowConfig :: Path Abs Dir -> Maybe (Path Abs File) -> RunFlowConfig
-[storePath] :: RunFlowConfig -> Path Abs Dir
-[configFile] :: RunFlowConfig -> Maybe (Path Abs File)
+RunFlowConfig :: !Path Abs Dir -> !Maybe (Path Abs File) -> RunFlowConfig
+[storePath] :: RunFlowConfig -> !Path Abs Dir
+[configFile] :: RunFlowConfig -> !Maybe (Path Abs File)
 
 
 -- | Composable computational workflows. See

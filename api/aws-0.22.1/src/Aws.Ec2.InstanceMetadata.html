@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.Ec2.InstanceMetadata</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-4"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad.Trans.Resource</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">throwM</span></span><span class="hs-special">)</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B8</span></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy.UTF8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BU</span></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Conduit</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">data</span><span> </span><span id="InstanceMetadataException"><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#InstanceMetadataException"><span class="hs-identifier hs-var">InstanceMetadataException</span></a></span></span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="MetadataNotFound"><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#MetadataNotFound"><span class="hs-identifier hs-var">MetadataNotFound</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679225004"><span id="local-6989586621679225006"><span id="local-6989586621679225008"><span class="annot"><span class="annottext">Int -&gt; InstanceMetadataException -&gt; ShowS
+[InstanceMetadataException] -&gt; ShowS
+InstanceMetadataException -&gt; String
+(Int -&gt; InstanceMetadataException -&gt; ShowS)
+-&gt; (InstanceMetadataException -&gt; String)
+-&gt; ([InstanceMetadataException] -&gt; ShowS)
+-&gt; Show InstanceMetadataException
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [InstanceMetadataException] -&gt; ShowS
+$cshowList :: [InstanceMetadataException] -&gt; ShowS
+show :: InstanceMetadataException -&gt; String
+$cshow :: InstanceMetadataException -&gt; String
+showsPrec :: Int -&gt; InstanceMetadataException -&gt; ShowS
+$cshowsPrec :: Int -&gt; InstanceMetadataException -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679224995"><span id="local-6989586621679224997"><span id="local-6989586621679224999"><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#InstanceMetadataException"><span class="hs-identifier hs-type">InstanceMetadataException</span></a></span></span></span></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadata"><span class="hs-identifier hs-type">getInstanceMetadata</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Manager</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span>
+</span><span id="line-20"></span><span id="getInstanceMetadata"><span class="annot"><span class="annottext">getInstanceMetadata :: Manager -&gt; String -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadata"><span class="hs-identifier hs-var hs-var">getInstanceMetadata</span></a></span></span><span> </span><span id="local-6989586621679224992"><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224992"><span class="hs-identifier hs-var">mgr</span></a></span></span><span> </span><span id="local-6989586621679224991"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224991"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679224990"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224990"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-21"></span><span>    </span><span id="local-6989586621679224989"><span class="annot"><span class="annottext">Request
+</span><a href="#local-6989586621679224989"><span class="hs-identifier hs-var">req</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO Request
+forall (m :: * -&gt; *). MonadThrow m =&gt; String -&gt; m Request
+</span><span class="hs-identifier hs-var">HTTP.parseUrlThrow</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;http://169.254.169.254/&quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224991"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'/'</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; ShowS
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224990"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><span class="annottext">Response ByteString -&gt; ByteString
+forall body. Response body -&gt; body
+</span><span class="hs-identifier hs-var hs-var">HTTP.responseBody</span></span><span> </span><span class="annot"><span class="annottext">(Response ByteString -&gt; ByteString)
+-&gt; IO (Response ByteString) -&gt; IO ByteString
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Request -&gt; Manager -&gt; IO (Response ByteString)
+forall (m :: * -&gt; *).
+MonadIO m =&gt;
+Request -&gt; Manager -&gt; m (Response ByteString)
+</span><span class="hs-identifier hs-var">HTTP.httpLbs</span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><a href="#local-6989586621679224989"><span class="hs-identifier hs-var">req</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224992"><span class="hs-identifier hs-var">mgr</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataListing"><span class="hs-identifier hs-type">getInstanceMetadataListing</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Manager</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span>
+</span><span id="line-25"></span><span id="getInstanceMetadataListing"><span class="annot"><span class="annottext">getInstanceMetadataListing :: Manager -&gt; String -&gt; IO [String]
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataListing"><span class="hs-identifier hs-var hs-var">getInstanceMetadataListing</span></a></span></span><span> </span><span id="local-6989586621679224983"><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224983"><span class="hs-identifier hs-var">mgr</span></a></span></span><span> </span><span id="local-6989586621679224982"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224982"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; String) -&gt; [ByteString] -&gt; [String]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; String
+</span><span class="hs-identifier hs-var">BU.toString</span></span><span> </span><span class="annot"><span class="annottext">([ByteString] -&gt; [String])
+-&gt; (ByteString -&gt; [ByteString]) -&gt; ByteString -&gt; [String]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; ByteString -&gt; [ByteString]
+</span><span class="hs-identifier hs-var">B8.split</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\n'</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; [String]) -&gt; IO ByteString -&gt; IO [String]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Manager -&gt; String -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadata"><span class="hs-identifier hs-var">getInstanceMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224983"><span class="hs-identifier hs-var">mgr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224982"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;&quot;</span></span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataFirst"><span class="hs-identifier hs-type">getInstanceMetadataFirst</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Manager</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span>
+</span><span id="line-28"></span><span id="getInstanceMetadataFirst"><span class="annot"><span class="annottext">getInstanceMetadataFirst :: Manager -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataFirst"><span class="hs-identifier hs-var hs-var">getInstanceMetadataFirst</span></a></span></span><span> </span><span id="local-6989586621679224977"><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224977"><span class="hs-identifier hs-var">mgr</span></a></span></span><span> </span><span id="local-6989586621679224976"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224976"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679224975"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679224975"><span class="hs-identifier hs-var">listing</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Manager -&gt; String -&gt; IO [String]
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataListing"><span class="hs-identifier hs-var">getInstanceMetadataListing</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224977"><span class="hs-identifier hs-var">mgr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224976"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-29"></span><span>                                    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679224975"><span class="hs-identifier hs-var">listing</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-30"></span><span>                                      </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InstanceMetadataException -&gt; IO ByteString
+forall (m :: * -&gt; *) e a. (MonadThrow m, Exception e) =&gt; e -&gt; m a
+</span><span class="hs-identifier hs-var">throwM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; InstanceMetadataException
+</span><a href="Aws.Ec2.InstanceMetadata.html#MetadataNotFound"><span class="hs-identifier hs-var">MetadataNotFound</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224976"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>                                      </span><span class="hs-special">(</span><span id="local-6989586621679224974"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224974"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span class="annot"><span class="annottext">[String]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Manager -&gt; String -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadata"><span class="hs-identifier hs-var">getInstanceMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224977"><span class="hs-identifier hs-var">mgr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224976"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224974"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataOrFirst"><span class="hs-identifier hs-type">getInstanceMetadataOrFirst</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HTTP.Manager</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">L.ByteString</span></span><span>
+</span><span id="line-34"></span><span id="getInstanceMetadataOrFirst"><span class="annot"><span class="annottext">getInstanceMetadataOrFirst :: Manager -&gt; String -&gt; Maybe String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataOrFirst"><span class="hs-identifier hs-var hs-var">getInstanceMetadataOrFirst</span></a></span></span><span> </span><span id="local-6989586621679224972"><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224972"><span class="hs-identifier hs-var">mgr</span></a></span></span><span> </span><span id="local-6989586621679224971"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224971"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679224970"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224970"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Manager -&gt; String -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadata"><span class="hs-identifier hs-var">getInstanceMetadata</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224972"><span class="hs-identifier hs-var">mgr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224971"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224970"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-35"></span><span class="annot"><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataOrFirst"><span class="hs-identifier hs-var">getInstanceMetadataOrFirst</span></a></span><span> </span><span id="local-6989586621679224969"><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224969"><span class="hs-identifier hs-var">mgr</span></a></span></span><span> </span><span id="local-6989586621679224968"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224968"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe String
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Manager -&gt; String -&gt; IO ByteString
+</span><a href="Aws.Ec2.InstanceMetadata.html#getInstanceMetadataFirst"><span class="hs-identifier hs-var">getInstanceMetadataFirst</span></a></span><span> </span><span class="annot"><span class="annottext">Manager
+</span><a href="#local-6989586621679224969"><span class="hs-identifier hs-var">mgr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679224968"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-36"></span></pre></body></html>

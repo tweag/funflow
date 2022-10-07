@@ -1,0 +1,186 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Aws.S3.Commands.GetBucketLocation</span><span>
+</span><span id="line-2"></span><span>       </span><span class="hs-keyword">where</span><span>
+</span><span id="line-3"></span><span>
+</span><span id="line-4"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.Core.html"><span class="hs-identifier">Aws.Core</span></a></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Aws.S3.Core.html"><span class="hs-identifier">Aws.S3.Core</span></a></span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Char8</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B8</span></span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Network.HTTP.Types</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HTTP</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Text.XML.Cursor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">($.//)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">data</span><span> </span><span id="GetBucketLocation"><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-var">GetBucketLocation</span></a></span></span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="GetBucketLocation"><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-var">GetBucketLocation</span></a></span></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-16"></span><span>      </span><span id="gblBucket"><span class="annot"><span class="annottext">GetBucketLocation -&gt; Bucket
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#gblBucket"><span class="hs-identifier hs-var hs-var">gblBucket</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#Bucket"><span class="hs-identifier hs-type">Bucket</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679238420"><span id="local-6989586621679238422"><span id="local-6989586621679238424"><span class="annot"><span class="annottext">Int -&gt; GetBucketLocation -&gt; ShowS
+[GetBucketLocation] -&gt; ShowS
+GetBucketLocation -&gt; String
+(Int -&gt; GetBucketLocation -&gt; ShowS)
+-&gt; (GetBucketLocation -&gt; String)
+-&gt; ([GetBucketLocation] -&gt; ShowS)
+-&gt; Show GetBucketLocation
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GetBucketLocation] -&gt; ShowS
+$cshowList :: [GetBucketLocation] -&gt; ShowS
+show :: GetBucketLocation -&gt; String
+$cshow :: GetBucketLocation -&gt; String
+showsPrec :: Int -&gt; GetBucketLocation -&gt; ShowS
+$cshowsPrec :: Int -&gt; GetBucketLocation -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#getBucketLocation"><span class="hs-identifier hs-type">getBucketLocation</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#Bucket"><span class="hs-identifier hs-type">Bucket</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span>
+</span><span id="line-20"></span><span id="getBucketLocation"><span class="annot"><span class="annottext">getBucketLocation :: Bucket -&gt; GetBucketLocation
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#getBucketLocation"><span class="hs-identifier hs-var hs-var">getBucketLocation</span></a></span></span><span> </span><span id="local-6989586621679238417"><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679238417"><span class="hs-identifier hs-var">bucket</span></a></span></span><span>
+</span><span id="line-21"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GetBucketLocation :: Bucket -&gt; GetBucketLocation
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-22"></span><span>      </span><span class="annot"><span class="annottext">gblBucket :: Bucket
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#gblBucket"><span class="hs-identifier hs-var">gblBucket</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679238417"><span class="hs-identifier hs-var">bucket</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">data</span><span> </span><span id="GetBucketLocationResponse"><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-var">GetBucketLocationResponse</span></a></span></span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="GetBucketLocationResponse"><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-var">GetBucketLocationResponse</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="gblrLocationConstraint"><span class="annot"><span class="annottext">GetBucketLocationResponse -&gt; Bucket
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#gblrLocationConstraint"><span class="hs-identifier hs-var hs-var">gblrLocationConstraint</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#LocationConstraint"><span class="hs-identifier hs-type">LocationConstraint</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679238408"><span id="local-6989586621679238410"><span id="local-6989586621679238412"><span class="annot"><span class="annottext">Int -&gt; GetBucketLocationResponse -&gt; ShowS
+[GetBucketLocationResponse] -&gt; ShowS
+GetBucketLocationResponse -&gt; String
+(Int -&gt; GetBucketLocationResponse -&gt; ShowS)
+-&gt; (GetBucketLocationResponse -&gt; String)
+-&gt; ([GetBucketLocationResponse] -&gt; ShowS)
+-&gt; Show GetBucketLocationResponse
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GetBucketLocationResponse] -&gt; ShowS
+$cshowList :: [GetBucketLocationResponse] -&gt; ShowS
+show :: GetBucketLocationResponse -&gt; String
+$cshow :: GetBucketLocationResponse -&gt; String
+showsPrec :: Int -&gt; GetBucketLocationResponse -&gt; ShowS
+$cshowsPrec :: Int -&gt; GetBucketLocationResponse -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#SignQuery"><span class="hs-identifier hs-type">SignQuery</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="ServiceConfiguration"><span class="annot"><a href="Aws.Core.html#ServiceConfiguration"><span class="hs-identifier hs-var">ServiceConfiguration</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#S3Configuration"><span class="hs-identifier hs-type">S3Configuration</span></a></span><span>
+</span><span id="line-31"></span><span>  </span><span id="local-6989586621679238405"><span class="annot"><span class="annottext">signQuery :: GetBucketLocation
+-&gt; ServiceConfiguration GetBucketLocation queryType
+-&gt; SignatureData
+-&gt; SignedQuery
+</span><a href="Aws.Core.html#signQuery"><span class="hs-identifier hs-var hs-var hs-var hs-var">signQuery</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621679238403"><span class="annot"><span class="annottext">Bucket
+gblBucket :: Bucket
+gblBucket :: GetBucketLocation -&gt; Bucket
+</span><a href="#local-6989586621679238403"><span class="hs-glyph hs-var hs-var">..</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">S3Query
+-&gt; S3Configuration queryType -&gt; SignatureData -&gt; SignedQuery
+forall qt.
+S3Query -&gt; S3Configuration qt -&gt; SignatureData -&gt; SignedQuery
+</span><a href="Aws.S3.Core.html#s3SignQuery"><span class="hs-identifier hs-var">s3SignQuery</span></a></span><span> </span><span class="annot"><span class="annottext">S3Query :: Method
+-&gt; Maybe ByteString
+-&gt; Maybe ByteString
+-&gt; Query
+-&gt; Query
+-&gt; Maybe ByteString
+-&gt; Maybe (Digest MD5)
+-&gt; RequestHeaders
+-&gt; RequestHeaders
+-&gt; Maybe RequestBody
+-&gt; S3Query
+</span><a href="Aws.S3.Core.html#S3Query"><span class="hs-identifier hs-type">S3Query</span></a></span><span> </span><span class="hs-special">{</span><span>
+</span><span id="line-32"></span><span>                                       </span><span class="annot"><span class="annottext">s3QMethod :: Method
+</span><a href="#local-6989586621679238400"><span class="hs-identifier hs-var">s3QMethod</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Method
+</span><a href="Aws.Core.html#Get"><span class="hs-identifier hs-var">Get</span></a></span><span>
+</span><span id="line-33"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QBucket :: Maybe ByteString
+</span><a href="#local-6989586621679238398"><span class="hs-identifier hs-var">s3QBucket</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Maybe ByteString) -&gt; ByteString -&gt; Maybe ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; ByteString
+</span><span class="hs-identifier hs-var">T.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679238403"><span class="hs-identifier hs-var">gblBucket</span></a></span><span>
+</span><span id="line-34"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QObject :: Maybe ByteString
+</span><a href="#local-6989586621679238396"><span class="hs-identifier hs-var">s3QObject</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-35"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QSubresources :: Query
+</span><a href="#local-6989586621679238395"><span class="hs-identifier hs-var">s3QSubresources</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-string">&quot;location&quot;</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-36"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QQuery :: Query
+</span><a href="#local-6989586621679238394"><span class="hs-identifier hs-var">s3QQuery</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(ByteString, Bucket)] -&gt; Query
+forall a. QueryLike a =&gt; a -&gt; Query
+</span><span class="hs-identifier hs-var">HTTP.toQuery</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">B8.ByteString</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Text</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span>
+</span><span id="line-37"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QContentType :: Maybe ByteString
+</span><a href="#local-6989586621679238391"><span class="hs-identifier hs-var">s3QContentType</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-38"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QContentMd5 :: Maybe (Digest MD5)
+</span><a href="#local-6989586621679238390"><span class="hs-identifier hs-var">s3QContentMd5</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (Digest MD5)
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-39"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QAmzHeaders :: RequestHeaders
+</span><a href="#local-6989586621679238389"><span class="hs-identifier hs-var">s3QAmzHeaders</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-40"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QOtherHeaders :: RequestHeaders
+</span><a href="#local-6989586621679238388"><span class="hs-identifier hs-var">s3QOtherHeaders</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-41"></span><span>                                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s3QRequestBody :: Maybe RequestBody
+</span><a href="#local-6989586621679238387"><span class="hs-identifier hs-var">s3QRequestBody</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe RequestBody
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-42"></span><span>                                     </span><span class="hs-special">}</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span id="local-6989586621679238386"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#ResponseConsumer"><span class="hs-identifier hs-type">ResponseConsumer</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679238386"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="ResponseMetadata"><span class="annot"><a href="Aws.Core.html#ResponseMetadata"><span class="hs-identifier hs-var">ResponseMetadata</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Core.html#S3Metadata"><span class="hs-identifier hs-type">S3Metadata</span></a></span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span>  </span><span id="local-6989586621679238382"><span class="annot"><span class="annottext">responseConsumer :: Request
+-&gt; r
+-&gt; IORef (ResponseMetadata GetBucketLocationResponse)
+-&gt; HTTPResponseConsumer GetBucketLocationResponse
+</span><a href="Aws.Core.html#responseConsumer"><span class="hs-identifier hs-var hs-var hs-var hs-var">responseConsumer</span></a></span></span><span> </span><span class="annot"><span class="annottext">Request
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">r
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Cursor -&gt; Response S3Metadata GetBucketLocationResponse)
+-&gt; IORef S3Metadata
+-&gt; HTTPResponseConsumer GetBucketLocationResponse
+forall a.
+(Cursor -&gt; Response S3Metadata a)
+-&gt; IORef S3Metadata -&gt; HTTPResponseConsumer a
+</span><a href="Aws.S3.Core.html#s3XmlResponseConsumer"><span class="hs-identifier hs-var">s3XmlResponseConsumer</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; Response S3Metadata GetBucketLocationResponse
+forall (m :: * -&gt; *).
+MonadThrow m =&gt;
+Cursor -&gt; m GetBucketLocationResponse
+</span><a href="#local-6989586621679238379"><span class="hs-identifier hs-var">parse</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679238379"><span class="annot"><span class="annottext">parse :: Cursor -&gt; m GetBucketLocationResponse
+</span><a href="#local-6989586621679238379"><span class="hs-identifier hs-var hs-var">parse</span></a></span></span><span> </span><span id="local-6989586621679238378"><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679238378"><span class="hs-identifier hs-var">cursor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-49"></span><span>            </span><span id="local-6989586621679238377"><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679238377"><span class="hs-identifier hs-var">locationConstraint</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Bucket] -&gt; m Bucket
+forall (m :: * -&gt; *) a. MonadThrow m =&gt; String -&gt; [a] -&gt; m a
+</span><a href="Aws.Core.html#force"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Missing Location&quot;</span></span><span> </span><span class="annot"><span class="annottext">([Bucket] -&gt; m Bucket) -&gt; [Bucket] -&gt; m Bucket
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Cursor
+</span><a href="#local-6989586621679238378"><span class="hs-identifier hs-var">cursor</span></a></span><span> </span><span class="annot"><span class="annottext">Cursor -&gt; (Cursor -&gt; [Bucket]) -&gt; [Bucket]
+forall node a. Cursor node -&gt; (Cursor node -&gt; [a]) -&gt; [a]
+</span><span class="hs-operator hs-var">$.//</span></span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; Cursor -&gt; [Bucket]
+</span><a href="Aws.Core.html#elContent"><span class="hs-identifier hs-var">elContent</span></a></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><span class="hs-string">&quot;LocationConstraint&quot;</span></span><span>
+</span><span id="line-50"></span><span>            </span><span class="annot"><span class="annottext">GetBucketLocationResponse -&gt; m GetBucketLocationResponse
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="annot"><span class="annottext">GetBucketLocationResponse :: Bucket -&gt; GetBucketLocationResponse
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">gblrLocationConstraint :: Bucket
+</span><a href="Aws.S3.Commands.GetBucketLocation.html#gblrLocationConstraint"><span class="hs-identifier hs-var">gblrLocationConstraint</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bucket -&gt; Bucket
+</span><a href="Aws.S3.Core.html#normaliseLocation"><span class="hs-identifier hs-var">normaliseLocation</span></a></span><span> </span><span class="annot"><span class="annottext">Bucket
+</span><a href="#local-6989586621679238377"><span class="hs-identifier hs-var">locationConstraint</span></a></span><span> </span><span class="hs-special">}</span></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#Transaction"><span class="hs-identifier hs-type">Transaction</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocation"><span class="hs-identifier hs-type">GetBucketLocation</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Aws.Core.html#AsMemoryResponse"><span class="hs-identifier hs-type">AsMemoryResponse</span></a></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="MemoryResponse"><span class="annot"><a href="Aws.Core.html#MemoryResponse"><span class="hs-identifier hs-var">MemoryResponse</span></a></span></span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Aws.S3.Commands.GetBucketLocation.html#GetBucketLocationResponse"><span class="hs-identifier hs-type">GetBucketLocationResponse</span></a></span><span>
+</span><span id="line-56"></span><span>  </span><span id="local-6989586621679238367"><span class="annot"><span class="annottext">loadToMemory :: GetBucketLocationResponse
+-&gt; ResourceT IO (MemoryResponse GetBucketLocationResponse)
+</span><a href="Aws.Core.html#loadToMemory"><span class="hs-identifier hs-var hs-var hs-var hs-var">loadToMemory</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">GetBucketLocationResponse
+-&gt; ResourceT IO (MemoryResponse GetBucketLocationResponse)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span>
+</span><span id="line-57"></span></pre></body></html>

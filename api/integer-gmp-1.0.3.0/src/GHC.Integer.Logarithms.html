@@ -1,0 +1,150 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE MagicHash #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE UnboxedTuples #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE UnliftedFFITypes #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE BangPatterns #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">GHC.Integer.Logarithms</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="GHC.Integer.Logarithms.html#wordLog2%23"><span class="hs-identifier">wordLog2#</span></a></span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier">integerLog2#</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLogBase%23"><span class="hs-identifier">integerLogBase#</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span class="hs-cpp">
+
+#include &quot;MachDeps.h&quot;
+</span><span class="hs-cpp">
+#if WORD_SIZE_IN_BITS == 32
+</span><span class="hs-cpp"># define LD_WORD_SIZE_IN_BITS 5
+</span><span class="hs-cpp">#elif WORD_SIZE_IN_BITS == 64
+</span><span class="hs-cpp"># define LD_WORD_SIZE_IN_BITS 6
+</span><span class="hs-cpp">#else
+</span><span class="hs-cpp"># error unsupported WORD_SIZE_IN_BITS
+</span><span class="hs-cpp">#endif
+</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Integer.Type.html"><span class="hs-identifier">GHC.Integer.Type</span></a></span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#/GHC.Prim.html"><span class="hs-identifier">GHC.Prim</span></a></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">default</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- | Calculate the integer logarithm for an arbitrary base.</span><span>
+</span><span id="line-31"></span><span class="hs-comment">--</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- The base must be greater than @1@, the second argument, the number</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- whose logarithm is sought, shall be positive, otherwise the</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- result is meaningless.</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- The following property holds</span><span>
+</span><span id="line-37"></span><span class="hs-comment">--</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- @base ^ 'integerLogBase#' base m &lt;= m &lt; base ^('integerLogBase#' base m + 1)@</span><span>
+</span><span id="line-39"></span><span class="hs-comment">--</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- for @base &gt; 1@ and @m &gt; 0@.</span><span>
+</span><span id="line-41"></span><span class="hs-comment">--</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- Note: Internally uses 'integerLog2#' for base 2</span><span>
+</span><span id="line-43"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLogBase%23"><span class="hs-identifier hs-type">integerLogBase#</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#Int%23/GHC.Prim.html#Int%23"><span class="hs-identifier hs-type">Int#</span></a></span><span>
+</span><span id="line-44"></span><span id="integerLogBase%23"><span class="annot"><span class="annottext">integerLogBase# :: Integer -&gt; Integer -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#integerLogBase%23"><span class="hs-identifier hs-var hs-var">integerLogBase#</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Integer.Type.html#S%23"><span class="hs-identifier hs-type">S#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">2#</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679023304"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023304"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier hs-var">integerLog2#</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023304"><span class="hs-identifier hs-var">m</span></a></span><span>
+</span><span id="line-45"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLogBase%23"><span class="hs-identifier hs-var">integerLogBase#</span></a></span><span> </span><span id="local-6989586621679023303"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023303"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679023302"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023302"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023301"><span class="hs-identifier hs-var">e'</span></a></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-glyph">!</span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679023301"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023301"><span class="hs-identifier hs-var">e'</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; (# Integer, Int# #)
+</span><a href="#local-6989586621679023300"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023303"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span>    </span><span id="local-6989586621679023300"><span class="annot"><span class="annottext">go :: Integer -&gt; (# Integer, Int# #)
+</span><a href="#local-6989586621679023300"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679023299"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023299"><span class="hs-identifier hs-var">pw</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023302"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+</span><a href="GHC.Integer.Type.html#ltInteger"><span class="hs-operator hs-var">`ltInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023299"><span class="hs-identifier hs-var">pw</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023302"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">0#</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><a href="#local-6989586621679023300"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span id="local-6989586621679023297"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023297"><span class="hs-identifier hs-var">pw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; (# Integer, Int# #)
+</span><a href="#local-6989586621679023300"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer
+</span><a href="GHC.Integer.Type.html#sqrInteger"><span class="hs-identifier hs-var">sqrInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023297"><span class="hs-identifier hs-var">pw</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-51"></span><span>              </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679023295"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023295"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679023294"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023294"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023295"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+</span><a href="GHC.Integer.Type.html#ltInteger"><span class="hs-operator hs-var">`ltInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023297"><span class="hs-identifier hs-var">pw</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023295"><span class="hs-identifier hs-var">q</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">2#</span></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2A%23/GHC.Prim.html#%2A%23"><span class="hs-operator hs-var">*#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023294"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-52"></span><span>              </span><span class="hs-special">(#</span><span> </span><span id="local-6989586621679023293"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023293"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679023292"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023292"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-special">#)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(#</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023293"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+</span><a href="GHC.Integer.Type.html#quotInteger"><span class="hs-operator hs-var">`quotInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679023297"><span class="hs-identifier hs-var">pw</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">2#</span></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2A%23/GHC.Prim.html#%2A%23"><span class="hs-operator hs-var">*#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023292"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2B%23/GHC.Prim.html#%2B%23"><span class="hs-operator hs-var">+#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span> </span><span class="hs-special">#)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | Calculate the integer base 2 logarithm of an 'Integer'.  The</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- calculation is more efficient than for the general case, on</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- platforms with 32- or 64-bit words much more efficient.</span><span>
+</span><span id="line-58"></span><span class="hs-comment">--</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- The argument must be strictly positive, that condition is /not/ checked.</span><span>
+</span><span id="line-60"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier hs-type">integerLog2#</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#Int%23/GHC.Prim.html#Int%23"><span class="hs-identifier hs-type">Int#</span></a></span><span>
+</span><span id="line-61"></span><span id="integerLog2%23"><span class="annot"><span class="annottext">integerLog2# :: Integer -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier hs-var hs-var">integerLog2#</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Integer.Type.html#S%23"><span class="hs-identifier hs-type">S#</span></a></span><span> </span><span id="local-6989586621679023291"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023291"><span class="hs-identifier hs-var">i#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#wordLog2%23"><span class="hs-identifier hs-var">wordLog2#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Word#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#int2Word%23/GHC.Prim.html#int2Word%23"><span class="hs-identifier hs-var">int2Word#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023291"><span class="hs-identifier hs-var">i#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier hs-var">integerLog2#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Integer.Type.html#Jn%23"><span class="hs-identifier hs-type">Jn#</span></a></span><span>  </span><span class="annot"><span class="annottext">BigNat
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">-1#</span></span><span>
+</span><span id="line-63"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#integerLog2%23"><span class="hs-identifier hs-var">integerLog2#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Integer.Type.html#Jp%23"><span class="hs-identifier hs-type">Jp#</span></a></span><span> </span><span id="local-6989586621679023288"><span class="annot"><span class="annottext">BigNat
+</span><a href="#local-6989586621679023288"><span class="hs-identifier hs-var">bn</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int#
+</span><a href="#local-6989586621679023287"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023286"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#-%23/GHC.Prim.html#-%23"><span class="hs-operator hs-var">-#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621679023286"><span class="annot"><span class="annottext">s :: Int#
+</span><a href="#local-6989586621679023286"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BigNat -&gt; Int#
+</span><a href="GHC.Integer.Type.html#sizeofBigNat%23"><span class="hs-identifier hs-var">sizeofBigNat#</span></a></span><span> </span><span class="annot"><span class="annottext">BigNat
+</span><a href="#local-6989586621679023288"><span class="hs-identifier hs-var">bn</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621679023287"><span class="annot"><span class="annottext">go :: Int# -&gt; Int#
+</span><a href="#local-6989586621679023287"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679023284"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023284"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">BigNat -&gt; Int# -&gt; Word#
+</span><a href="GHC.Integer.Type.html#indexBigNat%23"><span class="hs-identifier hs-var">indexBigNat#</span></a></span><span> </span><span class="annot"><span class="annottext">BigNat
+</span><a href="#local-6989586621679023288"><span class="hs-identifier hs-var">bn</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023284"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-67"></span><span>               </span><span class="annot"><span class="annottext">Word#
+</span><span class="hs-number">0##</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int#
+</span><a href="#local-6989586621679023287"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023284"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#-%23/GHC.Prim.html#-%23"><span class="hs-operator hs-var">-#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><span class="hs-number">1#</span></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>               </span><span id="local-6989586621679023282"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679023282"><span class="hs-identifier hs-var">w</span></a></span></span><span>   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#wordLog2%23"><span class="hs-identifier hs-var">wordLog2#</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679023282"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2B%23/GHC.Prim.html#%2B%23"><span class="hs-operator hs-var">+#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#uncheckedIShiftL%23/GHC.Prim.html#uncheckedIShiftL%23"><span class="hs-identifier hs-var">uncheckedIShiftL#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679023284"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-identifier">LD_WORD_SIZE_IN_BITS#</span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- | Compute base-2 log of 'Word#'</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- This is internally implemented as count-leading-zeros machine instruction.</span><span>
+</span><span id="line-73"></span><span class="annot"><a href="GHC.Integer.Logarithms.html#wordLog2%23"><span class="hs-identifier hs-type">wordLog2#</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#Word%23/GHC.Prim.html#Word%23"><span class="hs-identifier hs-type">Word#</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#Int%23/GHC.Prim.html#Int%23"><span class="hs-identifier hs-type">Int#</span></a></span><span>
+</span><span id="line-74"></span><span id="wordLog2%23"><span class="annot"><span class="annottext">wordLog2# :: Word# -&gt; Int#
+</span><a href="GHC.Integer.Logarithms.html#wordLog2%23"><span class="hs-identifier hs-var hs-var">wordLog2#</span></a></span></span><span> </span><span id="local-6989586621679023281"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679023281"><span class="hs-identifier hs-var">w#</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">WORD_SIZE_IN_BITS#</span><span> </span><span class="hs-operator">-#</span><span> </span><span class="hs-number">1#</span><span class="hs-special">)</span><span> </span><span class="hs-operator">-#</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">word2Int#</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">clz#</span><span> </span><span class="hs-identifier">w#</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span></pre></body></html>

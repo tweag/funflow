@@ -1,0 +1,474 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE StandaloneDeriving #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Module      :  Control.Lens.Internal.Getter</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Copyright   :  (C) 2012-2016 Edward Kmett</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  BSD-style (see the file LICENSE)</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  :  Edward Kmett &lt;ekmett@gmail.com&gt;</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Stability   :  provisional</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Portability :  non-portable</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--</span><span>
+</span><span id="line-14"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Lens.Internal.Getter</span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Control.Lens.Internal.Getter.html#noEffect"><span class="hs-identifier">noEffect</span></a></span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier">AlongsideLeft</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier">AlongsideRight</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Lens.Internal.Prelude.html"><span class="hs-identifier">Control.Lens.Internal.Prelude</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bifoldable</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bifunctor</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bitraversable</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Semigroup.Foldable</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Semigroup.Traversable</span></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- | The 'mempty' equivalent for a 'Contravariant' 'Applicative' 'Functor'.</span><span>
+</span><span id="line-31"></span><span id="local-6989586621679318711"><span id="local-6989586621679318712"><span class="annot"><a href="Control.Lens.Internal.Getter.html#noEffect"><span class="hs-identifier hs-type">noEffect</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="annot"><a href="#local-6989586621679318712"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Applicative</span></span><span> </span><span class="annot"><a href="#local-6989586621679318712"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679318712"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318711"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-32"></span><span id="noEffect"><span class="annot"><span class="annottext">noEffect :: f a
+</span><a href="Control.Lens.Internal.Getter.html#noEffect"><span class="hs-identifier hs-var hs-var">noEffect</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f () -&gt; f a
+forall (f :: * -&gt; *) a b.
+(Functor f, Contravariant f) =&gt;
+f a -&gt; f b
+</span><span class="hs-identifier hs-var">phantom</span></span><span> </span><span class="annot"><span class="annottext">(f () -&gt; f a) -&gt; f () -&gt; f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">() -&gt; f ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Control.Lens.Internal.Getter.html#noEffect"><span class="hs-pragma hs-type">noEffect</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">newtype</span><span> </span><span id="AlongsideLeft"><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span></span><span> </span><span id="local-6989586621679318995"><span class="annot"><a href="#local-6989586621679318995"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679318993"><span class="annot"><a href="#local-6989586621679318993"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span id="local-6989586621679318994"><span class="annot"><a href="#local-6989586621679318994"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AlongsideLeft"><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getAlongsideLeft"><span class="annot"><span class="annottext">AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679318995"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318994"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318993"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span id="local-6989586621679318699"><span id="local-6989586621679318701"><span id="local-6989586621679318703"><span id="local-6989586621679318705"><span id="local-6989586621679318706"><span id="local-6989586621679318707"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318707"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318706"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318705"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318707"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318705"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318706"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-38"></span><span id="local-6989586621679318687"><span id="local-6989586621679318689"><span id="local-6989586621679318691"><span id="local-6989586621679318693"><span id="local-6989586621679318695"><span id="local-6989586621679318696"><span id="local-6989586621679318697"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Read</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318697"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318696"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318695"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Read</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318697"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318695"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318696"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span id="local-6989586621679318684"><span id="local-6989586621679318685"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318681"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679318685"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318685"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318684"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-41"></span><span>  </span><span id="local-6989586621679318679"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; AlongsideLeft f b a -&gt; AlongsideLeft f b b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679318678"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318678"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (b, b) -&gt; AlongsideLeft f b b
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (b, b) -&gt; AlongsideLeft f b b)
+-&gt; (AlongsideLeft f b a -&gt; f (b, b))
+-&gt; AlongsideLeft f b a
+-&gt; AlongsideLeft f b b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; (b, b)) -&gt; f (a, b) -&gt; f (b, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (a, b) -&gt; (b, b)
+forall (p :: * -&gt; * -&gt; *) a b c.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; p a c -&gt; p b c
+</span><span class="hs-identifier hs-var">first</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318678"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; f (b, b))
+-&gt; (AlongsideLeft f b a -&gt; f (a, b))
+-&gt; AlongsideLeft f b a
+-&gt; f (b, b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f b a -&gt; f (a, b)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">fmap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span id="local-6989586621679318674"><span id="local-6989586621679318675"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318671"><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="annot"><a href="#local-6989586621679318675"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318675"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318674"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>  </span><span id="local-6989586621679318669"><span class="annot"><span class="annottext">contramap :: (a -&gt; b) -&gt; AlongsideLeft f b b -&gt; AlongsideLeft f b a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">contramap</span></span></span><span> </span><span id="local-6989586621679318667"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318667"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (a, b) -&gt; AlongsideLeft f b a
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; AlongsideLeft f b a)
+-&gt; (AlongsideLeft f b b -&gt; f (a, b))
+-&gt; AlongsideLeft f b b
+-&gt; AlongsideLeft f b a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; (b, b)) -&gt; f (b, b) -&gt; f (a, b)
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><span class="hs-identifier hs-var">contramap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (a, b) -&gt; (b, b)
+forall (p :: * -&gt; * -&gt; *) a b c.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; p a c -&gt; p b c
+</span><span class="hs-identifier hs-var">first</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318667"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (b, b) -&gt; f (a, b))
+-&gt; (AlongsideLeft f b b -&gt; f (b, b))
+-&gt; AlongsideLeft f b b
+-&gt; f (a, b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f b b -&gt; f (b, b)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">contramap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span id="local-6989586621679318665"><span id="local-6989586621679318666"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318632"><span id="local-6989586621679318634"><span id="local-6989586621679318636"><span id="local-6989586621679318638"><span id="local-6989586621679318640"><span id="local-6989586621679318642"><span id="local-6989586621679318644"><span id="local-6989586621679318646"><span id="local-6989586621679318648"><span id="local-6989586621679318650"><span id="local-6989586621679318652"><span id="local-6989586621679318654"><span id="local-6989586621679318656"><span id="local-6989586621679318658"><span id="local-6989586621679318660"><span id="local-6989586621679318663"><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318666"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318666"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318665"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-49"></span><span>  </span><span id="local-6989586621679318630"><span class="annot"><span class="annottext">foldMap :: (a -&gt; m) -&gt; AlongsideLeft f b a -&gt; m
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">foldMap</span></span></span><span> </span><span id="local-6989586621679318628"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318628"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; m) -&gt; f (a, b) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318628"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m) -&gt; ((a, b) -&gt; a) -&gt; (a, b) -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a, b) -&gt; a
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; m)
+-&gt; (AlongsideLeft f b a -&gt; f (a, b)) -&gt; AlongsideLeft f b a -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f b a -&gt; f (a, b)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">foldMap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span id="local-6989586621679318626"><span id="local-6989586621679318627"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318617"><span id="local-6989586621679318619"><span id="local-6989586621679318621"><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318627"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318627"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318626"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-53"></span><span>  </span><span id="local-6989586621679318615"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; AlongsideLeft f b a -&gt; f (AlongsideLeft f b b)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></span></span><span> </span><span id="local-6989586621679318613"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318613"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span id="local-6989586621679318612"><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318612"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (b, b) -&gt; AlongsideLeft f b b
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (b, b) -&gt; AlongsideLeft f b b)
+-&gt; f (f (b, b)) -&gt; f (AlongsideLeft f b b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; f (b, b)) -&gt; f (a, b) -&gt; f (f (b, b))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; (b -&gt; f b) -&gt; (a, b) -&gt; f (b, b)
+forall (t :: * -&gt; * -&gt; *) (f :: * -&gt; *) a c b d.
+(Bitraversable t, Applicative f) =&gt;
+(a -&gt; f c) -&gt; (b -&gt; f d) -&gt; t a b -&gt; f (t c d)
+</span><span class="hs-identifier hs-var">bitraverse</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318613"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; f b
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318612"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">traverse</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span id="local-6989586621679318608"><span id="local-6989586621679318609"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318602"><span id="local-6989586621679318605"><span class="annot"><span class="hs-identifier hs-type">Foldable1</span></span><span> </span><span class="annot"><a href="#local-6989586621679318609"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Foldable1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318609"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318608"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-57"></span><span>  </span><span id="local-6989586621679318600"><span class="annot"><span class="annottext">foldMap1 :: (a -&gt; m) -&gt; AlongsideLeft f b a -&gt; m
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">foldMap1</span></span></span><span> </span><span id="local-6989586621679318598"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318598"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; m) -&gt; f (a, b) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable1 t, Semigroup m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318598"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m) -&gt; ((a, b) -&gt; a) -&gt; (a, b) -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a, b) -&gt; a
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; m)
+-&gt; (AlongsideLeft f b a -&gt; f (a, b)) -&gt; AlongsideLeft f b a -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f b a -&gt; f (a, b)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">foldMap1</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span id="local-6989586621679318596"><span id="local-6989586621679318597"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318591"><span class="annot"><span class="hs-identifier hs-type">Traversable1</span></span><span> </span><span class="annot"><a href="#local-6989586621679318597"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318597"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318596"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>  </span><span id="local-6989586621679318589"><span class="annot"><span class="annottext">traverse1 :: (a -&gt; f b) -&gt; AlongsideLeft f b a -&gt; f (AlongsideLeft f b b)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse1</span></span></span><span> </span><span id="local-6989586621679318587"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318587"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span id="local-6989586621679318586"><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318586"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (b, b) -&gt; AlongsideLeft f b b
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (b, b) -&gt; AlongsideLeft f b b)
+-&gt; f (f (b, b)) -&gt; f (AlongsideLeft f b b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; f (b, b)) -&gt; f (a, b) -&gt; f (f (b, b))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable1 t, Apply f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse1</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679318585"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318585"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679318584"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679318584"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(b -&gt; b -&gt; (b, b)) -&gt; b -&gt; b -&gt; (b, b)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679318584"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; (b, b)) -&gt; f b -&gt; f (b, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318587"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318585"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318586"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">traverse1</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span id="local-6989586621679318582"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318577"><span id="local-6989586621679318579"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679318582"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bifunctor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318582"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>  </span><span id="local-6989586621679318575"><span class="annot"><span class="annottext">bimap :: (a -&gt; b) -&gt; (c -&gt; d) -&gt; AlongsideLeft f a c -&gt; AlongsideLeft f b d
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">bimap</span></span></span><span> </span><span id="local-6989586621679318573"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318573"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318572"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679318572"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (d, b) -&gt; AlongsideLeft f b d
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (d, b) -&gt; AlongsideLeft f b d)
+-&gt; (AlongsideLeft f a c -&gt; f (d, b))
+-&gt; AlongsideLeft f a c
+-&gt; AlongsideLeft f b d
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">((c, a) -&gt; (d, b)) -&gt; f (c, a) -&gt; f (d, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(c -&gt; d) -&gt; (a -&gt; b) -&gt; (c, a) -&gt; (d, b)
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p a c -&gt; p b d
+</span><span class="hs-identifier hs-var">bimap</span></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679318572"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318573"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (c, a) -&gt; f (d, b))
+-&gt; (AlongsideLeft f a c -&gt; f (c, a))
+-&gt; AlongsideLeft f a c
+-&gt; f (d, b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f a c -&gt; f (c, a)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bimap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span id="local-6989586621679318571"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318564"><span id="local-6989586621679318566"><span id="local-6989586621679318569"><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318571"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bifoldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318571"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-69"></span><span>  </span><span id="local-6989586621679318562"><span class="annot"><span class="annottext">bifoldMap :: (a -&gt; m) -&gt; (b -&gt; m) -&gt; AlongsideLeft f a b -&gt; m
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">bifoldMap</span></span></span><span> </span><span id="local-6989586621679318560"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318560"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318559"><span class="annot"><span class="annottext">b -&gt; m
+</span><a href="#local-6989586621679318559"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((b, a) -&gt; m) -&gt; f (b, a) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; m) -&gt; (a -&gt; m) -&gt; (b, a) -&gt; m
+forall (p :: * -&gt; * -&gt; *) m a b.
+(Bifoldable p, Monoid m) =&gt;
+(a -&gt; m) -&gt; (b -&gt; m) -&gt; p a b -&gt; m
+</span><span class="hs-identifier hs-var">bifoldMap</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; m
+</span><a href="#local-6989586621679318559"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318560"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (b, a) -&gt; m)
+-&gt; (AlongsideLeft f a b -&gt; f (b, a)) -&gt; AlongsideLeft f a b -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideLeft f a b -&gt; f (b, a)
+forall (f :: * -&gt; *) b a. AlongsideLeft f b a -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideLeft"><span class="hs-identifier hs-var hs-var">getAlongsideLeft</span></a></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bifoldMap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span id="local-6989586621679318558"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318558"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bitraversable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318558"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-73"></span><span>  </span><span id="local-6989586621679318553"><span class="annot"><span class="annottext">bitraverse :: (a -&gt; f c)
+-&gt; (b -&gt; f d) -&gt; AlongsideLeft f a b -&gt; f (AlongsideLeft f c d)
+</span><a href="#local-6989586621679318553"><span class="hs-identifier hs-var hs-var hs-var hs-var">bitraverse</span></a></span></span><span> </span><span id="local-6989586621679318552"><span class="annot"><span class="annottext">a -&gt; f c
+</span><a href="#local-6989586621679318552"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318551"><span class="annot"><span class="annottext">b -&gt; f d
+</span><a href="#local-6989586621679318551"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-type">AlongsideLeft</span></a></span><span> </span><span id="local-6989586621679318550"><span class="annot"><span class="annottext">f (b, a)
+</span><a href="#local-6989586621679318550"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (d, c) -&gt; AlongsideLeft f c d
+forall (f :: * -&gt; *) b a. f (a, b) -&gt; AlongsideLeft f b a
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideLeft"><span class="hs-identifier hs-var">AlongsideLeft</span></a></span><span> </span><span class="annot"><span class="annottext">(f (d, c) -&gt; AlongsideLeft f c d)
+-&gt; f (f (d, c)) -&gt; f (AlongsideLeft f c d)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((b, a) -&gt; f (d, c)) -&gt; f (b, a) -&gt; f (f (d, c))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; f d) -&gt; (a -&gt; f c) -&gt; (b, a) -&gt; f (d, c)
+forall (t :: * -&gt; * -&gt; *) (f :: * -&gt; *) a c b d.
+(Bitraversable t, Applicative f) =&gt;
+(a -&gt; f c) -&gt; (b -&gt; f d) -&gt; t a b -&gt; f (t c d)
+</span><span class="hs-identifier hs-var">bitraverse</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; f d
+</span><a href="#local-6989586621679318551"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f c
+</span><a href="#local-6989586621679318552"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (b, a)
+</span><a href="#local-6989586621679318550"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bitraverse</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-keyword">newtype</span><span> </span><span id="AlongsideRight"><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span></span><span> </span><span id="local-6989586621679318802"><span class="annot"><a href="#local-6989586621679318802"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679318801"><span class="annot"><a href="#local-6989586621679318801"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679318800"><span class="annot"><a href="#local-6989586621679318800"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AlongsideRight"><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getAlongsideRight"><span class="annot"><span class="annottext">AlongsideRight f a b -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideRight"><span class="hs-identifier hs-var hs-var">getAlongsideRight</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679318802"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318801"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318800"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span id="local-6989586621679318539"><span id="local-6989586621679318541"><span id="local-6989586621679318543"><span id="local-6989586621679318545"><span id="local-6989586621679318546"><span id="local-6989586621679318547"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318547"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318546"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318545"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318547"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318546"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318545"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-79"></span><span id="local-6989586621679318528"><span id="local-6989586621679318530"><span id="local-6989586621679318532"><span id="local-6989586621679318534"><span id="local-6989586621679318536"><span id="local-6989586621679318537"><span id="local-6989586621679318538"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Read</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318538"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679318537"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679318536"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Read</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318538"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318537"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318536"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span id="local-6989586621679318526"><span id="local-6989586621679318527"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318523"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679318527"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318527"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318526"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-82"></span><span>  </span><span id="local-6989586621679318522"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; AlongsideRight f a a -&gt; AlongsideRight f a b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679318521"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318521"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span id="local-6989586621679318520"><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318520"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (a, b) -&gt; AlongsideRight f a b
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((a, a) -&gt; (a, b)) -&gt; f (a, a) -&gt; f (a, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (a, a) -&gt; (a, b)
+forall (p :: * -&gt; * -&gt; *) b c a.
+Bifunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318521"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318520"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">fmap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span id="local-6989586621679318517"><span id="local-6989586621679318518"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318514"><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="annot"><a href="#local-6989586621679318518"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Contravariant</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318518"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318517"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>  </span><span id="local-6989586621679318513"><span class="annot"><span class="annottext">contramap :: (a -&gt; b) -&gt; AlongsideRight f a b -&gt; AlongsideRight f a a
+</span><a href="#local-6989586621679318513"><span class="hs-identifier hs-var hs-var hs-var hs-var">contramap</span></a></span></span><span> </span><span id="local-6989586621679318512"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318512"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span id="local-6989586621679318511"><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318511"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (a, a) -&gt; AlongsideRight f a a
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((a, a) -&gt; (a, b)) -&gt; f (a, b) -&gt; f (a, a)
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><span class="hs-identifier hs-var">contramap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (a, a) -&gt; (a, b)
+forall (p :: * -&gt; * -&gt; *) b c a.
+Bifunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><span class="hs-identifier hs-var">second</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318512"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318511"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">contramap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span id="local-6989586621679318509"><span id="local-6989586621679318510"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318476"><span id="local-6989586621679318478"><span id="local-6989586621679318480"><span id="local-6989586621679318482"><span id="local-6989586621679318484"><span id="local-6989586621679318486"><span id="local-6989586621679318488"><span id="local-6989586621679318490"><span id="local-6989586621679318492"><span id="local-6989586621679318494"><span id="local-6989586621679318496"><span id="local-6989586621679318498"><span id="local-6989586621679318500"><span id="local-6989586621679318502"><span id="local-6989586621679318504"><span id="local-6989586621679318507"><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318510"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318510"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318509"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-90"></span><span>  </span><span id="local-6989586621679318475"><span class="annot"><span class="annottext">foldMap :: (a -&gt; m) -&gt; AlongsideRight f a a -&gt; m
+</span><a href="#local-6989586621679318475"><span class="hs-identifier hs-var hs-var hs-var hs-var">foldMap</span></a></span></span><span> </span><span id="local-6989586621679318474"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318474"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, a) -&gt; m) -&gt; f (a, a) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318474"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m) -&gt; ((a, a) -&gt; a) -&gt; (a, a) -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a, a) -&gt; a
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, a) -&gt; m)
+-&gt; (AlongsideRight f a a -&gt; f (a, a)) -&gt; AlongsideRight f a a -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideRight f a a -&gt; f (a, a)
+forall (f :: * -&gt; *) a b. AlongsideRight f a b -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideRight"><span class="hs-identifier hs-var hs-var">getAlongsideRight</span></a></span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">foldMap</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621679318472"><span id="local-6989586621679318473"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318463"><span id="local-6989586621679318465"><span id="local-6989586621679318467"><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318473"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318473"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318472"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>  </span><span id="local-6989586621679318462"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; AlongsideRight f a a -&gt; f (AlongsideRight f a b)
+</span><a href="#local-6989586621679318462"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679318461"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318461"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span id="local-6989586621679318460"><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318460"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (a, b) -&gt; AlongsideRight f a b
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; AlongsideRight f a b)
+-&gt; f (f (a, b)) -&gt; f (AlongsideRight f a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((a, a) -&gt; f (a, b)) -&gt; f (a, a) -&gt; f (f (a, b))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; f a) -&gt; (a -&gt; f b) -&gt; (a, a) -&gt; f (a, b)
+forall (t :: * -&gt; * -&gt; *) (f :: * -&gt; *) a c b d.
+(Bitraversable t, Applicative f) =&gt;
+(a -&gt; f c) -&gt; (b -&gt; f d) -&gt; t a b -&gt; f (t c d)
+</span><span class="hs-identifier hs-var">bitraverse</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318461"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318460"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-95"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">traverse</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span id="local-6989586621679318458"><span id="local-6989586621679318459"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318452"><span id="local-6989586621679318455"><span class="annot"><span class="hs-identifier hs-type">Foldable1</span></span><span> </span><span class="annot"><a href="#local-6989586621679318459"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Foldable1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318459"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318458"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-98"></span><span>  </span><span id="local-6989586621679318451"><span class="annot"><span class="annottext">foldMap1 :: (a -&gt; m) -&gt; AlongsideRight f a a -&gt; m
+</span><a href="#local-6989586621679318451"><span class="hs-identifier hs-var hs-var hs-var hs-var">foldMap1</span></a></span></span><span> </span><span id="local-6989586621679318450"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318450"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, a) -&gt; m) -&gt; f (a, a) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable1 t, Semigroup m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318450"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m) -&gt; ((a, a) -&gt; a) -&gt; (a, a) -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(a, a) -&gt; a
+forall a b. (a, b) -&gt; b
+</span><span class="hs-identifier hs-var">snd</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, a) -&gt; m)
+-&gt; (AlongsideRight f a a -&gt; f (a, a)) -&gt; AlongsideRight f a a -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideRight f a a -&gt; f (a, a)
+forall (f :: * -&gt; *) a b. AlongsideRight f a b -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideRight"><span class="hs-identifier hs-var hs-var">getAlongsideRight</span></a></span><span>
+</span><span id="line-99"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">foldMap1</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span id="local-6989586621679318448"><span id="local-6989586621679318449"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318443"><span class="annot"><span class="hs-identifier hs-type">Traversable1</span></span><span> </span><span class="annot"><a href="#local-6989586621679318449"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318449"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318448"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-102"></span><span>  </span><span id="local-6989586621679318442"><span class="annot"><span class="annottext">traverse1 :: (a -&gt; f b) -&gt; AlongsideRight f a a -&gt; f (AlongsideRight f a b)
+</span><a href="#local-6989586621679318442"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse1</span></a></span></span><span> </span><span id="local-6989586621679318441"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318441"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span id="local-6989586621679318440"><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318440"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (a, b) -&gt; AlongsideRight f a b
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; AlongsideRight f a b)
+-&gt; f (f (a, b)) -&gt; f (AlongsideRight f a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((a, a) -&gt; f (a, b)) -&gt; f (a, a) -&gt; f (f (a, b))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable1 t, Apply f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse1</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679318439"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318439"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679318438"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318438"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318439"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; (a, b)) -&gt; f b -&gt; f (a, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679318441"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679318438"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, a)
+</span><a href="#local-6989586621679318440"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-103"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">traverse1</span></span><span> </span><span class="hs-pragma">#-}</span></span></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span id="local-6989586621679318437"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318432"><span id="local-6989586621679318434"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="#local-6989586621679318437"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bifunctor</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318437"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>  </span><span id="local-6989586621679318431"><span class="annot"><span class="annottext">bimap :: (a -&gt; b)
+-&gt; (c -&gt; d) -&gt; AlongsideRight f a c -&gt; AlongsideRight f b d
+</span><a href="#local-6989586621679318431"><span class="hs-identifier hs-var hs-var hs-var hs-var">bimap</span></a></span></span><span> </span><span id="local-6989586621679318430"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318430"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318429"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679318429"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (b, d) -&gt; AlongsideRight f b d
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="annot"><span class="annottext">(f (b, d) -&gt; AlongsideRight f b d)
+-&gt; (AlongsideRight f a c -&gt; f (b, d))
+-&gt; AlongsideRight f a c
+-&gt; AlongsideRight f b d
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">((a, c) -&gt; (b, d)) -&gt; f (a, c) -&gt; f (b, d)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (c -&gt; d) -&gt; (a, c) -&gt; (b, d)
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p a c -&gt; p b d
+</span><span class="hs-identifier hs-var">bimap</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679318430"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621679318429"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, c) -&gt; f (b, d))
+-&gt; (AlongsideRight f a c -&gt; f (a, c))
+-&gt; AlongsideRight f a c
+-&gt; f (b, d)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideRight f a c -&gt; f (a, c)
+forall (f :: * -&gt; *) a b. AlongsideRight f a b -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideRight"><span class="hs-identifier hs-var hs-var">getAlongsideRight</span></a></span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bimap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span id="local-6989586621679318428"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679318421"><span id="local-6989586621679318423"><span id="local-6989586621679318426"><span class="annot"><span class="hs-identifier hs-type">Foldable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318428"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bifoldable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318428"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-110"></span><span>  </span><span id="local-6989586621679318420"><span class="annot"><span class="annottext">bifoldMap :: (a -&gt; m) -&gt; (b -&gt; m) -&gt; AlongsideRight f a b -&gt; m
+</span><a href="#local-6989586621679318420"><span class="hs-identifier hs-var hs-var hs-var hs-var">bifoldMap</span></a></span></span><span> </span><span id="local-6989586621679318419"><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318419"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318418"><span class="annot"><span class="annottext">b -&gt; m
+</span><a href="#local-6989586621679318418"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; m) -&gt; f (a, b) -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; m) -&gt; (b -&gt; m) -&gt; (a, b) -&gt; m
+forall (p :: * -&gt; * -&gt; *) m a b.
+(Bifoldable p, Monoid m) =&gt;
+(a -&gt; m) -&gt; (b -&gt; m) -&gt; p a b -&gt; m
+</span><span class="hs-identifier hs-var">bifoldMap</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m
+</span><a href="#local-6989586621679318419"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; m
+</span><a href="#local-6989586621679318418"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(f (a, b) -&gt; m)
+-&gt; (AlongsideRight f a b -&gt; f (a, b)) -&gt; AlongsideRight f a b -&gt; m
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">AlongsideRight f a b -&gt; f (a, b)
+forall (f :: * -&gt; *) a b. AlongsideRight f a b -&gt; f (a, b)
+</span><a href="Control.Lens.Internal.Getter.html#getAlongsideRight"><span class="hs-identifier hs-var hs-var">getAlongsideRight</span></a></span><span>
+</span><span id="line-111"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bifoldMap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span id="local-6989586621679318417"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Traversable</span></span><span> </span><span class="annot"><a href="#local-6989586621679318417"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bitraversable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679318417"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679318413"><span class="annot"><span class="annottext">bitraverse :: (a -&gt; f c)
+-&gt; (b -&gt; f d) -&gt; AlongsideRight f a b -&gt; f (AlongsideRight f c d)
+</span><a href="#local-6989586621679318413"><span class="hs-identifier hs-var hs-var hs-var hs-var">bitraverse</span></a></span></span><span> </span><span id="local-6989586621679318412"><span class="annot"><span class="annottext">a -&gt; f c
+</span><a href="#local-6989586621679318412"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679318411"><span class="annot"><span class="annottext">b -&gt; f d
+</span><a href="#local-6989586621679318411"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-type">AlongsideRight</span></a></span><span> </span><span id="local-6989586621679318410"><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318410"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f (c, d) -&gt; AlongsideRight f c d
+forall (f :: * -&gt; *) a b. f (a, b) -&gt; AlongsideRight f a b
+</span><a href="Control.Lens.Internal.Getter.html#AlongsideRight"><span class="hs-identifier hs-var">AlongsideRight</span></a></span><span> </span><span class="annot"><span class="annottext">(f (c, d) -&gt; AlongsideRight f c d)
+-&gt; f (f (c, d)) -&gt; f (AlongsideRight f c d)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">((a, b) -&gt; f (c, d)) -&gt; f (a, b) -&gt; f (f (c, d))
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">traverse</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; f c) -&gt; (b -&gt; f d) -&gt; (a, b) -&gt; f (c, d)
+forall (t :: * -&gt; * -&gt; *) (f :: * -&gt; *) a c b d.
+(Bitraversable t, Applicative f) =&gt;
+(a -&gt; f c) -&gt; (b -&gt; f d) -&gt; t a b -&gt; f (t c d)
+</span><span class="hs-identifier hs-var">bitraverse</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f c
+</span><a href="#local-6989586621679318412"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; f d
+</span><a href="#local-6989586621679318411"><span class="hs-identifier hs-var">g</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f (a, b)
+</span><a href="#local-6989586621679318410"><span class="hs-keyword hs-var">as</span></a></span><span>
+</span><span id="line-115"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">bitraverse</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-116"></span></pre></body></html>

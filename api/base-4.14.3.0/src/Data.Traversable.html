@@ -1,0 +1,753 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveTraversable #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE StandaloneDeriving #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators #-}</span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Module      :  Data.Traversable</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Copyright   :  Conor McBride and Ross Paterson 2005</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- License     :  BSD-style (see the LICENSE file in the distribution)</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Maintainer  :  libraries@haskell.org</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- Class of data structures that can be traversed from left to right,</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- performing an action on each element.</span><span>
+</span><span id="line-21"></span><span class="hs-comment">--</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- See also</span><span>
+</span><span id="line-23"></span><span class="hs-comment">--</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--  * \&quot;Applicative Programming with Effects\&quot;,</span><span>
+</span><span id="line-25"></span><span class="hs-comment">--    by Conor McBride and Ross Paterson,</span><span>
+</span><span id="line-26"></span><span class="hs-comment">--    /Journal of Functional Programming/ 18:1 (2008) 1-13, online at</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--    &lt;http://www.soi.city.ac.uk/~ross/papers/Applicative.html&gt;.</span><span>
+</span><span id="line-28"></span><span class="hs-comment">--</span><span>
+</span><span id="line-29"></span><span class="hs-comment">--  * \&quot;The Essence of the Iterator Pattern\&quot;,</span><span>
+</span><span id="line-30"></span><span class="hs-comment">--    by Jeremy Gibbons and Bruno Oliveira,</span><span>
+</span><span id="line-31"></span><span class="hs-comment">--    in /Mathematically-Structured Functional Programming/, 2006, online at</span><span>
+</span><span id="line-32"></span><span class="hs-comment">--    &lt;http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator&gt;.</span><span>
+</span><span id="line-33"></span><span class="hs-comment">--</span><span>
+</span><span id="line-34"></span><span class="hs-comment">--  * \&quot;An Investigation of the Laws of Traversals\&quot;,</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--    by Mauro Jaskelioff and Ondrej Rypacek,</span><span>
+</span><span id="line-36"></span><span class="hs-comment">--    in /Mathematically-Structured Functional Programming/, 2012, online at</span><span>
+</span><span id="line-37"></span><span class="hs-comment">--    &lt;http://arxiv.org/pdf/1202.2919&gt;.</span><span>
+</span><span id="line-38"></span><span class="hs-comment">--</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Traversable</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><span class="hs-comment">-- * The 'Traversable' class</span></span><span>
+</span><span id="line-43"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier">Traversable</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Utility functions</span></span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#for"><span class="hs-identifier">for</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-46"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#forM"><span class="hs-identifier">forM</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#mapAccumL"><span class="hs-identifier">mapAccumL</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#mapAccumR"><span class="hs-identifier">mapAccumR</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-49"></span><span>    </span><span class="annot"><span class="hs-comment">-- * General definitions for superclass methods</span></span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#fmapDefault"><span class="hs-identifier">fmapDefault</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#foldMapDefault"><span class="hs-identifier">foldMapDefault</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- It is convenient to use 'Const' here but this means we must</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- define a few instances here which really belong in Control.Applicative</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Applicative.html"><span class="hs-identifier">Control.Applicative</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Functor.Const.html#Const"><span class="hs-identifier">Const</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Applicative.html#ZipList"><span class="hs-identifier">ZipList</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Coerce.html"><span class="hs-identifier">Data.Coerce</span></a></span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Either.html"><span class="hs-identifier">Data.Either</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Either.html#Either"><span class="hs-identifier">Either</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Foldable.html"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Foldable.html#Foldable"><span class="hs-identifier">Foldable</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.html"><span class="hs-identifier">Data.Functor</span></a></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.Identity.html"><span class="hs-identifier">Data.Functor.Identity</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Functor.Identity.html#Identity"><span class="hs-identifier">Identity</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.Utils.html"><span class="hs-identifier">Data.Functor.Utils</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Functor.Utils.html#StateL"><span class="hs-identifier">StateL</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Functor.Utils.html#StateR"><span class="hs-identifier">StateR</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Monoid.html"><span class="hs-identifier">Data.Monoid</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Dual"><span class="hs-identifier">Dual</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Sum"><span class="hs-identifier">Sum</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Product"><span class="hs-identifier">Product</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-64"></span><span>                     </span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier">First</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier">Last</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Alt"><span class="hs-identifier">Alt</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier">Ap</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Ord.html"><span class="hs-identifier">Data.Ord</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Ord.html#Down"><span class="hs-identifier">Down</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Proxy.html"><span class="hs-identifier">Data.Proxy</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Proxy.html#Proxy"><span class="hs-identifier">Proxy</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Arr.html"><span class="hs-identifier">GHC.Arr</span></a></span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Base.html"><span class="hs-identifier">GHC.Base</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier">Applicative</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier">Monad</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier">Monoid</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Maybe.html#Maybe"><span class="hs-identifier">Maybe</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#NonEmpty"><span class="hs-identifier">NonEmpty</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>                  </span><span class="annot"><a href="GHC.Base.html#%24"><span class="hs-operator">($)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#."><span class="hs-operator">(.)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#id"><span class="hs-identifier">id</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#flip"><span class="hs-identifier">flip</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Generics.html"><span class="hs-identifier">GHC.Generics</span></a></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="GHC.List.html"><span class="hs-identifier">GHC.List</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">List</span></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="GHC.Base.html#foldr"><span class="hs-identifier">foldr</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- | Functors representing data structures that can be traversed from</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- left to right.</span><span>
+</span><span id="line-76"></span><span class="hs-comment">--</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- A definition of 'traverse' must satisfy the following laws:</span><span>
+</span><span id="line-78"></span><span class="hs-comment">--</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- [Naturality]</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--   @t . 'traverse' f = 'traverse' (t . f)@</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--   for every applicative transformation @t@</span><span>
+</span><span id="line-82"></span><span class="hs-comment">--</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- [Identity]</span><span>
+</span><span id="line-84"></span><span class="hs-comment">--   @'traverse' 'Identity' = 'Identity'@</span><span>
+</span><span id="line-85"></span><span class="hs-comment">--</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- [Composition]</span><span>
+</span><span id="line-87"></span><span class="hs-comment">--   @'traverse' ('Data.Functor.Compose.Compose' . 'fmap' g . f)</span><span>
+</span><span id="line-88"></span><span class="hs-comment">--     = 'Data.Functor.Compose.Compose' . 'fmap' ('traverse' g) . 'traverse' f@</span><span>
+</span><span id="line-89"></span><span class="hs-comment">--</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- A definition of 'sequenceA' must satisfy the following laws:</span><span>
+</span><span id="line-91"></span><span class="hs-comment">--</span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- [Naturality]</span><span>
+</span><span id="line-93"></span><span class="hs-comment">--   @t . 'sequenceA' = 'sequenceA' . 'fmap' t@</span><span>
+</span><span id="line-94"></span><span class="hs-comment">--   for every applicative transformation @t@</span><span>
+</span><span id="line-95"></span><span class="hs-comment">--</span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- [Identity]</span><span>
+</span><span id="line-97"></span><span class="hs-comment">--   @'sequenceA' . 'fmap' 'Identity' = 'Identity'@</span><span>
+</span><span id="line-98"></span><span class="hs-comment">--</span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- [Composition]</span><span>
+</span><span id="line-100"></span><span class="hs-comment">--   @'sequenceA' . 'fmap' 'Data.Functor.Compose.Compose'</span><span>
+</span><span id="line-101"></span><span class="hs-comment">--     = 'Data.Functor.Compose.Compose' . 'fmap' 'sequenceA' . 'sequenceA'@</span><span>
+</span><span id="line-102"></span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- where an /applicative transformation/ is a function</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- @t :: (Applicative f, Applicative g) =&gt; f a -&gt; g a@</span><span>
+</span><span id="line-106"></span><span class="hs-comment">--</span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- preserving the 'Applicative' operations, i.e.</span><span>
+</span><span id="line-108"></span><span class="hs-comment">--</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- t ('pure' x) = 'pure' x</span><span>
+</span><span id="line-111"></span><span class="hs-comment">-- t (f '&lt;*&gt;' x) = t f '&lt;*&gt;' t x</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-113"></span><span class="hs-comment">--</span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- and the identity functor 'Identity' and composition functors</span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- 'Data.Functor.Compose.Compose' are from &quot;Data.Functor.Identity&quot; and</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- &quot;Data.Functor.Compose&quot;.</span><span>
+</span><span id="line-117"></span><span class="hs-comment">--</span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- A result of the naturality law is a purity law for 'traverse'</span><span>
+</span><span id="line-119"></span><span class="hs-comment">--</span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- @'traverse' 'pure' = 'pure'@</span><span>
+</span><span id="line-121"></span><span class="hs-comment">--</span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- (The naturality law is implied by parametricity and thus so is the</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- purity law [1, p15].)</span><span>
+</span><span id="line-124"></span><span class="hs-comment">--</span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- Instances are similar to 'Functor', e.g. given a data type</span><span>
+</span><span id="line-126"></span><span class="hs-comment">--</span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- &gt; data Tree a = Empty | Leaf a | Node (Tree a) a (Tree a)</span><span>
+</span><span id="line-128"></span><span class="hs-comment">--</span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- a suitable instance would be</span><span>
+</span><span id="line-130"></span><span class="hs-comment">--</span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- &gt; instance Traversable Tree where</span><span>
+</span><span id="line-132"></span><span class="hs-comment">-- &gt;    traverse f Empty = pure Empty</span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- &gt;    traverse f (Leaf x) = Leaf &lt;$&gt; f x</span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- &gt;    traverse f (Node l k r) = Node &lt;$&gt; traverse f l &lt;*&gt; f k &lt;*&gt; traverse f r</span><span>
+</span><span id="line-135"></span><span class="hs-comment">--</span><span>
+</span><span id="line-136"></span><span class="hs-comment">-- This is suitable even for abstract types, as the laws for '&lt;*&gt;'</span><span>
+</span><span id="line-137"></span><span class="hs-comment">-- imply a form of associativity.</span><span>
+</span><span id="line-138"></span><span class="hs-comment">--</span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- The superclass instances should satisfy the following:</span><span>
+</span><span id="line-140"></span><span class="hs-comment">--</span><span>
+</span><span id="line-141"></span><span class="hs-comment">--  * In the 'Functor' instance, 'fmap' should be equivalent to traversal</span><span>
+</span><span id="line-142"></span><span class="hs-comment">--    with the identity applicative functor ('fmapDefault').</span><span>
+</span><span id="line-143"></span><span class="hs-comment">--</span><span>
+</span><span id="line-144"></span><span class="hs-comment">--  * In the 'Foldable' instance, 'Data.Foldable.foldMap' should be</span><span>
+</span><span id="line-145"></span><span class="hs-comment">--    equivalent to traversal with a constant applicative functor</span><span>
+</span><span id="line-146"></span><span class="hs-comment">--    ('foldMapDefault').</span><span>
+</span><span id="line-147"></span><span class="hs-comment">--</span><span>
+</span><span id="line-148"></span><span class="hs-comment">-- References:</span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- [1] The Essence of the Iterator Pattern, Jeremy Gibbons and Bruno C. d. S. Oliveira</span><span>
+</span><span id="line-150"></span><span class="hs-keyword">class</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Functor"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Foldable.html#Foldable"><span class="hs-identifier hs-type">Foldable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="Traversable"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-var">Traversable</span></a></span></span><span> </span><span id="local-6989586621679531282"><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-pragma">{-# MINIMAL</span><span> </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-pragma hs-type">traverse</span></a></span><span> </span><span class="hs-pragma">|</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-pragma hs-type">sequenceA</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-comment">-- | Map each element of a structure to an action, evaluate these actions</span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-comment">-- from left to right, and collect the results. For a version that ignores</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-comment">-- the results see 'Data.Foldable.traverse_'.</span><span>
+</span><span id="line-156"></span><span>    </span><span id="local-6989586621679531269"><span id="local-6989586621679531270"><span id="local-6989586621679531271"><span id="traverse"><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-type">traverse</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531271"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531270"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531271"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531269"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531270"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531271"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531269"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-pragma hs-type">traverse</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>  </span><span class="hs-comment">-- See Note [Inline default methods]</span><span>
+</span><span id="line-158"></span><span>    </span><span id="local-6989586621679530808"><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var hs-var">traverse</span></a></span><span> </span><span id="local-6989586621679530807"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530807"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">t (f b) -&gt; f (t b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a.
+(Traversable t, Applicative f) =&gt;
+t (f a) -&gt; f (t a)
+</span><a href="Data.Traversable.html#sequenceA"><span class="hs-identifier hs-var">sequenceA</span></a></span><span> </span><span class="annot"><span class="annottext">(t (f b) -&gt; f (t b)) -&gt; (t a -&gt; t (f b)) -&gt; t a -&gt; f (t b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; t a -&gt; t (f b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530807"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-comment">-- | Evaluate each action in the structure from left to right, and</span><span>
+</span><span id="line-161"></span><span>    </span><span class="hs-comment">-- collect the results. For a version that ignores the results</span><span>
+</span><span id="line-162"></span><span>    </span><span class="hs-comment">-- see 'Data.Foldable.sequenceA_'.</span></span><span>
+</span><span id="line-163"></span><span>    </span><span id="local-6989586621679531280"><span id="local-6989586621679531281"><span id="sequenceA"><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-identifier hs-type">sequenceA</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531281"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531281"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531280"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531281"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531280"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-164"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-pragma hs-type">sequenceA</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>  </span><span class="hs-comment">-- See Note [Inline default methods]</span><span>
+</span><span id="line-165"></span><span>    </span><span id="local-6989586621679530806"><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-identifier hs-var hs-var">sequenceA</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f a -&gt; f a) -&gt; t (f a) -&gt; f (t a)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">f a -&gt; f a
+forall a. a -&gt; a
+</span><a href="GHC.Base.html#id"><span class="hs-identifier hs-var">id</span></a></span></span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span>    </span><span class="hs-comment">-- | Map each element of a structure to a monadic action, evaluate</span><span>
+</span><span id="line-168"></span><span>    </span><span class="hs-comment">-- these actions from left to right, and collect the results. For</span><span>
+</span><span id="line-169"></span><span>    </span><span class="hs-comment">-- a version that ignores the results see 'Data.Foldable.mapM_'.</span><span>
+</span><span id="line-170"></span><span>    </span><span id="local-6989586621679531260"><span id="local-6989586621679531261"><span id="local-6989586621679531262"><span id="mapM"><span class="annot"><a href="Data.Traversable.html#mapM"><span class="hs-identifier hs-type">mapM</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531262"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531261"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531262"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531260"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531261"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531262"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531260"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-171"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#mapM"><span class="hs-pragma hs-type">mapM</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>  </span><span class="hs-comment">-- See Note [Inline default methods]</span><span>
+</span><span id="line-172"></span><span>    </span><span id="local-6989586621679530804"><span class="annot"><a href="Data.Traversable.html#mapM"><span class="hs-identifier hs-var hs-var">mapM</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; m b) -&gt; t a -&gt; m (t b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span>    </span><span class="hs-comment">-- | Evaluate each monadic action in the structure from left to</span><span>
+</span><span id="line-175"></span><span>    </span><span class="hs-comment">-- right, and collect the results. For a version that ignores the</span><span>
+</span><span id="line-176"></span><span>    </span><span class="hs-comment">-- results see 'Data.Foldable.sequence_'.</span><span>
+</span><span id="line-177"></span><span>    </span><span id="local-6989586621679531258"><span id="local-6989586621679531259"><span id="sequence"><span class="annot"><a href="Data.Traversable.html#sequence"><span class="hs-identifier hs-type">sequence</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531259"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531259"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531258"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679531259"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679531282"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679531258"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-178"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequence"><span class="hs-pragma hs-type">sequence</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>  </span><span class="hs-comment">-- See Note [Inline default methods]</span><span>
+</span><span id="line-179"></span><span>    </span><span id="local-6989586621679530802"><span class="annot"><a href="Data.Traversable.html#sequence"><span class="hs-identifier hs-var hs-var">sequence</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">t (m a) -&gt; m (t a)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a.
+(Traversable t, Applicative f) =&gt;
+t (f a) -&gt; f (t a)
+</span><a href="Data.Traversable.html#sequenceA"><span class="hs-identifier hs-var">sequenceA</span></a></span></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span class="hs-comment">{- Note [Inline default methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+   class ... =&gt; Traversable t where
+       ...
+       mapM :: Monad m =&gt; (a -&gt; m b) -&gt; t a -&gt; m (t b)
+       mapM = traverse   -- Default method
+
+   instance Traversable [] where
+       {-# INLINE traverse #-}
+       traverse = ...code for traverse on lists ...
+
+This gives rise to a list-instance of mapM looking like this
+
+  $fTraversable[]_$ctraverse = ...code for traverse on lists...
+       {-# INLINE $fTraversable[]_$ctraverse #-}
+  $fTraversable[]_$cmapM    = $fTraversable[]_$ctraverse
+
+Now the $ctraverse obediently inlines into the RHS of $cmapM, /but/
+that's all!  We get
+
+  $fTraversable[]_$cmapM = ...code for traverse on lists...
+
+with NO INLINE pragma!  This happens even though 'traverse' had an
+INLINE pragma because the author knew it should be inlined pretty
+vigorously.
+
+Indeed, it turned out that the rhs of $cmapM was just too big to
+inline, so all uses of mapM on lists used a terribly inefficient
+dictionary-passing style, because of its 'Monad m =&gt;' type.  Disaster!
+
+Solution: add an INLINE pragma on the default method:
+
+   class ... =&gt; Traversable t where
+       ...
+       mapM :: Monad m =&gt; (a -&gt; m b) -&gt; t a -&gt; m (t b)
+       {-# INLINE mapM #-}     -- VERY IMPORTANT!
+       mapM = traverse
+-}</span><span>
+</span><span id="line-221"></span><span>
+</span><span id="line-222"></span><span class="hs-comment">-- instances for Prelude types</span><span>
+</span><span id="line-223"></span><span>
+</span><span id="line-224"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-225"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530793"><span id="local-6989586621679530795"><span id="local-6989586621679530797"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-226"></span><span>    </span><span id="local-6989586621679530791"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Maybe a -&gt; f (Maybe b)
+</span><a href="#local-6989586621679530791"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe b -&gt; f (Maybe b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe b
+forall a. Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-227"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span id="local-6989586621679530790"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530790"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Maybe.html#Just"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679530789"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530789"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Maybe b
+forall a. a -&gt; Maybe a
+</span><a href="GHC.Maybe.html#Just"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Maybe b) -&gt; f b -&gt; f (Maybe b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530790"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530789"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-228"></span><span>
+</span><span id="line-229"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-230"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530779"><span id="local-6989586621679530781"><span id="local-6989586621679530783"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-231"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-pragma hs-type">traverse</span></a></span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-comment">-- so that traverse can fuse</span><span>
+</span><span id="line-232"></span><span>    </span><span id="local-6989586621679530778"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; [a] -&gt; f [b]
+</span><a href="#local-6989586621679530778"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530777"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530777"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; f [b] -&gt; f [b]) -&gt; f [b] -&gt; [a] -&gt; f [b]
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; [a] -&gt; b
+</span><a href="GHC.Base.html#foldr"><span class="hs-identifier hs-var">List.foldr</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f [b] -&gt; f [b]
+</span><a href="#local-6989586621679530776"><span class="hs-identifier hs-var">cons_f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[b] -&gt; f [b]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-233"></span><span>      </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679530776"><span class="annot"><span class="annottext">cons_f :: a -&gt; f [b] -&gt; f [b]
+</span><a href="#local-6989586621679530776"><span class="hs-identifier hs-var hs-var">cons_f</span></a></span></span><span> </span><span id="local-6989586621679530775"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530775"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679530774"><span class="annot"><span class="annottext">f [b]
+</span><a href="#local-6989586621679530774"><span class="hs-identifier hs-var">ys</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; [b] -&gt; [b]) -&gt; f b -&gt; f [b] -&gt; f [b]
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><a href="GHC.Base.html#liftA2"><span class="hs-identifier hs-var">liftA2</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530777"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530775"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">f [b]
+</span><a href="#local-6989586621679530774"><span class="hs-identifier hs-var">ys</span></a></span><span>
+</span><span id="line-234"></span><span>
+</span><span id="line-235"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-236"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530764"><span id="local-6989586621679530766"><span id="local-6989586621679530768"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Base.html#NonEmpty"><span class="hs-identifier hs-type">NonEmpty</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-237"></span><span>  </span><span id="local-6989586621679530763"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; NonEmpty a -&gt; f (NonEmpty b)
+</span><a href="#local-6989586621679530763"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530762"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530762"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">~</span><span class="hs-special">(</span><span id="local-6989586621679530761"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530761"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><a href="GHC.Base.html#%3A%7C"><span class="hs-operator hs-type">:|</span></a></span><span> </span><span id="local-6989586621679530759"><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679530759"><span class="hs-keyword hs-var">as</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; [b] -&gt; NonEmpty b) -&gt; f b -&gt; f [b] -&gt; f (NonEmpty b)
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><a href="GHC.Base.html#liftA2"><span class="hs-identifier hs-var">liftA2</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; [b] -&gt; NonEmpty b
+forall a. a -&gt; [a] -&gt; NonEmpty a
+</span><a href="GHC.Base.html#%3A%7C"><span class="hs-operator hs-var">(:|)</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530762"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530761"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; [a] -&gt; f [b]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530762"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679530759"><span class="hs-keyword hs-var">as</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-238"></span><span>
+</span><span id="line-239"></span><span class="hs-comment">-- | @since 4.7.0.0</span><span>
+</span><span id="line-240"></span><span id="local-6989586621679530758"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530749"><span id="local-6989586621679530751"><span id="local-6989586621679530753"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Either.html#Either"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530758"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-241"></span><span>    </span><span id="local-6989586621679530748"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Either a a -&gt; f (Either a b)
+</span><a href="#local-6989586621679530748"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Either.html#Left"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621679530747"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530747"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Either a b -&gt; f (Either a b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; Either a b
+forall a b. a -&gt; Either a b
+</span><a href="Data.Either.html#Left"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530747"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-242"></span><span>    </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span id="local-6989586621679530746"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530746"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Either.html#Right"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621679530745"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530745"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Either a b
+forall a b. b -&gt; Either a b
+</span><a href="Data.Either.html#Right"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Either a b) -&gt; f b -&gt; f (Either a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530746"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530745"><span class="hs-identifier hs-var">y</span></a></span></span><span>
+</span><span id="line-243"></span><span>
+</span><span id="line-244"></span><span class="hs-comment">-- | @since 4.7.0.0</span><span>
+</span><span id="line-245"></span><span id="local-6989586621679530744"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530735"><span id="local-6989586621679530737"><span id="local-6989586621679530739"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679530744"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-246"></span><span>    </span><span id="local-6989586621679530734"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; (a, a) -&gt; f (a, b)
+</span><a href="#local-6989586621679530734"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530733"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530733"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679530732"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530732"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679530731"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530731"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530732"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; (a, b)) -&gt; f b -&gt; f (a, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530733"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530731"><span class="hs-identifier hs-var">y</span></a></span></span><span>
+</span><span id="line-247"></span><span>
+</span><span id="line-248"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-249"></span><span id="local-6989586621679530730"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530721"><span id="local-6989586621679530723"><span id="local-6989586621679530725"><span class="annot"><a href="GHC.Ix.html#Ix"><span class="hs-identifier hs-type">Ix</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530730"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Arr.html#Array"><span class="hs-identifier hs-type">Array</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530730"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-250"></span><span>    </span><span id="local-6989586621679530720"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Array i a -&gt; f (Array i b)
+</span><a href="#local-6989586621679530720"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530719"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530719"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679530718"><span class="annot"><span class="annottext">Array i a
+</span><a href="#local-6989586621679530718"><span class="hs-identifier hs-var">arr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(i, i) -&gt; [b] -&gt; Array i b
+forall i e. Ix i =&gt; (i, i) -&gt; [e] -&gt; Array i e
+</span><a href="GHC.Arr.html#listArray"><span class="hs-identifier hs-var">listArray</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Array i a -&gt; (i, i)
+forall i e. Array i e -&gt; (i, i)
+</span><a href="GHC.Arr.html#bounds"><span class="hs-identifier hs-var">bounds</span></a></span><span> </span><span class="annot"><span class="annottext">Array i a
+</span><a href="#local-6989586621679530718"><span class="hs-identifier hs-var">arr</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([b] -&gt; Array i b) -&gt; f [b] -&gt; f (Array i b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-operator hs-var">`fmap`</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; [a] -&gt; f [b]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530719"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Array i a -&gt; [a]
+forall i e. Array i e -&gt; [e]
+</span><a href="GHC.Arr.html#elems"><span class="hs-identifier hs-var">elems</span></a></span><span> </span><span class="annot"><span class="annottext">Array i a
+</span><a href="#local-6989586621679530718"><span class="hs-identifier hs-var">arr</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-251"></span><span>
+</span><span id="line-252"></span><span class="hs-comment">-- | @since 4.7.0.0</span><span>
+</span><span id="line-253"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Proxy.html#Proxy"><span class="hs-identifier hs-type">Proxy</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-254"></span><span>    </span><span id="local-6989586621679530708"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Proxy a -&gt; f (Proxy b)
+</span><a href="#local-6989586621679530708"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Proxy a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy b -&gt; f (Proxy b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy b
+forall k (t :: k). Proxy t
+</span><a href="Data.Proxy.html#Proxy"><span class="hs-identifier hs-var">Proxy</span></a></span><span>
+</span><span id="line-255"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-pragma hs-type">traverse</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-256"></span><span>    </span><span id="local-6989586621679530706"><span class="annot"><span class="annottext">sequenceA :: Proxy (f a) -&gt; f (Proxy a)
+</span><a href="#local-6989586621679530706"><span class="hs-identifier hs-var hs-var hs-var hs-var">sequenceA</span></a></span></span><span> </span><span class="annot"><span class="annottext">Proxy (f a)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy a -&gt; f (Proxy a)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy a
+forall k (t :: k). Proxy t
+</span><a href="Data.Proxy.html#Proxy"><span class="hs-identifier hs-var">Proxy</span></a></span><span>
+</span><span id="line-257"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-pragma hs-type">sequenceA</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-258"></span><span>    </span><span id="local-6989586621679530705"><span class="annot"><span class="annottext">mapM :: (a -&gt; m b) -&gt; Proxy a -&gt; m (Proxy b)
+</span><a href="#local-6989586621679530705"><span class="hs-identifier hs-var hs-var hs-var hs-var">mapM</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Proxy a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy b -&gt; m (Proxy b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy b
+forall k (t :: k). Proxy t
+</span><a href="Data.Proxy.html#Proxy"><span class="hs-identifier hs-var">Proxy</span></a></span><span>
+</span><span id="line-259"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#mapM"><span class="hs-pragma hs-type">mapM</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-260"></span><span>    </span><span id="local-6989586621679530704"><span class="annot"><span class="annottext">sequence :: Proxy (m a) -&gt; m (Proxy a)
+</span><a href="#local-6989586621679530704"><span class="hs-identifier hs-var hs-var hs-var hs-var">sequence</span></a></span></span><span> </span><span class="annot"><span class="annottext">Proxy (m a)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy a -&gt; m (Proxy a)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy a
+forall k (t :: k). Proxy t
+</span><a href="Data.Proxy.html#Proxy"><span class="hs-identifier hs-var">Proxy</span></a></span><span>
+</span><span id="line-261"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequence"><span class="hs-pragma hs-type">sequence</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-262"></span><span>
+</span><span id="line-263"></span><span class="hs-comment">-- | @since 4.7.0.0</span><span>
+</span><span id="line-264"></span><span id="local-6989586621679530703"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530694"><span id="local-6989586621679530696"><span id="local-6989586621679530698"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Const.html#Const"><span class="hs-identifier hs-type">Const</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530703"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-265"></span><span>    </span><span id="local-6989586621679530693"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Const m a -&gt; f (Const m b)
+</span><a href="#local-6989586621679530693"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Functor.Const.html#Const"><span class="hs-identifier hs-type">Const</span></a></span><span> </span><span id="local-6989586621679530691"><span class="annot"><span class="annottext">m
+</span><a href="#local-6989586621679530691"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Const m b -&gt; f (Const m b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(Const m b -&gt; f (Const m b)) -&gt; Const m b -&gt; f (Const m b)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">m -&gt; Const m b
+forall k a (b :: k). a -&gt; Const a b
+</span><a href="Data.Functor.Const.html#Const"><span class="hs-identifier hs-var">Const</span></a></span><span> </span><span class="annot"><span class="annottext">m
+</span><a href="#local-6989586621679530691"><span class="hs-identifier hs-var">m</span></a></span></span><span>
+</span><span id="line-266"></span><span>
+</span><span id="line-267"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-268"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530682"><span id="local-6989586621679530684"><span id="local-6989586621679530686"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Dual"><span class="hs-identifier hs-type">Dual</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-269"></span><span>    </span><span id="local-6989586621679530681"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Dual a -&gt; f (Dual b)
+</span><a href="#local-6989586621679530681"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530680"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530680"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Semigroup.Internal.html#Dual"><span class="hs-identifier hs-type">Dual</span></a></span><span> </span><span id="local-6989586621679530678"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530678"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Dual b
+forall a. a -&gt; Dual a
+</span><a href="Data.Semigroup.Internal.html#Dual"><span class="hs-identifier hs-var">Dual</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Dual b) -&gt; f b -&gt; f (Dual b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530680"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530678"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-270"></span><span>
+</span><span id="line-271"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-272"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530669"><span id="local-6989586621679530671"><span id="local-6989586621679530673"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Sum"><span class="hs-identifier hs-type">Sum</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-273"></span><span>    </span><span id="local-6989586621679530668"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Sum a -&gt; f (Sum b)
+</span><a href="#local-6989586621679530668"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530667"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530667"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Semigroup.Internal.html#Sum"><span class="hs-identifier hs-type">Sum</span></a></span><span> </span><span id="local-6989586621679530665"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530665"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Sum b
+forall a. a -&gt; Sum a
+</span><a href="Data.Semigroup.Internal.html#Sum"><span class="hs-identifier hs-var">Sum</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Sum b) -&gt; f b -&gt; f (Sum b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530667"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530665"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-274"></span><span>
+</span><span id="line-275"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-276"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530656"><span id="local-6989586621679530658"><span id="local-6989586621679530660"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#Product"><span class="hs-identifier hs-type">Product</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-277"></span><span>    </span><span id="local-6989586621679530655"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Product a -&gt; f (Product b)
+</span><a href="#local-6989586621679530655"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530654"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530654"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Semigroup.Internal.html#Product"><span class="hs-identifier hs-type">Product</span></a></span><span> </span><span id="local-6989586621679530652"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530652"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Product b
+forall a. a -&gt; Product a
+</span><a href="Data.Semigroup.Internal.html#Product"><span class="hs-identifier hs-var">Product</span></a></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Product b) -&gt; f b -&gt; f (Product b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530654"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530652"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-278"></span><span>
+</span><span id="line-279"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-280"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530643"><span id="local-6989586621679530645"><span id="local-6989586621679530647"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-type">First</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-281"></span><span>    </span><span id="local-6989586621679530642"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; First a -&gt; f (First b)
+</span><a href="#local-6989586621679530642"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530641"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530641"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-type">First</span></a></span><span> </span><span id="local-6989586621679530639"><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679530639"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe b -&gt; First b
+forall a. Maybe a -&gt; First a
+</span><a href="Data.Monoid.html#First"><span class="hs-identifier hs-var">First</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe b -&gt; First b) -&gt; f (Maybe b) -&gt; f (First b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; Maybe a -&gt; f (Maybe b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530641"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679530639"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-282"></span><span>
+</span><span id="line-283"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-284"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530630"><span id="local-6989586621679530632"><span id="local-6989586621679530634"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-type">Last</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-285"></span><span>    </span><span id="local-6989586621679530629"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Last a -&gt; f (Last b)
+</span><a href="#local-6989586621679530629"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530628"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530628"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-type">Last</span></a></span><span> </span><span id="local-6989586621679530626"><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679530626"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe b -&gt; Last b
+forall a. Maybe a -&gt; Last a
+</span><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-var">Last</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe b -&gt; Last b) -&gt; f (Maybe b) -&gt; f (Last b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; Maybe a -&gt; f (Maybe b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530628"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679530626"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-286"></span><span>
+</span><span id="line-287"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-288"></span><span id="local-6989586621679530625"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530616"><span id="local-6989586621679530618"><span id="local-6989586621679530620"><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530625"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Semigroup.Internal.html#Alt"><span class="hs-identifier hs-type">Alt</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530625"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-289"></span><span>    </span><span id="local-6989586621679530615"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Alt f a -&gt; f (Alt f b)
+</span><a href="#local-6989586621679530615"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530614"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530614"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Semigroup.Internal.html#Alt"><span class="hs-identifier hs-type">Alt</span></a></span><span> </span><span id="local-6989586621679530612"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679530612"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f b -&gt; Alt f b
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; Alt f a
+</span><a href="Data.Semigroup.Internal.html#Alt"><span class="hs-identifier hs-var">Alt</span></a></span><span> </span><span class="annot"><span class="annottext">(f b -&gt; Alt f b) -&gt; f (f b) -&gt; f (Alt f b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; f a -&gt; f (f b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530614"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679530612"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-290"></span><span>
+</span><span id="line-291"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-292"></span><span id="local-6989586621679530611"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530602"><span id="local-6989586621679530604"><span id="local-6989586621679530606"><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530611"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530611"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-293"></span><span>    </span><span id="local-6989586621679530601"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; Ap f a -&gt; f (Ap f b)
+</span><a href="#local-6989586621679530601"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530600"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530600"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span id="local-6989586621679530598"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679530598"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f b -&gt; Ap f b
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; Ap f a
+</span><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="annot"><span class="annottext">(f b -&gt; Ap f b) -&gt; f (f b) -&gt; f (Ap f b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; f a -&gt; f (f b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530600"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679530598"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-294"></span><span>
+</span><span id="line-295"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-296"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679530589"><span id="local-6989586621679530591"><span id="local-6989586621679530593"><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Control.Applicative.html#ZipList"><span class="hs-identifier hs-type">ZipList</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-297"></span><span>    </span><span id="local-6989586621679530588"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; ZipList a -&gt; f (ZipList b)
+</span><a href="#local-6989586621679530588"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span id="local-6989586621679530587"><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530587"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Applicative.html#ZipList"><span class="hs-identifier hs-type">ZipList</span></a></span><span> </span><span id="local-6989586621679530585"><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679530585"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[b] -&gt; ZipList b
+forall a. [a] -&gt; ZipList a
+</span><a href="Control.Applicative.html#ZipList"><span class="hs-identifier hs-var">ZipList</span></a></span><span> </span><span class="annot"><span class="annottext">([b] -&gt; ZipList b) -&gt; f [b] -&gt; f (ZipList b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="Data.Functor.html#%3C%24%3E"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; [a] -&gt; f [b]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><a href="#local-6989586621679530587"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679530585"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-298"></span><span>
+</span><span id="line-299"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-300"></span><span id="local-6989586621679530575"><span id="local-6989586621679530577"><span id="local-6989586621679530579"><span id="local-6989586621679530581"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Functor.Identity.html#Identity"><span class="hs-identifier hs-type">Identity</span></a></span></span></span></span></span><span>
+</span><span id="line-301"></span><span>
+</span><span id="line-302"></span><span>
+</span><span id="line-303"></span><span class="hs-comment">-- Instances for GHC.Generics</span><span>
+</span><span id="line-304"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-305"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#U1"><span class="hs-identifier hs-type">U1</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-306"></span><span>    </span><span id="local-6989586621679530568"><span class="annot"><span class="annottext">traverse :: (a -&gt; f b) -&gt; U1 a -&gt; f (U1 b)
+</span><a href="#local-6989586621679530568"><span class="hs-identifier hs-var hs-var hs-var hs-var">traverse</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; f b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">U1 a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 b -&gt; f (U1 b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">U1 b
+forall k (p :: k). U1 p
+</span><a href="GHC.Generics.html#U1"><span class="hs-identifier hs-var">U1</span></a></span><span>
+</span><span id="line-307"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#traverse"><span class="hs-pragma hs-type">traverse</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-308"></span><span>    </span><span id="local-6989586621679530566"><span class="annot"><span class="annottext">sequenceA :: U1 (f a) -&gt; f (U1 a)
+</span><a href="#local-6989586621679530566"><span class="hs-identifier hs-var hs-var hs-var hs-var">sequenceA</span></a></span></span><span> </span><span class="annot"><span class="annottext">U1 (f a)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 a -&gt; f (U1 a)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">U1 a
+forall k (p :: k). U1 p
+</span><a href="GHC.Generics.html#U1"><span class="hs-identifier hs-var">U1</span></a></span><span>
+</span><span id="line-309"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequenceA"><span class="hs-pragma hs-type">sequenceA</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-310"></span><span>    </span><span id="local-6989586621679530565"><span class="annot"><span class="annottext">mapM :: (a -&gt; m b) -&gt; U1 a -&gt; m (U1 b)
+</span><a href="#local-6989586621679530565"><span class="hs-identifier hs-var hs-var hs-var hs-var">mapM</span></a></span></span><span> </span><span class="annot"><span class="annottext">a -&gt; m b
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">U1 a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 b -&gt; m (U1 b)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">U1 b
+forall k (p :: k). U1 p
+</span><a href="GHC.Generics.html#U1"><span class="hs-identifier hs-var">U1</span></a></span><span>
+</span><span id="line-311"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#mapM"><span class="hs-pragma hs-type">mapM</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-312"></span><span>    </span><span id="local-6989586621679530564"><span class="annot"><span class="annottext">sequence :: U1 (m a) -&gt; m (U1 a)
+</span><a href="#local-6989586621679530564"><span class="hs-identifier hs-var hs-var hs-var hs-var">sequence</span></a></span></span><span> </span><span class="annot"><span class="annottext">U1 (m a)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 a -&gt; m (U1 a)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">U1 a
+forall k (p :: k). U1 p
+</span><a href="GHC.Generics.html#U1"><span class="hs-identifier hs-var">U1</span></a></span><span>
+</span><span id="line-313"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#sequence"><span class="hs-pragma hs-type">sequence</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-314"></span><span>
+</span><span id="line-315"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-316"></span><span id="local-6989586621679530554"><span id="local-6989586621679530556"><span id="local-6989586621679530558"><span id="local-6989586621679530560"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#V1"><span class="hs-identifier hs-type">V1</span></a></span></span></span></span></span><span>
+</span><span id="line-317"></span><span>
+</span><span id="line-318"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-319"></span><span id="local-6989586621679530544"><span id="local-6989586621679530546"><span id="local-6989586621679530548"><span id="local-6989586621679530550"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#Par1"><span class="hs-identifier hs-type">Par1</span></a></span></span></span></span></span><span>
+</span><span id="line-320"></span><span>
+</span><span id="line-321"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-322"></span><span id="local-6989586621679530533"><span id="local-6989586621679530535"><span id="local-6989586621679530537"><span id="local-6989586621679530539"><span id="local-6989586621679530543"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530543"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Generics.html#Rec1"><span class="hs-identifier hs-type">Rec1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530543"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span>
+</span><span id="line-323"></span><span>
+</span><span id="line-324"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-325"></span><span id="local-6989586621679530521"><span id="local-6989586621679530523"><span id="local-6989586621679530525"><span id="local-6989586621679530527"><span id="local-6989586621679530531"><span id="local-6989586621679530532"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Generics.html#K1"><span class="hs-identifier hs-type">K1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530532"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530531"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-326"></span><span>
+</span><span id="line-327"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-328"></span><span id="local-6989586621679530508"><span id="local-6989586621679530510"><span id="local-6989586621679530512"><span id="local-6989586621679530514"><span id="local-6989586621679530518"><span id="local-6989586621679530519"><span id="local-6989586621679530520"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530520"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Generics.html#M1"><span class="hs-identifier hs-type">M1</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530519"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530518"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530520"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span><span>
+</span><span id="line-329"></span><span>
+</span><span id="line-330"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-331"></span><span id="local-6989586621679530496"><span id="local-6989586621679530498"><span id="local-6989586621679530500"><span id="local-6989586621679530502"><span id="local-6989586621679530506"><span id="local-6989586621679530507"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530507"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530506"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530507"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#%3A%2B%3A"><span class="hs-operator hs-type">:+:</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530506"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-332"></span><span>
+</span><span id="line-333"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-334"></span><span id="local-6989586621679530484"><span id="local-6989586621679530486"><span id="local-6989586621679530488"><span id="local-6989586621679530490"><span id="local-6989586621679530494"><span id="local-6989586621679530495"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530495"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530494"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530495"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#%3A%2A%3A"><span class="hs-operator hs-type">:*:</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530494"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-335"></span><span>
+</span><span id="line-336"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-337"></span><span id="local-6989586621679530472"><span id="local-6989586621679530474"><span id="local-6989586621679530476"><span id="local-6989586621679530478"><span id="local-6989586621679530482"><span id="local-6989586621679530483"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530483"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530482"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530483"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#%3A.%3A"><span class="hs-operator hs-type">:.:</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530482"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span><span>
+</span><span id="line-338"></span><span>
+</span><span id="line-339"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-340"></span><span id="local-6989586621679530462"><span id="local-6989586621679530464"><span id="local-6989586621679530466"><span id="local-6989586621679530468"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UAddr"><span class="hs-identifier hs-type">UAddr</span></a></span></span></span></span></span><span>
+</span><span id="line-341"></span><span>
+</span><span id="line-342"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-343"></span><span id="local-6989586621679530452"><span id="local-6989586621679530454"><span id="local-6989586621679530456"><span id="local-6989586621679530458"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UChar"><span class="hs-identifier hs-type">UChar</span></a></span></span></span></span></span><span>
+</span><span id="line-344"></span><span>
+</span><span id="line-345"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-346"></span><span id="local-6989586621679530442"><span id="local-6989586621679530444"><span id="local-6989586621679530446"><span id="local-6989586621679530448"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UDouble"><span class="hs-identifier hs-type">UDouble</span></a></span></span></span></span></span><span>
+</span><span id="line-347"></span><span>
+</span><span id="line-348"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-349"></span><span id="local-6989586621679530432"><span id="local-6989586621679530434"><span id="local-6989586621679530436"><span id="local-6989586621679530438"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UFloat"><span class="hs-identifier hs-type">UFloat</span></a></span></span></span></span></span><span>
+</span><span id="line-350"></span><span>
+</span><span id="line-351"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-352"></span><span id="local-6989586621679530422"><span id="local-6989586621679530424"><span id="local-6989586621679530426"><span id="local-6989586621679530428"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UInt"><span class="hs-identifier hs-type">UInt</span></a></span></span></span></span></span><span>
+</span><span id="line-353"></span><span>
+</span><span id="line-354"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-355"></span><span id="local-6989586621679530412"><span id="local-6989586621679530414"><span id="local-6989586621679530416"><span id="local-6989586621679530418"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="GHC.Generics.html#UWord"><span class="hs-identifier hs-type">UWord</span></a></span></span></span></span></span><span>
+</span><span id="line-356"></span><span>
+</span><span id="line-357"></span><span class="hs-comment">-- Instance for Data.Ord</span><span>
+</span><span id="line-358"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-359"></span><span id="local-6989586621679530402"><span id="local-6989586621679530404"><span id="local-6989586621679530406"><span id="local-6989586621679530408"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="Data.Ord.html#Down"><span class="hs-identifier hs-type">Down</span></a></span></span></span></span></span><span>
+</span><span id="line-360"></span><span>
+</span><span id="line-361"></span><span class="hs-comment">-- general functions</span><span>
+</span><span id="line-362"></span><span>
+</span><span id="line-363"></span><span class="hs-comment">-- | 'for' is 'traverse' with its arguments flipped. For a version</span><span>
+</span><span id="line-364"></span><span class="hs-comment">-- that ignores the results see 'Data.Foldable.for_'.</span><span>
+</span><span id="line-365"></span><span id="local-6989586621679530398"><span id="local-6989586621679530399"><span id="local-6989586621679530400"><span id="local-6989586621679530401"><span class="annot"><a href="Data.Traversable.html#for"><span class="hs-identifier hs-type">for</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530401"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530400"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530401"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530399"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530399"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530400"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530398"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530400"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530401"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530398"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-366"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#for"><span class="hs-pragma hs-type">for</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-367"></span><span id="for"><span class="annot"><span class="annottext">for :: t a -&gt; (a -&gt; f b) -&gt; f (t b)
+</span><a href="Data.Traversable.html#for"><span class="hs-identifier hs-var hs-var">for</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a -&gt; f b) -&gt; t a -&gt; f (t b)) -&gt; t a -&gt; (a -&gt; f b) -&gt; f (t b)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="GHC.Base.html#flip"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; f b) -&gt; t a -&gt; f (t b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span>
+</span><span id="line-368"></span><span>
+</span><span id="line-369"></span><span class="hs-comment">-- | 'forM' is 'mapM' with its arguments flipped. For a version that</span><span>
+</span><span id="line-370"></span><span class="hs-comment">-- ignores the results see 'Data.Foldable.forM_'.</span><span>
+</span><span id="line-371"></span><span id="local-6989586621679530394"><span id="local-6989586621679530395"><span id="local-6989586621679530396"><span id="local-6989586621679530397"><span class="annot"><a href="Data.Traversable.html#forM"><span class="hs-identifier hs-type">forM</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530397"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530396"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530397"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530395"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530395"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530396"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530394"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530396"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530397"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530394"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-372"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#forM"><span class="hs-pragma hs-type">forM</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-373"></span><span id="forM"><span class="annot"><span class="annottext">forM :: t a -&gt; (a -&gt; m b) -&gt; m (t b)
+</span><a href="Data.Traversable.html#forM"><span class="hs-identifier hs-var hs-var">forM</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a -&gt; m b) -&gt; t a -&gt; m (t b)) -&gt; t a -&gt; (a -&gt; m b) -&gt; m (t b)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="GHC.Base.html#flip"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m b) -&gt; t a -&gt; m (t b)
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Traversable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m (t b)
+</span><a href="Data.Traversable.html#mapM"><span class="hs-identifier hs-var">mapM</span></a></span><span>
+</span><span id="line-374"></span><span>
+</span><span id="line-375"></span><span class="hs-comment">-- |The 'mapAccumL' function behaves like a combination of 'fmap'</span><span>
+</span><span id="line-376"></span><span class="hs-comment">-- and 'Data.Foldable.foldl'; it applies a function to each element of a structure,</span><span>
+</span><span id="line-377"></span><span class="hs-comment">-- passing an accumulating parameter from left to right, and returning</span><span>
+</span><span id="line-378"></span><span class="hs-comment">-- a final value of this accumulator together with the new structure.</span><span>
+</span><span id="line-379"></span><span id="local-6989586621679530390"><span id="local-6989586621679530391"><span id="local-6989586621679530392"><span id="local-6989586621679530393"><span class="annot"><a href="Data.Traversable.html#mapAccumL"><span class="hs-identifier hs-type">mapAccumL</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530393"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530392"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530391"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530392"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679530390"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530392"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530393"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530391"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530392"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679530393"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530390"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-380"></span><span id="mapAccumL"><span class="annot"><span class="annottext">mapAccumL :: (a -&gt; b -&gt; (a, c)) -&gt; a -&gt; t b -&gt; (a, t c)
+</span><a href="Data.Traversable.html#mapAccumL"><span class="hs-identifier hs-var hs-var">mapAccumL</span></a></span></span><span> </span><span id="local-6989586621679530389"><span class="annot"><span class="annottext">a -&gt; b -&gt; (a, c)
+</span><a href="#local-6989586621679530389"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679530388"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530388"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679530387"><span class="annot"><span class="annottext">t b
+</span><a href="#local-6989586621679530387"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateL a (t c) -&gt; a -&gt; (a, t c)
+forall s a. StateL s a -&gt; s -&gt; (s, a)
+</span><a href="Data.Functor.Utils.html#runStateL"><span class="hs-identifier hs-var hs-var">runStateL</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; StateL a c) -&gt; t b -&gt; StateL a (t c)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; (a, c)) -&gt; StateL a c
+forall s a. (s -&gt; (s, a)) -&gt; StateL s a
+</span><a href="Data.Functor.Utils.html#StateL"><span class="hs-identifier hs-var">StateL</span></a></span><span> </span><span class="annot"><span class="annottext">((a -&gt; (a, c)) -&gt; StateL a c)
+-&gt; (b -&gt; a -&gt; (a, c)) -&gt; b -&gt; StateL a c
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; (a, c)) -&gt; b -&gt; a -&gt; (a, c)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="GHC.Base.html#flip"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b -&gt; (a, c)
+</span><a href="#local-6989586621679530389"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">t b
+</span><a href="#local-6989586621679530387"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530388"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-381"></span><span>
+</span><span id="line-382"></span><span class="hs-comment">-- |The 'mapAccumR' function behaves like a combination of 'fmap'</span><span>
+</span><span id="line-383"></span><span class="hs-comment">-- and 'Data.Foldable.foldr'; it applies a function to each element of a structure,</span><span>
+</span><span id="line-384"></span><span class="hs-comment">-- passing an accumulating parameter from right to left, and returning</span><span>
+</span><span id="line-385"></span><span class="hs-comment">-- a final value of this accumulator together with the new structure.</span><span>
+</span><span id="line-386"></span><span id="local-6989586621679530381"><span id="local-6989586621679530382"><span id="local-6989586621679530383"><span id="local-6989586621679530384"><span class="annot"><a href="Data.Traversable.html#mapAccumR"><span class="hs-identifier hs-type">mapAccumR</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530384"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530383"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530382"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530383"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679530381"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530383"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530384"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530382"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530383"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679530384"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530381"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-387"></span><span id="mapAccumR"><span class="annot"><span class="annottext">mapAccumR :: (a -&gt; b -&gt; (a, c)) -&gt; a -&gt; t b -&gt; (a, t c)
+</span><a href="Data.Traversable.html#mapAccumR"><span class="hs-identifier hs-var hs-var">mapAccumR</span></a></span></span><span> </span><span id="local-6989586621679530380"><span class="annot"><span class="annottext">a -&gt; b -&gt; (a, c)
+</span><a href="#local-6989586621679530380"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679530379"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530379"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621679530378"><span class="annot"><span class="annottext">t b
+</span><a href="#local-6989586621679530378"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateR a (t c) -&gt; a -&gt; (a, t c)
+forall s a. StateR s a -&gt; s -&gt; (s, a)
+</span><a href="Data.Functor.Utils.html#runStateR"><span class="hs-identifier hs-var hs-var">runStateR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; StateR a c) -&gt; t b -&gt; StateR a (t c)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; (a, c)) -&gt; StateR a c
+forall s a. (s -&gt; (s, a)) -&gt; StateR s a
+</span><a href="Data.Functor.Utils.html#StateR"><span class="hs-identifier hs-var">StateR</span></a></span><span> </span><span class="annot"><span class="annottext">((a -&gt; (a, c)) -&gt; StateR a c)
+-&gt; (b -&gt; a -&gt; (a, c)) -&gt; b -&gt; StateR a c
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; (a, c)) -&gt; b -&gt; a -&gt; (a, c)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="GHC.Base.html#flip"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b -&gt; (a, c)
+</span><a href="#local-6989586621679530380"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">t b
+</span><a href="#local-6989586621679530378"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679530379"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-388"></span><span>
+</span><span id="line-389"></span><span class="hs-comment">-- | This function may be used as a value for `fmap` in a `Functor`</span><span>
+</span><span id="line-390"></span><span class="hs-comment">--   instance, provided that 'traverse' is defined. (Using</span><span>
+</span><span id="line-391"></span><span class="hs-comment">--   `fmapDefault` with a `Traversable` instance defined only by</span><span>
+</span><span id="line-392"></span><span class="hs-comment">--   'sequenceA' will result in infinite recursion.)</span><span>
+</span><span id="line-393"></span><span class="hs-comment">--</span><span>
+</span><span id="line-394"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-395"></span><span class="hs-comment">-- 'fmapDefault' f &#8801; 'runIdentity' . 'traverse' ('Identity' . f)</span><span>
+</span><span id="line-396"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-397"></span><span class="annot"><a href="Data.Traversable.html#fmapDefault"><span class="hs-identifier hs-type">fmapDefault</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679530375"><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span id="local-6989586621679530374"><span class="annot"><a href="#local-6989586621679530374"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679530373"><span class="annot"><a href="#local-6989586621679530373"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-398"></span><span>            </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530374"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530373"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530374"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530373"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-399"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#fmapDefault"><span class="hs-pragma hs-type">fmapDefault</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-400"></span><span class="hs-comment">-- See Note [Function coercion] in Data.Functor.Utils.</span><span>
+</span><span id="line-401"></span><span id="fmapDefault"><span class="annot"><span class="annottext">fmapDefault :: (a -&gt; b) -&gt; t a -&gt; t b
+</span><a href="Data.Traversable.html#fmapDefault"><span class="hs-identifier hs-var hs-var">fmapDefault</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a -&gt; Identity b) -&gt; t a -&gt; Identity (t b))
+-&gt; (a -&gt; b) -&gt; t a -&gt; t b
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#coerce/GHC.Prim.html#coerce"><span class="hs-identifier hs-var">coerce</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; Identity b) -&gt; t a -&gt; Identity (t b)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530374"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Identity.html#Identity"><span class="hs-identifier hs-type">Identity</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530373"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530374"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Identity.html#Identity"><span class="hs-identifier hs-type">Identity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530375"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530373"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-402"></span><span>
+</span><span id="line-403"></span><span class="hs-comment">-- | This function may be used as a value for `Data.Foldable.foldMap`</span><span>
+</span><span id="line-404"></span><span class="hs-comment">-- in a `Foldable` instance.</span><span>
+</span><span id="line-405"></span><span class="hs-comment">--</span><span>
+</span><span id="line-406"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-407"></span><span class="hs-comment">-- 'foldMapDefault' f &#8801; 'getConst' . 'traverse' ('Const' . f)</span><span>
+</span><span id="line-408"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-409"></span><span class="annot"><a href="Data.Traversable.html#foldMapDefault"><span class="hs-identifier hs-type">foldMapDefault</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679530372"><span class="annot"><a href="#local-6989586621679530372"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span id="local-6989586621679530371"><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679530370"><span class="annot"><a href="#local-6989586621679530370"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Traversable.html#Traversable"><span class="hs-identifier hs-type">Traversable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530372"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-410"></span><span>               </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530372"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-411"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.Traversable.html#foldMapDefault"><span class="hs-pragma hs-type">foldMapDefault</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-412"></span><span class="hs-comment">-- See Note [Function coercion] in Data.Functor.Utils.</span><span>
+</span><span id="line-413"></span><span id="foldMapDefault"><span class="annot"><span class="annottext">foldMapDefault :: (a -&gt; m) -&gt; t a -&gt; m
+</span><a href="Data.Traversable.html#foldMapDefault"><span class="hs-identifier hs-var hs-var">foldMapDefault</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((a -&gt; Const m ()) -&gt; t a -&gt; Const m (t ()))
+-&gt; (a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#coerce/GHC.Prim.html#coerce"><span class="hs-identifier hs-var">coerce</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; Const m ()) -&gt; t a -&gt; Const m (t ())
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="Data.Traversable.html#traverse"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Const.html#Const"><span class="hs-identifier hs-type">Const</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679530372"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Functor.Const.html#Const"><span class="hs-identifier hs-type">Const</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679530371"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679530372"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-414"></span></pre></body></html>

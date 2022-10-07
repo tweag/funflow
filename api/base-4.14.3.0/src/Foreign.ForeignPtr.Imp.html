@@ -1,0 +1,191 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE Unsafe #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# OPTIONS_HADDOCK not-home #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Module      :  Foreign.ForeignPtr.Imp</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Copyright   :  (c) The University of Glasgow 2001</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  BSD-style (see the file libraries/base/LICENSE)</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- </span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Maintainer  :  ffi@haskell.org</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Stability   :  provisional</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- The 'ForeignPtr' type and operations.  This module is part of the</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Foreign Function Interface (FFI) and will usually be imported via</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- the &quot;Foreign&quot; module.</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Foreign.ForeignPtr.Imp</span><span>
+</span><span id="line-22"></span><span>        </span><span class="hs-special">(</span><span> </span><span>
+</span><span id="line-23"></span><span>        </span><span class="annot"><span class="hs-comment">-- * Finalised data pointers</span></span><span>
+</span><span id="line-24"></span><span>          </span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier">ForeignPtr</span></a></span><span>
+</span><span id="line-25"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#FinalizerPtr"><span class="hs-identifier">FinalizerPtr</span></a></span><span>
+</span><span id="line-26"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#FinalizerEnvPtr"><span class="hs-identifier">FinalizerEnvPtr</span></a></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span>        </span><span class="annot"><span class="hs-comment">-- ** Basic operations</span></span><span>
+</span><span id="line-29"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#newForeignPtr"><span class="hs-identifier">newForeignPtr</span></a></span><span>
+</span><span id="line-30"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#newForeignPtr_"><span class="hs-identifier">newForeignPtr_</span></a></span><span>
+</span><span id="line-31"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#addForeignPtrFinalizer"><span class="hs-identifier">addForeignPtrFinalizer</span></a></span><span>
+</span><span id="line-32"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#newForeignPtrEnv"><span class="hs-identifier">newForeignPtrEnv</span></a></span><span>
+</span><span id="line-33"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#addForeignPtrFinalizerEnv"><span class="hs-identifier">addForeignPtrFinalizerEnv</span></a></span><span>
+</span><span id="line-34"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#withForeignPtr"><span class="hs-identifier">withForeignPtr</span></a></span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#finalizeForeignPtr"><span class="hs-identifier">finalizeForeignPtr</span></a></span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span>        </span><span class="annot"><span class="hs-comment">-- ** Low-level operations</span></span><span>
+</span><span id="line-38"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#unsafeForeignPtrToPtr"><span class="hs-identifier">unsafeForeignPtrToPtr</span></a></span><span>
+</span><span id="line-39"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#touchForeignPtr"><span class="hs-identifier">touchForeignPtr</span></a></span><span>
+</span><span id="line-40"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#castForeignPtr"><span class="hs-identifier">castForeignPtr</span></a></span><span>
+</span><span id="line-41"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#plusForeignPtr"><span class="hs-identifier">plusForeignPtr</span></a></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span>        </span><span class="annot"><span class="hs-comment">-- ** Allocating managed memory</span></span><span>
+</span><span id="line-44"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#mallocForeignPtr"><span class="hs-identifier">mallocForeignPtr</span></a></span><span>
+</span><span id="line-45"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#mallocForeignPtrBytes"><span class="hs-identifier">mallocForeignPtrBytes</span></a></span><span>
+</span><span id="line-46"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray"><span class="hs-identifier">mallocForeignPtrArray</span></a></span><span>
+</span><span id="line-47"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray0"><span class="hs-identifier">mallocForeignPtrArray0</span></a></span><span>
+</span><span id="line-48"></span><span>        </span><span class="hs-special">)</span><span> </span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Foreign.Ptr.html"><span class="hs-identifier">Foreign.Ptr</span></a></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Foreign.Storable.html"><span class="hs-identifier">Foreign.Storable</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Foreign.Storable.html#Storable"><span class="hs-identifier">Storable</span></a></span><span class="hs-special">(</span><span class="annot"><a href="Foreign.Storable.html#sizeOf"><span class="hs-identifier">sizeOf</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Base.html"><span class="hs-identifier">GHC.Base</span></a></span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Num.html"><span class="hs-identifier">GHC.Num</span></a></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html"><span class="hs-identifier">GHC.ForeignPtr</span></a></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span id="local-6989586621679512678"><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#newForeignPtr"><span class="hs-identifier hs-type">newForeignPtr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#FinalizerPtr"><span class="hs-identifier hs-type">FinalizerPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512678"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512678"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512678"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- ^Turns a plain memory reference into a foreign pointer, and</span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- associates a finalizer with the reference.  The finalizer will be</span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- executed after the last reference to the foreign object is dropped.</span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- There is no guarantee of promptness, however the finalizer will be</span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- executed before the program exits.</span><span>
+</span><span id="line-64"></span><span id="newForeignPtr"><span class="annot"><span class="annottext">newForeignPtr :: FinalizerPtr a -&gt; Ptr a -&gt; IO (ForeignPtr a)
+</span><a href="Foreign.ForeignPtr.Imp.html#newForeignPtr"><span class="hs-identifier hs-var hs-var">newForeignPtr</span></a></span></span><span> </span><span id="local-6989586621679512677"><span class="annot"><span class="annottext">FinalizerPtr a
+</span><a href="#local-6989586621679512677"><span class="hs-identifier hs-var">finalizer</span></a></span></span><span> </span><span id="local-6989586621679512676"><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679512676"><span class="hs-identifier hs-var">p</span></a></span></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679512675"><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512675"><span class="hs-identifier hs-var">fObj</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr a -&gt; IO (ForeignPtr a)
+forall a. Ptr a -&gt; IO (ForeignPtr a)
+</span><a href="GHC.ForeignPtr.html#newForeignPtr_"><span class="hs-identifier hs-var">newForeignPtr_</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679512676"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-66"></span><span>       </span><span class="annot"><span class="annottext">FinalizerPtr a -&gt; ForeignPtr a -&gt; IO ()
+forall a. FinalizerPtr a -&gt; ForeignPtr a -&gt; IO ()
+</span><a href="GHC.ForeignPtr.html#addForeignPtrFinalizer"><span class="hs-identifier hs-var">addForeignPtrFinalizer</span></a></span><span> </span><span class="annot"><span class="annottext">FinalizerPtr a
+</span><a href="#local-6989586621679512677"><span class="hs-identifier hs-var">finalizer</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512675"><span class="hs-identifier hs-var">fObj</span></a></span><span>
+</span><span id="line-67"></span><span>       </span><span class="annot"><span class="annottext">ForeignPtr a -&gt; IO (ForeignPtr a)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512675"><span class="hs-identifier hs-var">fObj</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span id="local-6989586621679512673"><span id="local-6989586621679512674"><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#withForeignPtr"><span class="hs-identifier hs-type">withForeignPtr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512674"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512674"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512673"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512673"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- ^This is a way to look at the pointer living inside a</span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- foreign object.  This function takes a function which is</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- applied to that pointer. The resulting 'IO' action is then</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- executed. The foreign object is kept alive at least during</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- the whole action, even if it is not used directly</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- inside. Note that it is not safe to return the pointer from</span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- the action and use it after the action completes. All uses</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- of the pointer should be inside the</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- 'withForeignPtr' bracket.  The reason for</span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- this unsafeness is the same as for</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- 'unsafeForeignPtrToPtr' below: the finalizer</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- may run earlier than expected, because the compiler can only</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- track usage of the 'ForeignPtr' object, not</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- a 'Ptr' object made from it.</span><span>
+</span><span id="line-84"></span><span class="hs-comment">--</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- This function is normally used for marshalling data to</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- or from the object pointed to by the</span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- 'ForeignPtr', using the operations from the</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- 'Storable' class.</span><span>
+</span><span id="line-89"></span><span id="withForeignPtr"><span class="annot"><span class="annottext">withForeignPtr :: ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="Foreign.ForeignPtr.Imp.html#withForeignPtr"><span class="hs-identifier hs-var hs-var">withForeignPtr</span></a></span></span><span> </span><span id="local-6989586621679512672"><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512672"><span class="hs-identifier hs-var">fo</span></a></span></span><span> </span><span id="local-6989586621679512671"><span class="annot"><span class="annottext">Ptr a -&gt; IO b
+</span><a href="#local-6989586621679512671"><span class="hs-identifier hs-var">io</span></a></span></span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679512670"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679512670"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr a -&gt; IO b
+</span><a href="#local-6989586621679512671"><span class="hs-identifier hs-var">io</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ForeignPtr a -&gt; Ptr a
+forall a. ForeignPtr a -&gt; Ptr a
+</span><a href="GHC.ForeignPtr.html#unsafeForeignPtrToPtr"><span class="hs-identifier hs-var">unsafeForeignPtrToPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512672"><span class="hs-identifier hs-var">fo</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>       </span><span class="annot"><span class="annottext">ForeignPtr a -&gt; IO ()
+forall a. ForeignPtr a -&gt; IO ()
+</span><a href="GHC.ForeignPtr.html#touchForeignPtr"><span class="hs-identifier hs-var">touchForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512672"><span class="hs-identifier hs-var">fo</span></a></span><span>
+</span><span id="line-92"></span><span>       </span><span class="annot"><span class="annottext">b -&gt; IO b
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679512670"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- | This variant of 'newForeignPtr' adds a finalizer that expects an</span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- environment in addition to the finalized pointer.  The environment</span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- that will be passed to the finalizer is fixed by the second argument to</span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- 'newForeignPtrEnv'.</span><span>
+</span><span id="line-98"></span><span id="local-6989586621679512668"><span id="local-6989586621679512669"><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#newForeignPtrEnv"><span class="hs-identifier hs-type">newForeignPtrEnv</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><a href="GHC.ForeignPtr.html#FinalizerEnvPtr"><span class="hs-identifier hs-type">FinalizerEnvPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512669"><span class="hs-identifier hs-type">env</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512668"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512669"><span class="hs-identifier hs-type">env</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512668"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512668"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-100"></span><span id="newForeignPtrEnv"><span class="annot"><span class="annottext">newForeignPtrEnv :: FinalizerEnvPtr env a -&gt; Ptr env -&gt; Ptr a -&gt; IO (ForeignPtr a)
+</span><a href="Foreign.ForeignPtr.Imp.html#newForeignPtrEnv"><span class="hs-identifier hs-var hs-var">newForeignPtrEnv</span></a></span></span><span> </span><span id="local-6989586621679512667"><span class="annot"><span class="annottext">FinalizerEnvPtr env a
+</span><a href="#local-6989586621679512667"><span class="hs-identifier hs-var">finalizer</span></a></span></span><span> </span><span id="local-6989586621679512666"><span class="annot"><span class="annottext">Ptr env
+</span><a href="#local-6989586621679512666"><span class="hs-identifier hs-var">env</span></a></span></span><span> </span><span id="local-6989586621679512665"><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679512665"><span class="hs-identifier hs-var">p</span></a></span></span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679512664"><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512664"><span class="hs-identifier hs-var">fObj</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr a -&gt; IO (ForeignPtr a)
+forall a. Ptr a -&gt; IO (ForeignPtr a)
+</span><a href="GHC.ForeignPtr.html#newForeignPtr_"><span class="hs-identifier hs-var">newForeignPtr_</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr a
+</span><a href="#local-6989586621679512665"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-102"></span><span>       </span><span class="annot"><span class="annottext">FinalizerEnvPtr env a -&gt; Ptr env -&gt; ForeignPtr a -&gt; IO ()
+forall env a.
+FinalizerEnvPtr env a -&gt; Ptr env -&gt; ForeignPtr a -&gt; IO ()
+</span><a href="GHC.ForeignPtr.html#addForeignPtrFinalizerEnv"><span class="hs-identifier hs-var">addForeignPtrFinalizerEnv</span></a></span><span> </span><span class="annot"><span class="annottext">FinalizerEnvPtr env a
+</span><a href="#local-6989586621679512667"><span class="hs-identifier hs-var">finalizer</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr env
+</span><a href="#local-6989586621679512666"><span class="hs-identifier hs-var">env</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512664"><span class="hs-identifier hs-var">fObj</span></a></span><span>
+</span><span id="line-103"></span><span>       </span><span class="annot"><span class="annottext">ForeignPtr a -&gt; IO (ForeignPtr a)
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr a
+</span><a href="#local-6989586621679512664"><span class="hs-identifier hs-var">fObj</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- | This function is similar to 'Foreign.Marshal.Array.mallocArray',</span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- but yields a memory area that has a finalizer attached that releases</span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- the memory area.  As with 'mallocForeignPtr', it is not guaranteed that</span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- the block of memory was allocated by 'Foreign.Marshal.Alloc.malloc'.</span><span>
+</span><span id="line-109"></span><span id="local-6989586621679512695"><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray"><span class="hs-identifier hs-type">mallocForeignPtrArray</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foreign.Storable.html#Storable"><span class="hs-identifier hs-type">Storable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512695"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512695"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-110"></span><span id="mallocForeignPtrArray"><span class="annot"><span class="annottext">mallocForeignPtrArray :: Int -&gt; IO (ForeignPtr a)
+</span><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray"><span class="hs-identifier hs-var hs-var">mallocForeignPtrArray</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Int -&gt; IO (ForeignPtr a)
+forall b. Storable b =&gt; b -&gt; Int -&gt; IO (ForeignPtr b)
+</span><a href="#local-6989586621679512663"><span class="hs-identifier hs-var">doMalloc</span></a></span><span> </span><span class="annot"><span class="annottext">a
+forall a. HasCallStack =&gt; a
+</span><a href="GHC.Err.html#undefined"><span class="hs-identifier hs-var">undefined</span></a></span><span>
+</span><span id="line-111"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679512705"><span class="annot"><a href="#local-6989586621679512663"><span class="hs-identifier hs-type">doMalloc</span></a></span><span>            </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foreign.Storable.html#Storable"><span class="hs-identifier hs-type">Storable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512705"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679512705"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512705"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-113"></span><span>    </span><span id="local-6989586621679512663"><span class="annot"><span class="annottext">doMalloc :: b -&gt; Int -&gt; IO (ForeignPtr b)
+</span><a href="#local-6989586621679512663"><span class="hs-identifier hs-var hs-var">doMalloc</span></a></span></span><span> </span><span id="local-6989586621679512661"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679512661"><span class="hs-identifier hs-var">dummy</span></a></span></span><span> </span><span id="local-6989586621679512660"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679512660"><span class="hs-identifier hs-var">size</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO (ForeignPtr b)
+forall a. Int -&gt; IO (ForeignPtr a)
+</span><a href="GHC.ForeignPtr.html#mallocForeignPtrBytes"><span class="hs-identifier hs-var">mallocForeignPtrBytes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679512660"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#%2A"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; Int
+forall a. Storable a =&gt; a -&gt; Int
+</span><a href="Foreign.Storable.html#sizeOf"><span class="hs-identifier hs-var">sizeOf</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679512661"><span class="hs-identifier hs-var">dummy</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- | This function is similar to 'Foreign.Marshal.Array.mallocArray0',</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- but yields a memory area that has a finalizer attached that releases</span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- the memory area.  As with 'mallocForeignPtr', it is not guaranteed that</span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- the block of memory was allocated by 'Foreign.Marshal.Alloc.malloc'.</span><span>
+</span><span id="line-119"></span><span id="local-6989586621679512658"><span class="annot"><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray0"><span class="hs-identifier hs-type">mallocForeignPtrArray0</span></a></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foreign.Storable.html#Storable"><span class="hs-identifier hs-type">Storable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512658"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679512658"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-120"></span><span id="mallocForeignPtrArray0"><span class="annot"><span class="annottext">mallocForeignPtrArray0 :: Int -&gt; IO (ForeignPtr a)
+</span><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray0"><span class="hs-identifier hs-var hs-var">mallocForeignPtrArray0</span></a></span></span><span> </span><span id="local-6989586621679512657"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679512657"><span class="hs-identifier hs-var">size</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO (ForeignPtr a)
+forall a. Storable a =&gt; Int -&gt; IO (ForeignPtr a)
+</span><a href="Foreign.ForeignPtr.Imp.html#mallocForeignPtrArray"><span class="hs-identifier hs-var">mallocForeignPtrArray</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679512657"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#%2B"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span></pre></body></html>

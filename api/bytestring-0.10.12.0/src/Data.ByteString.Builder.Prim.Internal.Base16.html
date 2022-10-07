@@ -1,0 +1,173 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 701
+</span><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-comment">-- |</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright   : (c) 2011 Simon Meier</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License     : BSD3-style (see LICENSE)</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Maintainer  : Simon Meier &lt;iridcode@gmail.com&gt;</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Portability : GHC</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Hexadecimal encoding of nibbles (4-bit) and octets (8-bit) as ASCII</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- characters.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- The current implementation is based on a table based encoding inspired by</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- the code in the 'base64-bytestring' library by Bryan O'Sullivan. In our</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- benchmarks on a 32-bit machine it turned out to be the fastest</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- implementation option.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.ByteString.Builder.Prim.Internal.Base16</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier">EncodingTable</span></a></span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerTable"><span class="hs-identifier">lowerTable</span></a></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#encode8_as_16h"><span class="hs-identifier">encode8_as_16h</span></a></span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Data.ByteString.html"><span class="hs-identifier">Data.ByteString</span></a></span><span>          </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Data.ByteString.Internal.html"><span class="hs-identifier">Data.ByteString.Internal</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span class="hs-cpp">
+
+#if MIN_VERSION_base(4,4,0)
+</span><span class="hs-cpp">#if MIN_VERSION_base(4,7,0)
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign.html#/Foreign.html"><span class="hs-identifier">Foreign</span></a></span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Foreign</span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">unsafePerformIO</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">unsafeForeignPtrToPtr</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign-ForeignPtr-Unsafe.html#/Foreign.ForeignPtr.Unsafe.html"><span class="hs-identifier">Foreign.ForeignPtr.Unsafe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-ForeignPtr.html#unsafeForeignPtrToPtr/GHC.ForeignPtr.html#unsafeForeignPtrToPtr"><span class="hs-identifier">unsafeForeignPtrToPtr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../base-4.14.3.0/src/System-IO-Unsafe.html#/System.IO.Unsafe.html"><span class="hs-identifier">System.IO.Unsafe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-IO-Unsafe.html#unsafePerformIO/GHC.IO.Unsafe.html#unsafePerformIO"><span class="hs-identifier">unsafePerformIO</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+#else
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Foreign</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- Creating the encoding table</span><span>
+</span><span id="line-43"></span><span class="hs-comment">------------------------------</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- TODO: Use table from C implementation.</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- | An encoding table for Base16 encoding.</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">newtype</span><span> </span><span id="EncodingTable"><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-var">EncodingTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EncodingTable"><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-var">EncodingTable</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-ForeignPtr.html#ForeignPtr/GHC.ForeignPtr.html#ForeignPtr"><span class="hs-identifier hs-type">ForeignPtr</span></a></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#tableFromList"><span class="hs-identifier hs-type">tableFromList</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span>
+</span><span id="line-51"></span><span id="tableFromList"><span class="annot"><span class="annottext">tableFromList :: [Word8] -&gt; EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#tableFromList"><span class="hs-identifier hs-var hs-var">tableFromList</span></a></span></span><span> </span><span id="local-6989586621679070775"><span class="annot"><span class="annottext">[Word8]
+</span><a href="#local-6989586621679070775"><span class="hs-identifier hs-var">xs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[Word8] -&gt; ByteString
+</span><a href="Data.ByteString.html#pack"><span class="hs-identifier hs-var">S.pack</span></a></span><span> </span><span class="annot"><span class="annottext">[Word8]
+</span><a href="#local-6989586621679070775"><span class="hs-identifier hs-var">xs</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span class="annot"><a href="Data.ByteString.Internal.html#PS"><span class="hs-identifier hs-type">S.PS</span></a></span><span> </span><span id="local-6989586621679070772"><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070772"><span class="hs-identifier hs-var">fp</span></a></span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-var">EncodingTable</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070772"><span class="hs-identifier hs-var">fp</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#unsafeIndex"><span class="hs-identifier hs-type">unsafeIndex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span>
+</span><span id="line-54"></span><span id="unsafeIndex"><span class="annot"><span class="annottext">unsafeIndex :: EncodingTable -&gt; Int -&gt; IO Word8
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#unsafeIndex"><span class="hs-identifier hs-var hs-var">unsafeIndex</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span> </span><span id="local-6989586621679070770"><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070770"><span class="hs-identifier hs-var">table</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Int -&gt; IO Word8
+forall a. Storable a =&gt; Ptr a -&gt; Int -&gt; IO a
+</span><a href="../../base-4.14.3.0/src/Foreign-Storable.html#peekElemOff/Foreign.Storable.html#peekElemOff"><span class="hs-identifier hs-var">peekElemOff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; Ptr Word8
+forall a. ForeignPtr a -&gt; Ptr a
+</span><a href="../../base-4.14.3.0/src/GHC-ForeignPtr.html#unsafeForeignPtrToPtr/GHC.ForeignPtr.html#unsafeForeignPtrToPtr"><span class="hs-identifier hs-var">unsafeForeignPtrToPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070770"><span class="hs-identifier hs-var">table</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#base16EncodingTable"><span class="hs-identifier hs-type">base16EncodingTable</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span>
+</span><span id="line-57"></span><span id="base16EncodingTable"><span class="annot"><span class="annottext">base16EncodingTable :: EncodingTable -&gt; IO EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#base16EncodingTable"><span class="hs-identifier hs-var hs-var">base16EncodingTable</span></a></span></span><span> </span><span id="local-6989586621679070767"><span class="annot"><span class="annottext">EncodingTable
+</span><a href="#local-6989586621679070767"><span class="hs-identifier hs-var">alphabet</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-58"></span><span>    </span><span id="local-6989586621679070766"><span class="annot"><span class="annottext">[Word8]
+</span><a href="#local-6989586621679070766"><span class="hs-identifier hs-var">xs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[IO Word8] -&gt; IO [Word8]
+forall (t :: * -&gt; *) (m :: * -&gt; *) a.
+(Traversable t, Monad m) =&gt;
+t (m a) -&gt; m (t a)
+</span><a href="../../base-4.14.3.0/src/Data-Traversable.html#sequence/Data.Traversable.html#sequence"><span class="hs-identifier hs-var">sequence</span></a></span><span> </span><span class="annot"><span class="annottext">([IO Word8] -&gt; IO [Word8]) -&gt; [IO Word8] -&gt; IO [Word8]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[[IO Word8]] -&gt; [IO Word8]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/Data-Foldable.html#concat/Data.Foldable.html#concat"><span class="hs-identifier hs-var">concat</span></a></span><span> </span><span class="annot"><span class="annottext">([[IO Word8]] -&gt; [IO Word8]) -&gt; [[IO Word8]] -&gt; [IO Word8]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-special">[</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int -&gt; IO Word8
+</span><a href="#local-6989586621679070763"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070762"><span class="hs-identifier hs-var">j</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Word8
+</span><a href="#local-6989586621679070763"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070761"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621679070762"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070762"><span class="hs-identifier hs-var">j</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-glyph">..</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">15</span></span><span class="hs-special">]</span><span class="hs-special">,</span><span> </span><span id="local-6989586621679070761"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679070761"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-glyph">..</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">15</span></span><span class="hs-special">]</span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-59"></span><span>    </span><span class="annot"><span class="annottext">EncodingTable -&gt; IO EncodingTable
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#return/GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">(EncodingTable -&gt; IO EncodingTable)
+-&gt; EncodingTable -&gt; IO EncodingTable
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Word8] -&gt; EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#tableFromList"><span class="hs-identifier hs-var">tableFromList</span></a></span><span> </span><span class="annot"><span class="annottext">[Word8]
+</span><a href="#local-6989586621679070766"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span id="local-6989586621679070763"><span class="annot"><span class="annottext">ix :: Int -&gt; IO Word8
+</span><a href="#local-6989586621679070763"><span class="hs-identifier hs-var hs-var">ix</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">EncodingTable -&gt; Int -&gt; IO Word8
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#unsafeIndex"><span class="hs-identifier hs-var">unsafeIndex</span></a></span><span> </span><span class="annot"><span class="annottext">EncodingTable
+</span><a href="#local-6989586621679070767"><span class="hs-identifier hs-var">alphabet</span></a></span><span>
+</span><span id="line-62"></span><span>
+</span><span id="line-63"></span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerAlphabet"><span class="hs-pragma hs-type">lowerAlphabet</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-64"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerAlphabet"><span class="hs-identifier hs-type">lowerAlphabet</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span>
+</span><span id="line-65"></span><span id="lowerAlphabet"><span class="annot"><span class="annottext">lowerAlphabet :: EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerAlphabet"><span class="hs-identifier hs-var hs-var">lowerAlphabet</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-66"></span><span>    </span><span class="annot"><span class="annottext">[Word8] -&gt; EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#tableFromList"><span class="hs-identifier hs-var">tableFromList</span></a></span><span> </span><span class="annot"><span class="annottext">([Word8] -&gt; EncodingTable) -&gt; [Word8] -&gt; EncodingTable
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Word8) -&gt; [Char] -&gt; [Word8]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#map/GHC.Base.html#map"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Word8
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromIntegral/GHC.Real.html#fromIntegral"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Word8) -&gt; (Char -&gt; Int) -&gt; Char -&gt; Word8
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#fromEnum/GHC.Enum.html#fromEnum"><span class="hs-identifier hs-var">fromEnum</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([Char] -&gt; [Word8]) -&gt; [Char] -&gt; [Word8]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'0'</span></span><span class="hs-glyph">..</span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'9'</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; [Char]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%2B%2B/GHC.Base.html#%2B%2B"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'a'</span></span><span class="hs-glyph">..</span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'f'</span></span><span class="hs-special">]</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- | The encoding table for hexadecimal values with lower-case characters;</span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- e.g., deadbeef.</span><span>
+</span><span id="line-70"></span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerTable"><span class="hs-pragma hs-type">lowerTable</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-71"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerTable"><span class="hs-identifier hs-type">lowerTable</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span>
+</span><span id="line-72"></span><span id="lowerTable"><span class="annot"><span class="annottext">lowerTable :: EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerTable"><span class="hs-identifier hs-var hs-var">lowerTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO EncodingTable -&gt; EncodingTable
+forall a. IO a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-IO-Unsafe.html#unsafePerformIO/GHC.IO.Unsafe.html#unsafePerformIO"><span class="hs-identifier hs-var">unsafePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO EncodingTable -&gt; EncodingTable)
+-&gt; IO EncodingTable -&gt; EncodingTable
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EncodingTable -&gt; IO EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#base16EncodingTable"><span class="hs-identifier hs-var">base16EncodingTable</span></a></span><span> </span><span class="annot"><span class="annottext">EncodingTable
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#lowerAlphabet"><span class="hs-identifier hs-var">lowerAlphabet</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- | Encode an octet as 16bit word comprising both encoded nibbles ordered</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- according to the host endianness. Writing these 16bit to memory will write</span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- the nibbles in the correct order (i.e. big-endian).</span><span>
+</span><span id="line-77"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#encode8_as_16h"><span class="hs-pragma hs-type">encode8_as_16h</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-78"></span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#encode8_as_16h"><span class="hs-identifier hs-type">encode8_as_16h</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word16/GHC.Word.html#Word16"><span class="hs-identifier hs-type">Word16</span></a></span><span>
+</span><span id="line-79"></span><span id="encode8_as_16h"><span class="annot"><span class="annottext">encode8_as_16h :: EncodingTable -&gt; Word8 -&gt; IO Word16
+</span><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#encode8_as_16h"><span class="hs-identifier hs-var hs-var">encode8_as_16h</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.Base16.html#EncodingTable"><span class="hs-identifier hs-type">EncodingTable</span></a></span><span> </span><span id="local-6989586621679070757"><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070757"><span class="hs-identifier hs-var">table</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><span class="annottext">Ptr Word16 -&gt; Int -&gt; IO Word16
+forall a. Storable a =&gt; Ptr a -&gt; Int -&gt; IO a
+</span><a href="../../base-4.14.3.0/src/Foreign-Storable.html#peekElemOff/Foreign.Storable.html#peekElemOff"><span class="hs-identifier hs-var">peekElemOff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ptr Word8 -&gt; Ptr Word16
+forall a b. Ptr a -&gt; Ptr b
+</span><a href="../../base-4.14.3.0/src/GHC-Ptr.html#castPtr/GHC.Ptr.html#castPtr"><span class="hs-identifier hs-var">castPtr</span></a></span><span> </span><span class="annot"><span class="annottext">(Ptr Word8 -&gt; Ptr Word16) -&gt; Ptr Word8 -&gt; Ptr Word16
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8 -&gt; Ptr Word8
+forall a. ForeignPtr a -&gt; Ptr a
+</span><a href="../../base-4.14.3.0/src/GHC-ForeignPtr.html#unsafeForeignPtrToPtr/GHC.ForeignPtr.html#unsafeForeignPtrToPtr"><span class="hs-identifier hs-var">unsafeForeignPtrToPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr Word8
+</span><a href="#local-6989586621679070757"><span class="hs-identifier hs-var">table</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; IO Word16) -&gt; (Word8 -&gt; Int) -&gt; Word8 -&gt; IO Word16
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromIntegral/GHC.Real.html#fromIntegral"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span>
+</span><span id="line-81"></span></pre></body></html>

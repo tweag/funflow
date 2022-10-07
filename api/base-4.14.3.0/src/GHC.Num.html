@@ -1,0 +1,282 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# OPTIONS_HADDOCK not-home #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Module      :  GHC.Num</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Copyright   :  (c) The University of Glasgow 1994-2002</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     :  see libraries/base/LICENSE</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Maintainer  :  cvs-ghc@haskell.org</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Stability   :  internal</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Portability :  non-portable (GHC Extensions)</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- The 'Num' class and the 'Integer' type.</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">GHC.Num</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="GHC.Num.html"><span class="hs-identifier">GHC.Num</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer.html#/GHC.Integer.html"><span class="hs-identifier">GHC.Integer</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="GHC.Natural.html"><span class="hs-identifier">GHC.Natural</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span class="hs-cpp">
+
+#include &quot;MachDeps.h&quot;
+</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Base.html"><span class="hs-identifier">GHC.Base</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer.html#/GHC.Integer.html"><span class="hs-identifier">GHC.Integer</span></a></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Natural.html"><span class="hs-identifier">GHC.Natural</span></a></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">infixl</span><span> </span><span class="hs-number">7</span><span>  </span><span class="annot"><a href="GHC.Num.html#%2A"><span class="hs-operator hs-type">*</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">infixl</span><span> </span><span class="hs-number">6</span><span>  </span><span class="annot"><a href="GHC.Num.html#%2B"><span class="hs-operator hs-type">+</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Num.html#-"><span class="hs-glyph hs-type">-</span></a></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">default</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>              </span><span class="hs-comment">-- Double isn't available yet,</span><span>
+</span><span id="line-32"></span><span>                        </span><span class="hs-comment">-- and we shouldn't be using defaults anyway</span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- | Basic numeric class.</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- The Haskell Report defines no laws for 'Num'. However, @('+')@ and @('*')@ are</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- customarily expected to define a ring and have the following properties:</span><span>
+</span><span id="line-38"></span><span class="hs-comment">--</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- [__Associativity of @('+')@__]: @(x + y) + z@ = @x + (y + z)@</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- [__Commutativity of @('+')@__]: @x + y@ = @y + x@</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- [__@'fromInteger' 0@ is the additive identity__]: @x + fromInteger 0@ = @x@</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- [__'negate' gives the additive inverse__]: @x + negate x@ = @fromInteger 0@</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- [__Associativity of @('*')@__]: @(x * y) * z@ = @x * (y * z)@</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- [__@'fromInteger' 1@ is the multiplicative identity__]:</span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- @x * fromInteger 1@ = @x@ and @fromInteger 1 * x@ = @x@</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- [__Distributivity of @('*')@ with respect to @('+')@__]:</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- @a * (b + c)@ = @(a * b) + (a * c)@ and @(b + c) * a@ = @(b * a) + (c * a)@</span><span>
+</span><span id="line-48"></span><span class="hs-comment">--</span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- Note that it /isn't/ customarily expected that a type instance of both 'Num'</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- and 'Ord' implement an ordered ring. Indeed, in @base@ only 'Integer' and</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- 'Data.Ratio.Rational' do.</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">class</span><span>  </span><span id="Num"><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-var">Num</span></a></span></span><span> </span><span id="local-6989586621679482712"><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-pragma">{-# MINIMAL</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">+</span><span class="hs-pragma">)</span><span class="hs-pragma">,</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">*</span><span class="hs-pragma">)</span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="GHC.Num.html#abs"><span class="hs-pragma hs-type">abs</span></a></span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="GHC.Num.html#signum"><span class="hs-pragma hs-type">signum</span></a></span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="GHC.Num.html#fromInteger"><span class="hs-pragma hs-type">fromInteger</span></a></span><span class="hs-pragma">,</span><span> </span><span class="hs-pragma">(</span><span class="annot"><a href="GHC.Num.html#negate"><span class="hs-pragma hs-type">negate</span></a></span><span> </span><span class="hs-pragma">|</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">-</span><span class="hs-pragma">)</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span>    </span><span id="%2B"><span class="annot"><a href="GHC.Num.html#%2B"><span class="hs-operator hs-type">(+)</span></a></span></span><span class="hs-special">,</span><span> </span><span id="-"><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="hs-special">)</span></span><span class="hs-special">,</span><span> </span><span id="%2A"><span class="annot"><a href="GHC.Num.html#%2A"><span class="hs-operator hs-type">(*)</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-comment">-- | Unary negation.</span><span>
+</span><span id="line-57"></span><span>    </span><span id="negate"><span class="annot"><a href="GHC.Num.html#negate"><span class="hs-identifier hs-type">negate</span></a></span></span><span>              </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-comment">-- | Absolute value.</span><span>
+</span><span id="line-59"></span><span>    </span><span id="abs"><span class="annot"><a href="GHC.Num.html#abs"><span class="hs-identifier hs-type">abs</span></a></span></span><span>                 </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-comment">-- | Sign of a number.</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- The functions 'abs' and 'signum' should satisfy the law:</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-comment">-- &gt; abs x * signum x == x</span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-comment">-- For real numbers, the 'signum' is either @-1@ (negative), @0@ (zero)</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-comment">-- or @1@ (positive).</span><span>
+</span><span id="line-67"></span><span>    </span><span id="signum"><span class="annot"><a href="GHC.Num.html#signum"><span class="hs-identifier hs-type">signum</span></a></span></span><span>              </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-comment">-- | Conversion from an 'Integer'.</span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-comment">-- An integer literal represents the application of the function</span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-comment">-- 'fromInteger' to the appropriate value of type 'Integer',</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">-- so such literals have type @('Num' a) =&gt; a@.</span><span>
+</span><span id="line-72"></span><span>    </span><span id="fromInteger"><span class="annot"><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-type">fromInteger</span></a></span></span><span>         </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482712"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">-</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="GHC.Num.html#negate"><span class="hs-pragma hs-type">negate</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-76"></span><span>    </span><span id="local-6989586621679482705"><span id="local-6989586621679482704"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482704"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><a href="GHC.Num.html#-"><span class="hs-glyph hs-var hs-var">-</span></a></span><span> </span><span id="local-6989586621679482703"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482703"><span class="hs-identifier hs-var">y</span></a></span></span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482704"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#%2B"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var">negate</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482703"><span class="hs-identifier hs-var">y</span></a></span></span><span>
+</span><span id="line-77"></span><span>    </span><span id="local-6989586621679482702"><span class="annot"><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var">negate</span></a></span><span> </span><span id="local-6989586621679482701"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482701"><span class="hs-identifier hs-var">x</span></a></span></span><span>            </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#-"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482701"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | the same as @'flip' ('-')@.</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- Because @-@ is treated specially in the Haskell grammar,</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- @(-@ /e/@)@ is not a section, but an application of prefix negation.</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- However, @('subtract'@ /exp/@)@ is equivalent to the disallowed section.</span><span>
+</span><span id="line-84"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="GHC.Num.html#subtract"><span class="hs-pragma hs-type">subtract</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-85"></span><span id="local-6989586621679482699"><span class="annot"><a href="GHC.Num.html#subtract"><span class="hs-identifier hs-type">subtract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679482699"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482699"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482699"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679482699"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-86"></span><span id="subtract"><span class="annot"><span class="annottext">subtract :: a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#subtract"><span class="hs-identifier hs-var hs-var">subtract</span></a></span></span><span> </span><span id="local-6989586621679482698"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482698"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679482697"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482697"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482697"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#-"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679482698"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-89"></span><span class="hs-keyword">instance</span><span>  </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-90"></span><span>    </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482688"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482688"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679482687"><span class="annot"><span class="annottext">+ :: Int -&gt; Int -&gt; Int
+</span><a href="#local-6989586621679482687"><span class="hs-operator hs-var hs-var hs-var hs-var">+</span></a></span></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482686"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482686"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482688"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2B%23/GHC.Prim.html#%2B%23"><span class="hs-operator hs-var">+#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482686"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>    </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482685"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482685"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679482684"><span class="annot"><span class="annottext">- :: Int -&gt; Int -&gt; Int
+</span><a href="GHC.Num.html#-"><span class="hs-glyph hs-var hs-var hs-var hs-var">-</span></a></span></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482683"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482683"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482685"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#-%23/GHC.Prim.html#-%23"><span class="hs-operator hs-var">-#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482683"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>    </span><span id="local-6989586621679482682"><span class="annot"><span class="annottext">negate :: Int -&gt; Int
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482681"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482681"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#negateInt%23/GHC.Prim.html#negateInt%23"><span class="hs-identifier hs-var">negateInt#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482681"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>    </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482680"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482680"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679482679"><span class="annot"><span class="annottext">* :: Int -&gt; Int -&gt; Int
+</span><a href="#local-6989586621679482679"><span class="hs-operator hs-var hs-var hs-var hs-var">*</span></a></span></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-type">I#</span></a></span><span> </span><span id="local-6989586621679482678"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482678"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482680"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#%2A%23/GHC.Prim.html#%2A%23"><span class="hs-operator hs-var">*#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679482678"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621679482677"><span class="annot"><span class="annottext">abs :: Int -&gt; Int
+</span><a href="#local-6989586621679482677"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span id="local-6989586621679482676"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482676"><span class="hs-identifier hs-var">n</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482676"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#geInt/GHC.Classes.html#geInt"><span class="hs-operator hs-var">`geInt`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482676"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var">negate</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482676"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span>    </span><span id="local-6989586621679482674"><span class="annot"><span class="annottext">signum :: Int -&gt; Int
+</span><a href="#local-6989586621679482674"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span id="local-6989586621679482673"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482673"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482673"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#ltInt/GHC.Classes.html#ltInt"><span class="hs-operator hs-var">`ltInt`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var">negate</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-97"></span><span>             </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679482673"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#eqInt/GHC.Classes.html#eqInt"><span class="hs-operator hs-var">`eqInt`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-98"></span><span>             </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="GHC.Num.html#fromInteger"><span class="hs-pragma hs-type">fromInteger</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>   </span><span class="hs-comment">-- Just to be sure!</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679482670"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Int
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span id="local-6989586621679482669"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482669"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int#
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#integerToInt/GHC.Integer.Type.html#integerToInt"><span class="hs-identifier hs-var">integerToInt</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482669"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-104"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Word/GHC.Types.html#Word"><span class="hs-identifier hs-type">Word</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482661"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482661"><span class="hs-identifier hs-var">x#</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679482660"><span class="annot"><span class="annottext">+ :: Word -&gt; Word -&gt; Word
+</span><a href="#local-6989586621679482660"><span class="hs-operator hs-var hs-var hs-var hs-var">+</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482659"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482659"><span class="hs-identifier hs-var">y#</span></a></span></span><span class="hs-special">)</span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-var">W#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482661"><span class="hs-identifier hs-var">x#</span></a></span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Word#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#plusWord%23/GHC.Prim.html#plusWord%23"><span class="hs-operator hs-var">`plusWord#`</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482659"><span class="hs-identifier hs-var">y#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482658"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482658"><span class="hs-identifier hs-var">x#</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679482657"><span class="annot"><span class="annottext">- :: Word -&gt; Word -&gt; Word
+</span><a href="GHC.Num.html#-"><span class="hs-glyph hs-var hs-var hs-var hs-var">-</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482656"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482656"><span class="hs-identifier hs-var">y#</span></a></span></span><span class="hs-special">)</span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-var">W#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482658"><span class="hs-identifier hs-var">x#</span></a></span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Word#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#minusWord%23/GHC.Prim.html#minusWord%23"><span class="hs-operator hs-var">`minusWord#`</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482656"><span class="hs-identifier hs-var">y#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482655"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482655"><span class="hs-identifier hs-var">x#</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679482654"><span class="annot"><span class="annottext">* :: Word -&gt; Word -&gt; Word
+</span><a href="#local-6989586621679482654"><span class="hs-operator hs-var hs-var hs-var hs-var">*</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482653"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482653"><span class="hs-identifier hs-var">y#</span></a></span></span><span class="hs-special">)</span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-var">W#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482655"><span class="hs-identifier hs-var">x#</span></a></span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word# -&gt; Word#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#timesWord%23/GHC.Prim.html#timesWord%23"><span class="hs-operator hs-var">`timesWord#`</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482653"><span class="hs-identifier hs-var">y#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>    </span><span id="local-6989586621679482652"><span class="annot"><span class="annottext">negate :: Word -&gt; Word
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-type">W#</span></a></span><span> </span><span id="local-6989586621679482651"><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482651"><span class="hs-identifier hs-var">x#</span></a></span></span><span class="hs-special">)</span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-var">W#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Word#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#int2Word%23/GHC.Prim.html#int2Word%23"><span class="hs-identifier hs-var">int2Word#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#negateInt%23/GHC.Prim.html#negateInt%23"><span class="hs-identifier hs-var">negateInt#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word# -&gt; Int#
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Prim.html#word2Int%23/GHC.Prim.html#word2Int%23"><span class="hs-identifier hs-var">word2Int#</span></a></span><span> </span><span class="annot"><span class="annottext">Word#
+</span><a href="#local-6989586621679482651"><span class="hs-identifier hs-var">x#</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679482650"><span class="annot"><span class="annottext">abs :: Word -&gt; Word
+</span><a href="#local-6989586621679482650"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span id="local-6989586621679482649"><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679482649"><span class="hs-identifier hs-var">x</span></a></span></span><span>                  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><a href="#local-6989586621679482649"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span id="local-6989586621679482648"><span class="annot"><span class="annottext">signum :: Word -&gt; Word
+</span><a href="#local-6989586621679482648"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">0</span></span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-111"></span><span>    </span><span class="annot"><a href="GHC.Num.html#signum"><span class="hs-identifier hs-var">signum</span></a></span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-identifier">_</span></span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679482647"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Word
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span id="local-6989586621679482646"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482646"><span class="hs-identifier hs-var">i</span></a></span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word# -&gt; Word
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#W%23/GHC.Types.html#W%23"><span class="hs-identifier hs-var">W#</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Word#
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#integerToWord/GHC.Integer.Type.html#integerToWord"><span class="hs-identifier hs-var">integerToWord</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482646"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-115"></span><span class="hs-keyword">instance</span><span>  </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-116"></span><span>    </span><span id="local-6989586621679482638"><span class="annot"><span class="annottext">+ :: Integer -&gt; Integer -&gt; Integer
+</span><a href="#local-6989586621679482638"><span class="hs-operator hs-var hs-var hs-var hs-var">(+)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#plusInteger/GHC.Integer.Type.html#plusInteger"><span class="hs-identifier hs-var">plusInteger</span></a></span><span>
+</span><span id="line-117"></span><span>    </span><span id="local-6989586621679482637"><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="hs-special">)</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#minusInteger/GHC.Integer.Type.html#minusInteger"><span class="hs-identifier hs-var">minusInteger</span></a></span><span>
+</span><span id="line-118"></span><span>    </span><span id="local-6989586621679482636"><span class="annot"><span class="annottext">* :: Integer -&gt; Integer -&gt; Integer
+</span><a href="#local-6989586621679482636"><span class="hs-operator hs-var hs-var hs-var hs-var">(*)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#timesInteger/GHC.Integer.Type.html#timesInteger"><span class="hs-identifier hs-var">timesInteger</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span id="local-6989586621679482635"><span class="annot"><span class="annottext">negate :: Integer -&gt; Integer
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#negateInteger/GHC.Integer.Type.html#negateInteger"><span class="hs-identifier hs-var">negateInteger</span></a></span><span>
+</span><span id="line-120"></span><span>    </span><span id="local-6989586621679482634"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Integer
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span id="local-6989586621679482633"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482633"><span class="hs-identifier hs-var">x</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span>  </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679482633"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679482632"><span class="annot"><span class="annottext">abs :: Integer -&gt; Integer
+</span><a href="#local-6989586621679482632"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#absInteger/GHC.Integer.Type.html#absInteger"><span class="hs-identifier hs-var">absInteger</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span id="local-6989586621679482631"><span class="annot"><span class="annottext">signum :: Integer -&gt; Integer
+</span><a href="#local-6989586621679482631"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#signumInteger/GHC.Integer.Type.html#signumInteger"><span class="hs-identifier hs-var">signumInteger</span></a></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an</span><span>
+</span><span id="line-126"></span><span class="hs-comment">-- additive inverse. It is a semiring though.</span><span>
+</span><span id="line-127"></span><span class="hs-comment">--</span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- @since 4.8.0.0</span><span>
+</span><span id="line-129"></span><span class="hs-keyword">instance</span><span>  </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="GHC.Natural.html#Natural"><span class="hs-identifier hs-type">Natural</span></a></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-130"></span><span>    </span><span id="local-6989586621679482623"><span class="annot"><span class="annottext">+ :: Natural -&gt; Natural -&gt; Natural
+</span><a href="#local-6989586621679482623"><span class="hs-operator hs-var hs-var hs-var hs-var">(+)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+</span><a href="GHC.Natural.html#plusNatural"><span class="hs-identifier hs-var">plusNatural</span></a></span><span>
+</span><span id="line-131"></span><span>    </span><span id="local-6989586621679482622"><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="hs-special">)</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+</span><a href="GHC.Natural.html#minusNatural"><span class="hs-identifier hs-var">minusNatural</span></a></span><span>
+</span><span id="line-132"></span><span>    </span><span id="local-6989586621679482621"><span class="annot"><span class="annottext">* :: Natural -&gt; Natural -&gt; Natural
+</span><a href="#local-6989586621679482621"><span class="hs-operator hs-var hs-var hs-var hs-var">(*)</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+</span><a href="GHC.Natural.html#timesNatural"><span class="hs-identifier hs-var">timesNatural</span></a></span><span>
+</span><span id="line-133"></span><span>    </span><span id="local-6989586621679482620"><span class="annot"><span class="annottext">negate :: Natural -&gt; Natural
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural
+</span><a href="GHC.Natural.html#negateNatural"><span class="hs-identifier hs-var">negateNatural</span></a></span><span>
+</span><span id="line-134"></span><span>    </span><span id="local-6989586621679482618"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Natural
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Natural
+</span><a href="GHC.Natural.html#naturalFromInteger"><span class="hs-identifier hs-var">naturalFromInteger</span></a></span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span>    </span><span id="local-6989586621679482617"><span class="annot"><span class="annottext">abs :: Natural -&gt; Natural
+</span><a href="#local-6989586621679482617"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural
+forall a. a -&gt; a
+</span><a href="GHC.Base.html#id"><span class="hs-identifier hs-var">id</span></a></span><span>
+</span><span id="line-137"></span><span>    </span><span id="local-6989586621679482615"><span class="annot"><span class="annottext">signum :: Natural -&gt; Natural
+</span><a href="#local-6989586621679482615"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural
+</span><a href="GHC.Natural.html#signumNatural"><span class="hs-identifier hs-var">signumNatural</span></a></span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span></pre></body></html>

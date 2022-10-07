@@ -1,0 +1,371 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveGeneric              #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude          #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE PolyKinds                  #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables        #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE Trustworthy                #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Module      :  Data.Monoid</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Copyright   :  (c) Andy Gill 2001,</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--                (c) Oregon Graduate Institute of Science and Technology, 2001</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- License     :  BSD-style (see the file libraries/base/LICENSE)</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Maintainer  :  libraries@haskell.org</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- A type @a@ is a 'Monoid' if it provides an associative function ('&lt;&gt;')</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- that lets you combine any two values of type @a@ into one, and a neutral</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- element (`mempty`) such that</span><span>
+</span><span id="line-22"></span><span class="hs-comment">--</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- &gt; a &lt;&gt; mempty == mempty &lt;&gt; a == a</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- A 'Monoid' is a 'Semigroup' with the added requirement of a neutral element.</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- Thus any 'Monoid' is a 'Semigroup', but not the other way around.</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- ==== __Examples__</span><span>
+</span><span id="line-29"></span><span class="hs-comment">--</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- The 'Sum' monoid is defined by the numerical addition operator and `0` as neutral element:</span><span>
+</span><span id="line-31"></span><span class="hs-comment">--</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- &gt;&gt;&gt; mempty :: Sum Int</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- Sum 0</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- &gt;&gt;&gt; Sum 1 &lt;&gt; Sum 2 &lt;&gt; Sum 3 &lt;&gt; Sum 4 :: Sum Int</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- Sum {getSum = 10}</span><span>
+</span><span id="line-36"></span><span class="hs-comment">--</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- We can combine multiple values in a list into a single value using the `mconcat` function.</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- Note that we have to specify the type here since 'Int' is a monoid under several different</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- operations:</span><span>
+</span><span id="line-40"></span><span class="hs-comment">--</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- &gt;&gt;&gt; mconcat [1,2,3,4] :: Sum Int</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- Sum {getSum = 10}</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- &gt;&gt;&gt; mconcat [] :: Sum Int</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- Sum {getSum = 0}</span><span>
+</span><span id="line-45"></span><span class="hs-comment">--</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- Another valid monoid instance of 'Int' is 'Product' It is defined by multiplication</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- and `1` as neutral element:</span><span>
+</span><span id="line-48"></span><span class="hs-comment">--</span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- &gt;&gt;&gt; Product 1 &lt;&gt; Product 2 &lt;&gt; Product 3 &lt;&gt; Product 4 :: Product Int</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- Product {getProduct = 24}</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- &gt;&gt;&gt; mconcat [1,2,3,4] :: Product Int</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- Product {getProduct = 24}</span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- &gt;&gt;&gt; mconcat [] :: Product Int</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- Product {getProduct = 1}</span><span>
+</span><span id="line-55"></span><span class="hs-comment">--</span><span>
+</span><span id="line-56"></span><span class="hs-comment">--</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Monoid</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-60"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Monoid' typeclass</span></span><span>
+</span><span id="line-61"></span><span>        </span><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier">Monoid</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-62"></span><span>        </span><span class="annot"><a href="GHC.Base.html#%3C%3E"><span class="hs-operator">(&lt;&gt;)</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-63"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Dual"><span class="hs-identifier">Dual</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-64"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Endo"><span class="hs-identifier">Endo</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-65"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Bool' wrappers</span></span><span>
+</span><span id="line-66"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#All"><span class="hs-identifier">All</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-67"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Any"><span class="hs-identifier">Any</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-68"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Num' wrappers</span></span><span>
+</span><span id="line-69"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Sum"><span class="hs-identifier">Sum</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Product"><span class="hs-identifier">Product</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-71"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Maybe' wrappers</span></span><span>
+</span><span id="line-72"></span><span>        </span><span class="annot"><span class="hs-comment">-- $MaybeExamples</span></span><span>
+</span><span id="line-73"></span><span>        </span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier">First</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-74"></span><span>        </span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier">Last</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-75"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Alternative' wrapper</span></span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><a href="Data.Semigroup.Internal.html#Alt"><span class="hs-identifier">Alt</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-77"></span><span>        </span><span class="annot"><span class="hs-comment">-- * 'Applicative' wrapper</span></span><span>
+</span><span id="line-78"></span><span>        </span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier">Ap</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- Push down the module in the dependency hierarchy.</span><span>
+</span><span id="line-82"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Base.html"><span class="hs-identifier">GHC.Base</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Any/GHC.Types.html#Any"><span class="hs-identifier">Any</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Enum.html"><span class="hs-identifier">GHC.Enum</span></a></span><span>
+</span><span id="line-84"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Generics.html"><span class="hs-identifier">GHC.Generics</span></a></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Num.html"><span class="hs-identifier">GHC.Num</span></a></span><span>
+</span><span id="line-86"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Read.html"><span class="hs-identifier">GHC.Read</span></a></span><span>
+</span><span id="line-87"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Show.html"><span class="hs-identifier">GHC.Show</span></a></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Monad.Fail.html"><span class="hs-identifier">Control.Monad.Fail</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Fail.html#MonadFail"><span class="hs-identifier">MonadFail</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html"><span class="hs-identifier">Data.Semigroup.Internal</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- $MaybeExamples</span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- To implement @find@ or @findLast@ on any 'Data.Foldable.Foldable':</span><span>
+</span><span id="line-95"></span><span class="hs-comment">--</span><span>
+</span><span id="line-96"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- findLast :: Foldable t =&gt; (a -&gt; Bool) -&gt; t a -&gt; Maybe a</span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- findLast pred = getLast . foldMap (\x -&gt; if pred x</span><span>
+</span><span id="line-99"></span><span class="hs-comment">--                                            then Last (Just x)</span><span>
+</span><span id="line-100"></span><span class="hs-comment">--                                            else Last Nothing)</span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-102"></span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- Much of 'Data.Map.Lazy.Map's interface can be implemented with</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- 'Data.Map.Lazy.alter'. Some of the rest can be implemented with a new</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- 'Data.Map.Lazy.alterF' function and either 'First' or 'Last':</span><span>
+</span><span id="line-106"></span><span class="hs-comment">--</span><span>
+</span><span id="line-107"></span><span class="hs-comment">-- &gt; alterF :: (Functor f, Ord k) =&gt;</span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- &gt;           (Maybe a -&gt; f (Maybe a)) -&gt; k -&gt; Map k a -&gt; f (Map k a)</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- &gt; instance Monoid a =&gt; Functor ((,) a)  -- from Data.Functor</span><span>
+</span><span id="line-111"></span><span class="hs-comment">--</span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- insertLookupWithKey :: Ord k =&gt; (k -&gt; v -&gt; v -&gt; v) -&gt; k -&gt; v</span><span>
+</span><span id="line-114"></span><span class="hs-comment">--                     -&gt; Map k v -&gt; (Maybe v, Map k v)</span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- insertLookupWithKey combine key value =</span><span>
+</span><span id="line-116"></span><span class="hs-comment">--   Arrow.first getFirst . 'Data.Map.Lazy.alterF' doChange key</span><span>
+</span><span id="line-117"></span><span class="hs-comment">--   where</span><span>
+</span><span id="line-118"></span><span class="hs-comment">--   doChange Nothing = (First Nothing, Just value)</span><span>
+</span><span id="line-119"></span><span class="hs-comment">--   doChange (Just oldValue) =</span><span>
+</span><span id="line-120"></span><span class="hs-comment">--     (First (Just oldValue),</span><span>
+</span><span id="line-121"></span><span class="hs-comment">--      Just (combine key value oldValue))</span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | Maybe monoid returning the leftmost non-Nothing value.</span><span>
+</span><span id="line-126"></span><span class="hs-comment">--</span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it</span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- historically.</span><span>
+</span><span id="line-129"></span><span class="hs-comment">--</span><span>
+</span><span id="line-130"></span><span class="hs-comment">-- &gt;&gt;&gt; getFirst (First (Just &quot;hello&quot;) &lt;&gt; First Nothing &lt;&gt; First (Just &quot;world&quot;))</span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- Just &quot;hello&quot;</span><span>
+</span><span id="line-132"></span><span class="hs-comment">--</span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- Use of this type is discouraged. Note the following equivalence:</span><span>
+</span><span id="line-134"></span><span class="hs-comment">--</span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- &gt; Data.Monoid.First x === Maybe (Data.Semigroup.First x)</span><span>
+</span><span id="line-136"></span><span class="hs-comment">--</span><span>
+</span><span id="line-137"></span><span class="hs-comment">-- In addition to being equivalent in the structural sense, the two</span><span>
+</span><span id="line-138"></span><span class="hs-comment">-- also have 'Monoid' instances that behave the same. This type will</span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- be marked deprecated in GHC 8.8, and removed in GHC 8.10.</span><span>
+</span><span id="line-140"></span><span class="hs-comment">-- Users are advised to use the variant from &quot;Data.Semigroup&quot; and wrap</span><span>
+</span><span id="line-141"></span><span class="hs-comment">-- it in 'Maybe'.</span><span>
+</span><span id="line-142"></span><span id="local-6989586621679507641"><span id="local-6989586621679507642"><span id="local-6989586621679507643"><span id="local-6989586621679507644"></span></span></span></span><span class="hs-keyword">newtype</span><span> </span><span id="First"><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-var">First</span></a></span></span><span> </span><span id="local-6989586621679507779"><span class="annot"><a href="#local-6989586621679507779"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="First"><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-var">First</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getFirst"><span class="annot"><span class="annottext">First a -&gt; Maybe a
+</span><a href="Data.Monoid.html#getFirst"><span class="hs-identifier hs-var hs-var">getFirst</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507779"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-143"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679507635"><span id="local-6989586621679507637"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Eq/GHC.Classes.html#Eq"><span class="hs-identifier hs-type">Eq</span></a></span><span>          </span><span class="hs-comment">-- ^ @since 2.01</span></span></span><span>
+</span><span id="line-144"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507619"><span id="local-6989586621679507621"><span id="local-6989586621679507623"><span id="local-6989586621679507625"><span id="local-6989586621679507627"><span id="local-6989586621679507629"><span id="local-6989586621679507631"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Ord/GHC.Classes.html#Ord"><span class="hs-identifier hs-type">Ord</span></a></span><span>         </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span></span></span></span></span><span>
+</span><span id="line-145"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507610"><span id="local-6989586621679507612"><span id="local-6989586621679507614"><span id="local-6989586621679507616"><span class="annot"><a href="GHC.Read.html#Read"><span class="hs-identifier hs-type">Read</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span></span><span>
+</span><span id="line-146"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507603"><span id="local-6989586621679507605"><span id="local-6989586621679507607"><span class="annot"><a href="GHC.Show.html#Show"><span class="hs-identifier hs-type">Show</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span><span>
+</span><span id="line-147"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic"><span class="hs-identifier hs-type">Generic</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.7.0.0</span><span>
+</span><span id="line-148"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic1"><span class="hs-identifier hs-type">Generic1</span></a></span><span>    </span><span class="hs-comment">-- ^ @since 4.7.0.0</span><span>
+</span><span id="line-149"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507592"><span id="local-6989586621679507594"><span class="annot"><a href="GHC.Base.html#Functor"><span class="hs-identifier hs-type">Functor</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span><span>
+</span><span id="line-150"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507580"><span id="local-6989586621679507582"><span id="local-6989586621679507584"><span id="local-6989586621679507586"><span id="local-6989586621679507588"><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span></span></span><span>
+</span><span id="line-151"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507572"><span id="local-6989586621679507574"><span id="local-6989586621679507576"><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span>       </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span><span>
+</span><span id="line-152"></span><span>                 </span><span class="hs-special">)</span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-155"></span><span id="local-6989586621679507570"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507567"><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-type">First</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507570"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-156"></span><span>        </span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-type">First</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span id="local-6989586621679507564"><span class="annot"><span class="annottext">&lt;&gt; :: First a -&gt; First a -&gt; First a
+</span><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span id="local-6989586621679507563"><span class="annot"><span class="annottext">First a
+</span><a href="#local-6989586621679507563"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">First a
+</span><a href="#local-6989586621679507563"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-157"></span><span>        </span><span id="local-6989586621679507562"><span class="annot"><span class="annottext">First a
+</span><a href="#local-6989586621679507562"><span class="hs-identifier hs-var">a</span></a></span></span><span>             </span><span class="annot"><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">First a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">First a
+</span><a href="#local-6989586621679507562"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-158"></span><span>        </span><span id="local-6989586621679507561"><span class="annot"><span class="annottext">stimes :: b -&gt; First a -&gt; First a
+</span><a href="GHC.Base.html#stimes"><span class="hs-identifier hs-var hs-var hs-var hs-var">stimes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; First a -&gt; First a
+forall b a. (Integral b, Monoid a) =&gt; b -&gt; a -&gt; a
+</span><a href="Data.Semigroup.Internal.html#stimesIdempotentMonoid"><span class="hs-identifier hs-var">stimesIdempotentMonoid</span></a></span></span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-161"></span><span id="local-6989586621679507558"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507552"><span id="local-6989586621679507554"><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#First"><span class="hs-identifier hs-type">First</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507558"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-162"></span><span>        </span><span id="local-6989586621679507550"><span class="annot"><span class="annottext">mempty :: First a
+</span><a href="GHC.Base.html#mempty"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe a -&gt; First a
+forall a. Maybe a -&gt; First a
+</span><a href="Data.Monoid.html#First"><span class="hs-identifier hs-var">First</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+forall a. Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span></span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- | Maybe monoid returning the rightmost non-Nothing value.</span><span>
+</span><span id="line-165"></span><span class="hs-comment">--</span><span>
+</span><span id="line-166"></span><span class="hs-comment">-- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to</span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- @'Dual' ('Alt' 'Maybe' a)@</span><span>
+</span><span id="line-168"></span><span class="hs-comment">--</span><span>
+</span><span id="line-169"></span><span class="hs-comment">-- &gt;&gt;&gt; getLast (Last (Just &quot;hello&quot;) &lt;&gt; Last Nothing &lt;&gt; Last (Just &quot;world&quot;))</span><span>
+</span><span id="line-170"></span><span class="hs-comment">-- Just &quot;world&quot;</span><span>
+</span><span id="line-171"></span><span class="hs-comment">--</span><span>
+</span><span id="line-172"></span><span class="hs-comment">-- Use of this type is discouraged. Note the following equivalence:</span><span>
+</span><span id="line-173"></span><span class="hs-comment">--</span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- &gt; Data.Monoid.Last x === Maybe (Data.Semigroup.Last x)</span><span>
+</span><span id="line-175"></span><span class="hs-comment">--</span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- In addition to being equivalent in the structural sense, the two</span><span>
+</span><span id="line-177"></span><span class="hs-comment">-- also have 'Monoid' instances that behave the same. This type will</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- be marked deprecated in GHC 8.8, and removed in GHC 8.10.</span><span>
+</span><span id="line-179"></span><span class="hs-comment">-- Users are advised to use the variant from &quot;Data.Semigroup&quot; and wrap</span><span>
+</span><span id="line-180"></span><span class="hs-comment">-- it in 'Maybe'.</span><span>
+</span><span id="line-181"></span><span id="local-6989586621679507546"><span id="local-6989586621679507547"><span id="local-6989586621679507548"><span id="local-6989586621679507549"></span></span></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Last"><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-var">Last</span></a></span></span><span> </span><span id="local-6989586621679507744"><span class="annot"><a href="#local-6989586621679507744"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Last"><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-var">Last</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getLast"><span class="annot"><span class="annottext">Last a -&gt; Maybe a
+</span><a href="Data.Monoid.html#getLast"><span class="hs-identifier hs-var hs-var">getLast</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507744"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-182"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679507540"><span id="local-6989586621679507542"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Eq/GHC.Classes.html#Eq"><span class="hs-identifier hs-type">Eq</span></a></span><span>          </span><span class="hs-comment">-- ^ @since 2.01</span></span></span><span>
+</span><span id="line-183"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507525"><span id="local-6989586621679507527"><span id="local-6989586621679507529"><span id="local-6989586621679507531"><span id="local-6989586621679507533"><span id="local-6989586621679507535"><span id="local-6989586621679507537"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Ord/GHC.Classes.html#Ord"><span class="hs-identifier hs-type">Ord</span></a></span><span>         </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span></span></span></span></span><span>
+</span><span id="line-184"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507517"><span id="local-6989586621679507519"><span id="local-6989586621679507521"><span id="local-6989586621679507523"><span class="annot"><a href="GHC.Read.html#Read"><span class="hs-identifier hs-type">Read</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span></span><span>
+</span><span id="line-185"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507511"><span id="local-6989586621679507513"><span id="local-6989586621679507515"><span class="annot"><a href="GHC.Show.html#Show"><span class="hs-identifier hs-type">Show</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 2.01</span></span></span></span><span>
+</span><span id="line-186"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic"><span class="hs-identifier hs-type">Generic</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.7.0.0</span><span>
+</span><span id="line-187"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic1"><span class="hs-identifier hs-type">Generic1</span></a></span><span>    </span><span class="hs-comment">-- ^ @since 4.7.0.0</span><span>
+</span><span id="line-188"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507503"><span id="local-6989586621679507505"><span class="annot"><a href="GHC.Base.html#Functor"><span class="hs-identifier hs-type">Functor</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span><span>
+</span><span id="line-189"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507492"><span id="local-6989586621679507494"><span id="local-6989586621679507496"><span id="local-6989586621679507498"><span id="local-6989586621679507500"><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span></span></span><span>
+</span><span id="line-190"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507485"><span id="local-6989586621679507487"><span id="local-6989586621679507489"><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span>       </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span><span>
+</span><span id="line-191"></span><span>                 </span><span class="hs-special">)</span><span>
+</span><span id="line-192"></span><span>
+</span><span id="line-193"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-194"></span><span id="local-6989586621679507484"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507481"><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-type">Last</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507484"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-195"></span><span>        </span><span id="local-6989586621679507479"><span class="annot"><span class="annottext">Last a
+</span><a href="#local-6989586621679507479"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679507478"><span class="annot"><span class="annottext">&lt;&gt; :: Last a -&gt; Last a -&gt; Last a
+</span><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-type">Last</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Last a
+</span><a href="#local-6989586621679507479"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-196"></span><span>        </span><span class="annot"><span class="annottext">Last a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span id="local-6989586621679507477"><span class="annot"><span class="annottext">Last a
+</span><a href="#local-6989586621679507477"><span class="hs-identifier hs-var">b</span></a></span></span><span>                   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Last a
+</span><a href="#local-6989586621679507477"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-197"></span><span>        </span><span id="local-6989586621679507476"><span class="annot"><span class="annottext">stimes :: b -&gt; Last a -&gt; Last a
+</span><a href="#local-6989586621679507476"><span class="hs-identifier hs-var hs-var hs-var hs-var">stimes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Last a -&gt; Last a
+forall b a. (Integral b, Monoid a) =&gt; b -&gt; a -&gt; a
+</span><a href="Data.Semigroup.Internal.html#stimesIdempotentMonoid"><span class="hs-identifier hs-var">stimesIdempotentMonoid</span></a></span></span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span class="hs-comment">-- | @since 2.01</span><span>
+</span><span id="line-200"></span><span id="local-6989586621679507475"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507469"><span id="local-6989586621679507471"><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-type">Last</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507475"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-201"></span><span>        </span><span id="local-6989586621679507468"><span class="annot"><span class="annottext">mempty :: Last a
+</span><a href="GHC.Base.html#mempty"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe a -&gt; Last a
+forall a. Maybe a -&gt; Last a
+</span><a href="Data.Monoid.html#Last"><span class="hs-identifier hs-var">Last</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+forall a. Maybe a
+</span><a href="GHC.Maybe.html#Nothing"><span class="hs-identifier hs-var">Nothing</span></a></span></span><span>
+</span><span id="line-202"></span><span>
+</span><span id="line-203"></span><span class="hs-comment">-- | This data type witnesses the lifting of a 'Monoid' into an</span><span>
+</span><span id="line-204"></span><span class="hs-comment">-- 'Applicative' pointwise.</span><span>
+</span><span id="line-205"></span><span class="hs-comment">--</span><span>
+</span><span id="line-206"></span><span class="hs-comment">-- @since 4.12.0.0</span><span>
+</span><span id="line-207"></span><span id="local-6989586621679507464"><span id="local-6989586621679507465"><span id="local-6989586621679507466"><span id="local-6989586621679507467"></span></span></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Ap"><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span></span><span> </span><span id="local-6989586621679507667"><span class="annot"><a href="#local-6989586621679507667"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621679507666"><span class="annot"><a href="#local-6989586621679507666"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Ap"><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getAp"><span class="annot"><span class="annottext">Ap f a -&gt; f a
+</span><a href="Data.Monoid.html#getAp"><span class="hs-identifier hs-var hs-var">getAp</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679507667"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507666"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-208"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679507453"><span id="local-6989586621679507455"><span id="local-6989586621679507457"><span id="local-6989586621679507459"><span class="annot"><a href="GHC.Base.html#Alternative"><span class="hs-identifier hs-type">Alternative</span></a></span><span> </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span></span><span>
+</span><span id="line-209"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507441"><span id="local-6989586621679507443"><span id="local-6989586621679507445"><span id="local-6989586621679507447"><span id="local-6989586621679507449"><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span></span></span><span>
+</span><span id="line-210"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507425"><span id="local-6989586621679507427"><span id="local-6989586621679507429"><span id="local-6989586621679507431"><span id="local-6989586621679507433"><span id="local-6989586621679507435"><span id="local-6989586621679507437"><span id="local-6989586621679507439"><span class="annot"><a href="GHC.Enum.html#Enum"><span class="hs-identifier hs-type">Enum</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-211"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507420"><span id="local-6989586621679507422"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Eq/GHC.Classes.html#Eq"><span class="hs-identifier hs-type">Eq</span></a></span><span>          </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span><span>
+</span><span id="line-212"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507416"><span id="local-6989586621679507418"><span class="annot"><a href="GHC.Base.html#Functor"><span class="hs-identifier hs-type">Functor</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span><span>
+</span><span id="line-213"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic"><span class="hs-identifier hs-type">Generic</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.12.0.0</span><span>
+</span><span id="line-214"></span><span>                 </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic1"><span class="hs-identifier hs-type">Generic1</span></a></span><span>    </span><span class="hs-comment">-- ^ @since 4.12.0.0</span><span>
+</span><span id="line-215"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507405"><span id="local-6989586621679507407"><span id="local-6989586621679507409"><span class="annot"><a href="GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span>       </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span><span>
+</span><span id="line-216"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507402"><span class="annot"><a href="Control.Monad.Fail.html#MonadFail"><span class="hs-identifier hs-type">MonadFail</span></a></span><span>   </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span><span>
+</span><span id="line-217"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507395"><span id="local-6989586621679507397"><span class="annot"><a href="GHC.Base.html#MonadPlus"><span class="hs-identifier hs-type">MonadPlus</span></a></span><span>   </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span><span>
+</span><span id="line-218"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507379"><span id="local-6989586621679507381"><span id="local-6989586621679507383"><span id="local-6989586621679507385"><span id="local-6989586621679507387"><span id="local-6989586621679507389"><span id="local-6989586621679507391"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Ord/GHC.Classes.html#Ord"><span class="hs-identifier hs-type">Ord</span></a></span><span>         </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span></span></span></span></span><span>
+</span><span id="line-219"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507371"><span id="local-6989586621679507373"><span id="local-6989586621679507375"><span id="local-6989586621679507377"><span class="annot"><a href="GHC.Read.html#Read"><span class="hs-identifier hs-type">Read</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span></span><span>
+</span><span id="line-220"></span><span>                 </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679507365"><span id="local-6989586621679507367"><span id="local-6989586621679507369"><span class="annot"><a href="GHC.Show.html#Show"><span class="hs-identifier hs-type">Show</span></a></span><span>        </span><span class="hs-comment">-- ^ @since 4.12.0.0</span></span></span></span><span>
+</span><span id="line-221"></span><span>                 </span><span class="hs-special">)</span><span>
+</span><span id="line-222"></span><span>
+</span><span id="line-223"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-224"></span><span id="local-6989586621679507363"><span id="local-6989586621679507364"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507358"><span id="local-6989586621679507360"><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507364"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507363"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507364"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507363"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-225"></span><span>        </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span id="local-6989586621679507357"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679507357"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679507356"><span class="annot"><span class="annottext">&lt;&gt; :: Ap f a -&gt; Ap f a -&gt; Ap f a
+</span><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span id="local-6989586621679507355"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679507355"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a -&gt; Ap f a
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; Ap f a
+</span><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; Ap f a) -&gt; f a -&gt; Ap f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; a -&gt; a) -&gt; f a -&gt; f a -&gt; f a
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><a href="GHC.Base.html#liftA2"><span class="hs-identifier hs-var">liftA2</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679507357"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621679507355"><span class="hs-identifier hs-var">y</span></a></span></span></span><span>
+</span><span id="line-226"></span><span>
+</span><span id="line-227"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-228"></span><span id="local-6989586621679507352"><span id="local-6989586621679507353"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507346"><span id="local-6989586621679507348"><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507353"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507352"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507353"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507352"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-229"></span><span>        </span><span id="local-6989586621679507345"><span class="annot"><span class="annottext">mempty :: Ap f a
+</span><a href="GHC.Base.html#mempty"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a -&gt; Ap f a
+forall k (f :: k -&gt; *) (a :: k). f a -&gt; Ap f a
+</span><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-var">Ap</span></a></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; Ap f a) -&gt; f a -&gt; Ap f a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+forall a. Monoid a =&gt; a
+</span><a href="GHC.Base.html#mempty"><span class="hs-identifier hs-var">mempty</span></a></span></span></span><span>
+</span><span id="line-230"></span><span>
+</span><span id="line-231"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-232"></span><span id="local-6989586621679507343"><span id="local-6989586621679507344"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507344"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Enum.html#Bounded"><span class="hs-identifier hs-type">Bounded</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507343"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="GHC.Enum.html#Bounded"><span class="hs-identifier hs-type">Bounded</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507344"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507343"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-233"></span><span>  </span><span id="local-6989586621679507339"><span class="annot"><span class="annottext">minBound :: Ap f a
+</span><a href="GHC.Enum.html#minBound"><span class="hs-identifier hs-var hs-var hs-var hs-var">minBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Ap f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+forall a. Bounded a =&gt; a
+</span><a href="GHC.Enum.html#minBound"><span class="hs-identifier hs-var">minBound</span></a></span><span>
+</span><span id="line-234"></span><span>  </span><span id="local-6989586621679507337"><span class="annot"><span class="annottext">maxBound :: Ap f a
+</span><a href="GHC.Enum.html#maxBound"><span class="hs-identifier hs-var hs-var hs-var hs-var">maxBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Ap f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+forall a. Bounded a =&gt; a
+</span><a href="GHC.Enum.html#maxBound"><span class="hs-identifier hs-var">maxBound</span></a></span></span></span><span>
+</span><span id="line-235"></span><span>
+</span><span id="line-236"></span><span class="hs-comment">-- | @since 4.12.0.0</span><span>
+</span><span id="line-237"></span><span id="local-6989586621679507334"><span id="local-6989586621679507335"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679507331"><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Applicative"><span class="hs-identifier hs-type">Applicative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507335"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507334"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Monoid.html#Ap"><span class="hs-identifier hs-type">Ap</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507335"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679507334"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-238"></span><span>  </span><span id="local-6989586621679507324"><span class="annot"><span class="annottext">+ :: Ap f a -&gt; Ap f a -&gt; Ap f a
+</span><a href="GHC.Num.html#%2B"><span class="hs-operator hs-var hs-var hs-var hs-var">(+)</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a -&gt; a) -&gt; Ap f a -&gt; Ap f a -&gt; Ap f a
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><a href="GHC.Base.html#liftA2"><span class="hs-identifier hs-var">liftA2</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#%2B"><span class="hs-operator hs-var">(+)</span></a></span><span>
+</span><span id="line-239"></span><span>  </span><span id="local-6989586621679507322"><span class="annot"><span class="annottext">* :: Ap f a -&gt; Ap f a -&gt; Ap f a
+</span><a href="GHC.Num.html#%2A"><span class="hs-operator hs-var hs-var hs-var hs-var">(*)</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a -&gt; a) -&gt; Ap f a -&gt; Ap f a -&gt; Ap f a
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><a href="GHC.Base.html#liftA2"><span class="hs-identifier hs-var">liftA2</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="GHC.Num.html#%2A"><span class="hs-operator hs-var">(*)</span></a></span><span>
+</span><span id="line-240"></span><span>  </span><span id="local-6989586621679507320"><span class="annot"><span class="annottext">negate :: Ap f a -&gt; Ap f a
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; Ap f a -&gt; Ap f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#negate"><span class="hs-identifier hs-var">negate</span></a></span><span>
+</span><span id="line-241"></span><span>  </span><span id="local-6989586621679507319"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; Ap f a
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Ap f a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="GHC.Base.html#pure"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Ap f a) -&gt; (Integer -&gt; a) -&gt; Integer -&gt; Ap f a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; a
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span>
+</span><span id="line-242"></span><span>  </span><span id="local-6989586621679507317"><span class="annot"><span class="annottext">abs :: Ap f a -&gt; Ap f a
+</span><a href="GHC.Num.html#abs"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; Ap f a -&gt; Ap f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#abs"><span class="hs-identifier hs-var">abs</span></a></span><span>
+</span><span id="line-243"></span><span>  </span><span id="local-6989586621679507315"><span class="annot"><span class="annottext">signum :: Ap f a -&gt; Ap f a
+</span><a href="GHC.Num.html#signum"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; Ap f a -&gt; Ap f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Num a =&gt; a -&gt; a
+</span><a href="GHC.Num.html#signum"><span class="hs-identifier hs-var">signum</span></a></span></span></span><span>
+</span><span id="line-244"></span><span>
+</span><span id="line-245"></span><span class="hs-comment">{-
+{--------------------------------------------------------------------
+  Testing
+--------------------------------------------------------------------}
+instance Arbitrary a =&gt; Arbitrary (Maybe a) where
+  arbitrary = oneof [return Nothing, Just `fmap` arbitrary]
+
+prop_mconcatMaybe :: [Maybe [Int]] -&gt; Bool
+prop_mconcatMaybe x =
+  fromMaybe [] (mconcat x) == mconcat (catMaybes x)
+
+prop_mconcatFirst :: [Maybe Int] -&gt; Bool
+prop_mconcatFirst x =
+  getFirst (mconcat (map First x)) == listToMaybe (catMaybes x)
+prop_mconcatLast :: [Maybe Int] -&gt; Bool
+prop_mconcatLast x =
+  getLast (mconcat (map Last x)) == listLastToMaybe (catMaybes x)
+        where listLastToMaybe [] = Nothing
+              listLastToMaybe lst = Just (last lst)
+-- -}</span><span>
+</span><span id="line-265"></span><span>
+</span><span id="line-266"></span><span class="hs-comment">-- $setup</span><span>
+</span><span id="line-267"></span><span class="hs-comment">-- &gt;&gt;&gt; import Prelude</span><span>
+</span><span id="line-268"></span></pre></body></html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE BangPatterns           #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE CPP                    #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FunctionalDependencies #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances   #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-warn-orphans #-}</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 702
+</span><span class="hs-pragma">{-# LANGUAGE Trustworthy            #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 706
+</span><span class="hs-pragma">{-# LANGUAGE PolyKinds              #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-comment">-- | Extra instances for 'FunctorWithIndex', 'FoldableWithIndex',</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- and 'TraversableWithIndex' type classes.</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Functor.WithIndex.Instances</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Int</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">flip</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-operator">(.)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&lt;$&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Lazy</span></span><span>   </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">HashMap</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Tagged</span></span><span>         </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Tagged</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span>         </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Vector</span></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Lazy</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HM</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span>       </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Foldable.WithIndex</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor.WithIndex</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Traversable.WithIndex</span></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- tagged</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span id="local-6989586621679039340"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FunctorWithIndex</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span class="annot"><a href="#local-6989586621679039340"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-38"></span><span>  </span><span id="local-6989586621679039336"><span class="annot"><span class="annottext">imap :: (() -&gt; a -&gt; b) -&gt; Tagged a a -&gt; Tagged a b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">imap</span></span></span><span> </span><span id="local-6989586621679039334"><span class="annot"><span class="annottext">() -&gt; a -&gt; b
+</span><a href="#local-6989586621679039334"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span id="local-6989586621679039332"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039332"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Tagged a b
+forall k (s :: k) b. b -&gt; Tagged s b
+</span><span class="hs-identifier hs-var">Tagged</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; a -&gt; b
+</span><a href="#local-6989586621679039334"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039332"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">imap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span id="local-6989586621679039331"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039319"><span id="local-6989586621679039321"><span id="local-6989586621679039323"><span id="local-6989586621679039325"><span id="local-6989586621679039327"><span class="annot"><span class="hs-identifier hs-type">FoldableWithIndex</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span class="annot"><a href="#local-6989586621679039331"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-42"></span><span>  </span><span id="local-6989586621679039317"><span class="annot"><span class="annottext">ifoldMap :: (() -&gt; a -&gt; m) -&gt; Tagged a a -&gt; m
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldMap</span></span></span><span> </span><span id="local-6989586621679039315"><span class="annot"><span class="annottext">() -&gt; a -&gt; m
+</span><a href="#local-6989586621679039315"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span id="local-6989586621679039314"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039314"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; a -&gt; m
+</span><a href="#local-6989586621679039315"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039314"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldMap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span id="local-6989586621679039313"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TraversableWithIndex</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span class="annot"><a href="#local-6989586621679039313"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-46"></span><span>  </span><span id="local-6989586621679039307"><span class="annot"><span class="annottext">itraverse :: (() -&gt; a -&gt; f b) -&gt; Tagged a a -&gt; f (Tagged a b)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">itraverse</span></span></span><span> </span><span id="local-6989586621679039305"><span class="annot"><span class="annottext">() -&gt; a -&gt; f b
+</span><a href="#local-6989586621679039305"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Tagged</span></span><span> </span><span id="local-6989586621679039304"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039304"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Tagged a b
+forall k (s :: k) b. b -&gt; Tagged s b
+</span><span class="hs-identifier hs-var">Tagged</span></span><span> </span><span class="annot"><span class="annottext">(b -&gt; Tagged a b) -&gt; f b -&gt; f (Tagged a b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">() -&gt; a -&gt; f b
+</span><a href="#local-6989586621679039305"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679039304"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">itraverse</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- vector</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FunctorWithIndex</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Vector</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>  </span><span id="local-6989586621679039301"><span class="annot"><span class="annottext">imap :: (Int -&gt; a -&gt; b) -&gt; Vector a -&gt; Vector b
+</span><a href="#local-6989586621679039301"><span class="hs-identifier hs-var hs-var hs-var hs-var">imap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; a -&gt; b) -&gt; Vector a -&gt; Vector b
+forall a b. (Int -&gt; a -&gt; b) -&gt; Vector a -&gt; Vector b
+</span><span class="hs-identifier hs-var">V.imap</span></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">imap</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039295"><span id="local-6989586621679039297"><span class="annot"><span class="hs-identifier hs-type">FoldableWithIndex</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Vector</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-57"></span><span>  </span><span id="local-6989586621679039290"><span class="annot"><span class="annottext">ifoldr :: (Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldr</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+forall a b. (Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var">V.ifoldr</span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldr</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-59"></span><span>  </span><span id="local-6989586621679039287"><span class="annot"><span class="annottext">ifoldl :: (Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldl</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; Int -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+forall a b. (a -&gt; Int -&gt; b -&gt; a) -&gt; a -&gt; Vector b -&gt; a
+</span><span class="hs-identifier hs-var">V.ifoldl</span></span><span> </span><span class="annot"><span class="annottext">((b -&gt; Int -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b)
+-&gt; ((Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Int -&gt; a -&gt; b)
+-&gt; (Int -&gt; b -&gt; a -&gt; b)
+-&gt; b
+-&gt; Vector a
+-&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Int -&gt; a -&gt; b
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldl</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-61"></span><span>  </span><span id="local-6989586621679039284"><span class="annot"><span class="annottext">ifoldr' :: (Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldr'</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+forall a b. (Int -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var">V.ifoldr'</span></span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldr'</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-63"></span><span>  </span><span id="local-6989586621679039281"><span class="annot"><span class="annottext">ifoldl' :: (Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldl'</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; Int -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b
+forall a b. (a -&gt; Int -&gt; b -&gt; a) -&gt; a -&gt; Vector b -&gt; a
+</span><span class="hs-identifier hs-var">V.ifoldl'</span></span><span> </span><span class="annot"><span class="annottext">((b -&gt; Int -&gt; a -&gt; b) -&gt; b -&gt; Vector a -&gt; b)
+-&gt; ((Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Int -&gt; a -&gt; b)
+-&gt; (Int -&gt; b -&gt; a -&gt; b)
+-&gt; b
+-&gt; Vector a
+-&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; Int -&gt; a -&gt; b
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldl'</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TraversableWithIndex</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Vector</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>  </span><span id="local-6989586621679039274"><span class="annot"><span class="annottext">itraverse :: (Int -&gt; a -&gt; f b) -&gt; Vector a -&gt; f (Vector b)
+</span><a href="#local-6989586621679039274"><span class="hs-identifier hs-var hs-var hs-var hs-var">itraverse</span></a></span></span><span> </span><span id="local-6989586621679039273"><span class="annot"><span class="annottext">Int -&gt; a -&gt; f b
+</span><a href="#local-6989586621679039273"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679039272"><span class="annot"><span class="annottext">Vector a
+</span><a href="#local-6989586621679039272"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679039271"><span class="annot"><span class="annottext">n :: Int
+</span><a href="#local-6989586621679039271"><span class="hs-identifier hs-var hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Vector a -&gt; Int
+forall a. Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">V.length</span></span><span> </span><span class="annot"><span class="annottext">Vector a
+</span><a href="#local-6989586621679039272"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [b] -&gt; Vector b
+forall a. Int -&gt; [a] -&gt; Vector a
+</span><span class="hs-identifier hs-var">V.fromListN</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679039271"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">([b] -&gt; Vector b) -&gt; f [b] -&gt; f (Vector b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; a -&gt; f b) -&gt; [a] -&gt; f [b]
+forall i (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(TraversableWithIndex i t, Applicative f) =&gt;
+(i -&gt; a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><span class="hs-identifier hs-var">itraverse</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; a -&gt; f b
+</span><a href="#local-6989586621679039273"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Vector a -&gt; [a]
+forall a. Vector a -&gt; [a]
+</span><span class="hs-identifier hs-var">V.toList</span></span><span> </span><span class="annot"><span class="annottext">Vector a
+</span><a href="#local-6989586621679039272"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">itraverse</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- unordered-containers</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span id="local-6989586621679039267"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FunctorWithIndex</span></span><span> </span><span class="annot"><a href="#local-6989586621679039267"><span class="hs-identifier hs-type">k</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">HashMap</span></span><span> </span><span class="annot"><a href="#local-6989586621679039267"><span class="hs-identifier hs-type">k</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-75"></span><span>  </span><span id="local-6989586621679039264"><span class="annot"><span class="annottext">imap :: (k -&gt; a -&gt; b) -&gt; HashMap k a -&gt; HashMap k b
+</span><a href="#local-6989586621679039264"><span class="hs-identifier hs-var hs-var hs-var hs-var">imap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(k -&gt; a -&gt; b) -&gt; HashMap k a -&gt; HashMap k b
+forall k a b. (k -&gt; a -&gt; b) -&gt; HashMap k a -&gt; HashMap k b
+</span><span class="hs-identifier hs-var">HM.mapWithKey</span></span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">imap</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-77"></span><span id="local-6989586621679039262"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679039252"><span id="local-6989586621679039254"><span id="local-6989586621679039257"><span id="local-6989586621679039259"><span class="annot"><span class="hs-identifier hs-type">FoldableWithIndex</span></span><span> </span><span class="annot"><a href="#local-6989586621679039262"><span class="hs-identifier hs-type">k</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">HashMap</span></span><span> </span><span class="annot"><a href="#local-6989586621679039262"><span class="hs-identifier hs-type">k</span></a></span><span class="hs-special">)</span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-78"></span><span>  </span><span id="local-6989586621679039250"><span class="annot"><span class="annottext">ifoldr :: (k -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b
+</span><a href="#local-6989586621679039250"><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldr</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(k -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b
+forall k a b. (k -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b
+</span><span class="hs-identifier hs-var">HM.foldrWithKey</span></span><span>
+</span><span id="line-79"></span><span>  </span><span id="local-6989586621679039248"><span class="annot"><span class="annottext">ifoldl' :: (k -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b
+</span><a href="#local-6989586621679039248"><span class="hs-identifier hs-var hs-var hs-var hs-var">ifoldl'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(b -&gt; k -&gt; a -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b
+forall a k v. (a -&gt; k -&gt; v -&gt; a) -&gt; a -&gt; HashMap k v -&gt; a
+</span><span class="hs-identifier hs-var">HM.foldlWithKey'</span></span><span> </span><span class="annot"><span class="annottext">((b -&gt; k -&gt; a -&gt; b) -&gt; b -&gt; HashMap k a -&gt; b)
+-&gt; ((k -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; k -&gt; a -&gt; b)
+-&gt; (k -&gt; b -&gt; a -&gt; b)
+-&gt; b
+-&gt; HashMap k a
+-&gt; b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(k -&gt; b -&gt; a -&gt; b) -&gt; b -&gt; k -&gt; a -&gt; b
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span>
+</span><span id="line-80"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldr</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">ifoldl'</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-82"></span><span id="local-6989586621679039246"><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TraversableWithIndex</span></span><span> </span><span class="annot"><a href="#local-6989586621679039246"><span class="hs-identifier hs-type">k</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">HashMap</span></span><span> </span><span class="annot"><a href="#local-6989586621679039246"><span class="hs-identifier hs-type">k</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-83"></span><span>  </span><span id="local-6989586621679039241"><span class="annot"><span class="annottext">itraverse :: (k -&gt; a -&gt; f b) -&gt; HashMap k a -&gt; f (HashMap k b)
+</span><a href="#local-6989586621679039241"><span class="hs-identifier hs-var hs-var hs-var hs-var">itraverse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(k -&gt; a -&gt; f b) -&gt; HashMap k a -&gt; f (HashMap k b)
+forall (f :: * -&gt; *) k v1 v2.
+Applicative f =&gt;
+(k -&gt; v1 -&gt; f v2) -&gt; HashMap k v1 -&gt; f (HashMap k v2)
+</span><span class="hs-identifier hs-var">HM.traverseWithKey</span></span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">itraverse</span></span><span> </span><span class="hs-pragma">#-}</span></span><span>
+</span><span id="line-85"></span></pre></body></html>

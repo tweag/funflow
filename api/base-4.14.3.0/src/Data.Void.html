@@ -1,0 +1,123 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE EmptyCase #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE EmptyDataDeriving #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE StandaloneDeriving #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Copyright   :  (C) 2008-2014 Edward Kmett</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- License     :  BSD-style (see the file libraries/base/LICENSE)</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Maintainer  :  Edward Kmett &lt;ekmett@gmail.com&gt;</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- Stability   :  provisional</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Portability :  portable</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- A logically uninhabited data type, used to indicate that a given</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- term should not exist.</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- @since 4.8.0.0</span><span>
+</span><span id="line-21"></span><span class="hs-comment">----------------------------------------------------------------------------</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Void</span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier">Void</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Void.html#absurd"><span class="hs-identifier">absurd</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Void.html#vacuous"><span class="hs-identifier">vacuous</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Exception.html"><span class="hs-identifier">Control.Exception</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Data.html"><span class="hs-identifier">Data.Data</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Ix.html"><span class="hs-identifier">Data.Ix</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="GHC.Generics.html"><span class="hs-identifier">GHC.Generics</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Semigroup.html"><span class="hs-identifier">Data.Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier">Semigroup</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Semigroup.Internal.html#stimesIdempotent"><span class="hs-identifier">stimesIdempotent</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- | Uninhabited data type</span><span>
+</span><span id="line-35"></span><span class="hs-comment">--</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- @since 4.8.0.0</span><span>
+</span><span id="line-37"></span><span id="local-6989586621679545406"><span id="local-6989586621679545407"></span></span><span class="hs-keyword">data</span><span> </span><span id="Void"><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-var">Void</span></a></span></span><span> </span><span class="hs-keyword">deriving</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-special">(</span><span> </span><span id="local-6989586621679545402"><span id="local-6989586621679545404"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Eq/GHC.Classes.html#Eq"><span class="hs-identifier hs-type">Eq</span></a></span><span>      </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="%24tVoid"><span id="local-6989586621679545372"><span id="local-6989586621679545374"><span id="local-6989586621679545376"><span id="local-6989586621679545378"><span id="local-6989586621679545380"><span id="local-6989586621679545382"><span id="local-6989586621679545384"><span id="local-6989586621679545386"><span id="local-6989586621679545388"><span id="local-6989586621679545390"><span id="local-6989586621679545392"><span id="local-6989586621679545394"><span id="local-6989586621679545396"><span id="local-6989586621679545398"><span class="annot"><a href="Data.Data.html#Data"><span class="hs-identifier hs-type">Data</span></a></span><span>    </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="GHC.Generics.html#Generic"><span class="hs-identifier hs-type">Generic</span></a></span><span> </span><span class="hs-comment">-- ^ @since 4.8.0.0</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679545352"><span id="local-6989586621679545354"><span id="local-6989586621679545356"><span id="local-6989586621679545358"><span id="local-6989586621679545360"><span id="local-6989586621679545362"><span id="local-6989586621679545364"><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#Ord/GHC.Classes.html#Ord"><span class="hs-identifier hs-type">Ord</span></a></span><span>     </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span></span></span></span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679545343"><span id="local-6989586621679545345"><span id="local-6989586621679545347"><span id="local-6989586621679545349"><span class="annot"><a href="GHC.Read.html#Read"><span class="hs-identifier hs-type">Read</span></a></span><span>    </span><span class="hs-comment">-- ^ Reading a 'Void' value is always a parse error, considering</span><span>
+</span><span id="line-43"></span><span>            </span><span class="hs-comment">-- 'Void' as a data type with no constructors.</span><span>
+</span><span id="line-44"></span><span>            </span><span class="hs-comment">--</span><span>
+</span><span id="line-45"></span><span>            </span><span class="hs-comment">-- @since 4.8.0.0</span></span></span></span></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="local-6989586621679545336"><span id="local-6989586621679545338"><span id="local-6989586621679545340"><span class="annot"><a href="GHC.Show.html#Show"><span class="hs-identifier hs-type">Show</span></a></span><span>    </span><span class="hs-comment">-- ^ @since 4.8.0.0</span></span></span></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679545326"><span id="local-6989586621679545330"><span class="annot"><a href="GHC.Ix.html#Ix"><span class="hs-identifier hs-type">Ix</span></a></span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-type">Void</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-51"></span><span>    </span><span id="local-6989586621679545324"><span class="annot"><span class="annottext">range :: (Void, Void) -&gt; [Void]
+</span><a href="GHC.Ix.html#range"><span class="hs-identifier hs-var hs-var hs-var hs-var">range</span></a></span></span><span> </span><span class="annot"><span class="annottext">(Void, Void)
+</span><span class="hs-identifier">_</span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-52"></span><span>    </span><span id="local-6989586621679545322"><span class="annot"><span class="annottext">index :: (Void, Void) -&gt; Void -&gt; Int
+</span><a href="GHC.Ix.html#index"><span class="hs-identifier hs-var hs-var hs-var hs-var">index</span></a></span></span><span> </span><span class="annot"><span class="annottext">(Void, Void)
+</span><span class="hs-identifier">_</span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Void -&gt; Int
+forall a. Void -&gt; a
+</span><a href="Data.Void.html#absurd"><span class="hs-identifier hs-var">absurd</span></a></span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621679545320"><span class="annot"><span class="annottext">inRange :: (Void, Void) -&gt; Void -&gt; Bool
+</span><a href="GHC.Ix.html#inRange"><span class="hs-identifier hs-var hs-var hs-var hs-var">inRange</span></a></span></span><span> </span><span class="annot"><span class="annottext">(Void, Void)
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Void -&gt; Bool
+forall a. Void -&gt; a
+</span><a href="Data.Void.html#absurd"><span class="hs-identifier hs-var">absurd</span></a></span><span>
+</span><span id="line-54"></span><span>    </span><span id="local-6989586621679545318"><span class="annot"><span class="annottext">rangeSize :: (Void, Void) -&gt; Int
+</span><a href="GHC.Ix.html#rangeSize"><span class="hs-identifier hs-var hs-var hs-var hs-var">rangeSize</span></a></span></span><span> </span><span class="annot"><span class="annottext">(Void, Void)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | @since 4.8.0.0</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679545309"><span id="local-6989586621679545311"><span id="local-6989586621679545313"><span class="annot"><a href="GHC.Exception.Type.html#Exception"><span class="hs-identifier hs-type">Exception</span></a></span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-type">Void</span></a></span></span></span></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- | @since 4.9.0.0</span><span>
+</span><span id="line-60"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679545305"><span class="annot"><a href="GHC.Base.html#Semigroup"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-type">Void</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span id="local-6989586621679545302"><span class="annot"><span class="annottext">Void
+</span><a href="#local-6989586621679545302"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621679545301"><span class="annot"><span class="annottext">&lt;&gt; :: Void -&gt; Void -&gt; Void
+</span><a href="GHC.Base.html#%3C%3E"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="annot"><span class="annottext">Void
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Void
+</span><a href="#local-6989586621679545302"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span id="local-6989586621679545300"><span class="annot"><span class="annottext">stimes :: b -&gt; Void -&gt; Void
+</span><a href="GHC.Base.html#stimes"><span class="hs-identifier hs-var hs-var hs-var hs-var">stimes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; Void -&gt; Void
+forall b a. Integral b =&gt; b -&gt; a -&gt; a
+</span><a href="Data.Semigroup.Internal.html#stimesIdempotent"><span class="hs-identifier hs-var">stimesIdempotent</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- | Since 'Void' values logically don't exist, this witnesses the</span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- logical reasoning tool of \&quot;ex falso quodlibet\&quot;.</span><span>
+</span><span id="line-66"></span><span class="hs-comment">--</span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- &gt;&gt;&gt; let x :: Either Void Int; x = Right 5</span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- &gt;&gt;&gt; :{</span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- case x of</span><span>
+</span><span id="line-70"></span><span class="hs-comment">--     Right r -&gt; r</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--     Left l  -&gt; absurd l</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- :}</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- 5</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- @since 4.8.0.0</span><span>
+</span><span id="line-76"></span><span id="local-6989586621679545426"><span class="annot"><a href="Data.Void.html#absurd"><span class="hs-identifier hs-type">absurd</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-type">Void</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679545426"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-77"></span><span id="absurd"><span class="annot"><span class="annottext">absurd :: Void -&gt; a
+</span><a href="Data.Void.html#absurd"><span class="hs-identifier hs-var hs-var">absurd</span></a></span></span><span> </span><span id="local-6989586621679545298"><span class="annot"><span class="annottext">Void
+</span><a href="#local-6989586621679545298"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Void
+</span><a href="#local-6989586621679545298"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span class="hs-special">{</span><span class="hs-special">}</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | If 'Void' is uninhabited then any 'Functor' that holds only</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- values of type 'Void' is holding no values.</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- Using @ApplicativeDo@: \'@'vacuous' theVoid@\' can be understood as the</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- @do@ expression</span><span>
+</span><span id="line-84"></span><span class="hs-comment">--</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- do void &lt;- theVoid</span><span>
+</span><span id="line-87"></span><span class="hs-comment">--    pure (absurd void)</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-89"></span><span class="hs-comment">--</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- with an inferred @Functor@ constraint.</span><span>
+</span><span id="line-91"></span><span class="hs-comment">--</span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- @since 4.8.0.0</span><span>
+</span><span id="line-93"></span><span id="local-6989586621679545296"><span id="local-6989586621679545297"><span class="annot"><a href="Data.Void.html#vacuous"><span class="hs-identifier hs-type">vacuous</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="GHC.Base.html#Functor"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679545297"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679545297"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="Data.Void.html#Void"><span class="hs-identifier hs-type">Void</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679545297"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679545296"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-94"></span><span id="vacuous"><span class="annot"><span class="annottext">vacuous :: f Void -&gt; f a
+</span><a href="Data.Void.html#vacuous"><span class="hs-identifier hs-var hs-var">vacuous</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Void -&gt; a) -&gt; f Void -&gt; f a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Void -&gt; a
+forall a. Void -&gt; a
+</span><a href="Data.Void.html#absurd"><span class="hs-identifier hs-var">absurd</span></a></span><span>
+</span><span id="line-95"></span></pre></body></html>

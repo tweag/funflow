@@ -1,0 +1,746 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables, CPP, ForeignFunctionInterface,
+             MagicHash, UnboxedTuples #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# OPTIONS_HADDOCK not-home #-}</span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 701
+</span><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span class="hs-cpp">
+#endif
+</span><span class="hs-comment">-- | Copyright : (c) 2010 - 2011 Simon Meier</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- License     : BSD3-style (see LICENSE)</span><span>
+</span><span id="line-9"></span><span class="hs-comment">--</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  : Simon Meier &lt;iridcode@gmail.com&gt;</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Portability : GHC</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Constructing 'Builder's using ASCII-based encodings.</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.ByteString.Builder.ASCII</span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">(</span><span>
+</span><span id="line-17"></span><span>      </span><span class="annot"><span class="hs-comment">-- ** Formatting numbers as text</span></span><span>
+</span><span id="line-18"></span><span>      </span><span class="hs-comment">-- | Formatting of numbers as ASCII text.</span><span>
+</span><span id="line-19"></span><span>      </span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span>      </span><span class="hs-comment">-- Note that you can also use these functions for the ISO/IEC 8859-1 and</span><span>
+</span><span id="line-21"></span><span>      </span><span class="hs-comment">-- UTF-8 encodings, as the ASCII encoding is equivalent on the </span><span>
+</span><span id="line-22"></span><span>      </span><span class="hs-comment">-- codepoints 0-127.</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span>      </span><span class="annot"><span class="hs-comment">-- *** Decimal numbers</span></span><span>
+</span><span id="line-25"></span><span>      </span><span class="annot"><span class="hs-comment">-- | Decimal encoding of numbers using ASCII encoded characters.</span></span><span>
+</span><span id="line-26"></span><span>      </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8Dec"><span class="hs-identifier">int8Dec</span></a></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16Dec"><span class="hs-identifier">int16Dec</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32Dec"><span class="hs-identifier">int32Dec</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64Dec"><span class="hs-identifier">int64Dec</span></a></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier">intDec</span></a></span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#integerDec"><span class="hs-identifier">integerDec</span></a></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Dec"><span class="hs-identifier">word8Dec</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Dec"><span class="hs-identifier">word16Dec</span></a></span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Dec"><span class="hs-identifier">word32Dec</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Dec"><span class="hs-identifier">word64Dec</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordDec"><span class="hs-identifier">wordDec</span></a></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatDec"><span class="hs-identifier">floatDec</span></a></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleDec"><span class="hs-identifier">doubleDec</span></a></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span>      </span><span class="annot"><span class="hs-comment">-- *** Hexadecimal numbers</span></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span>      </span><span class="hs-comment">-- | Encoding positive integers as hexadecimal numbers using lower-case</span><span>
+</span><span id="line-45"></span><span>      </span><span class="hs-comment">-- ASCII characters. The shortest</span><span>
+</span><span id="line-46"></span><span>      </span><span class="hs-comment">-- possible representation is used. For example,</span><span>
+</span><span id="line-47"></span><span>      </span><span class="hs-comment">--</span><span>
+</span><span id="line-48"></span><span>      </span><span class="hs-comment">-- &gt;&gt;&gt; toLazyByteString (word16Hex 0x0a10)</span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-comment">-- Chunk &quot;a10&quot; Empty</span><span>
+</span><span id="line-50"></span><span>      </span><span class="hs-comment">--</span><span>
+</span><span id="line-51"></span><span>      </span><span class="hs-comment">-- Note that there is no support for using upper-case characters. Please</span><span>
+</span><span id="line-52"></span><span>      </span><span class="hs-comment">-- contact the maintainer, if your application cannot work without</span><span>
+</span><span id="line-53"></span><span>      </span><span class="hs-comment">-- hexadecimal encodings that use upper-case characters.</span><span>
+</span><span id="line-54"></span><span>      </span><span class="hs-comment">--</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Hex"><span class="hs-identifier">word8Hex</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Hex"><span class="hs-identifier">word16Hex</span></a></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Hex"><span class="hs-identifier">word32Hex</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Hex"><span class="hs-identifier">word64Hex</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordHex"><span class="hs-identifier">wordHex</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span>      </span><span class="annot"><span class="hs-comment">-- *** Fixed-width hexadecimal numbers</span></span><span>
+</span><span id="line-62"></span><span>      </span><span class="hs-comment">--</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8HexFixed"><span class="hs-identifier">int8HexFixed</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16HexFixed"><span class="hs-identifier">int16HexFixed</span></a></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32HexFixed"><span class="hs-identifier">int32HexFixed</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64HexFixed"><span class="hs-identifier">int64HexFixed</span></a></span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8HexFixed"><span class="hs-identifier">word8HexFixed</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16HexFixed"><span class="hs-identifier">word16HexFixed</span></a></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32HexFixed"><span class="hs-identifier">word32HexFixed</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64HexFixed"><span class="hs-identifier">word64HexFixed</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatHexFixed"><span class="hs-identifier">floatHexFixed</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleHexFixed"><span class="hs-identifier">doubleHexFixed</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#byteStringHex"><span class="hs-identifier">byteStringHex</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#lazyByteStringHex"><span class="hs-identifier">lazyByteStringHex</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.ByteString.html"><span class="hs-identifier">Data.ByteString</span></a></span><span>                                </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-81"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.ByteString.Lazy.html"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span>                           </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-82"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html"><span class="hs-identifier">Data.ByteString.Builder.Internal</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier">Builder</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.html"><span class="hs-identifier">Data.ByteString.Builder.Prim</span></a></span><span>                   </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">P</span></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign.html#/Foreign.html"><span class="hs-identifier">Foreign</span></a></span><span class="hs-cpp">
+
+
+#if __GLASGOW_HASKELL__ &gt;= 811
+</span><span>
+</span><span id="line-90"></span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">GHC.Num.Integer</span><span class="hs-cpp">
+#define HAS_INTEGER_CONSTR 1
+</span><span class="hs-cpp">#define quotRemInteger integerQuotRem#
+</span><span class="hs-cpp">
+#elif defined(INTEGER_GMP)
+</span><span class="hs-cpp">
+#define HAS_INTEGER_CONSTR 1
+</span><span class="hs-cpp">#define IS S#
+</span><span class="hs-cpp">
+# if !(MIN_VERSION_base(4,8,0))
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">Data.Monoid</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">mappend</span><span class="hs-special">)</span><span class="hs-cpp">
+# endif
+</span><span class="hs-cpp">
+# if __GLASGOW_HASKELL__ &lt; 710
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">GHC.Num</span><span>     </span><span class="hs-special">(</span><span class="hs-identifier">quotRemInteger</span><span class="hs-special">)</span><span class="hs-cpp">
+# endif
+</span><span class="hs-cpp">
+# if __GLASGOW_HASKELL__ &lt; 611
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-identifier">GHC.Integer.Internals</span><span class="hs-cpp">
+# else
+</span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-GMP-Internals.html#/GHC.Integer.GMP.Internals.html"><span class="hs-identifier">GHC.Integer.GMP.Internals</span></a></span><span class="hs-cpp">
+# endif
+</span><span class="hs-cpp">#endif
+</span><span class="hs-cpp">
+#if HAS_INTEGER_CONSTR
+</span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.html"><span class="hs-identifier">Data.ByteString.Builder.Prim.Internal</span></a></span><span>          </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">P</span></span><span>
+</span><span id="line-116"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.UncheckedShifts.html"><span class="hs-identifier">Data.ByteString.Builder.Prim.Internal.UncheckedShifts</span></a></span><span>
+</span><span id="line-117"></span><span>                   </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.UncheckedShifts.html#caseWordSize_32_64"><span class="hs-identifier">caseWordSize_32_64</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign-C-Types.html#/Foreign.C.Types.html"><span class="hs-identifier">Foreign.C.Types</span></a></span><span>
+</span><span id="line-119"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#/GHC.Types.html"><span class="hs-identifier">GHC.Types</span></a></span><span>   </span><span class="hs-special">(</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier">Int</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-122"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- Decimal Encoding</span><span>
+</span><span id="line-124"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- | Encode a 'String' using 'P.char7'.</span><span>
+</span><span id="line-128"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#string7"><span class="hs-pragma hs-type">string7</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-129"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#string7"><span class="hs-identifier hs-type">string7</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#String/GHC.Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-130"></span><span id="string7"><span class="annot"><span class="annottext">string7 :: String -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#string7"><span class="hs-identifier hs-var hs-var">string7</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Char -&gt; String -&gt; Builder
+forall a. FixedPrim a -&gt; [a] -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primMapListFixed"><span class="hs-identifier hs-var">P.primMapListFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Char
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#char7"><span class="hs-identifier hs-var">P.char7</span></a></span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- Decimal Encoding</span><span>
+</span><span id="line-134"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span class="hs-comment">-- Signed integers</span><span>
+</span><span id="line-137"></span><span class="hs-comment">------------------</span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | Decimal encoding of an 'Int8' using the ASCII digits.</span><span>
+</span><span id="line-140"></span><span class="hs-comment">--</span><span>
+</span><span id="line-141"></span><span class="hs-comment">-- e.g.</span><span>
+</span><span id="line-142"></span><span class="hs-comment">--</span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- &gt; toLazyByteString (int8Dec 42)   = &quot;42&quot;</span><span>
+</span><span id="line-144"></span><span class="hs-comment">-- &gt; toLazyByteString (int8Dec (-1)) = &quot;-1&quot;</span><span>
+</span><span id="line-145"></span><span class="hs-comment">--</span><span>
+</span><span id="line-146"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8Dec"><span class="hs-pragma hs-type">int8Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-147"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8Dec"><span class="hs-identifier hs-type">int8Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int8/GHC.Int.html#Int8"><span class="hs-identifier hs-type">Int8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-148"></span><span id="int8Dec"><span class="annot"><span class="annottext">int8Dec :: Int8 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int8Dec"><span class="hs-identifier hs-var hs-var">int8Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int8 -&gt; Int8 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int8Dec"><span class="hs-identifier hs-var">P.int8Dec</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span class="hs-comment">-- | Decimal encoding of an 'Int16' using the ASCII digits.</span><span>
+</span><span id="line-151"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16Dec"><span class="hs-pragma hs-type">int16Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-152"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16Dec"><span class="hs-identifier hs-type">int16Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int16/GHC.Int.html#Int16"><span class="hs-identifier hs-type">Int16</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-153"></span><span id="int16Dec"><span class="annot"><span class="annottext">int16Dec :: Int16 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int16Dec"><span class="hs-identifier hs-var hs-var">int16Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int16 -&gt; Int16 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int16
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int16Dec"><span class="hs-identifier hs-var">P.int16Dec</span></a></span><span>
+</span><span id="line-154"></span><span>
+</span><span id="line-155"></span><span class="hs-comment">-- | Decimal encoding of an 'Int32' using the ASCII digits.</span><span>
+</span><span id="line-156"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32Dec"><span class="hs-pragma hs-type">int32Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-157"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32Dec"><span class="hs-identifier hs-type">int32Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int32/GHC.Int.html#Int32"><span class="hs-identifier hs-type">Int32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-158"></span><span id="int32Dec"><span class="annot"><span class="annottext">int32Dec :: Int32 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int32Dec"><span class="hs-identifier hs-var hs-var">int32Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int32 -&gt; Int32 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int32
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int32Dec"><span class="hs-identifier hs-var">P.int32Dec</span></a></span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- | Decimal encoding of an 'Int64' using the ASCII digits.</span><span>
+</span><span id="line-161"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64Dec"><span class="hs-pragma hs-type">int64Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-162"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64Dec"><span class="hs-identifier hs-type">int64Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int64/GHC.Int.html#Int64"><span class="hs-identifier hs-type">Int64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-163"></span><span id="int64Dec"><span class="annot"><span class="annottext">int64Dec :: Int64 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int64Dec"><span class="hs-identifier hs-var hs-var">int64Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int64 -&gt; Int64 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int64
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int64Dec"><span class="hs-identifier hs-var">P.int64Dec</span></a></span><span>
+</span><span id="line-164"></span><span>
+</span><span id="line-165"></span><span class="hs-comment">-- | Decimal encoding of an 'Int' using the ASCII digits.</span><span>
+</span><span id="line-166"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-pragma hs-type">intDec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-167"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier hs-type">intDec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-168"></span><span id="intDec"><span class="annot"><span class="annottext">intDec :: Int -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier hs-var hs-var">intDec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int -&gt; Int -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#intDec"><span class="hs-identifier hs-var">P.intDec</span></a></span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span class="hs-comment">-- Unsigned integers</span><span>
+</span><span id="line-172"></span><span class="hs-comment">--------------------</span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-comment">-- | Decimal encoding of a 'Word8' using the ASCII digits.</span><span>
+</span><span id="line-175"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Dec"><span class="hs-pragma hs-type">word8Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-176"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Dec"><span class="hs-identifier hs-type">word8Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-177"></span><span id="word8Dec"><span class="annot"><span class="annottext">word8Dec :: Word8 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word8Dec"><span class="hs-identifier hs-var hs-var">word8Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8 -&gt; Word8 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word8Dec"><span class="hs-identifier hs-var">P.word8Dec</span></a></span><span>
+</span><span id="line-178"></span><span>
+</span><span id="line-179"></span><span class="hs-comment">-- | Decimal encoding of a 'Word16' using the ASCII digits.</span><span>
+</span><span id="line-180"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Dec"><span class="hs-pragma hs-type">word16Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-181"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Dec"><span class="hs-identifier hs-type">word16Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word16/GHC.Word.html#Word16"><span class="hs-identifier hs-type">Word16</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-182"></span><span id="word16Dec"><span class="annot"><span class="annottext">word16Dec :: Word16 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word16Dec"><span class="hs-identifier hs-var hs-var">word16Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word16 -&gt; Word16 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word16
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word16Dec"><span class="hs-identifier hs-var">P.word16Dec</span></a></span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- | Decimal encoding of a 'Word32' using the ASCII digits.</span><span>
+</span><span id="line-185"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Dec"><span class="hs-pragma hs-type">word32Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-186"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Dec"><span class="hs-identifier hs-type">word32Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word32/GHC.Word.html#Word32"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-187"></span><span id="word32Dec"><span class="annot"><span class="annottext">word32Dec :: Word32 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word32Dec"><span class="hs-identifier hs-var hs-var">word32Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word32 -&gt; Word32 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word32
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word32Dec"><span class="hs-identifier hs-var">P.word32Dec</span></a></span><span>
+</span><span id="line-188"></span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- | Decimal encoding of a 'Word64' using the ASCII digits.</span><span>
+</span><span id="line-190"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Dec"><span class="hs-pragma hs-type">word64Dec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-191"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Dec"><span class="hs-identifier hs-type">word64Dec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word64/GHC.Word.html#Word64"><span class="hs-identifier hs-type">Word64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-192"></span><span id="word64Dec"><span class="annot"><span class="annottext">word64Dec :: Word64 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word64Dec"><span class="hs-identifier hs-var hs-var">word64Dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word64 -&gt; Word64 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word64
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word64Dec"><span class="hs-identifier hs-var">P.word64Dec</span></a></span><span>
+</span><span id="line-193"></span><span>
+</span><span id="line-194"></span><span class="hs-comment">-- | Decimal encoding of a 'Word' using the ASCII digits.</span><span>
+</span><span id="line-195"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordDec"><span class="hs-pragma hs-type">wordDec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-196"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordDec"><span class="hs-identifier hs-type">wordDec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Word/GHC.Types.html#Word"><span class="hs-identifier hs-type">Word</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-197"></span><span id="wordDec"><span class="annot"><span class="annottext">wordDec :: Word -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#wordDec"><span class="hs-identifier hs-var hs-var">wordDec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word -&gt; Word -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#wordDec"><span class="hs-identifier hs-var">P.wordDec</span></a></span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span>
+</span><span id="line-200"></span><span class="hs-comment">-- Floating point numbers</span><span>
+</span><span id="line-201"></span><span class="hs-comment">-------------------------</span><span>
+</span><span id="line-202"></span><span>
+</span><span id="line-203"></span><span class="hs-comment">-- TODO: Use Bryan O'Sullivan's double-conversion package to speed it up.</span><span>
+</span><span id="line-204"></span><span>
+</span><span id="line-205"></span><span class="hs-comment">-- | /Currently slow./ Decimal encoding of an IEEE 'Float'.</span><span>
+</span><span id="line-206"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatDec"><span class="hs-pragma hs-type">floatDec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-207"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatDec"><span class="hs-identifier hs-type">floatDec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Float/GHC.Types.html#Float"><span class="hs-identifier hs-type">Float</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-208"></span><span id="floatDec"><span class="annot"><span class="annottext">floatDec :: Float -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#floatDec"><span class="hs-identifier hs-var hs-var">floatDec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#string7"><span class="hs-identifier hs-var">string7</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Builder) -&gt; (Float -&gt; String) -&gt; Float -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Float -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../../base-4.14.3.0/src/GHC-Show.html#show/GHC.Show.html#show"><span class="hs-identifier hs-var">show</span></a></span><span>
+</span><span id="line-209"></span><span>
+</span><span id="line-210"></span><span class="hs-comment">-- | /Currently slow./ Decimal encoding of an IEEE 'Double'.</span><span>
+</span><span id="line-211"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleDec"><span class="hs-pragma hs-type">doubleDec</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-212"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleDec"><span class="hs-identifier hs-type">doubleDec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Double/GHC.Types.html#Double"><span class="hs-identifier hs-type">Double</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-213"></span><span id="doubleDec"><span class="annot"><span class="annottext">doubleDec :: Double -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#doubleDec"><span class="hs-identifier hs-var hs-var">doubleDec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#string7"><span class="hs-identifier hs-var">string7</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Builder) -&gt; (Double -&gt; String) -&gt; Double -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Double -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../../base-4.14.3.0/src/GHC-Show.html#show/GHC.Show.html#show"><span class="hs-identifier hs-var">show</span></a></span><span>
+</span><span id="line-214"></span><span>
+</span><span id="line-215"></span><span>
+</span><span id="line-216"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-217"></span><span class="hs-comment">-- Hexadecimal Encoding</span><span>
+</span><span id="line-218"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-219"></span><span>
+</span><span id="line-220"></span><span class="hs-comment">-- without lead</span><span>
+</span><span id="line-221"></span><span class="hs-comment">---------------</span><span>
+</span><span id="line-222"></span><span>
+</span><span id="line-223"></span><span class="hs-comment">-- | Shortest hexadecimal encoding of a 'Word8' using lower-case characters.</span><span>
+</span><span id="line-224"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Hex"><span class="hs-pragma hs-type">word8Hex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-225"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8Hex"><span class="hs-identifier hs-type">word8Hex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-226"></span><span id="word8Hex"><span class="annot"><span class="annottext">word8Hex :: Word8 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word8Hex"><span class="hs-identifier hs-var hs-var">word8Hex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8 -&gt; Word8 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word8Hex"><span class="hs-identifier hs-var">P.word8Hex</span></a></span><span>
+</span><span id="line-227"></span><span>
+</span><span id="line-228"></span><span class="hs-comment">-- | Shortest hexadecimal encoding of a 'Word16' using lower-case characters.</span><span>
+</span><span id="line-229"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Hex"><span class="hs-pragma hs-type">word16Hex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-230"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16Hex"><span class="hs-identifier hs-type">word16Hex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word16/GHC.Word.html#Word16"><span class="hs-identifier hs-type">Word16</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-231"></span><span id="word16Hex"><span class="annot"><span class="annottext">word16Hex :: Word16 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word16Hex"><span class="hs-identifier hs-var hs-var">word16Hex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word16 -&gt; Word16 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word16
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word16Hex"><span class="hs-identifier hs-var">P.word16Hex</span></a></span><span>
+</span><span id="line-232"></span><span>
+</span><span id="line-233"></span><span class="hs-comment">-- | Shortest hexadecimal encoding of a 'Word32' using lower-case characters.</span><span>
+</span><span id="line-234"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Hex"><span class="hs-pragma hs-type">word32Hex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-235"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32Hex"><span class="hs-identifier hs-type">word32Hex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word32/GHC.Word.html#Word32"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-236"></span><span id="word32Hex"><span class="annot"><span class="annottext">word32Hex :: Word32 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word32Hex"><span class="hs-identifier hs-var hs-var">word32Hex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word32 -&gt; Word32 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word32
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word32Hex"><span class="hs-identifier hs-var">P.word32Hex</span></a></span><span>
+</span><span id="line-237"></span><span>
+</span><span id="line-238"></span><span class="hs-comment">-- | Shortest hexadecimal encoding of a 'Word64' using lower-case characters.</span><span>
+</span><span id="line-239"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Hex"><span class="hs-pragma hs-type">word64Hex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-240"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64Hex"><span class="hs-identifier hs-type">word64Hex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word64/GHC.Word.html#Word64"><span class="hs-identifier hs-type">Word64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-241"></span><span id="word64Hex"><span class="annot"><span class="annottext">word64Hex :: Word64 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word64Hex"><span class="hs-identifier hs-var hs-var">word64Hex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word64 -&gt; Word64 -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word64
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word64Hex"><span class="hs-identifier hs-var">P.word64Hex</span></a></span><span>
+</span><span id="line-242"></span><span>
+</span><span id="line-243"></span><span class="hs-comment">-- | Shortest hexadecimal encoding of a 'Word' using lower-case characters.</span><span>
+</span><span id="line-244"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordHex"><span class="hs-pragma hs-type">wordHex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-245"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#wordHex"><span class="hs-identifier hs-type">wordHex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Word/GHC.Types.html#Word"><span class="hs-identifier hs-type">Word</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-246"></span><span id="wordHex"><span class="annot"><span class="annottext">wordHex :: Word -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#wordHex"><span class="hs-identifier hs-var hs-var">wordHex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word -&gt; Word -&gt; Builder
+forall a. BoundedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primBounded"><span class="hs-identifier hs-var">P.primBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Word
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#wordHex"><span class="hs-identifier hs-var">P.wordHex</span></a></span><span>
+</span><span id="line-247"></span><span>
+</span><span id="line-248"></span><span>
+</span><span id="line-249"></span><span class="hs-comment">-- fixed width; leading zeroes</span><span>
+</span><span id="line-250"></span><span class="hs-comment">------------------------------</span><span>
+</span><span id="line-251"></span><span>
+</span><span id="line-252"></span><span class="hs-comment">-- | Encode a 'Int8' using 2 nibbles (hexadecimal digits).</span><span>
+</span><span id="line-253"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8HexFixed"><span class="hs-pragma hs-type">int8HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-254"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int8HexFixed"><span class="hs-identifier hs-type">int8HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int8/GHC.Int.html#Int8"><span class="hs-identifier hs-type">Int8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-255"></span><span id="int8HexFixed"><span class="annot"><span class="annottext">int8HexFixed :: Int8 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int8HexFixed"><span class="hs-identifier hs-var hs-var">int8HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Int8 -&gt; Int8 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Int8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int8HexFixed"><span class="hs-identifier hs-var">P.int8HexFixed</span></a></span><span>
+</span><span id="line-256"></span><span>
+</span><span id="line-257"></span><span class="hs-comment">-- | Encode a 'Int16' using 4 nibbles.</span><span>
+</span><span id="line-258"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16HexFixed"><span class="hs-pragma hs-type">int16HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-259"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int16HexFixed"><span class="hs-identifier hs-type">int16HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int16/GHC.Int.html#Int16"><span class="hs-identifier hs-type">Int16</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-260"></span><span id="int16HexFixed"><span class="annot"><span class="annottext">int16HexFixed :: Int16 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int16HexFixed"><span class="hs-identifier hs-var hs-var">int16HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Int16 -&gt; Int16 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Int16
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int16HexFixed"><span class="hs-identifier hs-var">P.int16HexFixed</span></a></span><span>
+</span><span id="line-261"></span><span>
+</span><span id="line-262"></span><span class="hs-comment">-- | Encode a 'Int32' using 8 nibbles.</span><span>
+</span><span id="line-263"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32HexFixed"><span class="hs-pragma hs-type">int32HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-264"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int32HexFixed"><span class="hs-identifier hs-type">int32HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int32/GHC.Int.html#Int32"><span class="hs-identifier hs-type">Int32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-265"></span><span id="int32HexFixed"><span class="annot"><span class="annottext">int32HexFixed :: Int32 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int32HexFixed"><span class="hs-identifier hs-var hs-var">int32HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Int32 -&gt; Int32 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Int32
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int32HexFixed"><span class="hs-identifier hs-var">P.int32HexFixed</span></a></span><span>
+</span><span id="line-266"></span><span>
+</span><span id="line-267"></span><span class="hs-comment">-- | Encode a 'Int64' using 16 nibbles.</span><span>
+</span><span id="line-268"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64HexFixed"><span class="hs-pragma hs-type">int64HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-269"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#int64HexFixed"><span class="hs-identifier hs-type">int64HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Int.html#Int64/GHC.Int.html#Int64"><span class="hs-identifier hs-type">Int64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-270"></span><span id="int64HexFixed"><span class="annot"><span class="annottext">int64HexFixed :: Int64 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#int64HexFixed"><span class="hs-identifier hs-var hs-var">int64HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Int64 -&gt; Int64 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Int64
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#int64HexFixed"><span class="hs-identifier hs-var">P.int64HexFixed</span></a></span><span>
+</span><span id="line-271"></span><span>
+</span><span id="line-272"></span><span class="hs-comment">-- | Encode a 'Word8' using 2 nibbles (hexadecimal digits).</span><span>
+</span><span id="line-273"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8HexFixed"><span class="hs-pragma hs-type">word8HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-274"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word8HexFixed"><span class="hs-identifier hs-type">word8HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-275"></span><span id="word8HexFixed"><span class="annot"><span class="annottext">word8HexFixed :: Word8 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word8HexFixed"><span class="hs-identifier hs-var hs-var">word8HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; Word8 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word8HexFixed"><span class="hs-identifier hs-var">P.word8HexFixed</span></a></span><span>
+</span><span id="line-276"></span><span>
+</span><span id="line-277"></span><span class="hs-comment">-- | Encode a 'Word16' using 4 nibbles.</span><span>
+</span><span id="line-278"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16HexFixed"><span class="hs-pragma hs-type">word16HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-279"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word16HexFixed"><span class="hs-identifier hs-type">word16HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word16/GHC.Word.html#Word16"><span class="hs-identifier hs-type">Word16</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-280"></span><span id="word16HexFixed"><span class="annot"><span class="annottext">word16HexFixed :: Word16 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word16HexFixed"><span class="hs-identifier hs-var hs-var">word16HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word16 -&gt; Word16 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word16
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word16HexFixed"><span class="hs-identifier hs-var">P.word16HexFixed</span></a></span><span>
+</span><span id="line-281"></span><span>
+</span><span id="line-282"></span><span class="hs-comment">-- | Encode a 'Word32' using 8 nibbles.</span><span>
+</span><span id="line-283"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32HexFixed"><span class="hs-pragma hs-type">word32HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-284"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word32HexFixed"><span class="hs-identifier hs-type">word32HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word32/GHC.Word.html#Word32"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-285"></span><span id="word32HexFixed"><span class="annot"><span class="annottext">word32HexFixed :: Word32 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word32HexFixed"><span class="hs-identifier hs-var hs-var">word32HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word32 -&gt; Word32 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word32
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word32HexFixed"><span class="hs-identifier hs-var">P.word32HexFixed</span></a></span><span>
+</span><span id="line-286"></span><span>
+</span><span id="line-287"></span><span class="hs-comment">-- | Encode a 'Word64' using 16 nibbles.</span><span>
+</span><span id="line-288"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64HexFixed"><span class="hs-pragma hs-type">word64HexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-289"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#word64HexFixed"><span class="hs-identifier hs-type">word64HexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word64/GHC.Word.html#Word64"><span class="hs-identifier hs-type">Word64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-290"></span><span id="word64HexFixed"><span class="annot"><span class="annottext">word64HexFixed :: Word64 -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#word64HexFixed"><span class="hs-identifier hs-var hs-var">word64HexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word64 -&gt; Word64 -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word64
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word64HexFixed"><span class="hs-identifier hs-var">P.word64HexFixed</span></a></span><span>
+</span><span id="line-291"></span><span>
+</span><span id="line-292"></span><span class="hs-comment">-- | Encode an IEEE 'Float' using 8 nibbles.</span><span>
+</span><span id="line-293"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatHexFixed"><span class="hs-pragma hs-type">floatHexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-294"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#floatHexFixed"><span class="hs-identifier hs-type">floatHexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Float/GHC.Types.html#Float"><span class="hs-identifier hs-type">Float</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-295"></span><span id="floatHexFixed"><span class="annot"><span class="annottext">floatHexFixed :: Float -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#floatHexFixed"><span class="hs-identifier hs-var hs-var">floatHexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Float -&gt; Float -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Float
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#floatHexFixed"><span class="hs-identifier hs-var">P.floatHexFixed</span></a></span><span>
+</span><span id="line-296"></span><span>
+</span><span id="line-297"></span><span class="hs-comment">-- | Encode an IEEE 'Double' using 16 nibbles.</span><span>
+</span><span id="line-298"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleHexFixed"><span class="hs-pragma hs-type">doubleHexFixed</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-299"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#doubleHexFixed"><span class="hs-identifier hs-type">doubleHexFixed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Double/GHC.Types.html#Double"><span class="hs-identifier hs-type">Double</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-300"></span><span id="doubleHexFixed"><span class="annot"><span class="annottext">doubleHexFixed :: Double -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#doubleHexFixed"><span class="hs-identifier hs-var hs-var">doubleHexFixed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Double -&gt; Double -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Double
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#doubleHexFixed"><span class="hs-identifier hs-var">P.doubleHexFixed</span></a></span><span>
+</span><span id="line-301"></span><span>
+</span><span id="line-302"></span><span class="hs-comment">-- | Encode each byte of a 'S.ByteString' using its fixed-width hex encoding.</span><span>
+</span><span id="line-303"></span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#byteStringHex"><span class="hs-pragma hs-type">byteStringHex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-comment">-- share code</span><span>
+</span><span id="line-304"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#byteStringHex"><span class="hs-identifier hs-type">byteStringHex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Internal.html#ByteString"><span class="hs-identifier hs-type">S.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-305"></span><span id="byteStringHex"><span class="annot"><span class="annottext">byteStringHex :: ByteString -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#byteStringHex"><span class="hs-identifier hs-var hs-var">byteStringHex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; ByteString -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primMapByteStringFixed"><span class="hs-identifier hs-var">P.primMapByteStringFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word8HexFixed"><span class="hs-identifier hs-var">P.word8HexFixed</span></a></span><span>
+</span><span id="line-306"></span><span>
+</span><span id="line-307"></span><span class="hs-comment">-- | Encode each byte of a lazy 'L.ByteString' using its fixed-width hex encoding.</span><span>
+</span><span id="line-308"></span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#lazyByteStringHex"><span class="hs-pragma hs-type">lazyByteStringHex</span></a></span><span> </span><span class="hs-pragma">#-}</span><span> </span><span class="hs-comment">-- share code</span><span>
+</span><span id="line-309"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#lazyByteStringHex"><span class="hs-identifier hs-type">lazyByteStringHex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Lazy.Internal.html#ByteString"><span class="hs-identifier hs-type">L.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-310"></span><span id="lazyByteStringHex"><span class="annot"><span class="annottext">lazyByteStringHex :: ByteString -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#lazyByteStringHex"><span class="hs-identifier hs-var hs-var">lazyByteStringHex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8 -&gt; ByteString -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primMapLazyByteStringFixed"><span class="hs-identifier hs-var">P.primMapLazyByteStringFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Word8
+</span><a href="Data.ByteString.Builder.Prim.ASCII.html#word8HexFixed"><span class="hs-identifier hs-var">P.word8HexFixed</span></a></span><span>
+</span><span id="line-311"></span><span>
+</span><span id="line-312"></span><span>
+</span><span id="line-313"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-314"></span><span class="hs-comment">-- Fast decimal 'Integer' encoding.</span><span>
+</span><span id="line-315"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#if HAS_INTEGER_CONSTR
+</span><span class="hs-comment">-- An optimized version of the integer serialization code</span><span>
+</span><span id="line-319"></span><span class="hs-comment">-- in blaze-textual (c) 2011 MailRank, Inc. Bryan O'Sullivan</span><span>
+</span><span id="line-320"></span><span class="hs-comment">-- &lt;bos@mailrank.com&gt;. It is 2.5x faster on Int-sized integers and 4.5x faster</span><span>
+</span><span id="line-321"></span><span class="hs-comment">-- on larger integers.</span><span class="hs-cpp">
+
+# define PAIR(a,b) (# a,b #)
+</span><span>
+</span><span id="line-325"></span><span class="hs-comment">-- | Maximal power of 10 fitting into an 'Int' without using the MSB.</span><span>
+</span><span id="line-326"></span><span class="hs-comment">--     10 ^ 9  for 32 bit ints  (31 * log 2 / log 10 =  9.33)</span><span>
+</span><span id="line-327"></span><span class="hs-comment">--     10 ^ 18 for 64 bit ints  (63 * log 2 / log 10 = 18.96)</span><span>
+</span><span id="line-328"></span><span class="hs-comment">--</span><span>
+</span><span id="line-329"></span><span class="hs-comment">-- FIXME: Think about also using the MSB. For 64 bit 'Int's this makes a</span><span>
+</span><span id="line-330"></span><span class="hs-comment">-- difference.</span><span>
+</span><span id="line-331"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-type">maxPow10</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-332"></span><span id="maxPow10"><span class="annot"><span class="annottext">maxPow10 :: Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var hs-var">maxPow10</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a. Integral a =&gt; a -&gt; Integer
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#toInteger/GHC.Real.html#toInteger"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Integer) -&gt; Int -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">10</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a b. (Num a, Integral b) =&gt; a -&gt; b -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#%5E/GHC.Real.html#%5E"><span class="hs-operator hs-var">^</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. a -&gt; a -&gt; a
+</span><a href="Data.ByteString.Builder.Prim.Internal.UncheckedShifts.html#caseWordSize_32_64"><span class="hs-identifier hs-var">caseWordSize_32_64</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">9</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">18</span></span><span>
+</span><span id="line-333"></span><span>
+</span><span id="line-334"></span><span class="hs-comment">-- | Decimal encoding of an 'Integer' using the ASCII digits.</span><span>
+</span><span id="line-335"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#integerDec"><span class="hs-identifier hs-type">integerDec</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-336"></span><span id="integerDec"><span class="annot"><span class="annottext">integerDec :: Integer -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#integerDec"><span class="hs-identifier hs-var hs-var">integerDec</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#S%23/GHC.Integer.Type.html#S%23"><span class="hs-identifier hs-type">IS</span></a></span><span> </span><span id="local-6989586621679072005"><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679072005"><span class="hs-identifier hs-var">i#</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier hs-var">intDec</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int# -&gt; Int
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#I%23/GHC.Types.html#I%23"><span class="hs-identifier hs-var">I#</span></a></span><span> </span><span class="annot"><span class="annottext">Int#
+</span><a href="#local-6989586621679072005"><span class="hs-identifier hs-var">i#</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-337"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#integerDec"><span class="hs-identifier hs-var">integerDec</span></a></span><span> </span><span id="local-6989586621679072004"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679072004"><span class="hs-identifier hs-var">i</span></a></span></span><span>
+</span><span id="line-338"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679072004"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#%3C/GHC.Classes.html#%3C"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Char -&gt; Char -&gt; Builder
+forall a. FixedPrim a -&gt; a -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primFixed"><span class="hs-identifier hs-var">P.primFixed</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Char
+</span><a href="Data.ByteString.Builder.Prim.html#char8"><span class="hs-identifier hs-var">P.char8</span></a></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'-'</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#mappend/GHC.Base.html#mappend"><span class="hs-operator hs-var">`mappend`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Builder
+</span><a href="#local-6989586621679072001"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679072004"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-339"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#otherwise/GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">=</span><span>                                   </span><span class="annot"><span class="annottext">Integer -&gt; Builder
+</span><a href="#local-6989586621679072001"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679072004"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-340"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-341"></span><span>    </span><span id="local-6989586621679072000"><span class="annot"><span class="annottext">errImpossible :: String -&gt; a
+</span><a href="#local-6989586621679072000"><span class="hs-identifier hs-var hs-var">errImpossible</span></a></span></span><span> </span><span id="local-6989586621679071999"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679071999"><span class="hs-identifier hs-var">fun</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-342"></span><span>        </span><span class="annot"><span class="annottext">String -&gt; a
+forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Err.html#error/GHC.Err.html#error"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; a) -&gt; String -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;integerDec: &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%2B%2B/GHC.Base.html#%2B%2B"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679071999"><span class="hs-identifier hs-var">fun</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%2B%2B/GHC.Base.html#%2B%2B"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;: the impossible happened.&quot;</span></span><span>
+</span><span id="line-343"></span><span>
+</span><span id="line-344"></span><span>    </span><span class="annot"><a href="#local-6989586621679072001"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Internal.html#Builder"><span class="hs-identifier hs-type">Builder</span></a></span><span>
+</span><span id="line-345"></span><span>    </span><span id="local-6989586621679072001"><span class="annot"><span class="annottext">go :: Integer -&gt; Builder
+</span><a href="#local-6989586621679072001"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679071997"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071997"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071997"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#%3C/GHC.Classes.html#%3C"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var">maxPow10</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier hs-var">intDec</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071997"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-346"></span><span>         </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#otherwise/GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span>    </span><span class="hs-glyph">=</span><span>
+</span><span id="line-347"></span><span>             </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071996"><span class="hs-identifier hs-var">putH</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; [Integer]
+</span><a href="#local-6989586621679071995"><span class="hs-identifier hs-var">splitf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var">maxPow10</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2A/GHC.Num.html#%2A"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var">maxPow10</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071997"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-348"></span><span>               </span><span class="hs-special">(</span><span id="local-6989586621679071993"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071993"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679071992"><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679071992"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder
+</span><a href="Data.ByteString.Builder.ASCII.html#intDec"><span class="hs-identifier hs-var">intDec</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071993"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Monoid a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#mappend/GHC.Base.html#mappend"><span class="hs-operator hs-var">`mappend`</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int -&gt; [Int] -&gt; Builder
+forall a. BoundedPrim a -&gt; [a] -&gt; Builder
+</span><a href="Data.ByteString.Builder.Prim.html#primMapListBounded"><span class="hs-identifier hs-var">P.primMapListBounded</span></a></span><span> </span><span class="annot"><span class="annottext">BoundedPrim Int
+</span><a href="Data.ByteString.Builder.ASCII.html#intDecPadded"><span class="hs-identifier hs-var">intDecPadded</span></a></span><span> </span><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679071992"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-349"></span><span>               </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; Builder
+forall a. String -&gt; a
+</span><a href="#local-6989586621679072000"><span class="hs-identifier hs-var">errImpossible</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;integerDec: go&quot;</span></span><span>
+</span><span id="line-350"></span><span>
+</span><span id="line-351"></span><span>    </span><span class="annot"><a href="#local-6989586621679071995"><span class="hs-identifier hs-type">splitf</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-352"></span><span>    </span><span id="local-6989586621679071995"><span class="annot"><span class="annottext">splitf :: Integer -&gt; Integer -&gt; [Integer]
+</span><a href="#local-6989586621679071995"><span class="hs-identifier hs-var hs-var">splitf</span></a></span></span><span> </span><span id="local-6989586621679071989"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span></span><span> </span><span id="local-6989586621679071988"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071988"><span class="hs-identifier hs-var">n0</span></a></span></span><span>
+</span><span id="line-353"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#%3E/GHC.Classes.html#%3E"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071988"><span class="hs-identifier hs-var">n0</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071988"><span class="hs-identifier hs-var">n0</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-354"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#otherwise/GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071986"><span class="hs-identifier hs-var">splith</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; [Integer]
+</span><a href="#local-6989586621679071995"><span class="hs-identifier hs-var">splitf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2A/GHC.Num.html#%2A"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071988"><span class="hs-identifier hs-var">n0</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-355"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-356"></span><span>        </span><span id="local-6989586621679071986"><span class="annot"><span class="annottext">splith :: [Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071986"><span class="hs-identifier hs-var hs-var">splith</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Integer]
+forall a. String -&gt; a
+</span><a href="#local-6989586621679072000"><span class="hs-identifier hs-var">errImpossible</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;splith&quot;</span></span><span>
+</span><span id="line-357"></span><span>        </span><span class="annot"><a href="#local-6989586621679071986"><span class="hs-identifier hs-var">splith</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071985"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071985"><span class="hs-identifier hs-var">n</span></a></span></span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679071984"><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071984"><span class="hs-identifier hs-var">ns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-358"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071985"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; (# Integer, Integer #)
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#quotRemInteger/GHC.Integer.Type.html#quotRemInteger"><span class="hs-operator hs-var">`quotRemInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-359"></span><span>                </span><span id="local-6989586621679071983"></span><span class="hs-identifier">PAIR</span><span class="hs-special">(</span><span id="local-6989586621679071982"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071982"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">,</span><span class="hs-identifier">r</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071983"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#%3E/GHC.Classes.html#%3E"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071983"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Integer] -&gt; [Integer]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071982"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Integer] -&gt; [Integer]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071981"><span class="hs-identifier hs-var">splitb</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071984"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-360"></span><span>                          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#otherwise/GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>     </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071982"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Integer] -&gt; [Integer]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071981"><span class="hs-identifier hs-var">splitb</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071984"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-361"></span><span>
+</span><span id="line-362"></span><span>        </span><span id="local-6989586621679071981"><span class="annot"><span class="annottext">splitb :: [Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071981"><span class="hs-identifier hs-var hs-var">splitb</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-363"></span><span>        </span><span class="annot"><a href="#local-6989586621679071981"><span class="hs-identifier hs-var">splitb</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071980"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071980"><span class="hs-identifier hs-var">n</span></a></span></span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679071979"><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071979"><span class="hs-identifier hs-var">ns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071980"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; (# Integer, Integer #)
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#quotRemInteger/GHC.Integer.Type.html#quotRemInteger"><span class="hs-operator hs-var">`quotRemInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071989"><span class="hs-identifier hs-var">pow10</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-364"></span><span>                            </span><span id="local-6989586621679071978"></span><span class="hs-identifier">PAIR</span><span class="hs-special">(</span><span id="local-6989586621679071977"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071977"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">,</span><span class="hs-identifier">r</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071978"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Integer] -&gt; [Integer]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071977"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Integer] -&gt; [Integer]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Integer]
+</span><a href="#local-6989586621679071981"><span class="hs-identifier hs-var">splitb</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071979"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-365"></span><span>
+</span><span id="line-366"></span><span>    </span><span class="annot"><a href="#local-6989586621679071996"><span class="hs-identifier hs-type">putH</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-367"></span><span>    </span><span id="local-6989586621679071996"><span class="annot"><span class="annottext">putH :: [Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071996"><span class="hs-identifier hs-var hs-var">putH</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [Int]
+forall a. String -&gt; a
+</span><a href="#local-6989586621679072000"><span class="hs-identifier hs-var">errImpossible</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;putH&quot;</span></span><span>
+</span><span id="line-368"></span><span>    </span><span class="annot"><a href="#local-6989586621679071996"><span class="hs-identifier hs-var">putH</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071976"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071976"><span class="hs-identifier hs-var">n</span></a></span></span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679071975"><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071975"><span class="hs-identifier hs-var">ns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071976"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; (# Integer, Integer #)
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#quotRemInteger/GHC.Integer.Type.html#quotRemInteger"><span class="hs-operator hs-var">`quotRemInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var">maxPow10</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-369"></span><span>                    </span><span id="local-6989586621679071974"></span><span class="hs-identifier">PAIR</span><span class="hs-special">(</span><span id="local-6989586621679071973"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071973"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span class="hs-identifier">y</span><span class="hs-special">)</span><span>
+</span><span id="line-370"></span><span>                        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071972"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Classes.html#%3E/GHC.Classes.html#%3E"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071972"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; [Int]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071971"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; [Int]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071970"><span class="hs-identifier hs-var">putB</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071975"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-371"></span><span>                        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#otherwise/GHC.Base.html#otherwise"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>     </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679071971"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; [Int]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071970"><span class="hs-identifier hs-var">putB</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071975"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-372"></span><span>                        </span><span class="hs-keyword">where</span><span> </span><span id="local-6989586621679071972"><span class="annot"><span class="annottext">q :: Int
+</span><a href="#local-6989586621679071972"><span class="hs-identifier hs-var hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071974"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-373"></span><span>                              </span><span id="local-6989586621679071971"><span class="annot"><span class="annottext">r :: Int
+</span><a href="#local-6989586621679071971"><span class="hs-identifier hs-var hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071973"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-374"></span><span>
+</span><span id="line-375"></span><span>    </span><span class="annot"><a href="#local-6989586621679071970"><span class="hs-identifier hs-type">putB</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#Integer/GHC.Integer.Type.html#Integer"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-376"></span><span>    </span><span id="local-6989586621679071970"><span class="annot"><span class="annottext">putB :: [Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071970"><span class="hs-identifier hs-var hs-var">putB</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-377"></span><span>    </span><span class="annot"><a href="#local-6989586621679071970"><span class="hs-identifier hs-var">putB</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679071969"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071969"><span class="hs-identifier hs-var">n</span></a></span></span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679071968"><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071968"><span class="hs-identifier hs-var">ns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071969"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; (# Integer, Integer #)
+</span><a href="../../integer-gmp-1.0.3.0/src/GHC-Integer-Type.html#quotRemInteger/GHC.Integer.Type.html#quotRemInteger"><span class="hs-operator hs-var">`quotRemInteger`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="Data.ByteString.Builder.ASCII.html#maxPow10"><span class="hs-identifier hs-var">maxPow10</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-378"></span><span>                    </span><span id="local-6989586621679071967"></span><span class="hs-identifier">PAIR</span><span class="hs-special">(</span><span id="local-6989586621679071966"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071966"><span class="hs-identifier hs-var">q</span></a></span></span><span class="hs-special">,</span><span class="hs-identifier">r</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071967"><span class="hs-identifier hs-var">q</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; [Int]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679071966"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; [Int]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#%3A/GHC.Types.html#%3A"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [Int]
+</span><a href="#local-6989586621679071970"><span class="hs-identifier hs-var">putB</span></a></span><span> </span><span class="annot"><span class="annottext">[Integer]
+</span><a href="#local-6989586621679071968"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-379"></span><span>
+</span><span id="line-380"></span><span>
+</span><span id="line-381"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-keyword">ccall</span></span><span> </span><span class="annot"><span class="hs-keyword">unsafe</span></span><span> </span><span class="annot"><span class="hs-string">&quot;static _hs_bytestring_int_dec_padded9&quot;</span></span><span>
+</span><span id="line-382"></span><span>    </span><span id="c_int_dec_padded9"><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#c_int_dec_padded9"><span class="hs-identifier hs-var">c_int_dec_padded9</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign-C-Types.html#CInt/Foreign.C.Types.html#CInt"><span class="hs-identifier hs-type">CInt</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Ptr.html#Ptr/GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-383"></span><span>
+</span><span id="line-384"></span><span class="hs-keyword">foreign</span><span> </span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-keyword">ccall</span></span><span> </span><span class="annot"><span class="hs-keyword">unsafe</span></span><span> </span><span class="annot"><span class="hs-string">&quot;static _hs_bytestring_long_long_int_dec_padded18&quot;</span></span><span>
+</span><span id="line-385"></span><span>    </span><span id="c_long_long_int_dec_padded18"><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#c_long_long_int_dec_padded18"><span class="hs-identifier hs-var">c_long_long_int_dec_padded18</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Foreign-C-Types.html#CLLong/Foreign.C.Types.html#CLLong"><span class="hs-identifier hs-type">CLLong</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Ptr.html#Ptr/GHC.Ptr.html#Ptr"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Word.html#Word8/GHC.Word.html#Word8"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#IO/GHC.Types.html#IO"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-386"></span><span>
+</span><span id="line-387"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#intDecPadded"><span class="hs-pragma hs-type">intDecPadded</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-388"></span><span class="annot"><a href="Data.ByteString.Builder.ASCII.html#intDecPadded"><span class="hs-identifier hs-type">intDecPadded</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.ByteString.Builder.Prim.Internal.html#BoundedPrim"><span class="hs-identifier hs-type">P.BoundedPrim</span></a></span><span> </span><span class="annot"><a href="../../ghc-prim-0.6.1/src/GHC-Types.html#Int/GHC.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-389"></span><span id="intDecPadded"><span class="annot"><span class="annottext">intDecPadded :: BoundedPrim Int
+</span><a href="Data.ByteString.Builder.ASCII.html#intDecPadded"><span class="hs-identifier hs-var hs-var">intDecPadded</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FixedPrim Int -&gt; BoundedPrim Int
+forall a. FixedPrim a -&gt; BoundedPrim a
+</span><a href="Data.ByteString.Builder.Prim.Internal.html#liftFixedToBounded"><span class="hs-identifier hs-var">P.liftFixedToBounded</span></a></span><span> </span><span class="annot"><span class="annottext">(FixedPrim Int -&gt; BoundedPrim Int)
+-&gt; FixedPrim Int -&gt; BoundedPrim Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FixedPrim Int -&gt; FixedPrim Int -&gt; FixedPrim Int
+forall a. a -&gt; a -&gt; a
+</span><a href="Data.ByteString.Builder.Prim.Internal.UncheckedShifts.html#caseWordSize_32_64"><span class="hs-identifier hs-var">caseWordSize_32_64</span></a></span><span>
+</span><span id="line-390"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; (Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int
+forall a. Int -&gt; (a -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim a
+</span><a href="Data.ByteString.Builder.Prim.Internal.html#fixedPrim"><span class="hs-identifier hs-var">P.fixedPrim</span></a></span><span>  </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">9</span></span><span> </span><span class="annot"><span class="annottext">((Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int)
+-&gt; (Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CInt -&gt; Ptr Word8 -&gt; IO ()
+</span><a href="Data.ByteString.Builder.ASCII.html#c_int_dec_padded9"><span class="hs-identifier hs-var">c_int_dec_padded9</span></a></span><span>            </span><span class="annot"><span class="annottext">(CInt -&gt; Ptr Word8 -&gt; IO ())
+-&gt; (Int -&gt; CInt) -&gt; Int -&gt; Ptr Word8 -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; CInt
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromIntegral/GHC.Real.html#fromIntegral"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-391"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; (Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int
+forall a. Int -&gt; (a -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim a
+</span><a href="Data.ByteString.Builder.Prim.Internal.html#fixedPrim"><span class="hs-identifier hs-var">P.fixedPrim</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">18</span></span><span> </span><span class="annot"><span class="annottext">((Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int)
+-&gt; (Int -&gt; Ptr Word8 -&gt; IO ()) -&gt; FixedPrim Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24/GHC.Base.html#%24"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CLLong -&gt; Ptr Word8 -&gt; IO ()
+</span><a href="Data.ByteString.Builder.ASCII.html#c_long_long_int_dec_padded18"><span class="hs-identifier hs-var">c_long_long_int_dec_padded18</span></a></span><span> </span><span class="annot"><span class="annottext">(CLLong -&gt; Ptr Word8 -&gt; IO ())
+-&gt; (Int -&gt; CLLong) -&gt; Int -&gt; Ptr Word8 -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; CLLong
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromIntegral/GHC.Real.html#fromIntegral"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+
+#else
+</span><span class="hs-comment">-- compilers other than GHC</span><span>
+</span><span id="line-395"></span><span>
+</span><span id="line-396"></span><span class="hs-comment">-- | Decimal encoding of an 'Integer' using the ASCII digits. Implemented</span><span>
+</span><span id="line-397"></span><span class="hs-comment">-- using via the 'Show' instance of 'Integer's.</span><span>
+</span><span id="line-398"></span><span class="hs-identifier">integerDec</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Integer</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Builder</span><span>
+</span><span id="line-399"></span><span class="hs-identifier">integerDec</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">string7</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">show</span><span class="hs-cpp">
+#endif
+</span></pre></body></html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE Trustworthy #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# OPTIONS -fno-warn-unused-imports #-}</span><span>
+</span><span id="line-3"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Time.Clock.Internal.DiffTime</span><span>
+</span><span id="line-4"></span><span>    </span><span class="hs-special">(</span><span>
+</span><span id="line-5"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Absolute intervals</span></span><span>
+</span><span id="line-6"></span><span>    </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier">DiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-7"></span><span>    </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#secondsToDiffTime"><span class="hs-identifier">secondsToDiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-8"></span><span>    </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#picosecondsToDiffTime"><span class="hs-identifier">picosecondsToDiffTime</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#diffTimeToPicoseconds"><span class="hs-identifier">diffTimeToPicoseconds</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Typeable.html#/Data.Typeable.html"><span class="hs-identifier">Data.Typeable</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Data.html#/Data.Data.html"><span class="hs-identifier">Data.Data</span></a></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Ratio.html#/Data.Ratio.html"><span class="hs-identifier">Data.Ratio</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#%25/GHC.Real.html#%25"><span class="hs-operator">(%)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Fixed.html#/Data.Fixed.html"><span class="hs-identifier">Data.Fixed</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../deepseq-1.4.4.0/src/Control-DeepSeq.html#/Control.DeepSeq.html"><span class="hs-identifier">Control.DeepSeq</span></a></span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- | This is a length of time, as measured by a clock.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- Conversion functions will treat it as seconds.</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- It has a precision of 10^-12 s.</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">newtype</span><span> </span><span id="DiffTime"><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-var">DiffTime</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="MkDiffTime"><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span></span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Fixed.html#Pico/Data.Fixed.html#Pico"><span class="hs-identifier hs-type">Pico</span></a></span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679064103"><span id="local-6989586621679064105"><span class="annot"><span class="annottext">DiffTime -&gt; DiffTime -&gt; Bool
+(DiffTime -&gt; DiffTime -&gt; Bool)
+-&gt; (DiffTime -&gt; DiffTime -&gt; Bool) -&gt; Eq DiffTime
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DiffTime -&gt; DiffTime -&gt; Bool
+$c/= :: DiffTime -&gt; DiffTime -&gt; Bool
+== :: DiffTime -&gt; DiffTime -&gt; Bool
+$c== :: DiffTime -&gt; DiffTime -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span id="local-6989586621679064087"><span id="local-6989586621679064089"><span id="local-6989586621679064091"><span id="local-6989586621679064093"><span id="local-6989586621679064095"><span id="local-6989586621679064097"><span id="local-6989586621679064099"><span class="annot"><span class="annottext">Eq DiffTime
+Eq DiffTime
+-&gt; (DiffTime -&gt; DiffTime -&gt; Ordering)
+-&gt; (DiffTime -&gt; DiffTime -&gt; Bool)
+-&gt; (DiffTime -&gt; DiffTime -&gt; Bool)
+-&gt; (DiffTime -&gt; DiffTime -&gt; Bool)
+-&gt; (DiffTime -&gt; DiffTime -&gt; Bool)
+-&gt; (DiffTime -&gt; DiffTime -&gt; DiffTime)
+-&gt; (DiffTime -&gt; DiffTime -&gt; DiffTime)
+-&gt; Ord DiffTime
+DiffTime -&gt; DiffTime -&gt; Bool
+DiffTime -&gt; DiffTime -&gt; Ordering
+DiffTime -&gt; DiffTime -&gt; DiffTime
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: DiffTime -&gt; DiffTime -&gt; DiffTime
+$cmin :: DiffTime -&gt; DiffTime -&gt; DiffTime
+max :: DiffTime -&gt; DiffTime -&gt; DiffTime
+$cmax :: DiffTime -&gt; DiffTime -&gt; DiffTime
+&gt;= :: DiffTime -&gt; DiffTime -&gt; Bool
+$c&gt;= :: DiffTime -&gt; DiffTime -&gt; Bool
+&gt; :: DiffTime -&gt; DiffTime -&gt; Bool
+$c&gt; :: DiffTime -&gt; DiffTime -&gt; Bool
+&lt;= :: DiffTime -&gt; DiffTime -&gt; Bool
+$c&lt;= :: DiffTime -&gt; DiffTime -&gt; Bool
+&lt; :: DiffTime -&gt; DiffTime -&gt; Bool
+$c&lt; :: DiffTime -&gt; DiffTime -&gt; Bool
+compare :: DiffTime -&gt; DiffTime -&gt; Ordering
+$ccompare :: DiffTime -&gt; DiffTime -&gt; Ordering
+$cp1Ord :: Eq DiffTime
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span id="%24cMkDiffTime"><span id="%24tDiffTime"><span id="local-6989586621679064057"><span id="local-6989586621679064059"><span id="local-6989586621679064061"><span id="local-6989586621679064063"><span id="local-6989586621679064065"><span id="local-6989586621679064067"><span id="local-6989586621679064069"><span id="local-6989586621679064071"><span id="local-6989586621679064073"><span id="local-6989586621679064075"><span id="local-6989586621679064077"><span id="local-6989586621679064079"><span id="local-6989586621679064081"><span id="local-6989586621679064083"><span class="annot"><span class="annottext">Typeable DiffTime
+DataType
+Constr
+Typeable DiffTime
+-&gt; (forall (c :: * -&gt; *).
+    (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+    -&gt; (forall g. g -&gt; c g) -&gt; DiffTime -&gt; c DiffTime)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DiffTime)
+-&gt; (DiffTime -&gt; Constr)
+-&gt; (DiffTime -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c DiffTime))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c DiffTime))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; DiffTime -&gt; DiffTime)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime)
+-&gt; Data DiffTime
+DiffTime -&gt; DataType
+DiffTime -&gt; Constr
+(forall b. Data b =&gt; b -&gt; b) -&gt; DiffTime -&gt; DiffTime
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; DiffTime -&gt; c DiffTime
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DiffTime
+forall a.
+Typeable a
+-&gt; (forall (c :: * -&gt; *).
+    (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+    -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DiffTime
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; DiffTime -&gt; c DiffTime
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c DiffTime)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c DiffTime)
+$cMkDiffTime :: Constr
+$tDiffTime :: DataType
+gmapMo :: (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+gmapMp :: (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+gmapM :: (forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; DiffTime -&gt; m DiffTime
+gmapQi :: Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; u
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; u
+gmapQ :: (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; [u]
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; DiffTime -&gt; [u]
+gmapQr :: (r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+gmapQl :: (r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; DiffTime -&gt; r
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; DiffTime -&gt; DiffTime
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; DiffTime -&gt; DiffTime
+dataCast2 :: (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c DiffTime)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c DiffTime)
+dataCast1 :: (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c DiffTime)
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c DiffTime)
+dataTypeOf :: DiffTime -&gt; DataType
+$cdataTypeOf :: DiffTime -&gt; DataType
+toConstr :: DiffTime -&gt; Constr
+$ctoConstr :: DiffTime -&gt; Constr
+gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DiffTime
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c DiffTime
+gfoldl :: (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; DiffTime -&gt; c DiffTime
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; DiffTime -&gt; c DiffTime
+$cp1Data :: Typeable DiffTime
+</span><a href="../../base-4.14.3.0/src/Data-Data.html#Data/Data.Data.html#Data"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Typeable-Internal.html#Typeable/Data.Typeable.Internal.html#Typeable"><span class="hs-identifier hs-type">Typeable</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../deepseq-1.4.4.0/src/Control-DeepSeq.html#NFData/Control.DeepSeq.html#NFData"><span class="hs-identifier hs-type">NFData</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span> </span><span class="hs-comment">-- FIXME: Data.Fixed had no NFData instances yet at time of writing</span><span>
+</span><span id="line-26"></span><span>        </span><span id="local-6989586621679064051"><span class="annot"><span class="annottext">rnf :: DiffTime -&gt; ()
+</span><a href="../../deepseq-1.4.4.0/src/Control-DeepSeq.html#rnf/Control.DeepSeq.html#rnf"><span class="hs-identifier hs-var hs-var hs-var hs-var">rnf</span></a></span></span><span> </span><span id="local-6989586621679064049"><span class="annot"><span class="annottext">DiffTime
+</span><a href="#local-6989586621679064049"><span class="hs-identifier hs-var">dt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DiffTime -&gt; () -&gt; ()
+</span><span class="hs-identifier hs-var">seq</span></span><span> </span><span class="annot"><span class="annottext">DiffTime
+</span><a href="#local-6989586621679064049"><span class="hs-identifier hs-var">dt</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Enum.html#Enum/GHC.Enum.html#Enum"><span class="hs-identifier hs-type">Enum</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>    </span><span id="local-6989586621679064039"><span class="annot"><span class="annottext">succ :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#succ/GHC.Enum.html#succ"><span class="hs-identifier hs-var hs-var hs-var hs-var">succ</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064037"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064037"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Enum a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#succ/GHC.Enum.html#succ"><span class="hs-identifier hs-var">succ</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064037"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>    </span><span id="local-6989586621679064036"><span class="annot"><span class="annottext">pred :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#pred/GHC.Enum.html#pred"><span class="hs-identifier hs-var hs-var hs-var hs-var">pred</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064034"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064034"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Enum a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#pred/GHC.Enum.html#pred"><span class="hs-identifier hs-var">pred</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064034"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>    </span><span id="local-6989586621679064033"><span class="annot"><span class="annottext">toEnum :: Int -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#toEnum/GHC.Enum.html#toEnum"><span class="hs-identifier hs-var hs-var hs-var hs-var">toEnum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="annot"><span class="annottext">(Pico -&gt; DiffTime) -&gt; (Int -&gt; Pico) -&gt; Int -&gt; DiffTime
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Pico
+forall a. Enum a =&gt; Int -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#toEnum/GHC.Enum.html#toEnum"><span class="hs-identifier hs-var">toEnum</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span id="local-6989586621679064030"><span class="annot"><span class="annottext">fromEnum :: DiffTime -&gt; Int
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#fromEnum/GHC.Enum.html#fromEnum"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromEnum</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064028"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064028"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#fromEnum/GHC.Enum.html#fromEnum"><span class="hs-identifier hs-var">fromEnum</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064028"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span id="local-6989586621679064027"><span class="annot"><span class="annottext">enumFrom :: DiffTime -&gt; [DiffTime]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFrom/GHC.Enum.html#enumFrom"><span class="hs-identifier hs-var hs-var hs-var hs-var">enumFrom</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064026"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064026"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Pico -&gt; DiffTime) -&gt; [Pico] -&gt; [DiffTime]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#fmap/GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; [Pico]
+forall a. Enum a =&gt; a -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFrom/GHC.Enum.html#enumFrom"><span class="hs-identifier hs-var">enumFrom</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064026"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>    </span><span id="local-6989586621679064025"><span class="annot"><span class="annottext">enumFromThen :: DiffTime -&gt; DiffTime -&gt; [DiffTime]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromThen/GHC.Enum.html#enumFromThen"><span class="hs-identifier hs-var hs-var hs-var hs-var">enumFromThen</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064024"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064024"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064023"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064023"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Pico -&gt; DiffTime) -&gt; [Pico] -&gt; [DiffTime]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#fmap/GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; [Pico]
+forall a. Enum a =&gt; a -&gt; a -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromThen/GHC.Enum.html#enumFromThen"><span class="hs-identifier hs-var">enumFromThen</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064024"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064023"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>    </span><span id="local-6989586621679064022"><span class="annot"><span class="annottext">enumFromTo :: DiffTime -&gt; DiffTime -&gt; [DiffTime]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromTo/GHC.Enum.html#enumFromTo"><span class="hs-identifier hs-var hs-var hs-var hs-var">enumFromTo</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064021"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064021"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064020"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064020"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Pico -&gt; DiffTime) -&gt; [Pico] -&gt; [DiffTime]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#fmap/GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; [Pico]
+forall a. Enum a =&gt; a -&gt; a -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromTo/GHC.Enum.html#enumFromTo"><span class="hs-identifier hs-var">enumFromTo</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064021"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064020"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>    </span><span id="local-6989586621679064019"><span class="annot"><span class="annottext">enumFromThenTo :: DiffTime -&gt; DiffTime -&gt; DiffTime -&gt; [DiffTime]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromThenTo/GHC.Enum.html#enumFromThenTo"><span class="hs-identifier hs-var hs-var hs-var hs-var">enumFromThenTo</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064018"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064018"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064017"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064017"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064016"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064016"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Pico -&gt; DiffTime) -&gt; [Pico] -&gt; [DiffTime]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#fmap/GHC.Base.html#fmap"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; Pico -&gt; [Pico]
+forall a. Enum a =&gt; a -&gt; a -&gt; a -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Enum.html#enumFromThenTo/GHC.Enum.html#enumFromThenTo"><span class="hs-identifier hs-var">enumFromThenTo</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064018"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064017"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064016"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679064011"><span id="local-6989586621679064014"><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Show.html#Show/GHC.Show.html#Show"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-40"></span><span>    </span><span id="local-6989586621679064009"><span class="annot"><span class="annottext">show :: DiffTime -&gt; String
+</span><a href="../../base-4.14.3.0/src/GHC-Show.html#show/GHC.Show.html#show"><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679064007"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064007"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; Pico -&gt; String
+forall k (a :: k). HasResolution a =&gt; Bool -&gt; Fixed a -&gt; String
+</span><a href="../../base-4.14.3.0/src/Data-Fixed.html#showFixed/Data.Fixed.html#showFixed"><span class="hs-identifier hs-var">showFixed</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679064007"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%2B%2B/GHC.Base.html#%2B%2B"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;s&quot;</span></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Num.html#Num/GHC.Num.html#Num"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063997"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063997"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679063996"><span class="annot"><span class="annottext">+ :: DiffTime -&gt; DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2B/GHC.Num.html#%2B"><span class="hs-operator hs-var hs-var hs-var hs-var">+</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063994"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063994"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063997"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2B/GHC.Num.html#%2B"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063994"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063993"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063993"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679063992"><span class="annot"><span class="annottext">- :: DiffTime -&gt; DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#-/GHC.Num.html#-"><span class="hs-glyph hs-var hs-var hs-var hs-var">-</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063991"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063991"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063993"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#-/GHC.Num.html#-"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063991"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063990"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063990"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679063989"><span class="annot"><span class="annottext">* :: DiffTime -&gt; DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2A/GHC.Num.html#%2A"><span class="hs-operator hs-var hs-var hs-var hs-var">*</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063987"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063987"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063990"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#%2A/GHC.Num.html#%2A"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063987"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>    </span><span id="local-6989586621679063986"><span class="annot"><span class="annottext">negate :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#negate/GHC.Num.html#negate"><span class="hs-identifier hs-var hs-var hs-var hs-var">negate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063985"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063985"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#negate/GHC.Num.html#negate"><span class="hs-identifier hs-var">negate</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063985"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621679063984"><span class="annot"><span class="annottext">abs :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#abs/GHC.Num.html#abs"><span class="hs-identifier hs-var hs-var hs-var hs-var">abs</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063982"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063982"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#abs/GHC.Num.html#abs"><span class="hs-identifier hs-var">abs</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063982"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>    </span><span id="local-6989586621679063981"><span class="annot"><span class="annottext">signum :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#signum/GHC.Num.html#signum"><span class="hs-identifier hs-var hs-var hs-var hs-var">signum</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063979"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063979"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Num a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#signum/GHC.Num.html#signum"><span class="hs-identifier hs-var">signum</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063979"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>    </span><span id="local-6989586621679063978"><span class="annot"><span class="annottext">fromInteger :: Integer -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromInteger</span></a></span></span><span> </span><span id="local-6989586621679063977"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063977"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Pico
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063977"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-53"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#Real/GHC.Real.html#Real"><span class="hs-identifier hs-type">Real</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>    </span><span id="local-6989586621679063972"><span class="annot"><span class="annottext">toRational :: DiffTime -&gt; Rational
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#toRational/GHC.Real.html#toRational"><span class="hs-identifier hs-var hs-var hs-var hs-var">toRational</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063971"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063971"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Rational
+forall a. Real a =&gt; a -&gt; Rational
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#toRational/GHC.Real.html#toRational"><span class="hs-identifier hs-var">toRational</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063971"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#Fractional/GHC.Real.html#Fractional"><span class="hs-identifier hs-type">Fractional</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063965"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063965"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679063964"><span class="annot"><span class="annottext">/ :: DiffTime -&gt; DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#%2F/GHC.Real.html#%2F"><span class="hs-operator hs-var hs-var hs-var hs-var">/</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063962"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063962"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063965"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Pico -&gt; Pico -&gt; Pico
+forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#%2F/GHC.Real.html#%2F"><span class="hs-operator hs-var">/</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063962"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679063961"><span class="annot"><span class="annottext">recip :: DiffTime -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#recip/GHC.Real.html#recip"><span class="hs-identifier hs-var hs-var hs-var hs-var">recip</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063959"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063959"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Pico -&gt; Pico
+forall a. Fractional a =&gt; a -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#recip/GHC.Real.html#recip"><span class="hs-identifier hs-var">recip</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063959"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>    </span><span id="local-6989586621679063958"><span class="annot"><span class="annottext">fromRational :: Rational -&gt; DiffTime
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromRational/GHC.Real.html#fromRational"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromRational</span></a></span></span><span> </span><span id="local-6989586621679063957"><span class="annot"><span class="annottext">Rational
+</span><a href="#local-6989586621679063957"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Rational -&gt; Pico
+forall a. Fractional a =&gt; Rational -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#fromRational/GHC.Real.html#fromRational"><span class="hs-identifier hs-var">fromRational</span></a></span><span> </span><span class="annot"><span class="annottext">Rational
+</span><a href="#local-6989586621679063957"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- necessary because H98 doesn't have &quot;cunning newtype&quot; derivation</span><span>
+</span><span id="line-63"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#RealFrac/GHC.Real.html#RealFrac"><span class="hs-identifier hs-type">RealFrac</span></a></span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-64"></span><span>    </span><span id="local-6989586621679063948"><span class="annot"><span class="annottext">properFraction :: DiffTime -&gt; (b, DiffTime)
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#properFraction/GHC.Real.html#properFraction"><span class="hs-identifier hs-var hs-var hs-var hs-var">properFraction</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063946"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063946"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679063945"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679063945"><span class="hs-identifier hs-var">b'</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679063944"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063944"><span class="hs-identifier hs-var">a'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; (b, Pico)
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; (b, a)
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#properFraction/GHC.Real.html#properFraction"><span class="hs-identifier hs-var">properFraction</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063946"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679063945"><span class="hs-identifier hs-var">b'</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063944"><span class="hs-identifier hs-var">a'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621679063943"><span class="annot"><span class="annottext">truncate :: DiffTime -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#truncate/GHC.Real.html#truncate"><span class="hs-identifier hs-var hs-var hs-var hs-var">truncate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063941"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063941"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#truncate/GHC.Real.html#truncate"><span class="hs-identifier hs-var">truncate</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063941"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621679063940"><span class="annot"><span class="annottext">round :: DiffTime -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#round/GHC.Real.html#round"><span class="hs-identifier hs-var hs-var hs-var hs-var">round</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063938"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063938"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#round/GHC.Real.html#round"><span class="hs-identifier hs-var">round</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063938"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679063937"><span class="annot"><span class="annottext">ceiling :: DiffTime -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#ceiling/GHC.Real.html#ceiling"><span class="hs-identifier hs-var hs-var hs-var hs-var">ceiling</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063935"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063935"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#ceiling/GHC.Real.html#ceiling"><span class="hs-identifier hs-var">ceiling</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063935"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span id="local-6989586621679063934"><span class="annot"><span class="annottext">floor :: DiffTime -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#floor/GHC.Real.html#floor"><span class="hs-identifier hs-var hs-var hs-var hs-var">floor</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063932"><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063932"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Real.html#floor/GHC.Real.html#floor"><span class="hs-identifier hs-var">floor</span></a></span><span> </span><span class="annot"><span class="annottext">Pico
+</span><a href="#local-6989586621679063932"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- | Create a 'DiffTime' which represents an integral number of seconds.</span><span>
+</span><span id="line-71"></span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#secondsToDiffTime"><span class="hs-identifier hs-type">secondsToDiffTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span>
+</span><span id="line-72"></span><span id="secondsToDiffTime"><span class="annot"><span class="annottext">secondsToDiffTime :: Integer -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#secondsToDiffTime"><span class="hs-identifier hs-var hs-var">secondsToDiffTime</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; DiffTime
+forall a. Num a =&gt; Integer -&gt; a
+</span><a href="../../base-4.14.3.0/src/GHC-Num.html#fromInteger/GHC.Num.html#fromInteger"><span class="hs-identifier hs-var">fromInteger</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- | Create a 'DiffTime' from a number of picoseconds.</span><span>
+</span><span id="line-75"></span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#picosecondsToDiffTime"><span class="hs-identifier hs-type">picosecondsToDiffTime</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span>
+</span><span id="line-76"></span><span id="picosecondsToDiffTime"><span class="annot"><span class="annottext">picosecondsToDiffTime :: Integer -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#picosecondsToDiffTime"><span class="hs-identifier hs-var hs-var">picosecondsToDiffTime</span></a></span></span><span> </span><span id="local-6989586621679063931"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063931"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Pico -&gt; DiffTime
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-var">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Pico
+forall k (a :: k). Integer -&gt; Fixed a
+</span><a href="../../base-4.14.3.0/src/Data-Fixed.html#MkFixed/Data.Fixed.html#MkFixed"><span class="hs-identifier hs-var">MkFixed</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063931"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | Get the number of picoseconds in a 'DiffTime'.</span><span>
+</span><span id="line-79"></span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#diffTimeToPicoseconds"><span class="hs-identifier hs-type">diffTimeToPicoseconds</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#DiffTime"><span class="hs-identifier hs-type">DiffTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span>
+</span><span id="line-80"></span><span id="diffTimeToPicoseconds"><span class="annot"><span class="annottext">diffTimeToPicoseconds :: DiffTime -&gt; Integer
+</span><a href="Data.Time.Clock.Internal.DiffTime.html#diffTimeToPicoseconds"><span class="hs-identifier hs-var hs-var">diffTimeToPicoseconds</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-identifier hs-type">MkDiffTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Fixed.html#MkFixed/Data.Fixed.html#MkFixed"><span class="hs-identifier hs-type">MkFixed</span></a></span><span> </span><span id="local-6989586621679063929"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063929"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679063929"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span class="hs-pragma">{-# RULES</span><span>
+</span><span id="line-83"></span><span class="annot"><span class="hs-pragma">&quot;realToFrac/DiffTime-&gt;Pico&quot;</span></span><span>              </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#realToFrac/GHC.Real.html#realToFrac"><span class="hs-pragma hs-type">realToFrac</span></a></span><span> </span><span class="hs-pragma">=</span><span> </span><span class="hs-pragma">\</span><span> </span><span class="hs-pragma">(</span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-pragma hs-type">MkDiffTime</span></a></span><span> </span><span id="local-6989586621679063928"><span class="annot"><a href="#local-6989586621679063928"><span class="hs-pragma hs-var">ps</span></a></span></span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679063928"><span class="hs-pragma hs-type">ps</span></a></span><span>
+</span><span id="line-84"></span><span class="annot"><span class="hs-pragma">&quot;realToFrac/Pico-&gt;DiffTime&quot;</span></span><span>              </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Real.html#realToFrac/GHC.Real.html#realToFrac"><span class="hs-pragma hs-type">realToFrac</span></a></span><span> </span><span class="hs-pragma">=</span><span> </span><span class="annot"><a href="Data.Time.Clock.Internal.DiffTime.html#MkDiffTime"><span class="hs-pragma hs-type">MkDiffTime</span></a></span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-86"></span></pre></body></html>

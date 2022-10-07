@@ -1,0 +1,734 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveDataTypeable #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE StandaloneDeriving #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Store.TypeHash.Internal</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">NFData</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">when</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">unless</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Crypto.Hash.SHA1</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">SHA1</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Char</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">isUpper</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">isLower</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Data</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Functor.Contravariant</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Generics</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">listify</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">sortBy</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Monoid</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-operator">(&lt;&gt;)</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Ord</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">comparing</span></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Proxy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Proxy</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Store.html"><span class="hs-identifier">Data.Store</span></a></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Data.Store.Internal.html"><span class="hs-identifier">Data.Store.Internal</span></a></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Generic</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.ReifyMany</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">reifyMany</span></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">unsafeTExpCoerce</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-pragma">{-# DEPRECATED</span><span> </span><span class="hs-pragma">mkManyHasTypeHash</span><span class="hs-pragma">,</span><span> </span><span class="hs-pragma">mkHasTypeHash</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-pragma">&quot;Use of Data.Store.TypeHash isn't recommended, as the hashes are too unstable for most uses.  Please instead consider using Data.Store.Version.  See https://github.com/fpco/store/issues/53&quot;</span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span id="local-6989586621679541813"><span id="local-6989586621679541814"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Tagged"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-var">Tagged</span></a></span></span><span> </span><span id="local-6989586621679541899"><span class="annot"><a href="#local-6989586621679541899"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Tagged"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-var">Tagged</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unTagged"><span class="annot"><span class="annottext">Tagged a -&gt; a
+</span><a href="Data.Store.TypeHash.Internal.html#unTagged"><span class="hs-identifier hs-var hs-var">unTagged</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679541899"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679541807"><span id="local-6989586621679541809"><span class="annot"><span class="annottext">Tagged a -&gt; Tagged a -&gt; Bool
+(Tagged a -&gt; Tagged a -&gt; Bool)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Bool) -&gt; Eq (Tagged a)
+forall a. Eq a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Tagged a -&gt; Tagged a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+== :: Tagged a -&gt; Tagged a -&gt; Bool
+$c== :: forall a. Eq a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541791"><span id="local-6989586621679541793"><span id="local-6989586621679541795"><span id="local-6989586621679541797"><span id="local-6989586621679541799"><span id="local-6989586621679541801"><span id="local-6989586621679541803"><span class="annot"><span class="annottext">Eq (Tagged a)
+Eq (Tagged a)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Ordering)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Bool)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Bool)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Bool)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Bool)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Tagged a)
+-&gt; (Tagged a -&gt; Tagged a -&gt; Tagged a)
+-&gt; Ord (Tagged a)
+Tagged a -&gt; Tagged a -&gt; Bool
+Tagged a -&gt; Tagged a -&gt; Ordering
+Tagged a -&gt; Tagged a -&gt; Tagged a
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall a. Ord a =&gt; Eq (Tagged a)
+forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Ordering
+forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Tagged a
+min :: Tagged a -&gt; Tagged a -&gt; Tagged a
+$cmin :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Tagged a
+max :: Tagged a -&gt; Tagged a -&gt; Tagged a
+$cmax :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Tagged a
+&gt;= :: Tagged a -&gt; Tagged a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+&gt; :: Tagged a -&gt; Tagged a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+&lt;= :: Tagged a -&gt; Tagged a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+&lt; :: Tagged a -&gt; Tagged a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Bool
+compare :: Tagged a -&gt; Tagged a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; Tagged a -&gt; Tagged a -&gt; Ordering
+$cp1Ord :: forall a. Ord a =&gt; Eq (Tagged a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541784"><span id="local-6989586621679541786"><span id="local-6989586621679541788"><span class="annot"><span class="annottext">Int -&gt; Tagged a -&gt; ShowS
+[Tagged a] -&gt; ShowS
+Tagged a -&gt; String
+(Int -&gt; Tagged a -&gt; ShowS)
+-&gt; (Tagged a -&gt; String) -&gt; ([Tagged a] -&gt; ShowS) -&gt; Show (Tagged a)
+forall a. Show a =&gt; Int -&gt; Tagged a -&gt; ShowS
+forall a. Show a =&gt; [Tagged a] -&gt; ShowS
+forall a. Show a =&gt; Tagged a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Tagged a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [Tagged a] -&gt; ShowS
+show :: Tagged a -&gt; String
+$cshow :: forall a. Show a =&gt; Tagged a -&gt; String
+showsPrec :: Int -&gt; Tagged a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; Tagged a -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="%24cTagged"><span id="%24tTagged"><span id="local-6989586621679541754"><span id="local-6989586621679541756"><span id="local-6989586621679541758"><span id="local-6989586621679541760"><span id="local-6989586621679541762"><span id="local-6989586621679541764"><span id="local-6989586621679541766"><span id="local-6989586621679541768"><span id="local-6989586621679541770"><span id="local-6989586621679541772"><span id="local-6989586621679541774"><span id="local-6989586621679541776"><span id="local-6989586621679541778"><span id="local-6989586621679541780"><span class="annot"><span class="annottext">Typeable (Tagged a)
+DataType
+Constr
+Typeable (Tagged a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+    -&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a))
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a))
+-&gt; (Tagged a -&gt; Constr)
+-&gt; (Tagged a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a)))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c (Tagged a)))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Tagged a -&gt; Tagged a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a))
+-&gt; Data (Tagged a)
+Tagged a -&gt; DataType
+Tagged a -&gt; Constr
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a))
+(forall b. Data b =&gt; b -&gt; b) -&gt; Tagged a -&gt; Tagged a
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a)
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a)
+forall a. Data a =&gt; Typeable (Tagged a)
+forall a. Data a =&gt; Tagged a -&gt; DataType
+forall a. Data a =&gt; Tagged a -&gt; Constr
+forall a.
+Data a =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; Tagged a -&gt; Tagged a
+forall a u.
+Data a =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; u
+forall a u.
+Data a =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; [u]
+forall a r r'.
+Data a =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+forall a r r'.
+Data a =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+forall a (m :: * -&gt; *).
+(Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a)
+forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a)
+forall a (t :: * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a))
+forall a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (Tagged a))
+forall a.
+Typeable a
+-&gt; (forall (c :: * -&gt; *).
+    (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+    -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a)
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a)
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a))
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (Tagged a))
+$cTagged :: Constr
+$tTagged :: DataType
+gmapMo :: (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+$cgmapMo :: forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+gmapMp :: (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+$cgmapMp :: forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+gmapM :: (forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+$cgmapM :: forall a (m :: * -&gt; *).
+(Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Tagged a -&gt; m (Tagged a)
+gmapQi :: Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; u
+$cgmapQi :: forall a u.
+Data a =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; u
+gmapQ :: (forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; [u]
+$cgmapQ :: forall a u.
+Data a =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; Tagged a -&gt; [u]
+gmapQr :: (r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+$cgmapQr :: forall a r r'.
+Data a =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+gmapQl :: (r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+$cgmapQl :: forall a r r'.
+Data a =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Tagged a -&gt; r
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Tagged a -&gt; Tagged a
+$cgmapT :: forall a.
+Data a =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; Tagged a -&gt; Tagged a
+dataCast2 :: (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (Tagged a))
+$cdataCast2 :: forall a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (Tagged a))
+dataCast1 :: (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a))
+$cdataCast1 :: forall a (t :: * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Tagged a))
+dataTypeOf :: Tagged a -&gt; DataType
+$cdataTypeOf :: forall a. Data a =&gt; Tagged a -&gt; DataType
+toConstr :: Tagged a -&gt; Constr
+$ctoConstr :: forall a. Data a =&gt; Tagged a -&gt; Constr
+gunfold :: (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a)
+$cgunfold :: forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Tagged a)
+gfoldl :: (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a)
+$cgfoldl :: forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Tagged a -&gt; c (Tagged a)
+$cp1Data :: forall a. Data a =&gt; Typeable (Tagged a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. Tagged a -&gt; Rep (Tagged a) x)
+-&gt; (forall x. Rep (Tagged a) x -&gt; Tagged a) -&gt; Generic (Tagged a)
+forall x. Rep (Tagged a) x -&gt; Tagged a
+forall x. Tagged a -&gt; Rep (Tagged a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (Tagged a) x -&gt; Tagged a
+forall a x. Tagged a -&gt; Rep (Tagged a) x
+$cto :: forall a x. Rep (Tagged a) x -&gt; Tagged a
+$cfrom :: forall a x. Tagged a -&gt; Rep (Tagged a) x
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span id="local-6989586621679541747"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679541745"><span class="annot"><span class="hs-identifier hs-type">NFData</span></span><span> </span><span class="annot"><a href="#local-6989586621679541747"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NFData</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-type">Tagged</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541747"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span id="local-6989586621679541743"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Store.Impl.html#Store"><span class="hs-identifier hs-type">Store</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541743"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#HasTypeHash"><span class="hs-identifier hs-type">HasTypeHash</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541743"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Data.Store.Impl.html#Store"><span class="hs-identifier hs-type">Store</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-type">Tagged</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679541743"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621679541738"><span class="annot"><span class="annottext">size :: Size (Tagged a)
+</span><a href="Data.Store.Impl.html#size"><span class="hs-identifier hs-var hs-var hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Size (Tagged a) -&gt; Size (Tagged a)
+forall a. Int -&gt; Size a -&gt; Size a
+</span><a href="Data.Store.Impl.html#addSize"><span class="hs-identifier hs-var">addSize</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">20</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Tagged a -&gt; a) -&gt; Size a -&gt; Size (Tagged a)
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><span class="hs-identifier hs-var">contramap</span></span><span> </span><span class="annot"><span class="annottext">Tagged a -&gt; a
+forall a. Tagged a -&gt; a
+</span><a href="Data.Store.TypeHash.Internal.html#unTagged"><span class="hs-identifier hs-var hs-var">unTagged</span></a></span><span> </span><span class="annot"><span class="annottext">Size a
+forall a. Store a =&gt; Size a
+</span><a href="Data.Store.Impl.html#size"><span class="hs-identifier hs-var">size</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621679541734"><span class="annot"><span class="annottext">peek :: Peek (Tagged a)
+</span><a href="Data.Store.Impl.html#peek"><span class="hs-identifier hs-var hs-var hs-var hs-var">peek</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-46"></span><span>        </span><span id="local-6989586621679541732"><span class="annot"><span class="annottext">TypeHash
+</span><a href="#local-6989586621679541732"><span class="hs-identifier hs-var">tag</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Peek TypeHash
+forall a. Store a =&gt; Peek a
+</span><a href="Data.Store.Impl.html#peek"><span class="hs-identifier hs-var">peek</span></a></span><span>
+</span><span id="line-47"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679541731"><span class="annot"><span class="annottext">expected :: TypeHash
+</span><a href="#local-6989586621679541731"><span class="hs-identifier hs-var hs-var">expected</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy a -&gt; TypeHash
+forall a. HasTypeHash a =&gt; Proxy a -&gt; TypeHash
+</span><a href="Data.Store.TypeHash.Internal.html#typeHash"><span class="hs-identifier hs-var">typeHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy a
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679541743"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>        </span><span class="annot"><span class="annottext">Bool -&gt; Peek () -&gt; Peek ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypeHash
+</span><a href="#local-6989586621679541732"><span class="hs-identifier hs-var">tag</span></a></span><span> </span><span class="annot"><span class="annottext">TypeHash -&gt; TypeHash -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">TypeHash
+</span><a href="#local-6989586621679541731"><span class="hs-identifier hs-var">expected</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Peek () -&gt; Peek ()) -&gt; Peek () -&gt; Peek ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Peek ()
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Mismatched type hash&quot;</span></span><span>
+</span><span id="line-49"></span><span>        </span><span class="annot"><span class="annottext">a -&gt; Tagged a
+forall a. a -&gt; Tagged a
+</span><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-var">Tagged</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Tagged a) -&gt; Peek a -&gt; Peek (Tagged a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Peek a
+forall a. Store a =&gt; Peek a
+</span><a href="Data.Store.Impl.html#peek"><span class="hs-identifier hs-var">peek</span></a></span><span>
+</span><span id="line-50"></span><span>    </span><span id="local-6989586621679541726"><span class="annot"><span class="annottext">poke :: Tagged a -&gt; Poke ()
+</span><a href="Data.Store.Impl.html#poke"><span class="hs-identifier hs-var hs-var hs-var hs-var">poke</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#Tagged"><span class="hs-identifier hs-type">Tagged</span></a></span><span> </span><span id="local-6989586621679541724"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679541724"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-51"></span><span>        </span><span class="annot"><span class="annottext">TypeHash -&gt; Poke ()
+forall a. Store a =&gt; a -&gt; Poke ()
+</span><a href="Data.Store.Impl.html#poke"><span class="hs-identifier hs-var">poke</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy a -&gt; TypeHash
+forall a. HasTypeHash a =&gt; Proxy a -&gt; TypeHash
+</span><a href="Data.Store.TypeHash.Internal.html#typeHash"><span class="hs-identifier hs-var">typeHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy a
+forall k (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679541743"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>        </span><span class="annot"><span class="annottext">a -&gt; Poke ()
+forall a. Store a =&gt; a -&gt; Poke ()
+</span><a href="Data.Store.Impl.html#poke"><span class="hs-identifier hs-var">poke</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679541724"><span class="hs-identifier hs-var">x</span></a></span></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span id="local-6989586621679541722"><span id="local-6989586621679541723"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="TypeHash"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-var">TypeHash</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TypeHash"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-var">TypeHash</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unTypeHash"><span class="annot"><span class="annottext">TypeHash -&gt; StaticSize 20 ByteString
+</span><a href="Data.Store.TypeHash.Internal.html#unTypeHash"><span class="hs-identifier hs-var hs-var">unTypeHash</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Store.Internal.html#StaticSize"><span class="hs-identifier hs-type">StaticSize</span></a></span><span> </span><span class="annot"><span class="hs-number">20</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">BS.ByteString</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679541716"><span id="local-6989586621679541718"><span class="annot"><span class="annottext">TypeHash -&gt; TypeHash -&gt; Bool
+(TypeHash -&gt; TypeHash -&gt; Bool)
+-&gt; (TypeHash -&gt; TypeHash -&gt; Bool) -&gt; Eq TypeHash
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: TypeHash -&gt; TypeHash -&gt; Bool
+$c/= :: TypeHash -&gt; TypeHash -&gt; Bool
+== :: TypeHash -&gt; TypeHash -&gt; Bool
+$c== :: TypeHash -&gt; TypeHash -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541701"><span id="local-6989586621679541703"><span id="local-6989586621679541705"><span id="local-6989586621679541707"><span id="local-6989586621679541709"><span id="local-6989586621679541711"><span id="local-6989586621679541713"><span class="annot"><span class="annottext">Eq TypeHash
+Eq TypeHash
+-&gt; (TypeHash -&gt; TypeHash -&gt; Ordering)
+-&gt; (TypeHash -&gt; TypeHash -&gt; Bool)
+-&gt; (TypeHash -&gt; TypeHash -&gt; Bool)
+-&gt; (TypeHash -&gt; TypeHash -&gt; Bool)
+-&gt; (TypeHash -&gt; TypeHash -&gt; Bool)
+-&gt; (TypeHash -&gt; TypeHash -&gt; TypeHash)
+-&gt; (TypeHash -&gt; TypeHash -&gt; TypeHash)
+-&gt; Ord TypeHash
+TypeHash -&gt; TypeHash -&gt; Bool
+TypeHash -&gt; TypeHash -&gt; Ordering
+TypeHash -&gt; TypeHash -&gt; TypeHash
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: TypeHash -&gt; TypeHash -&gt; TypeHash
+$cmin :: TypeHash -&gt; TypeHash -&gt; TypeHash
+max :: TypeHash -&gt; TypeHash -&gt; TypeHash
+$cmax :: TypeHash -&gt; TypeHash -&gt; TypeHash
+&gt;= :: TypeHash -&gt; TypeHash -&gt; Bool
+$c&gt;= :: TypeHash -&gt; TypeHash -&gt; Bool
+&gt; :: TypeHash -&gt; TypeHash -&gt; Bool
+$c&gt; :: TypeHash -&gt; TypeHash -&gt; Bool
+&lt;= :: TypeHash -&gt; TypeHash -&gt; Bool
+$c&lt;= :: TypeHash -&gt; TypeHash -&gt; Bool
+&lt; :: TypeHash -&gt; TypeHash -&gt; Bool
+$c&lt; :: TypeHash -&gt; TypeHash -&gt; Bool
+compare :: TypeHash -&gt; TypeHash -&gt; Ordering
+$ccompare :: TypeHash -&gt; TypeHash -&gt; Ordering
+$cp1Ord :: Eq TypeHash
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541695"><span id="local-6989586621679541697"><span id="local-6989586621679541699"><span class="annot"><span class="annottext">Int -&gt; TypeHash -&gt; ShowS
+[TypeHash] -&gt; ShowS
+TypeHash -&gt; String
+(Int -&gt; TypeHash -&gt; ShowS)
+-&gt; (TypeHash -&gt; String) -&gt; ([TypeHash] -&gt; ShowS) -&gt; Show TypeHash
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TypeHash] -&gt; ShowS
+$cshowList :: [TypeHash] -&gt; ShowS
+show :: TypeHash -&gt; String
+$cshow :: TypeHash -&gt; String
+showsPrec :: Int -&gt; TypeHash -&gt; ShowS
+$cshowsPrec :: Int -&gt; TypeHash -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541689"><span id="local-6989586621679541691"><span id="local-6989586621679541693"><span class="annot"><span class="annottext">Peek TypeHash
+Size TypeHash
+Size TypeHash
+-&gt; (TypeHash -&gt; Poke ()) -&gt; Peek TypeHash -&gt; Store TypeHash
+TypeHash -&gt; Poke ()
+forall a. Size a -&gt; (a -&gt; Poke ()) -&gt; Peek a -&gt; Store a
+peek :: Peek TypeHash
+$cpeek :: Peek TypeHash
+poke :: TypeHash -&gt; Poke ()
+$cpoke :: TypeHash -&gt; Poke ()
+size :: Size TypeHash
+$csize :: Size TypeHash
+</span><a href="#local-6989586621679541689"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Store</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. TypeHash -&gt; Rep TypeHash x)
+-&gt; (forall x. Rep TypeHash x -&gt; TypeHash) -&gt; Generic TypeHash
+forall x. Rep TypeHash x -&gt; TypeHash
+forall x. TypeHash -&gt; Rep TypeHash x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep TypeHash x -&gt; TypeHash
+$cfrom :: forall x. TypeHash -&gt; Rep TypeHash x
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></span><span class="hs-special">)</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 710
+</span><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span><span>
+</span><span id="line-59"></span><span id="%24cTypeHash"><span id="%24tTypeHash"><span id="local-6989586621679541658"><span id="local-6989586621679541660"><span id="local-6989586621679541662"><span id="local-6989586621679541664"><span id="local-6989586621679541666"><span id="local-6989586621679541668"><span id="local-6989586621679541670"><span id="local-6989586621679541672"><span id="local-6989586621679541674"><span id="local-6989586621679541676"><span id="local-6989586621679541678"><span id="local-6989586621679541680"><span id="local-6989586621679541682"><span id="local-6989586621679541684"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679541654"><span class="annot"><span class="hs-identifier hs-type">NFData</span></span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Lift</span></span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621679541650"><span class="annot"><span class="annottext">lift :: TypeHash -&gt; Q Exp
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">lift</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Q Exp
+</span><a href="Data.Store.Internal.html#staticByteStringExp"><span class="hs-identifier hs-var">staticByteStringExp</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Q Exp)
+-&gt; (TypeHash -&gt; ByteString) -&gt; TypeHash -&gt; Q Exp
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">StaticSize 20 ByteString -&gt; ByteString
+forall (n :: Nat) a. StaticSize n a -&gt; a
+</span><a href="Data.Store.Internal.html#unStaticSize"><span class="hs-identifier hs-var hs-var">unStaticSize</span></a></span><span> </span><span class="annot"><span class="annottext">(StaticSize 20 ByteString -&gt; ByteString)
+-&gt; (TypeHash -&gt; StaticSize 20 ByteString) -&gt; TypeHash -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">TypeHash -&gt; StaticSize 20 ByteString
+</span><a href="Data.Store.TypeHash.Internal.html#unTypeHash"><span class="hs-identifier hs-var hs-var">unTypeHash</span></a></span><span class="hs-cpp">
+#if MIN_VERSION_template_haskell(2,17,0)
+</span><span>    </span><span class="hs-identifier">liftTyped</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">Code</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">unsafeTExpCoerce</span><span> </span><span class="hs-operator">.</span><span> </span><span class="hs-identifier">lift</span><span class="hs-cpp">
+#elif MIN_VERSION_template_haskell(2,16,0)
+</span><span>    </span><span id="local-6989586621679541646"><span class="annot"><span class="annottext">liftTyped :: TypeHash -&gt; Q (TExp TypeHash)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">liftTyped</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q (TExp TypeHash)
+forall a. Q Exp -&gt; Q (TExp a)
+</span><span class="hs-identifier hs-var">unsafeTExpCoerce</span></span><span> </span><span class="annot"><span class="annottext">(Q Exp -&gt; Q (TExp TypeHash))
+-&gt; (TypeHash -&gt; Q Exp) -&gt; TypeHash -&gt; Q (TExp TypeHash)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">TypeHash -&gt; Q Exp
+forall t. Lift t =&gt; t -&gt; Q Exp
+</span><span class="hs-identifier hs-var">lift</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-72"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#reifyManyTyDecls"><span class="hs-identifier hs-type">reifyManyTyDecls</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Info</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>                 </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span><span>
+</span><span id="line-74"></span><span>                 </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Info</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-75"></span><span id="reifyManyTyDecls"><span class="annot"><span class="annottext">reifyManyTyDecls :: ((Name, Info) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Data.Store.TypeHash.Internal.html#reifyManyTyDecls"><span class="hs-identifier hs-var hs-var">reifyManyTyDecls</span></a></span></span><span> </span><span id="local-6989586621679541644"><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541644"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((Name, Info) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><span class="hs-identifier hs-var">reifyMany</span></span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>    </span><span id="local-6989586621679541643"><span class="annot"><span class="annottext">go :: (Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541643"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679541642"><span class="annot"><span class="annottext">x :: (Name, Info)
+</span><a href="#local-6989586621679541642"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TyConI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541644"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info)
+</span><a href="#local-6989586621679541642"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-78"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span id="local-6989586621679541640"><span class="annot"><span class="annottext">x :: (Name, Info)
+</span><a href="#local-6989586621679541640"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FamilyI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541644"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info)
+</span><a href="#local-6989586621679541640"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-79"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span id="local-6989586621679541638"><span class="annot"><span class="annottext">x :: (Name, Info)
+</span><a href="#local-6989586621679541638"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">PrimTyConI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541644"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info)
+</span><a href="#local-6989586621679541638"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span id="local-6989586621679541636"><span class="annot"><span class="annottext">x :: (Name, Info)
+</span><a href="#local-6989586621679541636"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">DataConI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679541644"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info)
+</span><a href="#local-6989586621679541636"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ClassI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ClassOpI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VarI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TyVarI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-cpp">
+#if MIN_VERSION_template_haskell(2,12,0)
+</span><span>    </span><span class="annot"><a href="#local-6989586621679541643"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">PatSynI</span></span><span class="hs-special">{</span><span class="hs-special">}</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-89"></span><span class="hs-comment">-- | At compiletime, this yields a hash of the specified datatypes.</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- Not only does this cover the datatypes themselves, but also all</span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- transitive dependencies.</span><span>
+</span><span id="line-92"></span><span class="hs-comment">--</span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- The resulting expression is a literal of type 'TypeHash'.</span><span>
+</span><span id="line-94"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#typeHashForNames"><span class="hs-identifier hs-type">typeHashForNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Exp</span></span><span>
+</span><span id="line-95"></span><span id="typeHashForNames"><span class="annot"><span class="annottext">typeHashForNames :: [Name] -&gt; Q Exp
+</span><a href="Data.Store.TypeHash.Internal.html#typeHashForNames"><span class="hs-identifier hs-var hs-var">typeHashForNames</span></a></span></span><span> </span><span id="local-6989586621679541628"><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679541628"><span class="hs-identifier hs-var">ns</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-96"></span><span>    </span><span id="local-6989586621679541627"><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679541627"><span class="hs-identifier hs-var">infos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Name] -&gt; Q [(Name, Info)]
+</span><a href="Data.Store.TypeHash.Internal.html#getTypeInfosRecursively"><span class="hs-identifier hs-var">getTypeInfosRecursively</span></a></span><span> </span><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679541628"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-special">[|</span><span> </span><span class="hs-identifier">TypeHash</span><span> </span><span class="hs-special">$(</span><span class="hs-identifier">staticByteStringExp</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">SHA1.hash</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">encode</span><span> </span><span class="hs-identifier">infos</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">|]</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- | At compiletime, this yields a cryptographic hash of the specified 'Type',</span><span>
+</span><span id="line-100"></span><span class="hs-comment">-- including the definition of things it references (transitively).</span><span>
+</span><span id="line-101"></span><span class="hs-comment">--</span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- The resulting expression is a literal of type 'TypeHash'.</span><span>
+</span><span id="line-103"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#hashOfType"><span class="hs-identifier hs-type">hashOfType</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Type</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Exp</span></span><span>
+</span><span id="line-104"></span><span id="hashOfType"><span class="annot"><span class="annottext">hashOfType :: Type -&gt; Q Exp
+</span><a href="Data.Store.TypeHash.Internal.html#hashOfType"><span class="hs-identifier hs-var hs-var">hashOfType</span></a></span></span><span> </span><span id="local-6989586621679541624"><span class="annot"><span class="annottext">Type
+</span><a href="#local-6989586621679541624"><span class="hs-identifier hs-var">ty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-105"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; Q () -&gt; Q ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">unless</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Name] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">null</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Type -&gt; [Name]
+forall a. Data a =&gt; a -&gt; [Name]
+</span><a href="Data.Store.TypeHash.Internal.html#getVarNames"><span class="hs-identifier hs-var">getVarNames</span></a></span><span> </span><span class="annot"><span class="annottext">Type
+</span><a href="#local-6989586621679541624"><span class="hs-identifier hs-var">ty</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Q () -&gt; Q ()) -&gt; Q () -&gt; Q ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Q ()
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Q ()) -&gt; String -&gt; Q ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;hashOfType cannot handle polymorphic type &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Type -&gt; String
+forall a. Ppr a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">pprint</span></span><span> </span><span class="annot"><span class="annottext">Type
+</span><a href="#local-6989586621679541624"><span class="hs-identifier hs-var">ty</span></a></span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621679541620"><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679541620"><span class="hs-identifier hs-var">infos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Name] -&gt; Q [(Name, Info)]
+</span><a href="Data.Store.TypeHash.Internal.html#getTypeInfosRecursively"><span class="hs-identifier hs-var">getTypeInfosRecursively</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Type -&gt; [Name]
+forall a. Data a =&gt; a -&gt; [Name]
+</span><a href="Data.Store.TypeHash.Internal.html#getConNames"><span class="hs-identifier hs-var">getConNames</span></a></span><span> </span><span class="annot"><span class="annottext">Type
+</span><a href="#local-6989586621679541624"><span class="hs-identifier hs-var">ty</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">[|</span><span> </span><span class="hs-identifier">TypeHash</span><span> </span><span class="hs-special">$(</span><span class="hs-identifier">staticByteStringExp</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">SHA1.hash</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">encode</span><span> </span><span class="hs-identifier">infos</span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">|]</span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#getTypeInfosRecursively"><span class="hs-identifier hs-type">getTypeInfosRecursively</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Info</span></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-110"></span><span id="getTypeInfosRecursively"><span class="annot"><span class="annottext">getTypeInfosRecursively :: [Name] -&gt; Q [(Name, Info)]
+</span><a href="Data.Store.TypeHash.Internal.html#getTypeInfosRecursively"><span class="hs-identifier hs-var hs-var">getTypeInfosRecursively</span></a></span></span><span> </span><span id="local-6989586621679541618"><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679541618"><span class="hs-identifier hs-var">names</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-111"></span><span>    </span><span id="local-6989586621679541617"><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679541617"><span class="hs-identifier hs-var">allInfos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">((Name, Info) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Data.Store.TypeHash.Internal.html#reifyManyTyDecls"><span class="hs-identifier hs-var">reifyManyTyDecls</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679541616"><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679541616"><span class="hs-identifier hs-var">info</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Bool, [Name]) -&gt; Q (Bool, [Name])
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Info -&gt; [Name]
+forall a. Data a =&gt; a -&gt; [Name]
+</span><a href="Data.Store.TypeHash.Internal.html#getConNames"><span class="hs-identifier hs-var">getConNames</span></a></span><span> </span><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679541616"><span class="hs-identifier hs-var">info</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679541618"><span class="hs-identifier hs-var">names</span></a></span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-comment">-- Sorting step probably unnecessary because this should be</span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-comment">-- deterministic, but hey why not.</span><span>
+</span><span id="line-114"></span><span>    </span><span class="annot"><span class="annottext">[(Name, Info)] -&gt; Q [(Name, Info)]
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><span class="hs-identifier hs-var">return</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((Name, Info) -&gt; (Name, Info) -&gt; Ordering)
+-&gt; [(Name, Info)] -&gt; [(Name, Info)]
+forall a. (a -&gt; a -&gt; Ordering) -&gt; [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">sortBy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((Name, Info) -&gt; Name) -&gt; (Name, Info) -&gt; (Name, Info) -&gt; Ordering
+forall a b. Ord a =&gt; (b -&gt; a) -&gt; b -&gt; b -&gt; Ordering
+</span><span class="hs-identifier hs-var">comparing</span></span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Name
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679541617"><span class="hs-identifier hs-var">allInfos</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span id="local-6989586621679541615"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#getConNames"><span class="hs-identifier hs-type">getConNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679541615"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541615"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span></span><span>
+</span><span id="line-117"></span><span id="getConNames"><span class="annot"><span class="annottext">getConNames :: a -&gt; [Name]
+</span><a href="Data.Store.TypeHash.Internal.html#getConNames"><span class="hs-identifier hs-var hs-var">getConNames</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name -&gt; Bool) -&gt; forall a. Data a =&gt; a -&gt; [Name]
+forall r. Typeable r =&gt; (r -&gt; Bool) -&gt; GenericQ [r]
+</span><span class="hs-identifier hs-var">listify</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isUpper</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; (Name -&gt; Char) -&gt; Name -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Char
+forall a. [a] -&gt; a
+</span><span class="hs-identifier hs-var">head</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Char) -&gt; (Name -&gt; String) -&gt; Name -&gt; Char
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; String
+</span><span class="hs-identifier hs-var">nameBase</span></span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span id="local-6989586621679541850"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#getVarNames"><span class="hs-identifier hs-type">getVarNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Data</span></span><span> </span><span class="annot"><a href="#local-6989586621679541850"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679541850"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">]</span></span><span>
+</span><span id="line-120"></span><span id="getVarNames"><span class="annot"><span class="annottext">getVarNames :: a -&gt; [Name]
+</span><a href="Data.Store.TypeHash.Internal.html#getVarNames"><span class="hs-identifier hs-var hs-var">getVarNames</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Name -&gt; Bool) -&gt; forall a. Data a =&gt; a -&gt; [Name]
+forall r. Typeable r =&gt; (r -&gt; Bool) -&gt; GenericQ [r]
+</span><span class="hs-identifier hs-var">listify</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isLower</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; (Name -&gt; Char) -&gt; Name -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Char
+forall a. [a] -&gt; a
+</span><span class="hs-identifier hs-var">head</span></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Char) -&gt; (Name -&gt; String) -&gt; Name -&gt; Char
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Name -&gt; String
+</span><span class="hs-identifier hs-var">nameBase</span></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- TODO: Generic instance for polymorphic types, or have TH generate</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- polymorphic instances.</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-keyword">class</span><span> </span><span id="HasTypeHash"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#HasTypeHash"><span class="hs-identifier hs-var">HasTypeHash</span></a></span></span><span> </span><span id="local-6989586621679541896"><span class="annot"><a href="#local-6989586621679541896"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-126"></span><span>    </span><span id="typeHash"><span class="annot"><a href="Data.Store.TypeHash.Internal.html#typeHash"><span class="hs-identifier hs-type">typeHash</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Proxy</span></span><span> </span><span class="annot"><a href="#local-6989586621679541896"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#mkHasTypeHash"><span class="hs-identifier hs-type">mkHasTypeHash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Type</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Dec</span></span><span class="hs-special">]</span><span>
+</span><span id="line-129"></span><span id="mkHasTypeHash"><span class="annot"><span class="annottext">mkHasTypeHash :: Type -&gt; Q [Dec]
+</span><a href="Data.Store.TypeHash.Internal.html#mkHasTypeHash"><span class="hs-identifier hs-var hs-var">mkHasTypeHash</span></a></span></span><span> </span><span id="local-6989586621679541611"><span class="annot"><span class="annottext">Type
+</span><a href="#local-6989586621679541611"><span class="hs-identifier hs-var">ty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-special">[d|</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">HasTypeHash</span><span> </span><span class="hs-special">$(</span><span class="hs-identifier">return</span><span> </span><span class="hs-identifier">ty</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-131"></span><span>            </span><span class="hs-identifier">typeHash</span><span> </span><span class="hs-identifier">_</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">$(</span><span class="hs-identifier">hashOfType</span><span> </span><span class="hs-identifier">ty</span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>      </span><span class="hs-special">|]</span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#mkManyHasTypeHash"><span class="hs-identifier hs-type">mkManyHasTypeHash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Type</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Dec</span></span><span class="hs-special">]</span><span>
+</span><span id="line-135"></span><span id="mkManyHasTypeHash"><span class="annot"><span class="annottext">mkManyHasTypeHash :: [Q Type] -&gt; Q [Dec]
+</span><a href="Data.Store.TypeHash.Internal.html#mkManyHasTypeHash"><span class="hs-identifier hs-var hs-var">mkManyHasTypeHash</span></a></span></span><span> </span><span id="local-6989586621679541609"><span class="annot"><span class="annottext">[Q Type]
+</span><a href="#local-6989586621679541609"><span class="hs-identifier hs-var">qtys</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[[Dec]] -&gt; [Dec]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><span class="hs-identifier hs-var">concat</span></span><span> </span><span class="annot"><span class="annottext">([[Dec]] -&gt; [Dec]) -&gt; Q [[Dec]] -&gt; Q [Dec]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Q Type -&gt; Q [Dec]) -&gt; [Q Type] -&gt; Q [[Dec]]
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Traversable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m (t b)
+</span><span class="hs-identifier hs-var">mapM</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Type -&gt; Q [Dec]
+</span><a href="Data.Store.TypeHash.Internal.html#mkHasTypeHash"><span class="hs-identifier hs-var">mkHasTypeHash</span></a></span><span> </span><span class="annot"><span class="annottext">(Type -&gt; Q [Dec]) -&gt; Q Type -&gt; Q [Dec]
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><span class="hs-operator hs-var">=&lt;&lt;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Q Type]
+</span><a href="#local-6989586621679541609"><span class="hs-identifier hs-var">qtys</span></a></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#combineTypeHashes"><span class="hs-identifier hs-type">combineTypeHashes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-type">TypeHash</span></a></span><span>
+</span><span id="line-138"></span><span id="combineTypeHashes"><span class="annot"><span class="annottext">combineTypeHashes :: [TypeHash] -&gt; TypeHash
+</span><a href="Data.Store.TypeHash.Internal.html#combineTypeHashes"><span class="hs-identifier hs-var hs-var">combineTypeHashes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StaticSize 20 ByteString -&gt; TypeHash
+</span><a href="Data.Store.TypeHash.Internal.html#TypeHash"><span class="hs-identifier hs-var">TypeHash</span></a></span><span> </span><span class="annot"><span class="annottext">(StaticSize 20 ByteString -&gt; TypeHash)
+-&gt; ([TypeHash] -&gt; StaticSize 20 ByteString)
+-&gt; [TypeHash]
+-&gt; TypeHash
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; StaticSize 20 ByteString
+forall (n :: Nat) a. IsStaticSize n a =&gt; a -&gt; StaticSize n a
+</span><a href="Data.Store.Internal.html#toStaticSizeEx"><span class="hs-identifier hs-var">toStaticSizeEx</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; StaticSize 20 ByteString)
+-&gt; ([TypeHash] -&gt; ByteString)
+-&gt; [TypeHash]
+-&gt; StaticSize 20 ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">SHA1.hash</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString)
+-&gt; ([TypeHash] -&gt; ByteString) -&gt; [TypeHash] -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[ByteString] -&gt; ByteString
+</span><span class="hs-identifier hs-var">BS.concat</span></span><span> </span><span class="annot"><span class="annottext">([ByteString] -&gt; ByteString)
+-&gt; ([TypeHash] -&gt; [ByteString]) -&gt; [TypeHash] -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(TypeHash -&gt; ByteString) -&gt; [TypeHash] -&gt; [ByteString]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StaticSize 20 ByteString -&gt; ByteString
+forall (n :: Nat) a. StaticSize n a -&gt; a
+</span><a href="Data.Store.Internal.html#unStaticSize"><span class="hs-identifier hs-var hs-var">unStaticSize</span></a></span><span> </span><span class="annot"><span class="annottext">(StaticSize 20 ByteString -&gt; ByteString)
+-&gt; (TypeHash -&gt; StaticSize 20 ByteString) -&gt; TypeHash -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">TypeHash -&gt; StaticSize 20 ByteString
+</span><a href="Data.Store.TypeHash.Internal.html#unTypeHash"><span class="hs-identifier hs-var hs-var">unTypeHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span></pre></body></html>

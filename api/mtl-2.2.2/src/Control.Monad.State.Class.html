@@ -1,0 +1,506 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FunctionalDependencies #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Search for UndecidableInstances to see why this is needed</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Module      :  Control.Monad.State.Class</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- Copyright   :  (c) Andy Gill 2001,</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--                (c) Oregon Graduate Institute of Science and Technology, 2001</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- License     :  BSD-style (see the file LICENSE)</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Maintainer  :  libraries@haskell.org</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Stability   :  experimental</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- Portability :  non-portable (multi-param classes, functional dependencies)</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- MonadState class.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-comment">--      This module is inspired by the paper</span><span>
+</span><span id="line-22"></span><span class="hs-comment">--      /Functional Programming with Overloading and Higher-Order Polymorphism/,</span><span>
+</span><span id="line-23"></span><span class="hs-comment">--        Mark P Jones (&lt;http://web.cecs.pdx.edu/~mpj/&gt;)</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--          Advanced School of Functional Programming, 1995.</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Monad.State.Class</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier">MonadState</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>    </span><span class="annot"><a href="Control.Monad.State.Class.html#modify"><span class="hs-identifier">modify</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>    </span><span class="annot"><a href="Control.Monad.State.Class.html#modify%27"><span class="hs-identifier">modify'</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>    </span><span class="annot"><a href="Control.Monad.State.Class.html#gets"><span class="hs-identifier">gets</span></a></span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Cont.html#/Control.Monad.Trans.Cont.html"><span class="hs-identifier">Control.Monad.Trans.Cont</span></a></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Error.html#/Control.Monad.Trans.Error.html"><span class="hs-identifier">Control.Monad.Trans.Error</span></a></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Except.html#/Control.Monad.Trans.Except.html"><span class="hs-identifier">Control.Monad.Trans.Except</span></a></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Identity.html#/Control.Monad.Trans.Identity.html"><span class="hs-identifier">Control.Monad.Trans.Identity</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-List.html#/Control.Monad.Trans.List.html"><span class="hs-identifier">Control.Monad.Trans.List</span></a></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Maybe.html#/Control.Monad.Trans.Maybe.html"><span class="hs-identifier">Control.Monad.Trans.Maybe</span></a></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Reader.html#/Control.Monad.Trans.Reader.html"><span class="hs-identifier">Control.Monad.Trans.Reader</span></a></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#/Control.Monad.Trans.RWS.Lazy.html"><span class="hs-identifier">Control.Monad.Trans.RWS.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LazyRWS</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#RWST/Control.Monad.Trans.RWS.Lazy.html#RWST"><span class="hs-identifier">RWST</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#get/Control.Monad.Trans.RWS.Lazy.html#get"><span class="hs-identifier">get</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#put/Control.Monad.Trans.RWS.Lazy.html#put"><span class="hs-identifier">put</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#state/Control.Monad.Trans.RWS.Lazy.html#state"><span class="hs-identifier">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#/Control.Monad.Trans.RWS.Strict.html"><span class="hs-identifier">Control.Monad.Trans.RWS.Strict</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">StrictRWS</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#RWST/Control.Monad.Trans.RWS.Strict.html#RWST"><span class="hs-identifier">RWST</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#get/Control.Monad.Trans.RWS.Strict.html#get"><span class="hs-identifier">get</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#put/Control.Monad.Trans.RWS.Strict.html#put"><span class="hs-identifier">put</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#state/Control.Monad.Trans.RWS.Strict.html#state"><span class="hs-identifier">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#/Control.Monad.Trans.State.Lazy.html"><span class="hs-identifier">Control.Monad.Trans.State.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Lazy</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#StateT/Control.Monad.Trans.State.Lazy.html#StateT"><span class="hs-identifier">StateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#get/Control.Monad.Trans.State.Lazy.html#get"><span class="hs-identifier">get</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#put/Control.Monad.Trans.State.Lazy.html#put"><span class="hs-identifier">put</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#state/Control.Monad.Trans.State.Lazy.html#state"><span class="hs-identifier">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#/Control.Monad.Trans.State.Strict.html"><span class="hs-identifier">Control.Monad.Trans.State.Strict</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Strict</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#StateT/Control.Monad.Trans.State.Strict.html#StateT"><span class="hs-identifier">StateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#get/Control.Monad.Trans.State.Strict.html#get"><span class="hs-identifier">get</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#put/Control.Monad.Trans.State.Strict.html#put"><span class="hs-identifier">put</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#state/Control.Monad.Trans.State.Strict.html#state"><span class="hs-identifier">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Writer-Lazy.html#/Control.Monad.Trans.Writer.Lazy.html"><span class="hs-identifier">Control.Monad.Trans.Writer.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Lazy</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Writer-Strict.html#/Control.Monad.Trans.Writer.Strict.html"><span class="hs-identifier">Control.Monad.Trans.Writer.Strict</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Strict</span></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#/Control.Monad.Trans.Class.html"><span class="hs-identifier">Control.Monad.Trans.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier">lift</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Control-Monad.html#/Control.Monad.html"><span class="hs-identifier">Control.Monad</span></a></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/Data-Monoid.html#/Data.Monoid.html"><span class="hs-identifier">Data.Monoid</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- ---------------------------------------------------------------------------</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | Minimal definition is either both of @get@ and @put@ or just @state@</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">class</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monad/GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="MonadState"><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-var">MonadState</span></a></span></span><span> </span><span id="local-6989586621679039044"><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621679039045"><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-comment">-- | Return the state from the internals of the monad.</span><span>
+</span><span id="line-58"></span><span>    </span><span id="get"><span class="annot"><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-type">get</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679038909"><span class="annot"><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var hs-var">get</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; (s, s)) -&gt; m s
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679038907"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038907"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038907"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038907"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- | Replace the state inside the monad.</span><span>
+</span><span id="line-62"></span><span>    </span><span id="put"><span class="annot"><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-type">put</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621679038905"><span class="annot"><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var hs-var">put</span></a></span><span> </span><span id="local-6989586621679038904"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038904"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; ((), s)) -&gt; m ()
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">s
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038904"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-comment">-- | Embed a simple state action into the monad.</span></span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621679039042"><span id="state"><span class="annot"><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-type">state</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679039042"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679039044"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679039045"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679039042"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679038903"><span class="annot"><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var hs-var">state</span></a></span><span> </span><span id="local-6989586621679038902"><span class="annot"><span class="annottext">s -&gt; (a, s)
+</span><a href="#local-6989586621679038902"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-68"></span><span>      </span><span id="local-6989586621679038901"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038901"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-69"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">~</span><span class="hs-special">(</span><span id="local-6989586621679038900"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679038900"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679038899"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038899"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; (a, s)
+</span><a href="#local-6989586621679038902"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038901"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-70"></span><span>      </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038899"><span class="hs-identifier hs-var">s'</span></a></span><span>
+</span><span id="line-71"></span><span>      </span><span class="annot"><span class="annottext">a -&gt; m a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#return/GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679038900"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-cpp">
+#if __GLASGOW_HASKELL__ &gt;= 707
+</span><span>    </span><span class="hs-pragma">{-# MINIMAL</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#state"><span class="hs-pragma hs-type">state</span></a></span><span> </span><span class="hs-pragma">|</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#get"><span class="hs-pragma hs-type">get</span></a></span><span class="hs-pragma">,</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#put"><span class="hs-pragma hs-type">put</span></a></span><span> </span><span class="hs-pragma">#-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- | Monadic state transformer.</span><span>
+</span><span id="line-77"></span><span class="hs-comment">--</span><span>
+</span><span id="line-78"></span><span class="hs-comment">--      Maps an old state to a new state inside a state monad.</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--      The old state is thrown away.</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- &gt;      Main&gt; :t modify ((+1) :: Int -&gt; Int)</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- &gt;      modify (...) :: (MonadState Int a) =&gt; a ()</span><span>
+</span><span id="line-83"></span><span class="hs-comment">--</span><span>
+</span><span id="line-84"></span><span class="hs-comment">--    This says that @modify (+1)@ acts over any</span><span>
+</span><span id="line-85"></span><span class="hs-comment">--    Monad that is a member of the @MonadState@ class,</span><span>
+</span><span id="line-86"></span><span class="hs-comment">--    with an @Int@ state.</span><span>
+</span><span id="line-87"></span><span id="local-6989586621679038897"><span id="local-6989586621679038898"><span class="annot"><a href="Control.Monad.State.Class.html#modify"><span class="hs-identifier hs-type">modify</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038898"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038897"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679038898"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038898"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038897"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-88"></span><span id="modify"><span class="annot"><span class="annottext">modify :: (s -&gt; s) -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#modify"><span class="hs-identifier hs-var hs-var">modify</span></a></span></span><span> </span><span id="local-6989586621679038896"><span class="annot"><span class="annottext">s -&gt; s
+</span><a href="#local-6989586621679038896"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; ((), s)) -&gt; m ()
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679038895"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038895"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s -&gt; s
+</span><a href="#local-6989586621679038896"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038895"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- | A variant of 'modify' in which the computation is strict in the</span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- new state.</span><span>
+</span><span id="line-92"></span><span class="hs-comment">--</span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- @since 2.2</span><span>
+</span><span id="line-94"></span><span id="local-6989586621679038893"><span id="local-6989586621679038894"><span class="annot"><a href="Control.Monad.State.Class.html#modify%27"><span class="hs-identifier hs-type">modify'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038894"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038893"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679038894"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038894"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038893"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-95"></span><span id="modify%27"><span class="annot"><span class="annottext">modify' :: (s -&gt; s) -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#modify%27"><span class="hs-identifier hs-var hs-var">modify'</span></a></span></span><span> </span><span id="local-6989586621679038892"><span class="annot"><span class="annottext">s -&gt; s
+</span><a href="#local-6989586621679038892"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621679038891"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038891"><span class="hs-identifier hs-var">s'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; m ()) -&gt; s -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#%24%21/GHC.Base.html#%24%21"><span class="hs-operator hs-var">$!</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; s
+</span><a href="#local-6989586621679038892"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038891"><span class="hs-identifier hs-var">s'</span></a></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="hs-comment">-- | Gets specific component of the state, using a projection function</span><span>
+</span><span id="line-100"></span><span class="hs-comment">-- supplied.</span><span>
+</span><span id="line-101"></span><span id="local-6989586621679038887"><span id="local-6989586621679038888"><span id="local-6989586621679038889"><span class="annot"><a href="Control.Monad.State.Class.html#gets"><span class="hs-identifier hs-type">gets</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038889"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038888"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679038889"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038887"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679038888"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038887"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-102"></span><span id="gets"><span class="annot"><span class="annottext">gets :: (s -&gt; a) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#gets"><span class="hs-identifier hs-var hs-var">gets</span></a></span></span><span> </span><span id="local-6989586621679038886"><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679038886"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-103"></span><span>    </span><span id="local-6989586621679038885"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038885"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-104"></span><span>    </span><span class="annot"><span class="annottext">a -&gt; m a
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#return/GHC.Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">s -&gt; a
+</span><a href="#local-6989586621679038886"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679038885"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span id="local-6989586621679038883"><span id="local-6989586621679038884"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monad/GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038884"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038883"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#StateT/Control.Monad.Trans.State.Lazy.html#StateT"><span class="hs-identifier hs-type">Lazy.StateT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038883"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038884"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-107"></span><span>    </span><span id="local-6989586621679038877"><span class="annot"><span class="annottext">get :: StateT s m s
+</span><a href="#local-6989586621679038877"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateT s m s
+forall (m :: * -&gt; *) s. Monad m =&gt; StateT s m s
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#get/Control.Monad.Trans.State.Lazy.html#get"><span class="hs-identifier hs-var">Lazy.get</span></a></span><span>
+</span><span id="line-108"></span><span>    </span><span id="local-6989586621679038876"><span class="annot"><span class="annottext">put :: s -&gt; StateT s m ()
+</span><a href="#local-6989586621679038876"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; StateT s m ()
+forall (m :: * -&gt; *) s. Monad m =&gt; s -&gt; StateT s m ()
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#put/Control.Monad.Trans.State.Lazy.html#put"><span class="hs-identifier hs-var">Lazy.put</span></a></span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679038875"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; StateT s m a
+</span><a href="#local-6989586621679038875"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; StateT s m a
+forall (m :: * -&gt; *) s a. Monad m =&gt; (s -&gt; (a, s)) -&gt; StateT s m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Lazy.html#state/Control.Monad.Trans.State.Lazy.html#state"><span class="hs-identifier hs-var">Lazy.state</span></a></span></span></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span id="local-6989586621679038873"><span id="local-6989586621679038874"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monad/GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038874"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038873"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#StateT/Control.Monad.Trans.State.Strict.html#StateT"><span class="hs-identifier hs-type">Strict.StateT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038873"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038874"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679038868"><span class="annot"><span class="annottext">get :: StateT s m s
+</span><a href="#local-6989586621679038868"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateT s m s
+forall (m :: * -&gt; *) s. Monad m =&gt; StateT s m s
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#get/Control.Monad.Trans.State.Strict.html#get"><span class="hs-identifier hs-var">Strict.get</span></a></span><span>
+</span><span id="line-113"></span><span>    </span><span id="local-6989586621679038867"><span class="annot"><span class="annottext">put :: s -&gt; StateT s m ()
+</span><a href="#local-6989586621679038867"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; StateT s m ()
+forall (m :: * -&gt; *) s. Monad m =&gt; s -&gt; StateT s m ()
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#put/Control.Monad.Trans.State.Strict.html#put"><span class="hs-identifier hs-var">Strict.put</span></a></span><span>
+</span><span id="line-114"></span><span>    </span><span id="local-6989586621679038866"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; StateT s m a
+</span><a href="#local-6989586621679038866"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; StateT s m a
+forall (m :: * -&gt; *) s a. Monad m =&gt; (s -&gt; (a, s)) -&gt; StateT s m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-State-Strict.html#state/Control.Monad.Trans.State.Strict.html#state"><span class="hs-identifier hs-var">Strict.state</span></a></span></span></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span id="local-6989586621679038862"><span id="local-6989586621679038863"><span id="local-6989586621679038864"><span id="local-6989586621679038865"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monad/GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038865"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monoid/GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038864"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038863"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#RWST/Control.Monad.Trans.RWS.Lazy.html#RWST"><span class="hs-identifier hs-type">LazyRWS.RWST</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038862"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038864"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038863"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038865"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-117"></span><span>    </span><span id="local-6989586621679038857"><span class="annot"><span class="annottext">get :: RWST r w s m s
+</span><a href="#local-6989586621679038857"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RWST r w s m s
+forall w (m :: * -&gt; *) r s. (Monoid w, Monad m) =&gt; RWST r w s m s
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#get/Control.Monad.Trans.RWS.Lazy.html#get"><span class="hs-identifier hs-var">LazyRWS.get</span></a></span><span>
+</span><span id="line-118"></span><span>    </span><span id="local-6989586621679038856"><span class="annot"><span class="annottext">put :: s -&gt; RWST r w s m ()
+</span><a href="#local-6989586621679038856"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; RWST r w s m ()
+forall w (m :: * -&gt; *) s r.
+(Monoid w, Monad m) =&gt;
+s -&gt; RWST r w s m ()
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#put/Control.Monad.Trans.RWS.Lazy.html#put"><span class="hs-identifier hs-var">LazyRWS.put</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span id="local-6989586621679038855"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; RWST r w s m a
+</span><a href="#local-6989586621679038855"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; RWST r w s m a
+forall w (m :: * -&gt; *) s a r.
+(Monoid w, Monad m) =&gt;
+(s -&gt; (a, s)) -&gt; RWST r w s m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Lazy.html#state/Control.Monad.Trans.RWS.Lazy.html#state"><span class="hs-identifier hs-var">LazyRWS.state</span></a></span></span></span></span></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span id="local-6989586621679038851"><span id="local-6989586621679038852"><span id="local-6989586621679038853"><span id="local-6989586621679038854"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monad/GHC.Base.html#Monad"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038854"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monoid/GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038853"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038852"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#RWST/Control.Monad.Trans.RWS.Strict.html#RWST"><span class="hs-identifier hs-type">StrictRWS.RWST</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038851"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038853"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038852"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038854"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679038846"><span class="annot"><span class="annottext">get :: RWST r w s m s
+</span><a href="#local-6989586621679038846"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RWST r w s m s
+forall w (m :: * -&gt; *) r s. (Monoid w, Monad m) =&gt; RWST r w s m s
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#get/Control.Monad.Trans.RWS.Strict.html#get"><span class="hs-identifier hs-var">StrictRWS.get</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span id="local-6989586621679038845"><span class="annot"><span class="annottext">put :: s -&gt; RWST r w s m ()
+</span><a href="#local-6989586621679038845"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">s -&gt; RWST r w s m ()
+forall w (m :: * -&gt; *) s r.
+(Monoid w, Monad m) =&gt;
+s -&gt; RWST r w s m ()
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#put/Control.Monad.Trans.RWS.Strict.html#put"><span class="hs-identifier hs-var">StrictRWS.put</span></a></span><span>
+</span><span id="line-124"></span><span>    </span><span id="local-6989586621679038844"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; RWST r w s m a
+</span><a href="#local-6989586621679038844"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; RWST r w s m a
+forall w (m :: * -&gt; *) s a r.
+(Monoid w, Monad m) =&gt;
+(s -&gt; (a, s)) -&gt; RWST r w s m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-RWS-Strict.html#state/Control.Monad.Trans.RWS.Strict.html#state"><span class="hs-identifier hs-var">StrictRWS.state</span></a></span></span></span></span></span><span>
+</span><span id="line-125"></span><span>
+</span><span id="line-126"></span><span class="hs-comment">-- ---------------------------------------------------------------------------</span><span>
+</span><span id="line-127"></span><span class="hs-comment">-- Instances for other mtl transformers</span><span>
+</span><span id="line-128"></span><span class="hs-comment">--</span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- All of these instances need UndecidableInstances,</span><span>
+</span><span id="line-130"></span><span class="hs-comment">-- because they do not satisfy the coverage condition.</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span id="local-6989586621679038841"><span id="local-6989586621679038842"><span id="local-6989586621679038843"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038843"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038842"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038843"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Cont.html#ContT/Control.Monad.Trans.Cont.html#ContT"><span class="hs-identifier hs-type">ContT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038841"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038842"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-133"></span><span>    </span><span id="local-6989586621679038836"><span class="annot"><span class="annottext">get :: ContT r m s
+</span><a href="#local-6989586621679038836"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; ContT r m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-134"></span><span>    </span><span id="local-6989586621679038835"><span class="annot"><span class="annottext">put :: s -&gt; ContT r m ()
+</span><a href="#local-6989586621679038835"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; ContT r m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; ContT r m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; ContT r m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-135"></span><span>    </span><span id="local-6989586621679038833"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; ContT r m a
+</span><a href="#local-6989586621679038833"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; ContT r m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ContT r m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; ContT r m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span id="local-6989586621679038830"><span id="local-6989586621679038831"><span id="local-6989586621679038832"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Error.html#Error/Control.Monad.Trans.Error.html#Error"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038832"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038831"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038830"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038831"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Error.html#ErrorT/Control.Monad.Trans.Error.html#ErrorT"><span class="hs-identifier hs-type">ErrorT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038832"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038830"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-138"></span><span>    </span><span id="local-6989586621679038825"><span class="annot"><span class="annottext">get :: ErrorT e m s
+</span><a href="#local-6989586621679038825"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; ErrorT e m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-139"></span><span>    </span><span id="local-6989586621679038824"><span class="annot"><span class="annottext">put :: s -&gt; ErrorT e m ()
+</span><a href="#local-6989586621679038824"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; ErrorT e m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; ErrorT e m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; ErrorT e m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621679038823"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; ErrorT e m a
+</span><a href="#local-6989586621679038823"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; ErrorT e m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ErrorT e m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; ErrorT e m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span class="hs-comment">-- | @since 2.2</span><span>
+</span><span id="line-143"></span><span id="local-6989586621679038820"><span id="local-6989586621679038821"><span id="local-6989586621679038822"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038822"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038821"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038822"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Except.html#ExceptT/Control.Monad.Trans.Except.html#ExceptT"><span class="hs-identifier hs-type">ExceptT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038820"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038821"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-144"></span><span>    </span><span id="local-6989586621679038815"><span class="annot"><span class="annottext">get :: ExceptT e m s
+</span><a href="#local-6989586621679038815"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; ExceptT e m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-145"></span><span>    </span><span id="local-6989586621679038814"><span class="annot"><span class="annottext">put :: s -&gt; ExceptT e m ()
+</span><a href="#local-6989586621679038814"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; ExceptT e m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; ExceptT e m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; ExceptT e m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-146"></span><span>    </span><span id="local-6989586621679038813"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; ExceptT e m a
+</span><a href="#local-6989586621679038813"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; ExceptT e m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ExceptT e m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; ExceptT e m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span id="local-6989586621679038811"><span id="local-6989586621679038812"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038812"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038811"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038812"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Identity.html#IdentityT/Control.Monad.Trans.Identity.html#IdentityT"><span class="hs-identifier hs-type">IdentityT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038811"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621679038806"><span class="annot"><span class="annottext">get :: IdentityT m s
+</span><a href="#local-6989586621679038806"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; IdentityT m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-150"></span><span>    </span><span id="local-6989586621679038805"><span class="annot"><span class="annottext">put :: s -&gt; IdentityT m ()
+</span><a href="#local-6989586621679038805"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; IdentityT m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; IdentityT m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; IdentityT m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-151"></span><span>    </span><span id="local-6989586621679038804"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; IdentityT m a
+</span><a href="#local-6989586621679038804"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; IdentityT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; IdentityT m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; IdentityT m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span id="local-6989586621679038802"><span id="local-6989586621679038803"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038803"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038802"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038803"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-List.html#ListT/Control.Monad.Trans.List.html#ListT"><span class="hs-identifier hs-type">ListT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038802"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-154"></span><span>    </span><span id="local-6989586621679038797"><span class="annot"><span class="annottext">get :: ListT m s
+</span><a href="#local-6989586621679038797"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; ListT m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-155"></span><span>    </span><span id="local-6989586621679038796"><span class="annot"><span class="annottext">put :: s -&gt; ListT m ()
+</span><a href="#local-6989586621679038796"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; ListT m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; ListT m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; ListT m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-156"></span><span>    </span><span id="local-6989586621679038795"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; ListT m a
+</span><a href="#local-6989586621679038795"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; ListT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ListT m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; ListT m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span><span>
+</span><span id="line-157"></span><span>
+</span><span id="line-158"></span><span id="local-6989586621679038793"><span id="local-6989586621679038794"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038794"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038793"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038794"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Maybe.html#MaybeT/Control.Monad.Trans.Maybe.html#MaybeT"><span class="hs-identifier hs-type">MaybeT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038793"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-159"></span><span>    </span><span id="local-6989586621679038788"><span class="annot"><span class="annottext">get :: MaybeT m s
+</span><a href="#local-6989586621679038788"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; MaybeT m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-160"></span><span>    </span><span id="local-6989586621679038787"><span class="annot"><span class="annottext">put :: s -&gt; MaybeT m ()
+</span><a href="#local-6989586621679038787"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; MaybeT m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; MaybeT m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; MaybeT m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-161"></span><span>    </span><span id="local-6989586621679038786"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; MaybeT m a
+</span><a href="#local-6989586621679038786"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; MaybeT m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; MaybeT m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; MaybeT m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span id="local-6989586621679038783"><span id="local-6989586621679038784"><span id="local-6989586621679038785"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038785"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038784"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038785"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Reader.html#ReaderT/Control.Monad.Trans.Reader.html#ReaderT"><span class="hs-identifier hs-type">ReaderT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038783"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038784"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-164"></span><span>    </span><span id="local-6989586621679038778"><span class="annot"><span class="annottext">get :: ReaderT r m s
+</span><a href="#local-6989586621679038778"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; ReaderT r m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-165"></span><span>    </span><span id="local-6989586621679038777"><span class="annot"><span class="annottext">put :: s -&gt; ReaderT r m ()
+</span><a href="#local-6989586621679038777"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; ReaderT r m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; ReaderT r m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; ReaderT r m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-166"></span><span>    </span><span id="local-6989586621679038776"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; ReaderT r m a
+</span><a href="#local-6989586621679038776"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; ReaderT r m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; ReaderT r m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; ReaderT r m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span id="local-6989586621679038773"><span id="local-6989586621679038774"><span id="local-6989586621679038775"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monoid/GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038775"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038774"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038773"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038774"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Writer-Lazy.html#WriterT/Control.Monad.Trans.Writer.Lazy.html#WriterT"><span class="hs-identifier hs-type">Lazy.WriterT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038775"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038773"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-169"></span><span>    </span><span id="local-6989586621679038768"><span class="annot"><span class="annottext">get :: WriterT w m s
+</span><a href="#local-6989586621679038768"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; WriterT w m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-170"></span><span>    </span><span id="local-6989586621679038767"><span class="annot"><span class="annottext">put :: s -&gt; WriterT w m ()
+</span><a href="#local-6989586621679038767"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; WriterT w m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; WriterT w m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; WriterT w m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-171"></span><span>    </span><span id="local-6989586621679038766"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; WriterT w m a
+</span><a href="#local-6989586621679038766"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; WriterT w m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; WriterT w m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; WriterT w m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span id="local-6989586621679038763"><span id="local-6989586621679038764"><span id="local-6989586621679038765"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.14.3.0/src/GHC-Base.html#Monoid/GHC.Base.html#Monoid"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038765"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038764"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038763"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.State.Class.html#MonadState"><span class="hs-identifier hs-type">MonadState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038764"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Writer-Strict.html#WriterT/Control.Monad.Trans.Writer.Strict.html#WriterT"><span class="hs-identifier hs-type">Strict.WriterT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038765"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679038763"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-174"></span><span>    </span><span id="local-6989586621679038758"><span class="annot"><span class="annottext">get :: WriterT w m s
+</span><a href="#local-6989586621679038758"><span class="hs-identifier hs-var hs-var hs-var hs-var">get</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m s -&gt; WriterT w m s
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m s
+forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="Control.Monad.State.Class.html#get"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-175"></span><span>    </span><span id="local-6989586621679038757"><span class="annot"><span class="annottext">put :: s -&gt; WriterT w m ()
+</span><a href="#local-6989586621679038757"><span class="hs-identifier hs-var hs-var hs-var hs-var">put</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m () -&gt; WriterT w m ()
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; WriterT w m ()) -&gt; (s -&gt; m ()) -&gt; s -&gt; WriterT w m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; m ()
+forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="Control.Monad.State.Class.html#put"><span class="hs-identifier hs-var">put</span></a></span><span>
+</span><span id="line-176"></span><span>    </span><span id="local-6989586621679038756"><span class="annot"><span class="annottext">state :: (s -&gt; (a, s)) -&gt; WriterT w m a
+</span><a href="#local-6989586621679038756"><span class="hs-identifier hs-var hs-var hs-var hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">m a -&gt; WriterT w m a
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../transformers-0.5.6.2/src/Control-Monad-Trans-Class.html#lift/Control.Monad.Trans.Class.html#lift"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(m a -&gt; WriterT w m a)
+-&gt; ((s -&gt; (a, s)) -&gt; m a) -&gt; (s -&gt; (a, s)) -&gt; WriterT w m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.14.3.0/src/GHC-Base.html#./GHC.Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(s -&gt; (a, s)) -&gt; m a
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; (s -&gt; (a, s)) -&gt; m a
+</span><a href="Control.Monad.State.Class.html#state"><span class="hs-identifier hs-var">state</span></a></span></span></span></span><span>
+</span><span id="line-177"></span></pre></body></html>
