@@ -13,7 +13,7 @@ import Network.HTTP.Client (Manager)
 import System.Directory (doesDirectoryExist, doesFileExist, getCurrentDirectory, listDirectory)
 import System.IO.Temp (withSystemTempDirectory, withSystemTempFile)
 import System.Info (os)
-import System.PosixCompat.User (getEffectiveGroupID, getEffectiveUserID)
+import System.Posix.User (getEffectiveGroupID, getEffectiveUserID)
 import Test.Tasty
 import Test.Tasty.HUnit
 
