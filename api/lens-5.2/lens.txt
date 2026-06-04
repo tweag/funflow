@@ -11059,6 +11059,13 @@ class Foldable f => FoldableWithIndex i (f :: Type -> Type) | f -> i
 ifoldMap :: (FoldableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
 
 -- | A variant of <a>ifoldMap</a> that is strict in the accumulator.
+--   
+--   When you don't need access to the index then <a>foldMap'</a> is more
+--   flexible in what it accepts.
+--   
+--   <pre>
+--   <a>foldMap'</a> ≡ <a>ifoldMap'</a> <a>.</a> <tt>const</tt>
+--   </pre>
 ifoldMap' :: (FoldableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
 
 -- | Right-associative fold of an indexed container with access to the
@@ -11101,7 +11108,7 @@ ifoldr' :: FoldableWithIndex i f => (i -> a -> b -> b) -> b -> f a -> b
 --   flexible in what it accepts.
 --   
 --   <pre>
---   <a>foldlOf'</a> l ≡ <tt>ifoldlOf'</tt> l <a>.</a> <tt>const</tt>
+--   <a>foldl'</a> l ≡ <a>ifoldl'</a> l <a>.</a> <tt>const</tt>
 --   </pre>
 ifoldl' :: FoldableWithIndex i f => (i -> b -> a -> b) -> b -> f a -> b
 
@@ -11203,11 +11210,11 @@ imapM_ :: (FoldableWithIndex i t, Monad m) => (i -> a -> m b) -> t a -> m ()
 --   <a>iforM_</a> ≡ <a>flip</a> <a>imapM_</a>
 --   </pre>
 --   
---   When you don't need access to the index then <a>forMOf_</a> is more
+--   When you don't need access to the index then <a>forM_</a> is more
 --   flexible in what it accepts.
 --   
 --   <pre>
---   <a>forMOf_</a> l a ≡ <tt>iforMOf</tt> l a <a>.</a> <tt>const</tt>
+--   <a>forM_</a> a ≡ <tt>iforM</tt> a <a>.</a> <tt>const</tt>
 --   </pre>
 iforM_ :: (FoldableWithIndex i t, Monad m) => t a -> (i -> a -> m b) -> m ()
 
@@ -11366,7 +11373,7 @@ iforM :: (TraversableWithIndex i t, Monad m) => t a -> (i -> a -> m b) -> m (t b
 
 -- | Generalizes <a>mapAccumR</a> to add access to the index.
 --   
---   <tt>imapAccumROf</tt> accumulates state from right to left.
+--   <a>imapAccumR</a> accumulates state from right to left.
 --   
 --   <pre>
 --   <a>mapAccumR</a> ≡ <a>imapAccumR</a> <tt>.</tt> <tt>const</tt>
@@ -11375,10 +11382,10 @@ imapAccumR :: TraversableWithIndex i t => (i -> s -> a -> (s, b)) -> s -> t a ->
 
 -- | Generalizes <a>mapAccumL</a> to add access to the index.
 --   
---   <tt>imapAccumLOf</tt> accumulates state from left to right.
+--   <a>imapAccumL</a> accumulates state from left to right.
 --   
 --   <pre>
---   <a>mapAccumLOf</a> ≡ <a>imapAccumL</a> <tt>.</tt> <tt>const</tt>
+--   <a>mapAccumL</a> ≡ <a>imapAccumL</a> <tt>.</tt> <tt>const</tt>
 --   </pre>
 imapAccumL :: TraversableWithIndex i t => (i -> s -> a -> (s, b)) -> s -> t a -> (s, t b)
 ifoldMapBy :: FoldableWithIndex i t => (r -> r -> r) -> r -> (i -> a -> r) -> t a -> r
@@ -20169,11 +20176,11 @@ iconcatMap :: FoldableWithIndex i f => (i -> a -> [b]) -> f a -> [b]
 --   <a>iforM_</a> ≡ <a>flip</a> <a>imapM_</a>
 --   </pre>
 --   
---   When you don't need access to the index then <a>forMOf_</a> is more
+--   When you don't need access to the index then <a>forM_</a> is more
 --   flexible in what it accepts.
 --   
 --   <pre>
---   <a>forMOf_</a> l a ≡ <tt>iforMOf</tt> l a <a>.</a> <tt>const</tt>
+--   <a>forM_</a> a ≡ <tt>iforM</tt> a <a>.</a> <tt>const</tt>
 --   </pre>
 iforM_ :: (FoldableWithIndex i t, Monad m) => t a -> (i -> a -> m b) -> m ()
 
@@ -20258,16 +20265,16 @@ iany :: FoldableWithIndex i f => (i -> a -> Bool) -> f a -> Bool
 
 -- | Generalizes <a>mapAccumL</a> to add access to the index.
 --   
---   <tt>imapAccumLOf</tt> accumulates state from left to right.
+--   <a>imapAccumL</a> accumulates state from left to right.
 --   
 --   <pre>
---   <a>mapAccumLOf</a> ≡ <a>imapAccumL</a> <tt>.</tt> <tt>const</tt>
+--   <a>mapAccumL</a> ≡ <a>imapAccumL</a> <tt>.</tt> <tt>const</tt>
 --   </pre>
 imapAccumL :: TraversableWithIndex i t => (i -> s -> a -> (s, b)) -> s -> t a -> (s, t b)
 
 -- | Generalizes <a>mapAccumR</a> to add access to the index.
 --   
---   <tt>imapAccumROf</tt> accumulates state from right to left.
+--   <a>imapAccumR</a> accumulates state from right to left.
 --   
 --   <pre>
 --   <a>mapAccumR</a> ≡ <a>imapAccumR</a> <tt>.</tt> <tt>const</tt>
@@ -20332,6 +20339,13 @@ class Foldable f => FoldableWithIndex i (f :: Type -> Type) | f -> i
 ifoldMap :: (FoldableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
 
 -- | A variant of <a>ifoldMap</a> that is strict in the accumulator.
+--   
+--   When you don't need access to the index then <a>foldMap'</a> is more
+--   flexible in what it accepts.
+--   
+--   <pre>
+--   <a>foldMap'</a> ≡ <a>ifoldMap'</a> <a>.</a> <tt>const</tt>
+--   </pre>
 ifoldMap' :: (FoldableWithIndex i f, Monoid m) => (i -> a -> m) -> f a -> m
 
 -- | Right-associative fold of an indexed container with access to the
@@ -20374,7 +20388,7 @@ ifoldr' :: FoldableWithIndex i f => (i -> a -> b -> b) -> b -> f a -> b
 --   flexible in what it accepts.
 --   
 --   <pre>
---   <a>foldlOf'</a> l ≡ <tt>ifoldlOf'</tt> l <a>.</a> <tt>const</tt>
+--   <a>foldl'</a> l ≡ <a>ifoldl'</a> l <a>.</a> <tt>const</tt>
 --   </pre>
 ifoldl' :: FoldableWithIndex i f => (i -> b -> a -> b) -> b -> f a -> b
 
