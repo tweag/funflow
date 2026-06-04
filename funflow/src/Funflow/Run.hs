@@ -84,7 +84,7 @@ import System.Directory (removeDirectory)
 import System.Directory.Funflow (moveDirectoryContent)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Info (os)
-import System.PosixCompat.User (getEffectiveGroupID, getEffectiveUserID)
+import System.Posix.User (getEffectiveGroupID, getEffectiveUserID)
 
 -- * Flow execution
 
